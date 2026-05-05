@@ -1,6 +1,7 @@
 (function () {
   const config = window.SHARSH_CONFIG;
   const runtime = window.SHARSH_RUNTIME_CONFIG || {};
+  const runtimeMeta = window.SHARSH_RUNTIME_CONFIG_META || {};
 
   function deepCopy(value) {
     return config.deepCopy(value);
@@ -252,6 +253,10 @@
     return "Локальный режим";
   }
 
+  function getShareQuery() {
+    return typeof runtimeMeta.shareQuery === "string" ? runtimeMeta.shareQuery : "";
+  }
+
   window.SHARSH_SYNC = {
     runtime,
     hasRemoteSync,
@@ -260,6 +265,7 @@
     saveReportDate,
     loadLocalSnapshot,
     writeLocalSnapshot,
-    getSourceLabel
+    getSourceLabel,
+    getShareQuery
   };
 })();

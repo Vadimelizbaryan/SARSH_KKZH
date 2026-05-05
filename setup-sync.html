@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sync Setup | SARSH_KKZH</title>
+  <link rel="stylesheet" href="assets/sharsh.css">
+  <script defer src="assets/sharsh-runtime-config.js"></script>
+  <script defer src="assets/sharsh-config.js"></script>
+  <script defer src="assets/sharsh-setup.js"></script>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <div>
+        <h1>Sync setup</h1>
+        <p>Enable shared internet sync for all department pages and generate browser links that work on other computers.</p>
+      </div>
+      <div class="toolbar-actions">
+        <span class="pill local" id="setupSourceLabel">Local only</span>
+        <a class="button-link" id="openMainBtn" href="./SARSH_KKZH.html">Open main file</a>
+      </div>
+    </div>
+
+    <div class="setup-grid">
+      <div class="info-stack">
+        <div class="panel">
+          <h2>Remote connection</h2>
+          <p>Use the public Supabase client values here. Do not paste the service role key into this page.</p>
+
+          <div class="setup-form">
+            <label class="setup-checkbox">
+              <input type="checkbox" id="syncEnabledField">
+              Enable Supabase sync
+            </label>
+
+            <label class="setup-field">
+              <span>Supabase URL</span>
+              <input type="text" id="supabaseUrlField" placeholder="https://xxxx.supabase.co">
+            </label>
+
+            <label class="setup-field">
+              <span>Supabase anon key</span>
+              <input type="text" id="supabaseAnonKeyField" placeholder="eyJhbGciOi...">
+            </label>
+
+            <label class="setup-field">
+              <span>Function name</span>
+              <input type="text" id="functionNameField" value="sharsh-sync">
+            </label>
+
+            <label class="setup-field">
+              <span>Refresh interval in ms</span>
+              <input type="text" id="refreshIntervalField" value="30000">
+            </label>
+
+            <label class="setup-checkbox">
+              <input type="checkbox" id="requireAccessCodeField">
+              Show department access code field
+            </label>
+
+            <div class="setup-actions">
+              <button type="button" id="testConnectionBtn">Test connection</button>
+              <button type="button" id="saveBrowserBtn">Save in browser</button>
+              <button type="button" id="clearBrowserBtn">Return to local</button>
+            </div>
+
+            <p class="hint" id="setupStatusText"></p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Generated links</h2>
+          <p>Open the main link first. After that you can copy department links either from this page or from the main file itself.</p>
+
+          <div class="setup-output">
+            <label class="setup-field">
+              <span>Main link</span>
+              <textarea id="mainLinkField" readonly></textarea>
+            </label>
+
+            <div class="setup-link-list" id="departmentLinks"></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel setup-aside">
+        <h2>Next steps</h2>
+        <ol>
+          <li>Create a Supabase project.</li>
+          <li>Run the SQL from <code>supabase/migrations/20260506_create_sharsh_tables.sql</code>.</li>
+          <li>Deploy the function from <code>supabase/functions/sharsh-sync/index.ts</code>.</li>
+          <li>Paste the public Supabase URL and anon key here.</li>
+          <li>Open the main link and give department links to each department.</li>
+        </ol>
+        <p>If you also configure department codes on the server, keep the checkbox <code>Show department access code field</code> enabled.</p>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

@@ -456,7 +456,7 @@
   function buildCopyCard(definition) {
     const row = getDepartmentRow(state.snapshot, definition.id);
     const freshness = getFreshnessMeta(row && row.updatedAt);
-    const relativePath = config.getDepartmentPagePath(".", definition.id);
+    const relativePath = appendShareQuery(config.getDepartmentPagePath(".", definition.id));
     return `
       <div class="link-card">
         <strong>${escapeHtml(definition.department)}</strong>
@@ -471,6 +471,19 @@
         </div>
       </div>
     `;
+  }
+
+  function appendShareQuery(path) {
+    const shareQuery = sync.getShareQuery();
+    if (!shareQuery) {
+      return path;
+    }
+    return path.includes("?") ? `${path}${shareQuery.replace("?", "&")}` : `${path}${shareQuery}`;
+  }
+
+  function getSetupPath() {
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return appendShareQuery(`${prefix}setup-sync.html`);
   }
 
   function buildDepartmentUpdateItem(row) {
@@ -521,6 +534,7 @@
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
+            <a class="button-link" href="${escapeHtml(getSetupPath())}">Sync setup</a>
             <button type="button" id="refreshBtn">Обновить</button>
             <button type="button" id="printBtn">Печать</button>
           </div>
@@ -617,7 +631,7 @@
       return;
     }
 
-    const mainPath = config.getMainPagePath(basePath);
+    const mainPath = appendShareQuery(config.getMainPagePath(basePath));
     const accessCodeValue = localStorage.getItem(config.getAccessCodeStorageKey(departmentId)) || "";
 
     app.innerHTML = `
@@ -634,6 +648,7 @@
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
+            <a class="button-link" href="${escapeHtml(getSetupPath())}">Sync setup</a>
             <button type="button" id="saveBtn">Сохранить</button>
             <button type="button" id="refreshBtn">Обновить</button>
             <button type="button" id="resetBtn">Сбросить</button>
