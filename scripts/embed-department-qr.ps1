@@ -3,7 +3,8 @@ param(
   [string]$ProjectRoot = "",
   [string]$SiteBaseUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/departments",
   [int]$QrImageSize = 320,
-  [double]$HeaderQrSizePoints = 62
+  [double]$HeaderQrSizePoints = 62,
+  [double]$TopMarginPoints = 90
 )
 
 $ErrorActionPreference = "Stop"
@@ -76,7 +77,12 @@ try {
   foreach ($entry in $entries) {
     $document = $word.Documents.Open($entry.DocPath, $false, $false)
     try {
+      $document.Content.ParagraphFormat.SpaceAfter = 0
+      $document.Content.ParagraphFormat.LineSpacingRule = 4
+      $document.Content.ParagraphFormat.LineSpacing = 12
+
       foreach ($section in $document.Sections) {
+        $section.PageSetup.TopMargin = $TopMarginPoints
         $section.PageSetup.DifferentFirstPageHeaderFooter = $false
         $section.PageSetup.OddAndEvenPagesHeaderFooter = $false
 
