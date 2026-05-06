@@ -249,9 +249,7 @@
     }
   ];
 
-  const linkedCells = {
-    "r5:officer": { rowId: "r4", key: "officer" }
-  };
+  const linkedCells = {};
 
   const summaryAccentKeys = new Set(["beenSoldier", "presentTotal", "currentShar", "leaveTotal"]);
   const columnOrder = new Map(columns.map((key, index) => [key, index]));
