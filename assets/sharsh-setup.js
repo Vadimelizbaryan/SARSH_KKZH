@@ -75,17 +75,17 @@
     const source = runtimeMeta.source || "default";
     const storedConfig = runtimeMeta.loadStoredConfig ? runtimeMeta.loadStoredConfig() : null;
     if (source === "query") {
-      sourceLabel.textContent = "From link";
+      sourceLabel.textContent = "Из ссылки";
       sourceLabel.className = "pill remote";
       return;
     }
     if (source === "storage" || (storedConfig && storedConfig.syncMode === "supabase-function")) {
-      sourceLabel.textContent = "Saved in this browser";
+      sourceLabel.textContent = "Сохранено в браузере";
       sourceLabel.className = "pill remote";
       return;
     }
 
-    sourceLabel.textContent = "Local only";
+    sourceLabel.textContent = "Локально";
     sourceLabel.className = "pill local";
   }
 
@@ -122,9 +122,9 @@
         const value = button.getAttribute("data-copy-value") || "";
         try {
           await copyText(value);
-          setStatus("Department link copied.", false);
+          setStatus("Ссылка отделения скопирована.", false);
         } catch (_error) {
-          window.prompt("Copy this link", value);
+          window.prompt("Скопируй эту ссылку", value);
         }
       });
     });
@@ -137,14 +137,14 @@
       || !runtimeConfig.supabaseUrl
       || !runtimeConfig.supabaseAnonKey
     ) {
-      setStatus("Enter Supabase URL and anon key first.", true);
+      setStatus("Сначала введи Supabase URL и anon key.", true);
       return;
     }
 
     const baseUrl = runtimeConfig.supabaseUrl.replace(/\/+$/, "");
     const endpoint = `${baseUrl}/functions/v1/${runtimeConfig.functionName}`;
 
-    setStatus("Checking server connection...", false);
+    setStatus("Проверяю подключение к серверу...", false);
 
     try {
       const response = await fetch(endpoint, {
@@ -161,10 +161,10 @@
       }
 
       const rowCount = payload && Array.isArray(payload.rows) ? payload.rows.length : 0;
-      setStatus(`Connection OK. Server returned ${rowCount} department rows.`, false);
+      setStatus(`Подключение работает. Сервер вернул ${rowCount} строк отделений.`, false);
     } catch (error) {
       setStatus(
-        error instanceof Error ? `Connection failed: ${error.message}` : "Connection failed.",
+        error instanceof Error ? `Ошибка подключения: ${error.message}` : "Ошибка подключения.",
         true
       );
     }
@@ -174,10 +174,10 @@
     const runtimeConfig = buildFormConfig();
     if (runtimeConfig.syncMode === "supabase-function") {
       runtimeMeta.saveStoredConfig(runtimeConfig);
-      setStatus("Remote sync settings saved in this browser.", false);
+      setStatus("Настройки интернет-синхронизации сохранены в этом браузере.", false);
     } else {
       runtimeMeta.clearStoredConfig();
-      setStatus("Browser returned to local-only mode.", false);
+      setStatus("Браузер возвращён в локальный режим.", false);
     }
 
     updateGeneratedLinks();
@@ -207,7 +207,7 @@
 
     updateGeneratedLinks();
     updateSourceLabel();
-    setStatus("Saved browser sync settings cleared.", false);
+    setStatus("Сохранённые настройки синхронизации удалены.", false);
   }
 
   function prefillFields() {
@@ -234,7 +234,7 @@
   prefillFields();
   updateSourceLabel();
   updateGeneratedLinks();
-  setStatus("Enter the Supabase values, test the connection, then open the main link.", false);
+  setStatus("Введи значения Supabase, проверь подключение, затем открой главную ссылку.", false);
 
   Object.values(fields).forEach((field) => {
     if (!field) {
