@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SARSH_KKZH QR Sheet</title>
+  <style>
+    :root {
+      --page-bg: #f4efe4;
+      --card-bg: #fffdf8;
+      --card-border: #d7cfc0;
+      --ink: #17130c;
+      --muted: #6d6457;
+      --accent: #a2681f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 18px;
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 30%),
+        linear-gradient(180deg, #faf5ea 0%, var(--page-bg) 100%);
+      color: var(--ink);
+      font-family: "Segoe UI", Tahoma, sans-serif;
+    }
+
+    .sheet {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-end;
+      margin-bottom: 18px;
+      padding: 0 4px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.04;
+    }
+
+    .hero p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .hero-badge {
+      border: 1px solid var(--card-border);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 165px;
+      padding: 14px;
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 252, 246, 0.98));
+      box-shadow: 0 12px 28px rgba(43, 35, 18, 0.08);
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      line-height: 1.1;
+      font-family: "Sylfaen", "Noto Serif Armenian", serif;
+    }
+
+    .card p {
+      margin: 0 0 8px;
+      font-size: 13px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+
+    .card code {
+      display: block;
+      margin-top: 6px;
+      color: var(--accent);
+      font-size: 11px;
+      line-height: 1.35;
+      word-break: break-word;
+      white-space: normal;
+    }
+
+    .qr-box {
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .qr-box img {
+      width: 112px;
+      height: 112px;
+      display: block;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 6px;
+    }
+
+    .qr-box span {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    @media (max-width: 980px) {
+      .cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 12px;
+      }
+
+      .hero {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .cards {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+
+    @media print {
+      body {
+        padding: 0;
+        background: #ffffff;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+
+      .sheet {
+        max-width: none;
+      }
+
+      .card {
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <section class="hero">
+      <div>
+        <h1>SARSH_KKZH QR Codes</h1>
+        <p>Сканируй QR-код и сразу открывай нужную HTML-страницу отделения в браузере.</p>
+      </div>
+      <div class="hero-badge">17 отделений</div>
+    </section>
+
+    <section class="cards">
+      <article class="card">
+        <div>
+          <h2>Վիրաբուժական</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/virabuzhakan.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/virabuzhakan.png" alt="QR Вիրաբուժական">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Դիմածնոտային վիր</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/ds-vb-bazhanmunq.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/ds-vb-bazhanmunq.png" alt="QR Դիմածնոտային վիր">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Քիթ-կոկորդ բ-ք</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/qit-kokord-bq.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/qit-kokord-bq.png" alt="QR Քիթ-կոկորդ բ-ք">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Ակնաբուժական</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/aknabuzhakan.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/aknabuzhakan.png" alt="QR Ակնաբուժական">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Վնասվածքաբանական</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/vnasvaqabanakan.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/vnasvaqabanakan.png" alt="QR Վնասվածքաբանական">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Կրծքային մ-բ</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/krtqayin-vb.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/krtqayin-vb.png" alt="QR Կրծքային մ-բ">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Ուռոլոգիական</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/urologiakan.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/urologiakan.png" alt="QR Ուռոլոգիական">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Նեյրովիրաբուժական</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/neyrovirabuzhakan.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/neyrovirabuzhakan.png" alt="QR Նեյրովիրաբուժական">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Թռիչքային</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/trichqayin.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/trichqayin.png" alt="QR Թռիչքային">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Թերապիա</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/terapia.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/terapia.png" alt="QR Թերապիա">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Վերակենդանացման</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/verakendanaqman.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/verakendanaqman.png" alt="QR Վերակենդանացման">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Նյարդաբանական</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/nyardabanakan.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/nyardabanakan.png" alt="QR Նյարդաբանական">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Գինեկոլոգիական</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/ginekologiakan.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/ginekologiakan.png" alt="QR Գինեկոլոգիական">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>ԱՆՈԹԱՅԻՆ</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/anotayin.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/anotayin.png" alt="QR ԱՆՈԹԱՅԻՆ">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>ԻՆՖ</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/inf.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/inf.png" alt="QR ԻՆՖ">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>ԱՏԴ</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/atd.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/atd.png" alt="QR ԱՏԴ">
+          <span>Scan</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div>
+          <h2>Ք-Հ</h2>
+          <p>Открывает страницу отделения для ввода данных.</p>
+          <code>departments/qh.html</code>
+        </div>
+        <div class="qr-box">
+          <img src="./qr-codes/qh.png" alt="QR Ք-Հ">
+          <span>Scan</span>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
