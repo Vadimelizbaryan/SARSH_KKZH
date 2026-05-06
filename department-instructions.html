@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SARSH_KKZH - Инструкция для отделений</title>
+  <style>
+    :root {
+      --ink: #1f2937;
+      --muted: #5b6472;
+      --line: #d7dde7;
+      --accent: #0f766e;
+      --accent-soft: #e6fffb;
+      --warn: #9a3412;
+      --warn-soft: #fff2e8;
+      --sheet: #ffffff;
+      --bg: #f3f4f6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.35;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 12mm;
+      background: var(--sheet);
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    .hero {
+      border: 2px solid var(--accent);
+      border-radius: 18px;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 100%);
+      margin-bottom: 12px;
+    }
+
+    .hero h1 {
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+
+    .hero p {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px 14px;
+      background: #fff;
+    }
+
+    .card h2 {
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    .steps {
+      padding-left: 18px;
+      margin: 0;
+    }
+
+    .steps li {
+      margin-bottom: 7px;
+      font-size: 14px;
+    }
+
+    .note {
+      border: 1px solid #bfe3dd;
+      background: var(--accent-soft);
+      border-radius: 14px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .warning {
+      border: 1px solid #f5c8b3;
+      background: var(--warn-soft);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    .links {
+      margin-top: 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .links strong {
+      color: var(--ink);
+    }
+
+    .links p + p {
+      margin-top: 4px;
+    }
+
+    @page {
+      size: A4;
+      margin: 10mm;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .page {
+        width: auto;
+        min-height: auto;
+        margin: 0;
+        padding: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>SARSH_KKZH</h1>
+      <p>Короткая инструкция для отделений. Заполняйте только свою страницу или переходите по своему QR-коду.</p>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Как открыть</h2>
+        <ol class="steps">
+          <li>Откройте свою личную ссылку отделения или отсканируйте QR-код на бланке.</li>
+          <li>Убедитесь, что открылась именно страница вашего отделения.</li>
+          <li>Если страница была открыта давно, обновите её один раз.</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>Как заполнять</h2>
+        <ol class="steps">
+          <li>Введите числа только в доступные поля вашего отделения.</li>
+          <li>Переходите по ячейкам мышкой или стрелками клавиатуры.</li>
+          <li>Итоги и расчёты считаются автоматически.</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>Как сохранить</h2>
+        <ol class="steps">
+          <li>После ввода данные сохраняются автоматически.</li>
+          <li>Если есть кнопка сохранения, можно нажать её дополнительно.</li>
+          <li>Через несколько секунд данные появятся в основном общем файле.</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>Что проверять</h2>
+        <ol class="steps">
+          <li>Смотрите, чтобы числа были введены без букв и лишних символов.</li>
+          <li>Не заполняйте страницы других отделений.</li>
+          <li>Если интернет пропал, обновите страницу позже и проверьте сохранение снова.</li>
+        </ol>
+      </section>
+    </div>
+
+    <div class="note">
+      <strong>Важно:</strong> главный общий файл открывается отдельно и собирает данные всех отделений автоматически. Самим отделениям обычно нужен только свой личный бланк.
+    </div>
+
+    <div class="warning">
+      <strong>Если что-то не так:</strong> не меняйте чужую ссылку и не открывайте другой бланк. Просто сообщите ответственному сотруднику, какое отделение и что именно не открывается или не сохраняется.
+    </div>
+
+    <section class="links">
+      <p><strong>Главная страница:</strong> https://vadimelizbaryan.github.io/SARSH_KKZH/</p>
+      <p><strong>Основной файл:</strong> https://vadimelizbaryan.github.io/SARSH_KKZH/SARSH_KKZH.html</p>
+      <p><strong>Полный список отделений:</strong> department-links.txt</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -114,7 +114,26 @@
     return hours ? `${totalDays} д ${hours} ч назад` : `${totalDays} д назад`;
   }
 
-  function getFreshnessMeta(updatedAt) {
+  function rowHasSubmittedData(row) {
+    if (!row || !row.values || typeof row.values !== "object") {
+      return false;
+    }
+
+    return Object.values(row.values).some((value) =>
+      value !== null && value !== "" && typeof value !== "undefined"
+    );
+  }
+
+  function getFreshnessMeta(updatedAt, hasData = true) {
+    if (!hasData) {
+      return {
+        level: "missing",
+        label: "Нет данных",
+        timestamp: "еще не отправлялось",
+        age: "Отделение еще не присылало данные."
+      };
+    }
+
     const date = parseTimestamp(updatedAt);
     if (!date) {
       return {
@@ -155,6 +174,10 @@
     };
   }
 
+  function getRowFreshnessMeta(row) {
+    return getFreshnessMeta(row && row.updatedAt, rowHasSubmittedData(row));
+  }
+
   function buildFreshnessStats(rows) {
     const counts = {
       fresh: 0,
@@ -167,11 +190,11 @@
     let newestRow = null;
 
     rows.forEach((row) => {
-      const meta = getFreshnessMeta(row.updatedAt);
+      const meta = getRowFreshnessMeta(row);
       counts[meta.level] += 1;
 
       const time = parseTimestamp(row.updatedAt);
-      if (!time) {
+      if (!time || !rowHasSubmittedData(row)) {
         return;
       }
 
@@ -455,7 +478,7 @@
 
   function buildCopyCard(definition) {
     const row = getDepartmentRow(state.snapshot, definition.id);
-    const freshness = getFreshnessMeta(row && row.updatedAt);
+    const freshness = getRowFreshnessMeta(row);
     const relativePath = appendShareQuery(config.getDepartmentPagePath(".", definition.id));
     return `
       <div class="link-card">
@@ -487,7 +510,7 @@
   }
 
   function buildDepartmentUpdateItem(row) {
-    const freshness = getFreshnessMeta(row.updatedAt);
+    const freshness = getRowFreshnessMeta(row);
     return `
       <div class="update-item" data-update-row="${row.id}">
         <div class="update-item-main">
@@ -616,7 +639,7 @@
   function renderDepartmentPage() {
     const row = getCurrentRow();
     const sourceLabel = sync.getSourceLabel(state.source);
-    const rowFreshness = getFreshnessMeta(row && row.updatedAt);
+    const rowFreshness = getRowFreshnessMeta(row);
     const currentDateTime = getCurrentDateTimeParts();
 
     if (!row) {
@@ -807,9 +830,9 @@
     if (lastUpdatedText) {
       if (mode === "department") {
         const row = getCurrentRow();
-        lastUpdatedText.textContent = formatTimestamp(row && row.updatedAt);
+        const meta = getRowFreshnessMeta(row);
+        lastUpdatedText.textContent = meta.timestamp;
         if (lastUpdatedBadge) {
-          const meta = getFreshnessMeta(row && row.updatedAt);
           lastUpdatedBadge.textContent = meta.label;
           lastUpdatedBadge.className = `status-chip status-chip--${meta.level}`;
         }
@@ -850,7 +873,7 @@
       }
 
       state.snapshot.rows.forEach((row) => {
-        const meta = getFreshnessMeta(row.updatedAt);
+        const meta = getRowFreshnessMeta(row);
         const statusEl = document.querySelector(`[data-department-status="${row.id}"]`);
         const updatedEl = document.querySelector(`[data-department-updated="${row.id}"]`);
         const ageEl = document.querySelector(`[data-department-age="${row.id}"]`);

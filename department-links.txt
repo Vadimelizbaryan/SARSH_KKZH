@@ -1,19 +1,17 @@
-SARSH_KKZH links
+SARSH_KKZH
 
-Main page:
+Главная страница:
 https://vadimelizbaryan.github.io/SARSH_KKZH/
 
-Main file:
+Основной файл:
 https://vadimelizbaryan.github.io/SARSH_KKZH/SARSH_KKZH.html
 
-Sync setup:
-https://vadimelizbaryan.github.io/SARSH_KKZH/setup-sync.html
+Отделения:
 
-Department links:
 Վիրաբուժական
 https://vadimelizbaryan.github.io/SARSH_KKZH/departments/virabuzhakan.html
 
-Դ/Ծ վ/բ բաժանմունք
+Դիմածնոտային վիր
 https://vadimelizbaryan.github.io/SARSH_KKZH/departments/ds-vb-bazhanmunq.html
 
 Քիթ-կոկորդ բ-ք
@@ -25,7 +23,7 @@ https://vadimelizbaryan.github.io/SARSH_KKZH/departments/aknabuzhakan.html
 Վնասվածքաբանական
 https://vadimelizbaryan.github.io/SARSH_KKZH/departments/vnasvaqabanakan.html
 
-Կրծքային վ/բ
+Կրծքային մ-բ
 https://vadimelizbaryan.github.io/SARSH_KKZH/departments/krtqayin-vb.html
 
 Ուռոլոգիական
@@ -49,7 +47,7 @@ https://vadimelizbaryan.github.io/SARSH_KKZH/departments/nyardabanakan.html
 Գինեկոլոգիական
 https://vadimelizbaryan.github.io/SARSH_KKZH/departments/ginekologiakan.html
 
-Անոթային
+ԱՆՈԹԱՅԻՆ
 https://vadimelizbaryan.github.io/SARSH_KKZH/departments/anotayin.html
 
 ԻՆՖ
@@ -58,5 +56,5 @@ https://vadimelizbaryan.github.io/SARSH_KKZH/departments/inf.html
 ԱՏԴ
 https://vadimelizbaryan.github.io/SARSH_KKZH/departments/atd.html
 
-Ք/Հ
+Ք-Հ
 https://vadimelizbaryan.github.io/SARSH_KKZH/departments/qh.html
