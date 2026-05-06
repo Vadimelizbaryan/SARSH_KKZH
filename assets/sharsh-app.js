@@ -540,14 +540,6 @@
     return "Сейчас включен локальный режим. Между разными компьютерами данные еще не объединяются.";
   }
 
-  function getPrintDocumentTitle() {
-    if (mode === "department") {
-      const row = getCurrentRow();
-      return row ? `${PRINT_REPORT_TITLE} ${row.department}` : PRINT_REPORT_TITLE;
-    }
-    return PRINT_REPORT_TITLE;
-  }
-
   function renderMainPage() {
     const sourceLabel = sync.getSourceLabel(state.source);
     const freshnessStats = buildFreshnessStats(state.snapshot.rows);
@@ -1157,7 +1149,7 @@
 
     if (!state.printHandlersAttached) {
       window.addEventListener("beforeprint", () => {
-        document.title = getPrintDocumentTitle();
+        document.title = "";
       });
 
       window.addEventListener("afterprint", () => {
