@@ -757,6 +757,30 @@ a {
   display: block;
 }
 
+.print-only {
+  display: none;
+}
+
+.print-title {
+  text-align: center;
+  margin: 0 0 10px;
+}
+
+.print-title h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 700;
+  font-family: "Sylfaen", "Noto Serif Armenian", serif;
+}
+
+.print-title p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: "Sylfaen", "Noto Serif Armenian", serif;
+}
+
 @media (max-width: 1200px) {
   .layout-grid.split {
     grid-template-columns: minmax(0, 1fr);
@@ -798,6 +822,10 @@ a {
 
   .no-print {
     display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
   }
 
   .sheet-shell,

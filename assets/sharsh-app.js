@@ -10,6 +10,8 @@
   const mode = document.body.dataset.view === "department" ? "department" : "main";
   const departmentId = document.body.dataset.departmentId || "";
   const basePath = document.body.dataset.basePath || ".";
+  const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
+  const DEFAULT_DOCUMENT_TITLE = document.title;
 
   const state = {
     snapshot: config.buildDefaultSnapshot(),
@@ -21,6 +23,7 @@
     saveTimer: 0,
     dateTimer: 0,
     saveSequence: 0,
+    printHandlersAttached: false,
     refreshIntervalId: 0,
     freshnessIntervalId: 0,
     clockIntervalId: 0
@@ -537,6 +540,14 @@
     return "Сейчас включен локальный режим. Между разными компьютерами данные еще не объединяются.";
   }
 
+  function getPrintDocumentTitle() {
+    if (mode === "department") {
+      const row = getCurrentRow();
+      return row ? `${PRINT_REPORT_TITLE} ${row.department}` : PRINT_REPORT_TITLE;
+    }
+    return PRINT_REPORT_TITLE;
+  }
+
   function renderMainPage() {
     const sourceLabel = sync.getSourceLabel(state.source);
     const freshnessStats = buildFreshnessStats(state.snapshot.rows);
@@ -545,6 +556,9 @@
 
     app.innerHTML = `
       <div class="page">
+        <div class="print-title print-only">
+          <h1>${escapeHtml(PRINT_REPORT_TITLE)}</h1>
+        </div>
         <div class="toolbar no-print">
           <div>
             <h1>SARSH_KKZH</h1>
@@ -659,6 +673,10 @@
 
     app.innerHTML = `
       <div class="page">
+        <div class="print-title print-only">
+          <h1>${escapeHtml(PRINT_REPORT_TITLE)}</h1>
+          <p>${escapeHtml(row.department)}</p>
+        </div>
         <div class="toolbar no-print">
           <div>
             <h1>${escapeHtml(row.department)}</h1>
@@ -1135,6 +1153,18 @@
       printBtn.addEventListener("click", () => {
         window.print();
       });
+    }
+
+    if (!state.printHandlersAttached) {
+      window.addEventListener("beforeprint", () => {
+        document.title = getPrintDocumentTitle();
+      });
+
+      window.addEventListener("afterprint", () => {
+        document.title = DEFAULT_DOCUMENT_TITLE;
+      });
+
+      state.printHandlersAttached = true;
     }
 
     if (refreshBtn) {
