@@ -1,9 +1,9 @@
 (function () {
-  const STORAGE_KEY = "sarsh-kkzh-runtime-config-v1";
+  const STORAGE_KEY = "sarsh-kkzh-runtime-config-v2";
   const DEFAULT_CONFIG = {
-    syncMode: "local-only",
-    supabaseUrl: "",
-    supabaseAnonKey: "",
+    syncMode: "supabase-function",
+    supabaseUrl: "https://ywecvlapdlaojpvijaqy.supabase.co",
+    supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZWN2bGFwZGxhb2pwdmlqYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNTAzMjgsImV4cCI6MjA5MzYyNjMyOH0._HEPdPB2bBTo_N-1Qo8jLau5g5oYGgvoGnBWPxDupL4",
     functionName: "sharsh-sync",
     autoSync: true,
     refreshIntervalMs: 30000,
@@ -94,6 +94,16 @@
     localStorage.removeItem(STORAGE_KEY);
   }
 
+  function configsMatch(left, right) {
+    return left.syncMode === right.syncMode
+      && left.supabaseUrl === right.supabaseUrl
+      && left.supabaseAnonKey === right.supabaseAnonKey
+      && left.functionName === right.functionName
+      && left.autoSync === right.autoSync
+      && left.refreshIntervalMs === right.refreshIntervalMs
+      && left.requireAccessCode === right.requireAccessCode;
+  }
+
   function parseQueryConfig() {
     const params = new URLSearchParams(window.location.search);
     const hasOverride = ["sync", "sbUrl", "sbKey", "fn", "as", "ri", "ac"].some((key) => params.has(key));
@@ -117,6 +127,12 @@
 
   function buildShareQueryString(source) {
     const normalized = normalizeConfig(source);
+    const defaultConfig = normalizeConfig(DEFAULT_CONFIG);
+
+    if (configsMatch(normalized, defaultConfig)) {
+      return "";
+    }
+
     if (
       normalized.syncMode !== "supabase-function"
       || !normalized.supabaseUrl
