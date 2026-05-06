@@ -1,0 +1,87 @@
+﻿SARSH_KKZH QR manifest
+
+Վիրաբուժական
+Document: Վիրաբուժական շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/virabuzhakan.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\virabuzhakan.png
+
+Դիմածնոտային վիր
+Document: Դիմածնոտային վիր շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/ds-vb-bazhanmunq.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\ds-vb-bazhanmunq.png
+
+Քիթ-կոկորդ բ-ք
+Document: Քիթ-կոկորդ բ-ք շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/qit-kokord-bq.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\qit-kokord-bq.png
+
+Ակնաբուժական
+Document: Ակնաբուժական շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/aknabuzhakan.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\aknabuzhakan.png
+
+Վնասվածքաբանական
+Document: Վնասվածքաբանական շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/vnasvaqabanakan.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\vnasvaqabanakan.png
+
+Կրծքային մ-բ
+Document: Կրծքային -վբ շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/krtqayin-vb.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\krtqayin-vb.png
+
+Ուռոլոգիական
+Document: Ուռոլոգիական շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/urologiakan.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\urologiakan.png
+
+Նեյրովիրաբուժական
+Document: Նեյրովիրաբուժական շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/neyrovirabuzhakan.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\neyrovirabuzhakan.png
+
+Թռիչքային
+Document: Թռիչքային շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/trichqayin.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\trichqayin.png
+
+Թերապիա
+Document: Թերապիա շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/terapia.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\terapia.png
+
+Վերակենդանացման
+Document: Վերակենդանացման շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/verakendanaqman.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\verakendanaqman.png
+
+Նյարդաբանական
+Document: Նյարդաբանական շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/nyardabanakan.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\nyardabanakan.png
+
+Գինեկոլոգիական
+Document: Գինեկոլոգիական շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/ginekologiakan.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\ginekologiakan.png
+
+ԱՆՈԹԱՅԻՆ
+Document: ԱՆՈԹԱՅԻՆ շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/anotayin.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\anotayin.png
+
+ԻՆՖ
+Document: ԻՆՖ շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/inf.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\inf.png
+
+ԱՏԴ
+Document: ԱՏԴ շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/atd.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\atd.png
+
+Ք-Հ
+Document: Ք-Հ շարժ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/departments/qh.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\qh.png
+
