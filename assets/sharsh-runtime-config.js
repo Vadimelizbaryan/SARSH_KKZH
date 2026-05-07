@@ -187,20 +187,36 @@
     });
   }
 
+  function hasPublishedRemoteDefaults() {
+    return !isLocalEnvironment()
+      && DEFAULT_CONFIG.syncMode === "supabase-function"
+      && typeof DEFAULT_CONFIG.supabaseUrl === "string"
+      && DEFAULT_CONFIG.supabaseUrl.trim() !== ""
+      && typeof DEFAULT_CONFIG.supabaseAnonKey === "string"
+      && DEFAULT_CONFIG.supabaseAnonKey.trim() !== "";
+  }
+
   const queryConfig = parseQueryConfig();
-  const storedConfig = queryConfig ? null : loadStoredConfig();
-  const baseConfig = queryConfig || storedConfig || normalizeConfig(DEFAULT_CONFIG);
+  const usePublishedDefaults = !queryConfig && hasPublishedRemoteDefaults();
+  const storedConfig = queryConfig || usePublishedDefaults ? null : loadStoredConfig();
+  const baseConfig = queryConfig || (usePublishedDefaults ? normalizeConfig(DEFAULT_CONFIG) : storedConfig) || normalizeConfig(DEFAULT_CONFIG);
   const forceLocalMode = !queryConfig && isLocalEnvironment();
   const effectiveConfig = forceLocalMode ? buildForcedLocalConfig(baseConfig) : baseConfig;
 
   if (queryConfig) {
     saveStoredConfig(queryConfig);
+  } else if (usePublishedDefaults) {
+    saveStoredConfig(normalizeConfig(DEFAULT_CONFIG));
   }
 
   window.SHARSH_RUNTIME_CONFIG = effectiveConfig;
   window.SHARSH_RUNTIME_CONFIG_META = {
     storageKey: STORAGE_KEY,
-    source: queryConfig ? "query" : (forceLocalMode ? "local-env" : (storedConfig ? "storage" : "default")),
+    source: queryConfig
+      ? "query"
+      : (forceLocalMode
+        ? "local-env"
+        : (usePublishedDefaults ? "published-default" : (storedConfig ? "storage" : "default"))),
     isLocalEnvironment,
     shareQuery: buildShareQueryString(effectiveConfig),
     buildShareQueryString,

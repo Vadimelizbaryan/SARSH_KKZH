@@ -4,10 +4,6 @@
   const runtimeMeta = window.SHARSH_RUNTIME_CONFIG_META || {};
   const auth = window.SHARSH_AUTH || null;
 
-  function deepCopy(value) {
-    return config.deepCopy(value);
-  }
-
   function hasRemoteSync() {
     return runtime.syncMode === "supabase-function"
       && typeof runtime.supabaseUrl === "string"
@@ -50,6 +46,28 @@
     if (requiresOwnerAuth() && !getAccessToken()) {
       throw new Error("Сначала войдите как владелец.");
     }
+  }
+
+  async function handleOwnerAuthFailure(response) {
+    if (!requiresOwnerAuth() || response.status !== 403) {
+      return false;
+    }
+    if (!auth || typeof auth.signOut !== "function") {
+      return false;
+    }
+
+    try {
+      await auth.signOut();
+    } catch (_error) {
+    }
+    return true;
+  }
+
+  function buildResponseError(response, payload, fallback) {
+    if (payload && typeof payload.error === "string" && payload.error.trim()) {
+      return new Error(payload.error.trim());
+    }
+    return new Error(`${fallback} (${response.status})`);
   }
 
   function readLocalDepartmentRecord(departmentId) {
@@ -145,11 +163,15 @@
       headers: getAuthHeaders()
     });
 
+    const payload = await response.json().catch(() => null);
+
     if (!response.ok) {
-      throw new Error(`Не удалось загрузить данные (${response.status})`);
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось загрузить данные");
     }
 
-    const payload = await response.json();
     const snapshot = config.buildSnapshotFromSaved(payload);
     writeLocalSnapshot(snapshot);
     return snapshot;
@@ -194,8 +216,10 @@
 
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      const message = payload && payload.error ? payload.error : `Ошибка синхронизации (${response.status})`;
-      throw new Error(message);
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Ошибка синхронизации");
     }
 
     const snapshot = config.buildSnapshotFromSaved(payload);
@@ -221,8 +245,10 @@
 
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      const message = payload && payload.error ? payload.error : `Ошибка проверки кода (${response.status})`;
-      throw new Error(message);
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Ошибка проверки кода");
     }
 
     return payload;
