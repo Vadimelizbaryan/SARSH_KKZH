@@ -13,6 +13,10 @@
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
   const DEFAULT_DOCUMENT_TITLE = document.title;
   const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
+  const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
+  const ARCHIVE_TIMEZONE = "Asia/Yerevan";
+  const ARCHIVE_CAPTURE_HOUR = 10;
+  const MAX_ARCHIVE_RECORDS = 60;
 
   const state = {
     snapshot: config.buildDefaultSnapshot(),
@@ -27,7 +31,9 @@
     printHandlersAttached: false,
     refreshIntervalId: 0,
     freshnessIntervalId: 0,
-    clockIntervalId: 0
+    clockIntervalId: 0,
+    archiveRecords: [],
+    initialized: false
   };
 
   function deepCopy(value) {
@@ -57,6 +63,135 @@
       hour: "2-digit",
       minute: "2-digit"
     });
+  }
+
+  function getArchiveContext(value = new Date()) {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: ARCHIVE_TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+    const parts = Object.fromEntries(
+      formatter
+        .formatToParts(value)
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value])
+    );
+
+    const key = `${parts.year}-${parts.month}-${parts.day}`;
+    return {
+      key,
+      label: `${parts.day}.${parts.month}.${parts.year}`,
+      timeLabel: `${parts.hour}:${parts.minute}`,
+      totalMinutes: (Number(parts.hour) * 60) + Number(parts.minute)
+    };
+  }
+
+  function normalizeArchiveRecord(record) {
+    if (!record || typeof record !== "object" || typeof record.archiveKey !== "string") {
+      return null;
+    }
+
+    return {
+      archiveKey: record.archiveKey,
+      archiveLabel: typeof record.archiveLabel === "string" && record.archiveLabel.trim()
+        ? record.archiveLabel.trim()
+        : record.archiveKey,
+      capturedAt: typeof record.capturedAt === "string" ? record.capturedAt : new Date().toISOString(),
+      reportDate: typeof record.reportDate === "string" && record.reportDate.trim()
+        ? record.reportDate.trim()
+        : config.DEFAULT_DATE,
+      source: typeof record.source === "string" ? record.source : "local-only",
+      snapshot: config.buildSnapshotFromSaved(record.snapshot)
+    };
+  }
+
+  function readArchiveRecords() {
+    try {
+      const raw = localStorage.getItem(ARCHIVE_STORAGE_KEY);
+      if (!raw) {
+        return [];
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed
+        .map(normalizeArchiveRecord)
+        .filter(Boolean)
+        .sort((left, right) => right.archiveKey.localeCompare(left.archiveKey))
+        .slice(0, MAX_ARCHIVE_RECORDS);
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function writeArchiveRecords(records) {
+    const normalized = records
+      .map(normalizeArchiveRecord)
+      .filter(Boolean)
+      .sort((left, right) => right.archiveKey.localeCompare(left.archiveKey))
+      .slice(0, MAX_ARCHIVE_RECORDS);
+
+    state.archiveRecords = normalized;
+    localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(normalized));
+    return normalized;
+  }
+
+  function ensureArchiveRecordsLoaded() {
+    if (!Array.isArray(state.archiveRecords) || !state.archiveRecords.length) {
+      state.archiveRecords = readArchiveRecords();
+    }
+    return state.archiveRecords;
+  }
+
+  function maybeCaptureDailyArchive() {
+    if (mode !== "main" || !state.initialized) {
+      return null;
+    }
+
+    const context = getArchiveContext();
+    if (context.totalMinutes < ARCHIVE_CAPTURE_HOUR * 60) {
+      return null;
+    }
+
+    const existing = ensureArchiveRecordsLoaded().find((record) => record.archiveKey === context.key);
+    if (existing) {
+      return existing;
+    }
+
+    const nextRecord = {
+      archiveKey: context.key,
+      archiveLabel: context.label,
+      capturedAt: new Date().toISOString(),
+      reportDate: state.snapshot.reportDate,
+      source: state.source,
+      snapshot: deepCopy(state.snapshot)
+    };
+
+    writeArchiveRecords([nextRecord, ...ensureArchiveRecordsLoaded()]);
+    return nextRecord;
+  }
+
+  function buildArchiveItem(record) {
+    return `
+      <div class="archive-item">
+        <div class="archive-item-main">
+          <strong>${escapeHtml(record.archiveLabel)}</strong>
+          <span>${escapeHtml(formatTimestamp(record.capturedAt))}</span>
+        </div>
+        <div class="archive-item-subtext">Снимок главного файла: ${escapeHtml(record.reportDate)}</div>
+        <div class="archive-item-actions">
+          <button type="button" data-download-archive="${escapeHtml(record.archiveKey)}">JSON</button>
+        </div>
+      </div>
+    `;
   }
 
   function getCurrentDateTimeParts() {
@@ -597,6 +732,8 @@
     const freshnessStats = buildFreshnessStats(state.snapshot.rows);
     const summaryFreshness = getFreshnessMeta(state.snapshot.updatedAt);
     const currentDateTime = getCurrentDateTimeParts();
+    const archiveRecords = ensureArchiveRecordsLoaded();
+    const latestArchive = archiveRecords[0] || null;
 
     app.innerHTML = `
       <div class="page">
@@ -678,6 +815,22 @@
               <p>Точный список по каждому отделению: когда именно пришли последние данные.</p>
               <div class="updates-list" id="departmentUpdatesList">
                 ${state.snapshot.rows.map((row) => buildDepartmentUpdateItem(row)).join("")}
+              </div>
+            </section>
+            <section class="panel no-print archive-panel">
+              <h2>Ежедневный архив 10:00</h2>
+              <p id="archiveSummaryText">${
+                latestArchive
+                  ? escapeHtml(`Последний снимок: ${latestArchive.archiveLabel}, сохранён ${formatTimestamp(latestArchive.capturedAt)}.`)
+                  : "Архивов пока нет. Первый снимок появится автоматически после 10:00 по Еревану."
+              }</p>
+              <p class="hint">Снимок сохраняется в этом браузере один раз в день после 10:00 по времени Еревана.</p>
+              <div class="archive-list" id="archiveList">
+                ${
+                  archiveRecords.length
+                    ? archiveRecords.map((record) => buildArchiveItem(record)).join("")
+                    : '<div class="archive-empty">Пока нет сохранённых дат.</div>'
+                }
               </div>
             </section>
           </div>
@@ -910,12 +1063,16 @@
     }
 
     if (mode === "main") {
+      maybeCaptureDailyArchive();
       const stats = buildFreshnessStats(state.snapshot.rows);
       const freshCount = document.getElementById("freshCount");
       const warningCount = document.getElementById("warningCount");
       const staleCount = document.getElementById("staleCount");
       const missingCount = document.getElementById("missingCount");
       const oldestText = document.getElementById("freshnessOldestText");
+      const archiveSummaryText = document.getElementById("archiveSummaryText");
+      const archiveList = document.getElementById("archiveList");
+      const archiveRecords = ensureArchiveRecordsLoaded();
 
       if (freshCount) {
         freshCount.textContent = String(stats.counts.fresh);
@@ -933,6 +1090,18 @@
         oldestText.textContent = stats.oldestRow
           ? `Самые старые данные: ${stats.oldestRow.department} — ${formatTimestamp(stats.oldestRow.updatedAt)} (${formatAge(stats.oldestRow.updatedAt)})`
           : "Нет ни одного отделения с отправленными данными.";
+      }
+
+      if (archiveSummaryText) {
+        const latestArchive = archiveRecords[0] || null;
+        archiveSummaryText.textContent = latestArchive
+          ? `Последний снимок: ${latestArchive.archiveLabel}, сохранён ${formatTimestamp(latestArchive.capturedAt)}.`
+          : "Архивов пока нет. Первый снимок появится автоматически после 10:00 по Еревану.";
+      }
+      if (archiveList) {
+        archiveList.innerHTML = archiveRecords.length
+          ? archiveRecords.map((record) => buildArchiveItem(record)).join("")
+          : '<div class="archive-empty">Пока нет сохранённых дат.</div>';
       }
 
       state.snapshot.rows.forEach((row) => {
@@ -1004,6 +1173,27 @@
       ruleText.textContent = validation.message;
       ruleText.className = `hint save-rule-note ${validation.isValid ? "save-rule-note--valid" : "save-rule-note--invalid"}`;
     }
+  }
+
+  function downloadArchiveRecord(archiveKey) {
+    const record = ensureArchiveRecordsLoaded().find((item) => item.archiveKey === archiveKey);
+    if (!record) {
+      setInfo("Не удалось найти сохранённый архив.", true);
+      return;
+    }
+
+    const blob = new Blob([JSON.stringify(record, null, 2)], {
+      type: "application/json;charset=utf-8"
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `SARSH_KKZH_${record.archiveKey}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    setInfo(`Архив ${record.archiveLabel} скачан.`, false);
   }
 
   function setInfo(message, isError) {
@@ -1305,6 +1495,28 @@
       });
     });
 
+    if (!app.dataset.archiveDownloadBound) {
+      app.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+
+        const button = target.closest("[data-download-archive]");
+        if (!(button instanceof HTMLElement)) {
+          return;
+        }
+
+        const archiveKey = button.getAttribute("data-download-archive") || "";
+        if (!archiveKey) {
+          return;
+        }
+
+        downloadArchiveRecord(archiveKey);
+      });
+      app.dataset.archiveDownloadBound = "1";
+    }
+
     if (mode !== "department" || !sheetBody) {
       return;
     }
@@ -1419,6 +1631,8 @@
     state.loadedSnapshot = deepCopy(result.snapshot);
     state.source = result.source;
     state.warning = result.warning || "";
+    state.archiveRecords = readArchiveRecords();
+    state.initialized = true;
     state.info = "";
     renderPage();
     startAutoRefreshIfNeeded();
