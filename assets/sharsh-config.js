@@ -3,6 +3,9 @@
   const LEGACY_MAIN_STORAGE_KEY = "sharsh-kkzh-05-05-26-zero-v1";
   const LEGACY_ZOOM_STORAGE_KEY = `${LEGACY_MAIN_STORAGE_KEY}-zoom`;
   const DEFAULT_DATE = "05,05,26";
+  const MAIN_PAGE_FILENAME = "ykow8ru3.html";
+  const SETUP_PAGE_FILENAME = "eti77ylq.html";
+  const DEPARTMENT_DIRECTORY = "bgej6lyx";
 
   const columns = [
     "beenTotal",
@@ -96,7 +99,7 @@
   const departmentDefinitions = [
     {
       id: "r4",
-      slug: "virabuzhakan",
+      slug: "te9625wg",
       group: "primary",
       department: "Վիրաբուժական",
       editableKeys: primaryEditableKeys,
@@ -105,7 +108,7 @@
     },
     {
       id: "r5",
-      slug: "ds-vb-bazhanmunq",
+      slug: "1ei6dnv2",
       group: "primary",
       department: "Դ/Ծ վ/բ բաժանմունք",
       editableKeys: primaryEditableKeys,
@@ -114,7 +117,7 @@
     },
     {
       id: "r6",
-      slug: "qit-kokord-bq",
+      slug: "du9wa6oq",
       group: "primary",
       department: "Քիթ-կոկորդ բ-ք",
       editableKeys: primaryEditableKeys,
@@ -123,7 +126,7 @@
     },
     {
       id: "r7",
-      slug: "aknabuzhakan",
+      slug: "08xa44ew",
       group: "primary",
       department: "Ակնաբուժական",
       editableKeys: primaryEditableKeys,
@@ -132,7 +135,7 @@
     },
     {
       id: "r8",
-      slug: "vnasvaqabanakan",
+      slug: "v1914tm9",
       group: "primary",
       department: "Վնասվածքաբանական",
       editableKeys: primaryEditableKeys,
@@ -141,7 +144,7 @@
     },
     {
       id: "r9",
-      slug: "krtqayin-vb",
+      slug: "c3usp3r9",
       group: "primary",
       department: "Կրծքային վ/բ",
       editableKeys: primaryEditableKeys,
@@ -150,7 +153,7 @@
     },
     {
       id: "r10",
-      slug: "urologiakan",
+      slug: "g5u3jca0",
       group: "primary",
       department: "Ուռոլոգիական",
       editableKeys: primaryEditableKeys,
@@ -159,7 +162,7 @@
     },
     {
       id: "r11",
-      slug: "neyrovirabuzhakan",
+      slug: "4k6uv2xu",
       group: "primary",
       department: "Նեյրովիրաբուժական",
       editableKeys: primaryEditableKeys,
@@ -168,7 +171,7 @@
     },
     {
       id: "r12",
-      slug: "trichqayin",
+      slug: "ltndeohl",
       group: "primary",
       department: "Թռիչքային",
       editableKeys: primaryEditableKeys,
@@ -177,7 +180,7 @@
     },
     {
       id: "r13",
-      slug: "terapia",
+      slug: "ptf9nvbv",
       group: "primary",
       department: "Թերապիա",
       editableKeys: primaryEditableKeys,
@@ -186,7 +189,7 @@
     },
     {
       id: "r14",
-      slug: "verakendanaqman",
+      slug: "9htuxle8",
       group: "primary",
       department: "Վերակենդանացման",
       editableKeys: primaryEditableKeys,
@@ -195,7 +198,7 @@
     },
     {
       id: "r15",
-      slug: "nyardabanakan",
+      slug: "ldvp99z7",
       group: "primary",
       department: "Նյարդաբանական",
       editableKeys: primaryEditableKeys,
@@ -204,7 +207,7 @@
     },
     {
       id: "r16",
-      slug: "ginekologiakan",
+      slug: "zzphaoqo",
       group: "primary",
       department: "Գինեկոլոգիական",
       editableKeys: primaryEditableKeys,
@@ -213,7 +216,7 @@
     },
     {
       id: "r17",
-      slug: "anotayin",
+      slug: "4zby7qi3",
       group: "primary",
       department: "Անոթային",
       editableKeys: primaryEditableKeys,
@@ -222,7 +225,7 @@
     },
     {
       id: "r19",
-      slug: "inf",
+      slug: "c5mv5bh4",
       group: "extra",
       department: "ԻՆՖ",
       editableKeys: extraEditableKeys,
@@ -231,7 +234,7 @@
     },
     {
       id: "r20",
-      slug: "atd",
+      slug: "5s7rrwg9",
       group: "extra",
       department: "ԱՏԴ",
       editableKeys: extraEditableKeys,
@@ -240,7 +243,7 @@
     },
     {
       id: "r21",
-      slug: "qh",
+      slug: "3ofsacp6",
       group: "extra",
       department: "Ք/Հ",
       editableKeys: extraEditableKeys,
@@ -378,18 +381,26 @@
       return null;
     }
     if (basePath === "@site") {
-      return buildSiteProxyPath(`departments/${definition.slug}.html`);
+      return buildSiteProxyPath(`${DEPARTMENT_DIRECTORY}/${definition.slug}.html`);
     }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
-    return `${prefix}departments/${definition.slug}.html`;
+    return `${prefix}${DEPARTMENT_DIRECTORY}/${definition.slug}.html`;
   }
 
   function getMainPagePath(basePath) {
     if (basePath === "@site") {
-      return buildSiteProxyPath("MAINFLOW.html");
+      return buildSiteProxyPath(MAIN_PAGE_FILENAME);
     }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
-    return `${prefix}MAINFLOW.html`;
+    return `${prefix}${MAIN_PAGE_FILENAME}`;
+  }
+
+  function getSetupPagePath(basePath) {
+    if (basePath === "@site") {
+      return buildSiteProxyPath(SETUP_PAGE_FILENAME);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return `${prefix}${SETUP_PAGE_FILENAME}`;
   }
 
   function getDepartmentStorageKey(departmentId) {
@@ -417,6 +428,9 @@
     LEGACY_MAIN_STORAGE_KEY,
     LEGACY_ZOOM_STORAGE_KEY,
     DEFAULT_DATE,
+    MAIN_PAGE_FILENAME,
+    SETUP_PAGE_FILENAME,
+    DEPARTMENT_DIRECTORY,
     columns,
     valueKeys,
     summaryAccentKeys,
@@ -433,6 +447,7 @@
     getDepartmentById,
     getDepartmentPagePath,
     getMainPagePath,
+    getSetupPagePath,
     getDepartmentStorageKey,
     getReportDateStorageKey,
     getMainCacheStorageKey,

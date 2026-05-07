@@ -25,10 +25,10 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp MAINFLOW.html _site/
-          cp setup-sync.html _site/
+          cp ykow8ru3.html _site/
+          cp eti77ylq.html _site/
           cp -R assets _site/
-          cp -R departments _site/
+          cp -R bgej6lyx _site/
           touch _site/.nojekyll
 
       - name: Upload artifact

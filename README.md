@@ -4,13 +4,13 @@
 
 ## Рабочие ссылки
 
-- Основной файл: `https://vadimelizbaryan.github.io/SARSH_KKZH/MAINFLOW.html`
+- Основной файл: `https://vadimelizbaryan.github.io/SARSH_KKZH/ykow8ru3.html`
 - Список ссылок отделений: `department-links.txt`
 
 ## Что находится в проекте
 
-- `MAINFLOW.html` - основной общий файл.
-- `departments/*.html` - отдельные страницы отделений.
+- `ykow8ru3.html` - основной общий файл.
+- `bgej6lyx/*.html` - отдельные страницы отделений.
 - `assets/` - общая логика и стили.
 - `department-links.txt` - готовый список рабочих ссылок.
 - `department-instructions.html` - краткая инструкция для сотрудников.
@@ -34,10 +34,10 @@
 
 Если нужно изменить параметры синхронизации вручную, можно открыть:
 
-- `setup-sync.html`
+- `eti77ylq.html`
 
 ## Важно
 
-- Не удаляйте `assets/`, `departments/` и `supabase/` - это рабочие части системы.
+- Не удаляйте `assets/`, `bgej6lyx/` и `supabase/` - это рабочие части системы.
 - Для сотрудников обычно достаточно их личной ссылки или QR-кода.
 - Основной файл нужен для общей сводки и печати.

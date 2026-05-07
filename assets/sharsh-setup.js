@@ -98,7 +98,7 @@
 
   function updateGeneratedLinks() {
     const runtimeConfig = buildFormConfig();
-    const mainUrl = buildAbsoluteLink("./MAINFLOW.html", runtimeConfig);
+    const mainUrl = buildAbsoluteLink(config.getMainPagePath("."), runtimeConfig);
 
     if (mainLink) {
       mainLink.value = mainUrl;
@@ -112,7 +112,7 @@
     }
 
     linksContainer.innerHTML = config.departmentDefinitions.map((definition) => {
-      const url = buildAbsoluteLink(`./departments/${definition.slug}.html`, runtimeConfig);
+      const url = buildAbsoluteLink(config.getDepartmentPagePath(".", definition.id), runtimeConfig);
       return `
         <div class="setup-link-row">
           <div>

@@ -894,11 +894,7 @@
   }
 
   function getSetupPath() {
-    if (basePath === "@site") {
-      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("setup-sync.html")}`);
-    }
-    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
-    return appendShareQuery(`${prefix}setup-sync.html`);
+    return appendShareQuery(config.getSetupPagePath(basePath));
   }
 
   function buildDepartmentUpdateItem(row) {

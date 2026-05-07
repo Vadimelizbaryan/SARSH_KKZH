@@ -1,7 +1,7 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
   [string]$ProjectRoot = "",
-  [string]$SiteBaseUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/departments",
+  [string]$SiteBaseUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx",
   [int]$QrImageSize = 320,
   [double]$HeaderQrSizePoints = 62,
   [double]$TopMarginPoints = 90
@@ -19,23 +19,23 @@ $qrRoot = Join-Path $ProjectRoot "qr-codes"
 $manifestPath = Join-Path $qrRoot "qr-manifest.txt"
 
 $mappings = @(
-  [PSCustomObject]@{ Folder = "Վիրաբուժական"; Slug = "virabuzhakan" }
-  [PSCustomObject]@{ Folder = "Դիմածնոտային վիր"; Slug = "ds-vb-bazhanmunq" }
-  [PSCustomObject]@{ Folder = "Քիթ-կոկորդ բ-ք"; Slug = "qit-kokord-bq" }
-  [PSCustomObject]@{ Folder = "Ակնաբուժական"; Slug = "aknabuzhakan" }
-  [PSCustomObject]@{ Folder = "Վնասվածքաբանական"; Slug = "vnasvaqabanakan" }
-  [PSCustomObject]@{ Folder = "Կրծքային մ-բ"; Slug = "krtqayin-vb" }
-  [PSCustomObject]@{ Folder = "Ուռոլոգիական"; Slug = "urologiakan" }
-  [PSCustomObject]@{ Folder = "Նեյրովիրաբուժական"; Slug = "neyrovirabuzhakan" }
-  [PSCustomObject]@{ Folder = "Թռիչքային"; Slug = "trichqayin" }
-  [PSCustomObject]@{ Folder = "Թերապիա"; Slug = "terapia" }
-  [PSCustomObject]@{ Folder = "Վերակենդանացման"; Slug = "verakendanaqman" }
-  [PSCustomObject]@{ Folder = "Նյարդաբանական"; Slug = "nyardabanakan" }
-  [PSCustomObject]@{ Folder = "Գինեկոլոգիական"; Slug = "ginekologiakan" }
-  [PSCustomObject]@{ Folder = "ԱՆՈԹԱՅԻՆ"; Slug = "anotayin" }
-  [PSCustomObject]@{ Folder = "ԻՆՖ"; Slug = "inf" }
-  [PSCustomObject]@{ Folder = "ԱՏԴ"; Slug = "atd" }
-  [PSCustomObject]@{ Folder = "Ք-Հ"; Slug = "qh" }
+  [PSCustomObject]@{ Folder = "Վիրաբուժական"; Slug = "te9625wg" }
+  [PSCustomObject]@{ Folder = "Դիմածնոտային վիր"; Slug = "1ei6dnv2" }
+  [PSCustomObject]@{ Folder = "Քիթ-կոկորդ բ-ք"; Slug = "du9wa6oq" }
+  [PSCustomObject]@{ Folder = "Ակնաբուժական"; Slug = "08xa44ew" }
+  [PSCustomObject]@{ Folder = "Վնասվածքաբանական"; Slug = "v1914tm9" }
+  [PSCustomObject]@{ Folder = "Կրծքային մ-բ"; Slug = "c3usp3r9" }
+  [PSCustomObject]@{ Folder = "Ուռոլոգիական"; Slug = "g5u3jca0" }
+  [PSCustomObject]@{ Folder = "Նեյրովիրաբուժական"; Slug = "4k6uv2xu" }
+  [PSCustomObject]@{ Folder = "Թռիչքային"; Slug = "ltndeohl" }
+  [PSCustomObject]@{ Folder = "Թերապիա"; Slug = "ptf9nvbv" }
+  [PSCustomObject]@{ Folder = "Վերակենդանացման"; Slug = "9htuxle8" }
+  [PSCustomObject]@{ Folder = "Նյարդաբանական"; Slug = "ldvp99z7" }
+  [PSCustomObject]@{ Folder = "Գինեկոլոգիական"; Slug = "zzphaoqo" }
+  [PSCustomObject]@{ Folder = "ԱՆՈԹԱՅԻՆ"; Slug = "4zby7qi3" }
+  [PSCustomObject]@{ Folder = "ԻՆՖ"; Slug = "c5mv5bh4" }
+  [PSCustomObject]@{ Folder = "ԱՏԴ"; Slug = "5s7rrwg9" }
+  [PSCustomObject]@{ Folder = "Ք-Հ"; Slug = "3ofsacp6" }
 )
 
 New-Item -Path $qrRoot -ItemType Directory -Force | Out-Null
