@@ -453,7 +453,8 @@ a {
   gap: 8px;
 }
 
-.archive-item-actions button {
+.archive-item-actions button,
+.archive-item-actions a {
   border: 1px solid rgba(17, 17, 17, 0.12);
   border-radius: 999px;
   background: #ffffff;
@@ -462,9 +463,12 @@ a {
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  text-decoration: none;
+  color: inherit;
 }
 
-.archive-item-actions button:hover {
+.archive-item-actions button:hover,
+.archive-item-actions a:hover {
   background: #fff6e9;
 }
 

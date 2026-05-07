@@ -7,9 +7,14 @@
     return;
   }
 
-  const mode = document.body.dataset.view === "department" ? "department" : "main";
+  const mode = document.body.dataset.view === "department"
+    ? "department"
+    : (document.body.dataset.view === "archive" ? "archive" : "main");
   const departmentId = document.body.dataset.departmentId || "";
   const basePath = document.body.dataset.basePath || ".";
+  const queryParams = new URLSearchParams(window.location.search);
+  const archiveKeyFromQuery = queryParams.get("archive") || "";
+  const archiveAutoPrint = queryParams.get("autoprint") !== "0";
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
   const DEFAULT_DOCUMENT_TITLE = document.title;
   const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
@@ -151,6 +156,13 @@
     return state.archiveRecords;
   }
 
+  function getArchiveRecordByKey(archiveKey) {
+    if (!archiveKey) {
+      return null;
+    }
+    return ensureArchiveRecordsLoaded().find((record) => record.archiveKey === archiveKey) || null;
+  }
+
   function maybeCaptureDailyArchive() {
     if (mode !== "main" || !state.initialized) {
       return null;
@@ -188,7 +200,7 @@
         </div>
         <div class="archive-item-subtext">Снимок главного файла: ${escapeHtml(record.reportDate)}</div>
         <div class="archive-item-actions">
-          <button type="button" data-print-archive="${escapeHtml(record.archiveKey)}">PDF</button>
+          <a href="${escapeHtml(getArchivePrintPath(record.archiveKey))}" target="_blank" rel="noopener">PDF</a>
         </div>
       </div>
     `;
@@ -704,6 +716,11 @@
     return path.includes("?") ? `${path}${shareQuery.replace("?", "&")}` : `${path}${shareQuery}`;
   }
 
+  function getArchivePrintPath(archiveKey) {
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return `${prefix}archive-print.html?archive=${encodeURIComponent(archiveKey)}&autoprint=1`;
+  }
+
   function getSetupPath() {
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
     return appendShareQuery(`${prefix}setup-sync.html`);
@@ -741,6 +758,10 @@
     if (mode === "department") {
       const row = getCurrentRow();
       return row ? `${PRINT_REPORT_TITLE} ${row.department}` : PRINT_REPORT_TITLE;
+    }
+    if (mode === "archive") {
+      const record = getArchiveRecordByKey(archiveKeyFromQuery);
+      return record ? `${PRINT_REPORT_TITLE} ${record.archiveLabel}` : PRINT_REPORT_TITLE;
     }
     return PRINT_REPORT_TITLE;
   }
@@ -951,15 +972,78 @@
     `;
   }
 
+  function renderArchivePage() {
+    const record = getArchiveRecordByKey(archiveKeyFromQuery);
+
+    if (!record) {
+      app.innerHTML = `
+        <div class="page">
+          <div class="panel">
+            <h2>Архив не найден</h2>
+            <p>Для этой даты архивный снимок в текущем браузере не найден. Открой главный файл, дождись появления даты в архиве и попробуй снова.</p>
+            <p><a href="${escapeHtml(config.getMainPagePath(basePath))}">Вернуться к главному файлу</a></p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const headerDateTime = getHeaderDateTimeParts(record.reportDate) || getCurrentDateTimeParts();
+    state.snapshot = deepCopy(record.snapshot);
+    state.loadedSnapshot = deepCopy(record.snapshot);
+    state.source = record.source || "local-only";
+
+    app.innerHTML = `
+      <div class="page">
+        <div class="print-title">
+          <h1>${escapeHtml(PRINT_REPORT_TITLE)}</h1>
+        </div>
+        <div class="toolbar no-print">
+          <div>
+            <h1>Архив ${escapeHtml(record.archiveLabel)}</h1>
+            <p>Архивная копия главного файла для печати и сохранения в PDF.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button type="button" id="printBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(config.getMainPagePath(basePath))}">К главному</a>
+          </div>
+        </div>
+
+        <div class="info-stack">
+          <div class="panel no-print">
+            <h2>Данные архива</h2>
+            <p><strong>Архивная дата:</strong> ${escapeHtml(record.archiveLabel)}</p>
+            <p><strong>Снимок создан:</strong> ${escapeHtml(formatTimestamp(record.capturedAt))}</p>
+            <p><strong>Дата документа:</strong> ${escapeHtml(record.reportDate)}</p>
+          </div>
+
+          <div class="zoom-target">
+            <div class="sheet-shell">
+              <div class="table-wrap">
+                ${renderTable(state.snapshot, state.snapshot.rows, { interactive: false, viewMode: "main", headerDateTime })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderPage() {
     if (mode === "department") {
       renderDepartmentPage();
+    } else if (mode === "archive") {
+      renderArchivePage();
     } else {
       renderMainPage();
     }
 
     attachCommonEvents();
     applyZoom(loadZoom());
+    if (mode === "archive") {
+      refreshComputedCells();
+      return;
+    }
     refreshTableData();
   }
 
@@ -1698,6 +1782,19 @@
   }
 
   async function init() {
+    if (mode === "archive") {
+      state.archiveRecords = readArchiveRecords();
+      state.initialized = true;
+      state.info = "";
+      renderPage();
+      if (archiveAutoPrint && getArchiveRecordByKey(archiveKeyFromQuery)) {
+        window.setTimeout(() => {
+          window.print();
+        }, 350);
+      }
+      return;
+    }
+
     syncCurrentReportDate();
     setInfo("Загружаю данные...", false);
     const result = await sync.loadSnapshot();
