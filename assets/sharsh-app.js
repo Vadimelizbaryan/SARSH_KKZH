@@ -38,6 +38,7 @@
     freshnessIntervalId: 0,
     clockIntervalId: 0,
     archiveRecords: [],
+    selectedArchiveKey: "",
     initialized: false
   };
 
@@ -204,6 +205,94 @@
         </div>
       </div>
     `;
+  }
+
+  function getSelectedArchiveRecord(records = ensureArchiveRecordsLoaded()) {
+    if (!Array.isArray(records) || !records.length) {
+      state.selectedArchiveKey = "";
+      return null;
+    }
+
+    const selected = state.selectedArchiveKey
+      ? records.find((record) => record.archiveKey === state.selectedArchiveKey) || null
+      : null;
+
+    if (selected) {
+      return selected;
+    }
+
+    state.selectedArchiveKey = records[0].archiveKey;
+    return records[0];
+  }
+
+  function getArchiveSummaryText(records) {
+    if (!Array.isArray(records) || !records.length) {
+      return "Архивов пока нет. Первый снимок появится автоматически после 10:00 по Еревану.";
+    }
+
+    const latestArchive = records[0];
+    return `Архивов: ${records.length}. Последний снимок: ${latestArchive.archiveLabel}, сохранён ${formatTimestamp(latestArchive.capturedAt)}.`;
+  }
+
+  function getArchiveSelectionText(record) {
+    if (!record) {
+      return "Выбери дату архива, чтобы открыть документ в PDF.";
+    }
+    return `Выбран архив ${record.archiveLabel}. Дата документа: ${record.reportDate}. Сохранён: ${formatTimestamp(record.capturedAt)}.`;
+  }
+
+  function buildArchiveOptions(records, selectedArchiveKey) {
+    return records.map((record) => `
+      <option value="${escapeHtml(record.archiveKey)}"${record.archiveKey === selectedArchiveKey ? " selected" : ""}>
+        ${escapeHtml(`${record.archiveLabel} — ${formatTimestamp(record.capturedAt)}`)}
+      </option>
+    `).join("");
+  }
+
+  function buildArchivePicker(records) {
+    const selectedRecord = getSelectedArchiveRecord(records);
+    if (!selectedRecord) {
+      return '<div class="archive-empty">Пока нет сохранённых дат.</div>';
+    }
+
+    return `
+      <div class="archive-selector">
+        <div class="archive-selector-row">
+          <label class="archive-picker" for="archiveSelect">
+            <span>Дата архива</span>
+            <select id="archiveSelect">
+              ${buildArchiveOptions(records, selectedRecord.archiveKey)}
+            </select>
+          </label>
+          <a class="archive-open-link" id="archivePdfLink" href="${escapeHtml(getArchivePrintPath(selectedRecord.archiveKey))}" target="_blank" rel="noopener">PDF</a>
+        </div>
+        <div class="archive-selected-meta" id="archiveSelectedMeta">${escapeHtml(getArchiveSelectionText(selectedRecord))}</div>
+      </div>
+    `;
+  }
+
+  function syncArchivePickerUi() {
+    const records = ensureArchiveRecordsLoaded();
+    const select = document.getElementById("archiveSelect");
+    const link = document.getElementById("archivePdfLink");
+    const meta = document.getElementById("archiveSelectedMeta");
+    const selectedRecord = getSelectedArchiveRecord(records);
+
+    if (select && selectedRecord) {
+      select.value = selectedRecord.archiveKey;
+    }
+    if (link) {
+      if (selectedRecord) {
+        link.href = getArchivePrintPath(selectedRecord.archiveKey);
+        link.removeAttribute("aria-disabled");
+      } else {
+        link.removeAttribute("href");
+        link.setAttribute("aria-disabled", "true");
+      }
+    }
+    if (meta) {
+      meta.textContent = getArchiveSelectionText(selectedRecord);
+    }
   }
 
   function getCurrentDateTimeParts() {
@@ -867,7 +956,7 @@
               <div class="archive-list" id="archiveList">
                 ${
                   archiveRecords.length
-                    ? archiveRecords.map((record) => buildArchiveItem(record)).join("")
+                    ? buildArchivePicker(archiveRecords)
                     : '<div class="archive-empty">Пока нет сохранённых дат.</div>'
                 }
               </div>
@@ -1205,6 +1294,14 @@
           ? archiveRecords.map((record) => buildArchiveItem(record)).join("")
           : '<div class="archive-empty">Пока нет сохранённых дат.</div>';
       }
+
+      if (archiveSummaryText) {
+        archiveSummaryText.textContent = getArchiveSummaryText(archiveRecords);
+      }
+      if (archiveList) {
+        archiveList.innerHTML = buildArchivePicker(archiveRecords);
+      }
+      syncArchivePickerUi();
 
       state.snapshot.rows.forEach((row) => {
         const meta = getRowFreshnessMeta(row);
@@ -1652,6 +1749,14 @@
         }
       });
     });
+
+    const archiveSelect = document.getElementById("archiveSelect");
+    if (archiveSelect) {
+      archiveSelect.addEventListener("change", () => {
+        state.selectedArchiveKey = archiveSelect.value || "";
+        syncArchivePickerUi();
+      });
+    }
 
     if (!app.dataset.archiveDownloadBound) {
       app.addEventListener("click", (event) => {
