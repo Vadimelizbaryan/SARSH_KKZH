@@ -1212,17 +1212,22 @@
   }
 
   function handleResetDepartment() {
-    const loadedRow = getCurrentLoadedRow();
     const currentRow = getCurrentRow();
-    if (!loadedRow || !currentRow) {
+    if (!currentRow) {
       return;
     }
 
-    state.snapshot.reportDate = state.loadedSnapshot.reportDate;
-    currentRow.values = deepCopy(loadedRow.values);
-    currentRow.updatedAt = loadedRow.updatedAt;
+    currentRow.values = deepCopy(config.zeroValues());
+    if (sync.runtime.autoSync) {
+      renderPage();
+      setInfo("Поля сброшены в 0. Отправляю изменения в общий файл...", false);
+      queueDepartmentSave();
+      return;
+    }
+
     renderPage();
-    setInfo("Возврат к последней сохраненной версии выполнен.", false);
+    setInfo("Поля сброшены в 0. Нажми Сохранить для отправки.", false);
+    return;
   }
 
   function attachCommonEvents() {
