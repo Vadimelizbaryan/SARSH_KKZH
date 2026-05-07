@@ -1247,7 +1247,18 @@
       return;
     }
 
-    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    const blob = new Blob([buildArchivePrintHtml(record)], {
+      type: "text/html;charset=utf-8"
+    });
+    const blobUrl = URL.createObjectURL(blob);
+    const printWindow = window.open(blobUrl, "_blank");
+    if (printWindow) {
+      window.setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 60000);
+      setInfo(`Архив ${record.archiveLabel} открыт для сохранения в PDF.`, false);
+      return;
+    }
     if (!printWindow) {
       setInfo("Браузер заблокировал окно печати архива.", true);
       return;
