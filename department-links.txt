@@ -1,8 +1,5 @@
 SARSH_KKZH
 
-Главная страница:
-https://vadimelizbaryan.github.io/SARSH_KKZH/
-
 Основной файл:
 https://vadimelizbaryan.github.io/SARSH_KKZH/MAINFLOW.html
 
