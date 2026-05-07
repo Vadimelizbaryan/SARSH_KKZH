@@ -386,10 +386,10 @@
 
   function getMainPagePath(basePath) {
     if (basePath === "@site") {
-      return buildSiteProxyPath("SARSH_KKZH.html");
+      return buildSiteProxyPath("MAINFLOW.html");
     }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
-    return `${prefix}SARSH_KKZH.html`;
+    return `${prefix}MAINFLOW.html`;
   }
 
   function getDepartmentStorageKey(departmentId) {

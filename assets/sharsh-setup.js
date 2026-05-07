@@ -98,7 +98,7 @@
 
   function updateGeneratedLinks() {
     const runtimeConfig = buildFormConfig();
-    const mainUrl = buildAbsoluteLink("./SARSH_KKZH.html", runtimeConfig);
+    const mainUrl = buildAbsoluteLink("./MAINFLOW.html", runtimeConfig);
 
     if (mainLink) {
       mainLink.value = mainUrl;

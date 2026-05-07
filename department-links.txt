@@ -4,7 +4,7 @@ SARSH_KKZH
 https://vadimelizbaryan.github.io/SARSH_KKZH/
 
 Основной файл:
-https://vadimelizbaryan.github.io/SARSH_KKZH/SARSH_KKZH.html
+https://vadimelizbaryan.github.io/SARSH_KKZH/MAINFLOW.html
 
 Отделения:
 
