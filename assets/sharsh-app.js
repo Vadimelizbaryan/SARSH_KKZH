@@ -188,7 +188,7 @@
         </div>
         <div class="archive-item-subtext">Снимок главного файла: ${escapeHtml(record.reportDate)}</div>
         <div class="archive-item-actions">
-          <button type="button" data-download-archive="${escapeHtml(record.archiveKey)}">JSON</button>
+          <button type="button" data-print-archive="${escapeHtml(record.archiveKey)}">PDF</button>
         </div>
       </div>
     `;
@@ -505,8 +505,25 @@
     `;
   }
 
-  function renderHead() {
-    const currentDateTime = getCurrentDateTimeParts();
+  function getHeaderDateTimeParts(value) {
+    if (typeof value !== "string") {
+      return null;
+    }
+
+    const match = value.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      date: `${match[1]}.${match[2]}.${match[3]}`,
+      time: `${match[4]}:${match[5]}`,
+      full: `${match[1]}.${match[2]}.${match[3]} ${match[4]}:${match[5]}`
+    };
+  }
+
+  function renderHead(headerDateTime) {
+    const currentDateTime = headerDateTime || getCurrentDateTimeParts();
     return `
       <thead>
         <tr>
@@ -623,6 +640,7 @@
 
   function renderTable(snapshot, rows, options) {
     const interactive = Boolean(options.interactive);
+    const headerDateTime = options.headerDateTime || getCurrentDateTimeParts();
     let bodyHtml = "";
 
     if (options.viewMode === "main") {
@@ -644,7 +662,7 @@
     return `
       <table class="sheet" id="sheetTable" aria-label="SARSH KKZH">
         ${renderColgroup()}
-        ${renderHead()}
+        ${renderHead(headerDateTime)}
         <tbody id="sheetBody">${bodyHtml}</tbody>
       </table>
     `;
@@ -1175,25 +1193,70 @@
     }
   }
 
-  function downloadArchiveRecord(archiveKey) {
+  function getStylesheetUrl() {
+    return new URL(`${basePath === "." ? "" : `${basePath}/`}assets/sharsh.css`, window.location.href).toString();
+  }
+
+  function buildArchivePrintHtml(record) {
+    const headerDateTime = getHeaderDateTimeParts(record.reportDate) || getCurrentDateTimeParts();
+    return `<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(`${PRINT_REPORT_TITLE} ${record.archiveLabel}`)}</title>
+  <link rel="stylesheet" href="${escapeHtml(getStylesheetUrl())}">
+  <style>
+    body { background: #ffffff; padding: 16px; }
+    .archive-print-wrap { max-width: 1700px; margin: 0 auto; }
+    .archive-print-meta { margin: 0 0 12px; color: #444; font: 600 14px/1.4 "Segoe UI", Tahoma, sans-serif; }
+    .archive-print-meta p { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <div class="archive-print-wrap">
+    <div class="print-title">
+      <h1>${escapeHtml(PRINT_REPORT_TITLE)}</h1>
+    </div>
+    <div class="archive-print-meta">
+      <p><strong>Архивная дата:</strong> ${escapeHtml(record.archiveLabel)}</p>
+      <p><strong>Снимок создан:</strong> ${escapeHtml(formatTimestamp(record.capturedAt))}</p>
+      <p><strong>Дата документа:</strong> ${escapeHtml(record.reportDate)}</p>
+    </div>
+    <div class="sheet-shell">
+      <div class="table-wrap">
+        ${renderTable(record.snapshot, record.snapshot.rows, { interactive: false, viewMode: "main", headerDateTime })}
+      </div>
+    </div>
+  </div>
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        window.print();
+      }, 250);
+    });
+  </script>
+</body>
+</html>`;
+  }
+
+  function printArchiveRecord(archiveKey) {
     const record = ensureArchiveRecordsLoaded().find((item) => item.archiveKey === archiveKey);
     if (!record) {
       setInfo("Не удалось найти сохранённый архив.", true);
       return;
     }
 
-    const blob = new Blob([JSON.stringify(record, null, 2)], {
-      type: "application/json;charset=utf-8"
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `SARSH_KKZH_${record.archiveKey}.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-    setInfo(`Архив ${record.archiveLabel} скачан.`, false);
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) {
+      setInfo("Браузер заблокировал окно печати архива.", true);
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(buildArchivePrintHtml(record));
+    printWindow.document.close();
+    setInfo(`Архив ${record.archiveLabel} открыт для сохранения в PDF.`, false);
   }
 
   function setInfo(message, isError) {
@@ -1502,17 +1565,17 @@
           return;
         }
 
-        const button = target.closest("[data-download-archive]");
+        const button = target.closest("[data-print-archive]");
         if (!(button instanceof HTMLElement)) {
           return;
         }
 
-        const archiveKey = button.getAttribute("data-download-archive") || "";
+        const archiveKey = button.getAttribute("data-print-archive") || "";
         if (!archiveKey) {
           return;
         }
 
-        downloadArchiveRecord(archiveKey);
+        printArchiveRecord(archiveKey);
       });
       app.dataset.archiveDownloadBound = "1";
     }
