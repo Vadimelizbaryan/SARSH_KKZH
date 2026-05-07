@@ -25,9 +25,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp index.html _site/
-          cp SARSH_KKZH.html _site/
-          cp SARSH_KKZH_owner.html _site/
+          cp MAINFLOW.html _site/
           cp setup-sync.html _site/
           cp -R assets _site/
           cp -R departments _site/
