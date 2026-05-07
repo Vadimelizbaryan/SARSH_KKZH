@@ -92,6 +92,69 @@ function getDepartmentCodes() {
   }
 }
 
+function getAllowedGoogleEmails() {
+  const raw = Deno.env.get("ALLOWED_GOOGLE_EMAILS");
+  if (!raw) {
+    return [];
+  }
+
+  return raw
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function getDepartmentAccessError(departmentId: string, accessCode: unknown) {
+  const accessCodes = getDepartmentCodes();
+  const expectedCode = accessCodes[departmentId];
+  if (!expectedCode) {
+    return null;
+  }
+
+  const normalizedAccessCode = String(accessCode ?? "").trim();
+  return expectedCode === normalizedAccessCode
+    ? null
+    : "Неверный код отделения.";
+}
+
+function extractBearerToken(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader) {
+    return "";
+  }
+
+  const [bearer, token] = authHeader.split(" ");
+  if (bearer !== "Bearer" || !token) {
+    return "";
+  }
+
+  return token.trim();
+}
+
+async function authorizeOwner(request: Request, supabase: ReturnType<typeof createClient>) {
+  const allowedEmails = getAllowedGoogleEmails();
+  if (!allowedEmails.length) {
+    return "Google owner access is not configured on the server.";
+  }
+
+  const token = extractBearerToken(request);
+  if (!token) {
+    return "Google sign-in is required.";
+  }
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) {
+    return "Google sign-in is required.";
+  }
+
+  const email = String(data.user.email || "").trim().toLowerCase();
+  if (!email || !allowedEmails.includes(email)) {
+    return "Access is allowed only for the owner Google account.";
+  }
+
+  return null;
+}
+
 async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
   const { data: departmentRows, error: departmentsError } = await supabase
     .from("sharsh_departments")
@@ -149,6 +212,10 @@ Deno.serve(async (request) => {
 
   try {
     const supabase = createSupabaseAdmin();
+    const authError = await authorizeOwner(request, supabase);
+    if (authError) {
+      return jsonResponse({ error: authError }, 403);
+    }
 
     if (request.method === "GET") {
       return jsonResponse(await loadSnapshot(supabase));
@@ -181,6 +248,20 @@ Deno.serve(async (request) => {
       return jsonResponse(await loadSnapshot(supabase));
     }
 
+    if (type === "verify_access_code") {
+      const departmentId = typeof payload.departmentId === "string" ? payload.departmentId : "";
+      if (!Object.prototype.hasOwnProperty.call(DEPARTMENTS, departmentId)) {
+        return jsonResponse({ error: "Unknown department." }, 400);
+      }
+
+      const accessError = getDepartmentAccessError(departmentId, payload.accessCode);
+      if (accessError) {
+        return jsonResponse({ error: accessError }, 403);
+      }
+
+      return jsonResponse({ ok: true });
+    }
+
     if (type !== "save_department") {
       return jsonResponse({ error: "Unknown request type." }, 400);
     }
@@ -190,10 +271,9 @@ Deno.serve(async (request) => {
       return jsonResponse({ error: "Unknown department." }, 400);
     }
 
-    const accessCodes = getDepartmentCodes();
-    const expectedCode = accessCodes[departmentId];
-    if (expectedCode && expectedCode !== String(payload.accessCode || "")) {
-      return jsonResponse({ error: "Неверный код отделения." }, 403);
+    const accessError = getDepartmentAccessError(departmentId, payload.accessCode);
+    if (accessError) {
+      return jsonResponse({ error: accessError }, 403);
     }
 
     const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()

@@ -7,8 +7,18 @@
     functionName: "sharsh-sync",
     autoSync: true,
     refreshIntervalMs: 30000,
-    requireAccessCode: false
+    requireAccessCode: false,
+    requireGoogleAuth: true
   };
+
+  function isLocalEnvironment() {
+    const protocol = String(window.location.protocol || "").toLowerCase();
+    const hostname = String(window.location.hostname || "").toLowerCase();
+    return protocol === "file:"
+      || hostname === "localhost"
+      || hostname === "127.0.0.1"
+      || hostname === "::1";
+  }
 
   function parseBoolean(value, fallback) {
     if (typeof value === "boolean") {
@@ -62,6 +72,7 @@
       next.autoSync = parseBoolean(source.autoSync, DEFAULT_CONFIG.autoSync);
       next.refreshIntervalMs = parsePositiveInteger(source.refreshIntervalMs, DEFAULT_CONFIG.refreshIntervalMs);
       next.requireAccessCode = parseBoolean(source.requireAccessCode, DEFAULT_CONFIG.requireAccessCode);
+      next.requireGoogleAuth = parseBoolean(source.requireGoogleAuth, DEFAULT_CONFIG.requireGoogleAuth);
     }
 
     if (next.syncMode !== "supabase-function") {
@@ -101,12 +112,13 @@
       && left.functionName === right.functionName
       && left.autoSync === right.autoSync
       && left.refreshIntervalMs === right.refreshIntervalMs
-      && left.requireAccessCode === right.requireAccessCode;
+      && left.requireAccessCode === right.requireAccessCode
+      && left.requireGoogleAuth === right.requireGoogleAuth;
   }
 
   function parseQueryConfig() {
     const params = new URLSearchParams(window.location.search);
-    const hasOverride = ["sync", "sbUrl", "sbKey", "fn", "as", "ri", "ac"].some((key) => params.has(key));
+    const hasOverride = ["sync", "sbUrl", "sbKey", "fn", "as", "ri", "ac", "ga"].some((key) => params.has(key));
     if (!hasOverride) {
       return null;
     }
@@ -121,7 +133,8 @@
       functionName: params.get("fn") || DEFAULT_CONFIG.functionName,
       autoSync: params.has("as") ? params.get("as") : DEFAULT_CONFIG.autoSync,
       refreshIntervalMs: params.get("ri") || DEFAULT_CONFIG.refreshIntervalMs,
-      requireAccessCode: params.get("ac")
+      requireAccessCode: params.has("ac") ? params.get("ac") : DEFAULT_CONFIG.requireAccessCode,
+      requireGoogleAuth: params.has("ga") ? params.get("ga") : DEFAULT_CONFIG.requireGoogleAuth
     });
   }
 
@@ -155,16 +168,30 @@
     if (normalized.refreshIntervalMs !== DEFAULT_CONFIG.refreshIntervalMs) {
       params.set("ri", String(normalized.refreshIntervalMs));
     }
-    if (normalized.requireAccessCode) {
-      params.set("ac", "1");
+    if (normalized.requireAccessCode !== DEFAULT_CONFIG.requireAccessCode) {
+      params.set("ac", normalized.requireAccessCode ? "1" : "0");
+    }
+    if (normalized.requireGoogleAuth !== DEFAULT_CONFIG.requireGoogleAuth) {
+      params.set("ga", normalized.requireGoogleAuth ? "1" : "0");
     }
 
     return `?${params.toString()}`;
   }
 
+  function buildForcedLocalConfig(source) {
+    return normalizeConfig({
+      ...source,
+      syncMode: "local-only",
+      requireAccessCode: false,
+      requireGoogleAuth: false
+    });
+  }
+
   const queryConfig = parseQueryConfig();
   const storedConfig = queryConfig ? null : loadStoredConfig();
-  const effectiveConfig = queryConfig || storedConfig || normalizeConfig(DEFAULT_CONFIG);
+  const baseConfig = queryConfig || storedConfig || normalizeConfig(DEFAULT_CONFIG);
+  const forceLocalMode = !queryConfig && isLocalEnvironment();
+  const effectiveConfig = forceLocalMode ? buildForcedLocalConfig(baseConfig) : baseConfig;
 
   if (queryConfig) {
     saveStoredConfig(queryConfig);
@@ -173,7 +200,8 @@
   window.SHARSH_RUNTIME_CONFIG = effectiveConfig;
   window.SHARSH_RUNTIME_CONFIG_META = {
     storageKey: STORAGE_KEY,
-    source: queryConfig ? "query" : (storedConfig ? "storage" : "default"),
+    source: queryConfig ? "query" : (forceLocalMode ? "local-env" : (storedConfig ? "storage" : "default")),
+    isLocalEnvironment,
     shareQuery: buildShareQueryString(effectiveConfig),
     buildShareQueryString,
     normalizeConfig,

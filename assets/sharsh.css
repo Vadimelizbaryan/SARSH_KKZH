@@ -46,6 +46,10 @@ a {
   margin: 0 auto;
 }
 
+.page--narrow {
+  max-width: 640px;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;
@@ -212,6 +216,27 @@ a {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.45;
+}
+
+.access-gate-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 56px;
+  padding: 24px;
+}
+
+.access-gate-panel h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.access-gate-form {
+  margin-top: 2px;
+}
+
+.access-gate-actions {
+  align-items: center;
 }
 
 .info-stack {
@@ -664,7 +689,8 @@ a {
 }
 
 .setup-actions button,
-.setup-link-copy {
+.setup-link-copy,
+.access-gate-link {
   border: 1px solid var(--panel-border);
   background: var(--panel);
   box-shadow: 0 10px 24px rgba(17, 17, 17, 0.08);
@@ -673,6 +699,20 @@ a {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.access-gate-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.setup-actions button:hover,
+.setup-link-copy:hover,
+.access-gate-link:hover {
+  background: #ffffff;
 }
 
 .setup-output {

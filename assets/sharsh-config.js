@@ -368,16 +368,26 @@
     return departmentById.get(id) || null;
   }
 
+  function buildSiteProxyPath(relativePath) {
+    return `${window.location.origin}/functions/v1/site?path=${encodeURIComponent(relativePath)}`;
+  }
+
   function getDepartmentPagePath(basePath, departmentId) {
     const definition = getDepartmentById(departmentId);
     if (!definition) {
       return null;
+    }
+    if (basePath === "@site") {
+      return buildSiteProxyPath(`departments/${definition.slug}.html`);
     }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
     return `${prefix}departments/${definition.slug}.html`;
   }
 
   function getMainPagePath(basePath) {
+    if (basePath === "@site") {
+      return buildSiteProxyPath("SARSH_KKZH.html");
+    }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
     return `${prefix}SARSH_KKZH.html`;
   }

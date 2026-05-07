@@ -13,7 +13,8 @@
     supabaseAnonKey: document.getElementById("supabaseAnonKeyField"),
     functionName: document.getElementById("functionNameField"),
     refreshInterval: document.getElementById("refreshIntervalField"),
-    requireAccessCode: document.getElementById("requireAccessCodeField")
+    requireAccessCode: document.getElementById("requireAccessCodeField"),
+    requireGoogleAuth: document.getElementById("requireGoogleAuthField")
   };
 
   const statusText = document.getElementById("setupStatusText");
@@ -52,7 +53,8 @@
       supabaseAnonKey: fields.supabaseAnonKey ? fields.supabaseAnonKey.value : "",
       functionName: fields.functionName ? fields.functionName.value : "",
       refreshIntervalMs: fields.refreshInterval ? fields.refreshInterval.value : "",
-      requireAccessCode: fields.requireAccessCode ? fields.requireAccessCode.checked : false
+      requireAccessCode: fields.requireAccessCode ? fields.requireAccessCode.checked : false,
+      requireGoogleAuth: fields.requireGoogleAuth ? fields.requireGoogleAuth.checked : false
     });
   }
 
@@ -77,6 +79,11 @@
     if (source === "query") {
       sourceLabel.textContent = "Из ссылки";
       sourceLabel.className = "pill remote";
+      return;
+    }
+    if (source === "local-env") {
+      sourceLabel.textContent = "Локально";
+      sourceLabel.className = "pill local";
       return;
     }
     if (source === "storage" || (storedConfig && storedConfig.syncMode === "supabase-function")) {
@@ -112,7 +119,7 @@
             <strong>${escapeHtml(definition.department)}</strong>
             <input class="setup-link-url" type="text" readonly value="${escapeHtml(url)}">
           </div>
-          <button type="button" class="setup-link-copy" data-copy-value="${escapeHtml(url)}">Copy</button>
+          <button type="button" class="setup-link-copy" data-copy-value="${escapeHtml(url)}">Копировать</button>
         </div>
       `;
     }).join("");
@@ -124,7 +131,7 @@
           await copyText(value);
           setStatus("Ссылка отделения скопирована.", false);
         } catch (_error) {
-          window.prompt("Скопируй эту ссылку", value);
+          window.prompt("Скопируйте эту ссылку", value);
         }
       });
     });
@@ -143,6 +150,9 @@
 
     const baseUrl = runtimeConfig.supabaseUrl.replace(/\/+$/, "");
     const endpoint = `${baseUrl}/functions/v1/${runtimeConfig.functionName}`;
+    const accessToken = window.SHARSH_AUTH && typeof window.SHARSH_AUTH.getAccessToken === "function"
+      ? window.SHARSH_AUTH.getAccessToken()
+      : "";
 
     setStatus("Проверяю подключение к серверу...", false);
 
@@ -151,7 +161,7 @@
         method: "GET",
         headers: {
           apikey: runtimeConfig.supabaseAnonKey,
-          Authorization: `Bearer ${runtimeConfig.supabaseAnonKey}`
+          Authorization: `Bearer ${accessToken || runtimeConfig.supabaseAnonKey}`
         }
       });
 
@@ -204,6 +214,9 @@
     if (fields.requireAccessCode) {
       fields.requireAccessCode.checked = false;
     }
+    if (fields.requireGoogleAuth) {
+      fields.requireGoogleAuth.checked = false;
+    }
 
     updateGeneratedLinks();
     updateSourceLabel();
@@ -229,36 +242,47 @@
     if (fields.requireAccessCode) {
       fields.requireAccessCode.checked = Boolean(runtime.requireAccessCode);
     }
-  }
-
-  prefillFields();
-  updateSourceLabel();
-  updateGeneratedLinks();
-  setStatus("Введи значения Supabase, проверь подключение, затем открой главную ссылку.", false);
-
-  Object.values(fields).forEach((field) => {
-    if (!field) {
-      return;
+    if (fields.requireGoogleAuth) {
+      fields.requireGoogleAuth.checked = runtime.requireGoogleAuth !== false;
     }
-    field.addEventListener("input", updateGeneratedLinks);
-    field.addEventListener("change", updateGeneratedLinks);
-  });
+  }
 
-  if (testButton) {
-    testButton.addEventListener("click", testConnection);
-  }
-  if (saveButton) {
-    saveButton.addEventListener("click", () => {
-      saveBrowserConfig();
-      updateSourceLabel();
+  async function init() {
+    if (window.SHARSH_AUTH_READY) {
+      await window.SHARSH_AUTH_READY;
+    }
+
+    prefillFields();
+    updateSourceLabel();
+    updateGeneratedLinks();
+    setStatus("Введи значения Supabase, проверь подключение, затем открой главную ссылку.", false);
+
+    Object.values(fields).forEach((field) => {
+      if (!field) {
+        return;
+      }
+      field.addEventListener("input", updateGeneratedLinks);
+      field.addEventListener("change", updateGeneratedLinks);
     });
+
+    if (testButton) {
+      testButton.addEventListener("click", testConnection);
+    }
+    if (saveButton) {
+      saveButton.addEventListener("click", () => {
+        saveBrowserConfig();
+        updateSourceLabel();
+      });
+    }
+    if (clearButton) {
+      clearButton.addEventListener("click", clearBrowserConfig);
+    }
+    if (mainLink) {
+      mainLink.addEventListener("click", () => {
+        mainLink.select();
+      });
+    }
   }
-  if (clearButton) {
-    clearButton.addEventListener("click", clearBrowserConfig);
-  }
-  if (mainLink) {
-    mainLink.addEventListener("click", () => {
-      mainLink.select();
-    });
-  }
+
+  init();
 })();

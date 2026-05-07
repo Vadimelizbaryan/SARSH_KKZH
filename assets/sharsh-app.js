@@ -1,6 +1,7 @@
 (function () {
   const config = window.SHARSH_CONFIG;
   const sync = window.SHARSH_SYNC;
+  const auth = window.SHARSH_AUTH || null;
   const app = document.getElementById("app");
 
   if (!config || !sync || !app) {
@@ -18,10 +19,12 @@
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
   const DEFAULT_DOCUMENT_TITLE = document.title;
   const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
+  const SAVE_RULE_TEXT_SHORT = "сумма блока АРКА Э = (1 + 4 + 11) - (7 + 10)";
   const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
   const ARCHIVE_TIMEZONE = "Asia/Yerevan";
   const ARCHIVE_CAPTURE_HOUR = 10;
   const MAX_ARCHIVE_RECORDS = 60;
+  const DEPARTMENT_UNLOCK_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:department-unlock:`;
 
   const state = {
     snapshot: config.buildDefaultSnapshot(),
@@ -52,6 +55,76 @@
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
+  }
+
+  function getCurrentDepartmentDefinition() {
+    return mode === "department" ? config.getDepartmentById(departmentId) : null;
+  }
+
+  function getDepartmentUnlockStorageKey() {
+    return `${DEPARTMENT_UNLOCK_STORAGE_PREFIX}${departmentId}`;
+  }
+
+  function migrateLegacyAccessCodeStorage() {
+    if (mode !== "department" || !departmentId) {
+      return;
+    }
+
+    const storageKey = config.getAccessCodeStorageKey(departmentId);
+    const sessionValue = sessionStorage.getItem(storageKey);
+    const legacyValue = localStorage.getItem(storageKey);
+
+    if (!sessionValue && legacyValue) {
+      sessionStorage.setItem(storageKey, legacyValue);
+    }
+    if (legacyValue) {
+      localStorage.removeItem(storageKey);
+    }
+  }
+
+  function getStoredAccessCode() {
+    if (mode !== "department" || !departmentId) {
+      return "";
+    }
+    return sessionStorage.getItem(config.getAccessCodeStorageKey(departmentId)) || "";
+  }
+
+  function setStoredAccessCode(value) {
+    if (mode !== "department" || !departmentId) {
+      return;
+    }
+
+    const storageKey = config.getAccessCodeStorageKey(departmentId);
+    const normalized = String(value || "").trim();
+    if (normalized) {
+      sessionStorage.setItem(storageKey, normalized);
+    } else {
+      sessionStorage.removeItem(storageKey);
+    }
+    localStorage.removeItem(storageKey);
+  }
+
+  function isDepartmentAccessProtected() {
+    return Boolean(sync.runtime && sync.runtime.requireAccessCode && sync.hasRemoteSync());
+  }
+
+  function isDepartmentUnlocked() {
+    return !isDepartmentAccessProtected() || sessionStorage.getItem(getDepartmentUnlockStorageKey()) === "1";
+  }
+
+  function unlockCurrentDepartment() {
+    if (mode !== "department" || !departmentId) {
+      return;
+    }
+    sessionStorage.setItem(getDepartmentUnlockStorageKey(), "1");
+  }
+
+  function clearCurrentDepartmentUnlock() {
+    if (mode !== "department" || !departmentId) {
+      return;
+    }
+    sessionStorage.removeItem(getDepartmentUnlockStorageKey());
+    setStoredAccessCode("");
   }
 
   function formatTimestamp(value) {
@@ -495,10 +568,16 @@
   function hasDepartmentSaveRule(row) {
     return Boolean(
       row
-      && row.hasLeaveTotal
       && Array.isArray(row.presentKeys)
-      && row.presentKeys.length === 10
+      && row.presentKeys.length >= 6
     );
+  }
+
+  function getDepartmentSaveRuleText(row) {
+    if (!row) {
+      return SAVE_RULE_TEXT;
+    }
+    return row.hasLeaveTotal ? SAVE_RULE_TEXT : SAVE_RULE_TEXT_SHORT;
   }
 
   function getDepartmentValidationState() {
@@ -523,6 +602,7 @@
       + getNumber(state.snapshot, row, "transferFromDepartment")
     );
     const isValid = actual === expected;
+    const ruleText = getDepartmentSaveRuleText(row);
 
     return {
       applicable: true,
@@ -780,7 +860,7 @@
   function buildCopyCard(definition) {
     const row = getDepartmentRow(state.snapshot, definition.id);
     const freshness = getRowFreshnessMeta(row);
-    const relativePath = appendShareQuery(config.getDepartmentPagePath(".", definition.id));
+    const relativePath = appendShareQuery(config.getDepartmentPagePath(basePath, definition.id));
     return `
       <div class="link-card">
         <strong>${escapeHtml(definition.department)}</strong>
@@ -806,11 +886,17 @@
   }
 
   function getArchivePrintPath(archiveKey) {
+    if (basePath === "@site") {
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&archive=${encodeURIComponent(archiveKey)}&autoprint=1`);
+    }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
     return `${prefix}archive-print.html?archive=${encodeURIComponent(archiveKey)}&autoprint=1`;
   }
 
   function getSetupPath() {
+    if (basePath === "@site") {
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("setup-sync.html")}`);
+    }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
     return appendShareQuery(`${prefix}setup-sync.html`);
   }
@@ -841,6 +927,25 @@
       return "Сейчас показан локальный кэш. Сервер временно недоступен.";
     }
     return "Сейчас включен локальный режим. Между разными компьютерами данные еще не объединяются.";
+  }
+
+  function showGoogleAuthTools() {
+    return Boolean(auth && typeof auth.requiresGoogleAuth === "function" && auth.requiresGoogleAuth());
+  }
+
+  function buildGoogleAuthActions() {
+    if (!showGoogleAuthTools()) {
+      return "";
+    }
+
+    const email = auth && typeof auth.getUserEmail === "function"
+      ? auth.getUserEmail()
+      : "";
+
+    return `
+      <span class="pill remote">${escapeHtml(email || "Google")}</span>
+      <button type="button" data-google-signout>Sign out</button>
+    `;
   }
 
   function getPrintDocumentTitle() {
@@ -875,6 +980,7 @@
           </div>
           <div class="toolbar-actions">
             <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
+            ${buildGoogleAuthActions()}
             <div class="zoom-control">
               <label for="zoomRange">Масштаб</label>
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
@@ -975,7 +1081,50 @@
     `;
   }
 
+  function renderDepartmentAccessGate(message = "", isError = false) {
+    const definition = getCurrentDepartmentDefinition();
+    const departmentName = definition ? definition.department : "Отделение";
+    const mainPath = appendShareQuery(config.getMainPagePath(basePath));
+    const canVerifyAccess = sync.hasRemoteSync();
+    const statusText = message || (canVerifyAccess
+      ? "Введите код отделения, чтобы открыть этот HTML-бланк."
+      : "Защищённый вход работает только при включённой онлайн-синхронизации Supabase.");
+
+    app.innerHTML = `
+      <div class="page page--narrow">
+        <div class="panel access-gate-panel">
+          <span class="pill ${canVerifyAccess ? "remote" : "local"}">Защищённый вход</span>
+          <h1>${escapeHtml(departmentName)}</h1>
+          <p>Бланк отделения откроется только после проверки кода доступа.</p>
+          <form id="departmentAccessForm" class="setup-form access-gate-form">
+            <label class="setup-field">
+              <span>Код доступа</span>
+              <input
+                type="password"
+                id="departmentAccessCode"
+                value="${escapeHtml(getStoredAccessCode())}"
+                aria-label="Код доступа отделения"
+                autocomplete="current-password"
+                ${canVerifyAccess ? "" : "disabled"}
+              >
+            </label>
+            <div class="setup-actions access-gate-actions">
+              <button type="submit" id="departmentAccessSubmit" ${canVerifyAccess ? "" : "disabled"}>Войти</button>
+              <a class="button-link access-gate-link" href="${escapeHtml(mainPath)}">К главному</a>
+            </div>
+          </form>
+          <p class="hint${isError ? " warning-note" : ""}" id="gateStatusText">${escapeHtml(statusText)}</p>
+        </div>
+      </div>
+    `;
+  }
+
   function renderDepartmentPage() {
+    if (isDepartmentAccessProtected() && !isDepartmentUnlocked()) {
+      renderDepartmentAccessGate();
+      return;
+    }
+
     const row = getCurrentRow();
     const sourceLabel = sync.getSourceLabel(state.source);
     const rowFreshness = getRowFreshnessMeta(row);
@@ -994,7 +1143,7 @@
     }
 
     const mainPath = appendShareQuery(config.getMainPagePath(basePath));
-    const accessCodeValue = localStorage.getItem(config.getAccessCodeStorageKey(departmentId)) || "";
+    const accessCodeValue = getStoredAccessCode();
 
     app.innerHTML = `
       <div class="page">
@@ -1009,6 +1158,7 @@
           </div>
           <div class="toolbar-actions">
             <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
+            ${buildGoogleAuthActions()}
             <div class="zoom-control">
               <label for="zoomRange">Масштаб</label>
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
@@ -1031,7 +1181,7 @@
                 <span>Дата и время</span>
                 <strong id="reportDateField">${escapeHtml(currentDateTime.full)}</strong>
               </div>
-              ${sync.runtime.requireAccessCode ? `
+              ${isDepartmentAccessProtected() ? `
                 <label class="inline-field access-code">
                   <span>Код</span>
                   <input type="password" id="accessCodeField" value="${escapeHtml(accessCodeValue)}" aria-label="Код отделения">
@@ -1375,6 +1525,9 @@
   }
 
   function getStylesheetUrl() {
+    if (basePath === "@site") {
+      return `${window.location.origin}/functions/v1/site?path=${encodeURIComponent("assets/sharsh.css")}`;
+    }
     return new URL(`${basePath === "." ? "" : `${basePath}/`}assets/sharsh.css`, window.location.href).toString();
   }
 
@@ -1530,14 +1683,73 @@
 
   function getAccessCode() {
     const input = document.getElementById("accessCodeField");
-    return input ? input.value.trim() : "";
+    return input ? input.value.trim() : getStoredAccessCode();
   }
 
   function persistAccessCode() {
-    if (!sync.runtime.requireAccessCode) {
+    if (!isDepartmentAccessProtected()) {
       return;
     }
-    localStorage.setItem(config.getAccessCodeStorageKey(departmentId), getAccessCode());
+    setStoredAccessCode(getAccessCode());
+  }
+
+  function setGateStatusText(message, isError) {
+    const status = document.getElementById("gateStatusText");
+    if (!status) {
+      return;
+    }
+
+    status.textContent = message || "";
+    status.className = `hint${isError ? " warning-note" : ""}`;
+  }
+
+  async function loadWorkingSnapshot() {
+    const result = await sync.loadSnapshot();
+    state.snapshot = deepCopy(result.snapshot);
+    state.loadedSnapshot = deepCopy(result.snapshot);
+    state.source = result.source;
+    state.warning = result.warning || "";
+    state.archiveRecords = readArchiveRecords();
+    state.initialized = true;
+    state.info = "";
+  }
+
+  async function handleDepartmentAccessSubmit(event) {
+    event.preventDefault();
+
+    if (!sync.hasRemoteSync()) {
+      setGateStatusText("Защищённый вход работает только при включённой онлайн-синхронизации Supabase.", true);
+      return;
+    }
+
+    const input = document.getElementById("departmentAccessCode");
+    const submitButton = document.getElementById("departmentAccessSubmit");
+    const accessCode = input instanceof HTMLInputElement ? input.value.trim() : "";
+
+    if (submitButton instanceof HTMLButtonElement) {
+      submitButton.disabled = true;
+    }
+    setGateStatusText("Проверяю код доступа...", false);
+
+    try {
+      await sync.verifyDepartmentAccess(departmentId, accessCode);
+      setStoredAccessCode(accessCode);
+      unlockCurrentDepartment();
+      await loadWorkingSnapshot();
+      renderPage();
+      startAutoRefreshIfNeeded();
+      startFreshnessTicker();
+      startClockTicker();
+    } catch (error) {
+      clearCurrentDepartmentUnlock();
+      setGateStatusText(
+        error instanceof Error ? error.message : "Не удалось проверить код доступа.",
+        true
+      );
+      if (submitButton instanceof HTMLButtonElement) {
+        submitButton.disabled = false;
+      }
+    }
   }
 
   async function persistDepartment(manual) {
@@ -1555,7 +1767,7 @@
       return;
     }
 
-    if (sync.runtime.requireAccessCode && !getAccessCode()) {
+    if (isDepartmentAccessProtected() && !getAccessCode()) {
       setInfo("Для сохранения нужен код отделения.", true);
       return;
     }
@@ -1682,6 +1894,7 @@
     const resetBtn = document.getElementById("resetBtn");
     const saveBtn = document.getElementById("saveBtn");
     const accessCodeField = document.getElementById("accessCodeField");
+    const accessForm = document.getElementById("departmentAccessForm");
     const sheetBody = document.getElementById("sheetBody");
 
     if (zoomRange) {
@@ -1725,6 +1938,10 @@
       });
     }
 
+    if (accessForm) {
+      accessForm.addEventListener("submit", handleDepartmentAccessSubmit);
+    }
+
     if (resetBtn) {
       resetBtn.addEventListener("click", () => {
         handleResetDepartment();
@@ -1745,10 +1962,17 @@
           await navigator.clipboard.writeText(absoluteLink);
           setInfo(`Ссылка скопирована: ${relativeLink}`, false);
         } catch (error) {
-          window.prompt("Скопируй ссылку вручную", absoluteLink);
+          window.prompt("Скопируйте ссылку вручную", absoluteLink);
         }
       });
     });
+
+    const signOutButton = document.querySelector("[data-google-signout]");
+    if (signOutButton && auth && typeof auth.signOut === "function") {
+      signOutButton.addEventListener("click", () => {
+        auth.signOut();
+      });
+    }
 
     const archiveSelect = document.getElementById("archiveSelect");
     if (archiveSelect) {
@@ -1887,6 +2111,10 @@
   }
 
   async function init() {
+    if (window.SHARSH_AUTH_READY) {
+      await window.SHARSH_AUTH_READY;
+    }
+
     if (mode === "archive") {
       state.archiveRecords = readArchiveRecords();
       state.initialized = true;
@@ -1900,16 +2128,18 @@
       return;
     }
 
+    migrateLegacyAccessCodeStorage();
+
+    if (isDepartmentAccessProtected() && !isDepartmentUnlocked()) {
+      state.info = "";
+      state.warning = "";
+      renderPage();
+      return;
+    }
+
     syncCurrentReportDate();
     setInfo("Загружаю данные...", false);
-    const result = await sync.loadSnapshot();
-    state.snapshot = deepCopy(result.snapshot);
-    state.loadedSnapshot = deepCopy(result.snapshot);
-    state.source = result.source;
-    state.warning = result.warning || "";
-    state.archiveRecords = readArchiveRecords();
-    state.initialized = true;
-    state.info = "";
+    await loadWorkingSnapshot();
     renderPage();
     startAutoRefreshIfNeeded();
     startFreshnessTicker();

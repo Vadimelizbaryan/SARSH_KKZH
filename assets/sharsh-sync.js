@@ -2,6 +2,7 @@
   const config = window.SHARSH_CONFIG;
   const runtime = window.SHARSH_RUNTIME_CONFIG || {};
   const runtimeMeta = window.SHARSH_RUNTIME_CONFIG_META || {};
+  const auth = window.SHARSH_AUTH || null;
 
   function deepCopy(value) {
     return config.deepCopy(value);
@@ -13,6 +14,16 @@
       && runtime.supabaseUrl.trim() !== ""
       && typeof runtime.supabaseAnonKey === "string"
       && runtime.supabaseAnonKey.trim() !== "";
+  }
+
+  function requiresGoogleAuth() {
+    return Boolean(runtime.requireGoogleAuth && hasRemoteSync());
+  }
+
+  function getAccessToken() {
+    return auth && typeof auth.getAccessToken === "function"
+      ? String(auth.getAccessToken() || "")
+      : "";
   }
 
   function getSyncEndpoint() {
@@ -27,11 +38,18 @@
     };
 
     if (hasRemoteSync()) {
+      const accessToken = getAccessToken();
       headers.apikey = runtime.supabaseAnonKey;
-      headers.Authorization = `Bearer ${runtime.supabaseAnonKey}`;
+      headers.Authorization = `Bearer ${accessToken || runtime.supabaseAnonKey}`;
     }
 
     return headers;
+  }
+
+  function ensureGoogleAuth() {
+    if (requiresGoogleAuth() && !getAccessToken()) {
+      throw new Error("Сначала войдите как владелец.");
+    }
   }
 
   function readLocalDepartmentRecord(departmentId) {
@@ -121,6 +139,7 @@
   }
 
   async function loadRemoteSnapshot() {
+    ensureGoogleAuth();
     const response = await fetch(getSyncEndpoint(), {
       method: "GET",
       headers: getAuthHeaders()
@@ -153,6 +172,9 @@
         source: "remote"
       };
     } catch (error) {
+      if (requiresGoogleAuth()) {
+        throw error;
+      }
       const snapshot = loadLocalSnapshot();
       return {
         snapshot,
@@ -163,6 +185,7 @@
   }
 
   async function postRemote(body) {
+    ensureGoogleAuth();
     const response = await fetch(getSyncEndpoint(), {
       method: "POST",
       headers: getAuthHeaders(),
@@ -178,6 +201,31 @@
     const snapshot = config.buildSnapshotFromSaved(payload);
     writeLocalSnapshot(snapshot);
     return snapshot;
+  }
+
+  async function verifyDepartmentAccess(departmentId, accessCode) {
+    ensureGoogleAuth();
+    if (!hasRemoteSync()) {
+      throw new Error("Защищённый вход доступен только при включённой онлайн-синхронизации.");
+    }
+
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "verify_access_code",
+        departmentId,
+        accessCode: accessCode || ""
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message = payload && payload.error ? payload.error : `Ошибка проверки кода (${response.status})`;
+      throw new Error(message);
+    }
+
+    return payload;
   }
 
   async function saveDepartment(departmentId, reportDate, values, accessCode) {
@@ -263,6 +311,7 @@
     loadSnapshot,
     saveDepartment,
     saveReportDate,
+    verifyDepartmentAccess,
     loadLocalSnapshot,
     writeLocalSnapshot,
     getSourceLabel,

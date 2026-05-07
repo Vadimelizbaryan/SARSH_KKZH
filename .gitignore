@@ -2,3 +2,6 @@ _*.png
 ~$*.docx
 Thumbs.db
 Desktop.ini
+scripts/.sarsh-local-server.pid
+.tools/
+supabase/.temp/
