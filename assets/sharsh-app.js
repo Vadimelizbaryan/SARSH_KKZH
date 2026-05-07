@@ -12,6 +12,7 @@
   const basePath = document.body.dataset.basePath || ".";
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
   const DEFAULT_DOCUMENT_TITLE = document.title;
+  const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
 
   const state = {
     snapshot: config.buildDefaultSnapshot(),
@@ -253,6 +254,49 @@
     return getNumber(snapshot, row, "leaveSharq")
       + getNumber(snapshot, row, "leaveSpa")
       + getNumber(snapshot, row, "leavePaym");
+  }
+
+  function hasDepartmentSaveRule(row) {
+    return Boolean(
+      row
+      && row.hasLeaveTotal
+      && Array.isArray(row.presentKeys)
+      && row.presentKeys.length === 10
+    );
+  }
+
+  function getDepartmentValidationState() {
+    const row = getCurrentRow();
+    if (mode !== "department" || !hasDepartmentSaveRule(row)) {
+      return {
+        applicable: false,
+        isValid: true,
+        actual: 0,
+        expected: 0,
+        message: ""
+      };
+    }
+
+    const actual = calcPresentTotal(state.snapshot, row);
+    const expected = (
+      getNumber(state.snapshot, row, "beenTotal")
+      + getNumber(state.snapshot, row, "admittedTotal")
+      + getNumber(state.snapshot, row, "transferToDepartment")
+    ) - (
+      getNumber(state.snapshot, row, "dgTotal")
+      + getNumber(state.snapshot, row, "transferFromDepartment")
+    );
+    const isValid = actual === expected;
+
+    return {
+      applicable: true,
+      isValid,
+      actual,
+      expected,
+      message: isValid
+        ? `Проверка пройдена: ${SAVE_RULE_TEXT}.`
+        : `Сохранение заблокировано: сумма 13-22 = ${actual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${expected}.`
+    };
   }
 
   function getSummaryValue(snapshot, rows, key) {
@@ -716,6 +760,7 @@
             <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
             <p class="hint" id="syncInfoText">${escapeHtml(state.info || "Изменения сохраняются локально сразу. Если онлайн-синхронизация включена, они автоматически отправляются в общий файл.")}</p>
             <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
+            <p class="hint save-rule-note" id="saveRuleText"></p>
           </div>
 
           <div class="zoom-target">
@@ -923,6 +968,42 @@
     }
 
     refreshComputedCells();
+    refreshDepartmentSaveState();
+  }
+
+  function refreshDepartmentSaveState() {
+    const saveBtn = document.getElementById("saveBtn");
+    const ruleText = document.getElementById("saveRuleText");
+
+    if (!saveBtn) {
+      return;
+    }
+
+    const validation = getDepartmentValidationState();
+    saveBtn.classList.remove("save-ready", "save-blocked");
+
+    if (!validation.applicable) {
+      saveBtn.disabled = false;
+      saveBtn.removeAttribute("aria-disabled");
+      saveBtn.removeAttribute("title");
+      if (ruleText) {
+        ruleText.textContent = "";
+        ruleText.className = "hint save-rule-note";
+      }
+      return;
+    }
+
+    saveBtn.disabled = !validation.isValid;
+    saveBtn.setAttribute("aria-disabled", String(!validation.isValid));
+    saveBtn.title = validation.isValid
+      ? "Формула совпадает, можно сохранять."
+      : "Исправь данные: кнопка станет активной, когда сумма 13-22 совпадет с формулой.";
+    saveBtn.classList.add(validation.isValid ? "save-ready" : "save-blocked");
+
+    if (ruleText) {
+      ruleText.textContent = validation.message;
+      ruleText.className = `hint save-rule-note ${validation.isValid ? "save-rule-note--valid" : "save-rule-note--invalid"}`;
+    }
   }
 
   function setInfo(message, isError) {
@@ -1023,6 +1104,12 @@
     syncCurrentReportDate();
     persistAccessCode();
 
+    const validation = getDepartmentValidationState();
+    if (validation.applicable && !validation.isValid) {
+      setInfo(validation.message, true);
+      return;
+    }
+
     if (sync.runtime.requireAccessCode && !getAccessCode()) {
       setInfo("Для сохранения нужен код отделения.", true);
       return;
@@ -1065,6 +1152,10 @@
 
   function queueDepartmentSave() {
     window.clearTimeout(state.saveTimer);
+    const validation = getDepartmentValidationState();
+    if (validation.applicable && !validation.isValid) {
+      return;
+    }
     if (!sync.runtime.autoSync) {
       setInfo("Изменения сохранены локально. Нажми Сохранить для отправки.", false);
       return;
