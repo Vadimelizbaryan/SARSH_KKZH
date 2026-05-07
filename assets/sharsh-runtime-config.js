@@ -1,5 +1,5 @@
 (function () {
-  const STORAGE_KEY = "sarsh-kkzh-runtime-config-v2";
+  const STORAGE_KEY = "sarsh-kkzh-runtime-config-v3";
   const DEFAULT_CONFIG = {
     syncMode: "supabase-function",
     supabaseUrl: "https://ywecvlapdlaojpvijaqy.supabase.co",
@@ -8,7 +8,7 @@
     autoSync: true,
     refreshIntervalMs: 30000,
     requireAccessCode: false,
-    requireGoogleAuth: true
+    requireOwnerAuth: true
   };
 
   function isLocalEnvironment() {
@@ -72,7 +72,7 @@
       next.autoSync = parseBoolean(source.autoSync, DEFAULT_CONFIG.autoSync);
       next.refreshIntervalMs = parsePositiveInteger(source.refreshIntervalMs, DEFAULT_CONFIG.refreshIntervalMs);
       next.requireAccessCode = parseBoolean(source.requireAccessCode, DEFAULT_CONFIG.requireAccessCode);
-      next.requireGoogleAuth = parseBoolean(source.requireGoogleAuth, DEFAULT_CONFIG.requireGoogleAuth);
+      next.requireOwnerAuth = parseBoolean(source.requireOwnerAuth, DEFAULT_CONFIG.requireOwnerAuth);
     }
 
     if (next.syncMode !== "supabase-function") {
@@ -113,12 +113,12 @@
       && left.autoSync === right.autoSync
       && left.refreshIntervalMs === right.refreshIntervalMs
       && left.requireAccessCode === right.requireAccessCode
-      && left.requireGoogleAuth === right.requireGoogleAuth;
+      && left.requireOwnerAuth === right.requireOwnerAuth;
   }
 
   function parseQueryConfig() {
     const params = new URLSearchParams(window.location.search);
-    const hasOverride = ["sync", "sbUrl", "sbKey", "fn", "as", "ri", "ac", "ga"].some((key) => params.has(key));
+    const hasOverride = ["sync", "sbUrl", "sbKey", "fn", "as", "ri", "ac", "oa"].some((key) => params.has(key));
     if (!hasOverride) {
       return null;
     }
@@ -134,7 +134,7 @@
       autoSync: params.has("as") ? params.get("as") : DEFAULT_CONFIG.autoSync,
       refreshIntervalMs: params.get("ri") || DEFAULT_CONFIG.refreshIntervalMs,
       requireAccessCode: params.has("ac") ? params.get("ac") : DEFAULT_CONFIG.requireAccessCode,
-      requireGoogleAuth: params.has("ga") ? params.get("ga") : DEFAULT_CONFIG.requireGoogleAuth
+      requireOwnerAuth: params.has("oa") ? params.get("oa") : DEFAULT_CONFIG.requireOwnerAuth
     });
   }
 
@@ -171,8 +171,8 @@
     if (normalized.requireAccessCode !== DEFAULT_CONFIG.requireAccessCode) {
       params.set("ac", normalized.requireAccessCode ? "1" : "0");
     }
-    if (normalized.requireGoogleAuth !== DEFAULT_CONFIG.requireGoogleAuth) {
-      params.set("ga", normalized.requireGoogleAuth ? "1" : "0");
+    if (normalized.requireOwnerAuth !== DEFAULT_CONFIG.requireOwnerAuth) {
+      params.set("oa", normalized.requireOwnerAuth ? "1" : "0");
     }
 
     return `?${params.toString()}`;
@@ -183,7 +183,7 @@
       ...source,
       syncMode: "local-only",
       requireAccessCode: false,
-      requireGoogleAuth: false
+      requireOwnerAuth: false
     });
   }
 

@@ -16,8 +16,8 @@
       && runtime.supabaseAnonKey.trim() !== "";
   }
 
-  function requiresGoogleAuth() {
-    return Boolean(runtime.requireGoogleAuth && hasRemoteSync());
+  function requiresOwnerAuth() {
+    return Boolean(runtime.requireOwnerAuth && hasRemoteSync());
   }
 
   function getAccessToken() {
@@ -46,8 +46,8 @@
     return headers;
   }
 
-  function ensureGoogleAuth() {
-    if (requiresGoogleAuth() && !getAccessToken()) {
+  function ensureOwnerAuth() {
+    if (requiresOwnerAuth() && !getAccessToken()) {
       throw new Error("Сначала войдите как владелец.");
     }
   }
@@ -68,7 +68,7 @@
         values: config.normalizeRowValues(parsed.values),
         updatedAt: parsed.updatedAt ? String(parsed.updatedAt) : null
       };
-    } catch (error) {
+    } catch (_error) {
       return null;
     }
   }
@@ -102,7 +102,7 @@
     try {
       const migrated = config.buildSnapshotFromSaved(JSON.parse(legacyRaw));
       return writeLocalSnapshot(migrated);
-    } catch (error) {
+    } catch (_error) {
       return null;
     }
   }
@@ -117,7 +117,7 @@
     if (cachedRaw) {
       try {
         return config.buildSnapshotFromSaved(JSON.parse(cachedRaw));
-      } catch (error) {
+      } catch (_error) {
         localStorage.removeItem(config.getMainCacheStorageKey());
       }
     }
@@ -139,7 +139,7 @@
   }
 
   async function loadRemoteSnapshot() {
-    ensureGoogleAuth();
+    ensureOwnerAuth();
     const response = await fetch(getSyncEndpoint(), {
       method: "GET",
       headers: getAuthHeaders()
@@ -172,7 +172,7 @@
         source: "remote"
       };
     } catch (error) {
-      if (requiresGoogleAuth()) {
+      if (requiresOwnerAuth()) {
         throw error;
       }
       const snapshot = loadLocalSnapshot();
@@ -185,7 +185,7 @@
   }
 
   async function postRemote(body) {
-    ensureGoogleAuth();
+    ensureOwnerAuth();
     const response = await fetch(getSyncEndpoint(), {
       method: "POST",
       headers: getAuthHeaders(),
@@ -204,7 +204,7 @@
   }
 
   async function verifyDepartmentAccess(departmentId, accessCode) {
-    ensureGoogleAuth();
+    ensureOwnerAuth();
     if (!hasRemoteSync()) {
       throw new Error("Защищённый вход доступен только при включённой онлайн-синхронизации.");
     }

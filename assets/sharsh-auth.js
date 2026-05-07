@@ -16,10 +16,10 @@
     state.readyResolve = resolve;
   });
 
-  function requiresGoogleAuth() {
+  function requiresOwnerAuth() {
     return Boolean(
       runtime.syncMode === "supabase-function"
-      && runtime.requireGoogleAuth
+      && runtime.requireOwnerAuth
       && runtime.supabaseUrl
       && runtime.supabaseAnonKey
     );
@@ -85,7 +85,7 @@
   }
 
   function renderOverlay(message, isError) {
-    if (!requiresGoogleAuth()) {
+    if (!requiresOwnerAuth()) {
       removeOverlay();
       return;
     }
@@ -98,7 +98,7 @@
       overlay.innerHTML = `
         <div style="width:min(92vw,520px);padding:28px 24px;border-radius:24px;background:#fffdf8;border:1px solid rgba(17,17,17,0.08);box-shadow:0 28px 70px rgba(34,24,8,0.18);font-family:'Segoe UI',Tahoma,sans-serif;color:#17130c;">
           <div style="display:grid;gap:12px;">
-            <div style="display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:8px 12px;border-radius:999px;border:1px solid rgba(17,17,17,0.1);background:rgba(255,255,255,0.88);font-size:13px;font-weight:700;width:max-content;">Owner Access</div>
+            <div style="display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:8px 12px;border-radius:999px;border:1px solid rgba(17,17,17,0.1);background:rgba(255,255,255,0.88);font-size:13px;font-weight:700;width:max-content;">Доступ владельца</div>
             <h1 style="margin:0;font-size:30px;line-height:1.08;">SARSH_KKZH</h1>
             <p style="margin:0;font-size:15px;line-height:1.5;color:rgba(24,24,24,0.72);">Интернет-режим открыт только для владельца через Supabase Auth.</p>
             <label style="display:grid;gap:6px;">
@@ -106,7 +106,7 @@
               <input type="email" id="ownerEmailField" value="${escapeAttr(getLastEmail())}" autocomplete="username" style="padding:11px 14px;border-radius:14px;border:1px solid rgba(17,17,17,0.14);font:inherit;">
             </label>
             <label style="display:grid;gap:6px;">
-              <span style="font-size:13px;font-weight:700;">Password</span>
+              <span style="font-size:13px;font-weight:700;">Пароль</span>
               <input type="password" id="ownerPasswordField" autocomplete="current-password" style="padding:11px 14px;border-radius:14px;border:1px solid rgba(17,17,17,0.14);font:inherit;">
             </label>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -217,7 +217,7 @@
   }
 
   async function initAuth() {
-    if (!requiresGoogleAuth()) {
+    if (!requiresOwnerAuth()) {
       ensureReadyResolved();
       return;
     }
@@ -234,7 +234,7 @@
         if (state.user) {
           removeOverlay();
           ensureReadyResolved();
-        } else if (requiresGoogleAuth()) {
+        } else if (requiresOwnerAuth()) {
           renderOverlay("Введите email и пароль владельца, чтобы открыть интернет-режим.", false);
         }
       });
@@ -263,7 +263,7 @@
   }
 
   window.SHARSH_AUTH = {
-    requiresGoogleAuth,
+    requiresOwnerAuth,
     isAuthenticated() {
       return Boolean(state.user && state.session);
     },

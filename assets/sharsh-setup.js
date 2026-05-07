@@ -14,7 +14,7 @@
     functionName: document.getElementById("functionNameField"),
     refreshInterval: document.getElementById("refreshIntervalField"),
     requireAccessCode: document.getElementById("requireAccessCodeField"),
-    requireGoogleAuth: document.getElementById("requireGoogleAuthField")
+    requireOwnerAuth: document.getElementById("requireOwnerAuthField")
   };
 
   const statusText = document.getElementById("setupStatusText");
@@ -54,7 +54,7 @@
       functionName: fields.functionName ? fields.functionName.value : "",
       refreshIntervalMs: fields.refreshInterval ? fields.refreshInterval.value : "",
       requireAccessCode: fields.requireAccessCode ? fields.requireAccessCode.checked : false,
-      requireGoogleAuth: fields.requireGoogleAuth ? fields.requireGoogleAuth.checked : false
+      requireOwnerAuth: fields.requireOwnerAuth ? fields.requireOwnerAuth.checked : false
     });
   }
 
@@ -144,7 +144,7 @@
       || !runtimeConfig.supabaseUrl
       || !runtimeConfig.supabaseAnonKey
     ) {
-      setStatus("Сначала введи Supabase URL и anon key.", true);
+      setStatus("Сначала введите Supabase URL и anon key.", true);
       return;
     }
 
@@ -214,8 +214,8 @@
     if (fields.requireAccessCode) {
       fields.requireAccessCode.checked = false;
     }
-    if (fields.requireGoogleAuth) {
-      fields.requireGoogleAuth.checked = false;
+    if (fields.requireOwnerAuth) {
+      fields.requireOwnerAuth.checked = false;
     }
 
     updateGeneratedLinks();
@@ -242,8 +242,8 @@
     if (fields.requireAccessCode) {
       fields.requireAccessCode.checked = Boolean(runtime.requireAccessCode);
     }
-    if (fields.requireGoogleAuth) {
-      fields.requireGoogleAuth.checked = runtime.requireGoogleAuth !== false;
+    if (fields.requireOwnerAuth) {
+      fields.requireOwnerAuth.checked = runtime.requireOwnerAuth !== false;
     }
   }
 
@@ -255,7 +255,7 @@
     prefillFields();
     updateSourceLabel();
     updateGeneratedLinks();
-    setStatus("Введи значения Supabase, проверь подключение, затем открой главную ссылку.", false);
+    setStatus("Введите значения Supabase, проверьте подключение, затем откройте главную ссылку.", false);
 
     Object.values(fields).forEach((field) => {
       if (!field) {

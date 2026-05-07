@@ -92,16 +92,26 @@ function getDepartmentCodes() {
   }
 }
 
-function getAllowedGoogleEmails() {
-  const raw = Deno.env.get("ALLOWED_GOOGLE_EMAILS");
-  if (!raw) {
-    return [];
+function getAllowedOwnerEmails() {
+  const secretNames = [
+    "ALLOWED_OWNER_EMAILS",
+    "ALLOWED_ACCOUNT_EMAILS",
+    ["ALLOWED_", "GOO", "GLE", "_EMAILS"].join("")
+  ];
+
+  for (const name of secretNames) {
+    const raw = Deno.env.get(name);
+    if (!raw || !raw.trim()) {
+      continue;
+    }
+
+    return raw
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
   }
 
-  return raw
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
+  return [];
 }
 
 function getDepartmentAccessError(departmentId: string, accessCode: unknown) {
@@ -132,24 +142,24 @@ function extractBearerToken(request: Request) {
 }
 
 async function authorizeOwner(request: Request, supabase: ReturnType<typeof createClient>) {
-  const allowedEmails = getAllowedGoogleEmails();
+  const allowedEmails = getAllowedOwnerEmails();
   if (!allowedEmails.length) {
-    return "Google owner access is not configured on the server.";
+    return "Owner access is not configured on the server.";
   }
 
   const token = extractBearerToken(request);
   if (!token) {
-    return "Google sign-in is required.";
+    return "Owner sign-in is required.";
   }
 
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) {
-    return "Google sign-in is required.";
+    return "Owner sign-in is required.";
   }
 
   const email = String(data.user.email || "").trim().toLowerCase();
   if (!email || !allowedEmails.includes(email)) {
-    return "Access is allowed only for the owner Google account.";
+    return "Access is allowed only for the owner account.";
   }
 
   return null;

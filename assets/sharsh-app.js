@@ -929,12 +929,12 @@
     return "Сейчас включен локальный режим. Между разными компьютерами данные еще не объединяются.";
   }
 
-  function showGoogleAuthTools() {
-    return Boolean(auth && typeof auth.requiresGoogleAuth === "function" && auth.requiresGoogleAuth());
+  function showOwnerAuthTools() {
+    return Boolean(auth && typeof auth.requiresOwnerAuth === "function" && auth.requiresOwnerAuth());
   }
 
-  function buildGoogleAuthActions() {
-    if (!showGoogleAuthTools()) {
+  function buildOwnerAuthActions() {
+    if (!showOwnerAuthTools()) {
       return "";
     }
 
@@ -943,8 +943,8 @@
       : "";
 
     return `
-      <span class="pill remote">${escapeHtml(email || "Google")}</span>
-      <button type="button" data-google-signout>Sign out</button>
+      <span class="pill remote">${escapeHtml(email || "Владелец")}</span>
+      <button type="button" data-owner-signout>Выйти</button>
     `;
   }
 
@@ -980,13 +980,13 @@
           </div>
           <div class="toolbar-actions">
             <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
-            ${buildGoogleAuthActions()}
+            ${buildOwnerAuthActions()}
             <div class="zoom-control">
               <label for="zoomRange">Масштаб</label>
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
-            <a class="button-link" href="${escapeHtml(getSetupPath())}">Sync setup</a>
+            <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="refreshBtn">Обновить</button>
             <button type="button" id="printBtn">Печать</button>
           </div>
@@ -1158,13 +1158,13 @@
           </div>
           <div class="toolbar-actions">
             <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
-            ${buildGoogleAuthActions()}
+            ${buildOwnerAuthActions()}
             <div class="zoom-control">
               <label for="zoomRange">Масштаб</label>
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
-            <a class="button-link" href="${escapeHtml(getSetupPath())}">Sync setup</a>
+            <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="saveBtn">Сохранить</button>
             <button type="button" id="refreshBtn">Обновить</button>
             <button type="button" id="resetBtn">Сбросить</button>
@@ -1967,7 +1967,7 @@
       });
     });
 
-    const signOutButton = document.querySelector("[data-google-signout]");
+    const signOutButton = document.querySelector("[data-owner-signout]");
     if (signOutButton && auth && typeof auth.signOut === "function") {
       signOutButton.addEventListener("click", () => {
         auth.signOut();
