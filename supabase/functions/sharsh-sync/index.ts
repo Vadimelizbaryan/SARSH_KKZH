@@ -38,7 +38,7 @@ const PHOTO_FIELD_MAPPINGS = [
   { cell: 9, key: "dgSeries", label: "Ô´/Ô³ / Õ·Õ¡Ö€Ö„" },
   { cell: 10, key: "transferFromDepartment", label: "ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­ / Õ¢Õ¡ÕªÕ¶Õ«Ö" },
   { cell: 11, key: "transferToDepartment", label: "ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­ / Õ¢Õ¡ÕªÕ«Õ¶" },
-  { cell: 12, key: null, label: "derived total / ignore", ignore: true },
+  { cell: 12, key: "photoCell12Derived", label: "derived total / ignored by app" },
   { cell: 13, key: "currentShar", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ·Õ¡Ö€Ö„" },
   { cell: 14, key: "currentSpa", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ½ÕºÕ¡" },
   { cell: 15, key: "currentPaym", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / ÕºÕ¡ÕµÕ´Õ¡Õ¶" },
@@ -49,6 +49,10 @@ const PHOTO_FIELD_MAPPINGS = [
   { cell: 20, key: "leaveSpa", label: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ / Õ½ÕºÕ¡" },
   { cell: 21, key: "leavePaym", label: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ / ÕºÕ¡ÕµÕ´Õ¡Õ¶" }
 ] as const;
+
+const PHOTO_SCHEMA_VALUE_KEYS = PHOTO_FIELD_MAPPINGS
+  .map((item) => item.key)
+  .filter((key): key is string => typeof key === "string");
 
 const DEPARTMENTS = {
   r4: { department: "ÕŽÕ«Ö€Õ¡Õ¢Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶", group: "primary", marker: "SR-4" },
@@ -189,7 +193,7 @@ async function requestOpenAiStructuredVision(
 
 function buildPhotoRecognitionSchema() {
   const valueProperties = Object.fromEntries(
-    VALUE_KEYS.map((key) => [key, { type: ["integer", "null"] }])
+    PHOTO_SCHEMA_VALUE_KEYS.map((key) => [key, { type: ["integer", "null"] }])
   );
 
   return {
@@ -201,7 +205,7 @@ function buildPhotoRecognitionSchema() {
         type: "object",
         additionalProperties: false,
         properties: valueProperties,
-        required: VALUE_KEYS
+        required: PHOTO_SCHEMA_VALUE_KEYS
       },
       notes: {
         type: "array",
@@ -269,8 +273,8 @@ async function recognizeDepartmentPhoto(
   }
 
   const fieldInstructions = PHOTO_FIELD_MAPPINGS
-    .map((item) => item.ignore
-      ? `- cell ${item.cell}: ${item.label}. Ignore this handwritten value completely and do not return it in values.`
+    .map((item) => item.cell === 12
+      ? `- cell ${item.cell}: ${item.key} (${item.label}). Return the handwritten value here, but the app will ignore it.`
       : `- cell ${item.cell}: ${item.key} (${item.label})`)
     .join("\n");
 
@@ -283,7 +287,7 @@ async function recognizeDepartmentPhoto(
     "Do not infer values from formulas. Do not copy printed column numbers.",
     "Map the handwritten values into these fields:",
     fieldInstructions,
-    "Cell 12 is a derived total between cell 11 and cell 13. Never assign the handwritten number from cell 12 to currentShar or any later field.",
+    "Cell 12 is a derived total between cell 11 and cell 13. Return it only under photoCell12Derived and never assign that handwritten number to currentShar or any later field.",
     "The top table also contains derived totals. Do not return those derived totals unless they correspond to one of the listed fields above.",
     "Return reportDate in dd.mm.yy or dd.mm.yyyy when visible, otherwise null.",
     "Use notes for short uncertainty comments only when needed."
