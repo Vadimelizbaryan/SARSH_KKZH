@@ -6,6 +6,7 @@
   const MAIN_PAGE_FILENAME = "ykow8ru3.html";
   const SETUP_PAGE_FILENAME = "eti77ylq.html";
   const DEPARTMENT_DIRECTORY = "bgej6lyx";
+  const DEPARTMENT_BLANKS_DIRECTORY = "Отделения";
 
   const columns = [
     "beenTotal",
@@ -266,6 +267,25 @@
   ];
 
   const linkedCells = {};
+  const departmentBlankFilesById = {
+    r4: { folder: "Վիրաբուժական", file: "Վիրաբուժական.pdf" },
+    r5: { folder: "Դիմածնոտային վիր", file: "Դիմածնոտային վիր.pdf" },
+    r6: { folder: "Քիթ-կոկորդ բ-ք", file: "Քիթ-կոկորդ բ-ք.pdf" },
+    r7: { folder: "Ակնաբուժական", file: "Ակնաբուժական.pdf" },
+    r8: { folder: "Վնասվածքաբանական", file: "Վնասվածքաբանական.pdf" },
+    r9: { folder: "Կրծքային մ-բ", file: "Կրծքային մ-բ.pdf" },
+    r10: { folder: "Ուռոլոգիական", file: "Ուռոլոգիական.pdf" },
+    r11: { folder: "Նեյրովիրաբուժական", file: "Նեյրովիրաբուժական.pdf" },
+    r12: { folder: "Թռիչքային", file: "Թռիչքային.pdf" },
+    r13: { folder: "Թերապիա", file: "Թերապիա.pdf" },
+    r14: { folder: "Վերակենդանացման", file: "Վերակենդանացման.pdf" },
+    r15: { folder: "Նյարդաբանական", file: "Նյարդաբանական.pdf" },
+    r16: { folder: "Գինեկոլոգիական", file: "Գինեկոլոգիական.pdf" },
+    r17: { folder: "ԱՆՈԹԱՅԻՆ", file: "ԱՆՈԹԱՅԻՆ.pdf" },
+    r19: { folder: "ԻՆՖ", file: "ԻՆՖ.pdf" },
+    r20: { folder: "ԱՏԴ", file: "ԱՏԴ.pdf" },
+    r21: { folder: "Ք-Հ", file: "Ք-Հ.pdf" }
+  };
 
   const summaryAccentKeys = new Set(["beenSoldier", "presentTotal", "currentShar", "leaveTotal"]);
   const columnOrder = new Map(columns.map((key, index) => [key, index]));
@@ -445,6 +465,19 @@
     return `${prefix}${DEPARTMENT_DIRECTORY}/${definition.slug}.html`;
   }
 
+  function getDepartmentBlankPdfPath(basePath, departmentId) {
+    const blank = departmentBlankFilesById[departmentId];
+    if (!blank) {
+      return null;
+    }
+    const relativePath = `${DEPARTMENT_BLANKS_DIRECTORY}/${blank.folder}/${blank.file}`;
+    if (basePath === "@site") {
+      return buildSiteProxyPath(relativePath);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return `${prefix}${relativePath}`;
+  }
+
   function getMainPagePath(basePath) {
     if (basePath === "@site") {
       return buildSiteProxyPath(MAIN_PAGE_FILENAME);
@@ -489,6 +522,7 @@
     MAIN_PAGE_FILENAME,
     SETUP_PAGE_FILENAME,
     DEPARTMENT_DIRECTORY,
+    DEPARTMENT_BLANKS_DIRECTORY,
     columns,
     valueKeys,
     summaryAccentKeys,
@@ -506,6 +540,7 @@
     getDepartmentBySlug,
     detectDepartmentIdFromText,
     getDepartmentPagePath,
+    getDepartmentBlankPdfPath,
     getMainPagePath,
     getSetupPagePath,
     getDepartmentStorageKey,

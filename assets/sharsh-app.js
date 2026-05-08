@@ -1408,7 +1408,13 @@
     }
 
     const mainPath = appendShareQuery(config.getMainPagePath(basePath));
+    const blankPdfPath = config.getDepartmentBlankPdfPath
+      ? config.getDepartmentBlankPdfPath(basePath, departmentId)
+      : null;
     const accessCodeValue = getStoredAccessCode();
+    const downloadPdfButtonHtml = blankPdfPath
+      ? `<a class="button-link" href="${escapeHtml(blankPdfPath)}" download target="_blank" rel="noopener">Скачать PDF</a>`
+      : "";
 
     app.innerHTML = `
       <div class="page">
@@ -1424,6 +1430,7 @@
           <div class="toolbar-actions">
             <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
             ${buildOwnerAuthActions()}
+            ${downloadPdfButtonHtml}
             <div class="zoom-control">
               <label for="zoomRange">Масштаб</label>
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
