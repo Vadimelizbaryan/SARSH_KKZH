@@ -38,6 +38,7 @@ const PHOTO_FIELD_MAPPINGS = [
   { cell: 9, key: "dgSeries", label: "Ô´/Ô³ / Õ·Õ¡Ö€Ö„" },
   { cell: 10, key: "transferFromDepartment", label: "ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­ / Õ¢Õ¡ÕªÕ¶Õ«Ö" },
   { cell: 11, key: "transferToDepartment", label: "ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­ / Õ¢Õ¡ÕªÕ«Õ¶" },
+  { cell: 12, key: null, label: "derived total / ignore", ignore: true },
   { cell: 13, key: "currentShar", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ·Õ¡Ö€Ö„" },
   { cell: 14, key: "currentSpa", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ½ÕºÕ¡" },
   { cell: 15, key: "currentPaym", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / ÕºÕ¡ÕµÕ´Õ¡Õ¶" },
@@ -268,7 +269,9 @@ async function recognizeDepartmentPhoto(
   }
 
   const fieldInstructions = PHOTO_FIELD_MAPPINGS
-    .map((item) => `- cell ${item.cell}: ${item.key} (${item.label})`)
+    .map((item) => item.ignore
+      ? `- cell ${item.cell}: ${item.label}. Ignore this handwritten value completely and do not return it in values.`
+      : `- cell ${item.cell}: ${item.key} (${item.label})`)
     .join("\n");
 
   const prompt = [
@@ -280,6 +283,7 @@ async function recognizeDepartmentPhoto(
     "Do not infer values from formulas. Do not copy printed column numbers.",
     "Map the handwritten values into these fields:",
     fieldInstructions,
+    "Cell 12 is a derived total between cell 11 and cell 13. Never assign the handwritten number from cell 12 to currentShar or any later field.",
     "The top table also contains derived totals. Do not return those derived totals unless they correspond to one of the listed fields above.",
     "Return reportDate in dd.mm.yy or dd.mm.yyyy when visible, otherwise null.",
     "Use notes for short uncertainty comments only when needed."
