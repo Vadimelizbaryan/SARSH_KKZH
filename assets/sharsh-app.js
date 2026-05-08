@@ -1347,7 +1347,7 @@
         <p>Загрузите фото верхней части бланка. Значения подставятся в ячейки локально, потом вы их проверите и сохраните обычной кнопкой.</p>
         <div class="photo-import-actions">
           <label class="button-link photo-file-label${photoState.isProcessing ? " is-disabled" : ""}">
-            <input type="file" id="photoImportFile" accept="image/*" ${photoState.isProcessing ? "disabled" : ""}>
+            <input type="file" id="photoImportFile" accept="image/*" capture="environment" ${photoState.isProcessing ? "disabled" : ""}>
             Выбрать фото
           </label>
           <button type="button" id="photoRecognizeBtn" ${!photoState.imageDataUrl || photoState.isProcessing || !canRecognize ? "disabled" : ""}>
@@ -1851,6 +1851,13 @@
     try {
       state.photoImport.imageDataUrl = await compressImageFile(file);
       state.photoImport.isProcessing = false;
+      const canAutoRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
+      if (canAutoRecognize) {
+        setPhotoImportStatus(`Фото готово: ${file.name || "image"}. Автоматически распознаю цифры...`, false);
+        renderPage();
+        await handlePhotoRecognition();
+        return;
+      }
       setPhotoImportStatus(`Фото готово: ${file.name || "image"}. Нажмите "Распознать".`, false);
       renderPage();
     } catch (error) {
@@ -1908,7 +1915,6 @@
       renderPage();
     }
   }
-
   function clearPhotoImportSelection() {
     const keepDraft = hasPhotoImportDraft();
     const next = buildInitialPhotoImportState();
@@ -1978,7 +1984,7 @@
         <p>Загрузите фото бланка на главном файле. После загрузки система сама определит отделение по крупному маркеру отделения или по шапке бланка, откроет нужную страницу и автоматически начнёт подстановку цифр в поля этого отделения.</p>
         <div class="photo-import-actions">
           <label class="button-link photo-file-label${routeState.isProcessing ? " is-disabled" : ""}">
-            <input type="file" id="mainPhotoRouteFile" accept="image/*" ${routeState.isProcessing ? "disabled" : ""}>
+            <input type="file" id="mainPhotoRouteFile" accept="image/*" capture="environment" ${routeState.isProcessing ? "disabled" : ""}>
             Выбрать фото
           </label>
           <button type="button" id="mainPhotoRouteDetectBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
