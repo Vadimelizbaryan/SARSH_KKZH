@@ -41,6 +41,7 @@
     { cell: 9, key: "dgSeries", label: "9" },
     { cell: 10, key: "transferFromDepartment", label: "10" },
     { cell: 11, key: "transferToDepartment", label: "11" },
+    { cell: 12, key: "presentTotal", label: "12", computed: true },
     { cell: 13, key: "currentShar", label: "13" },
     { cell: 14, key: "currentSpa", label: "14" },
     { cell: 15, key: "currentPaym", label: "15" },
@@ -123,7 +124,7 @@
       ...(Array.isArray(row.editableKeys) ? row.editableKeys : [])
     ]);
 
-    return PHOTO_FIELD_DEFINITIONS.filter((item) => allowedKeys.has(item.key));
+    return PHOTO_FIELD_DEFINITIONS.filter((item) => item.key === "presentTotal" || allowedKeys.has(item.key));
   }
 
   function hasPhotoImportDraft() {
@@ -744,6 +745,19 @@
     return value === null || value === "" || typeof value === "undefined" ? "" : String(value);
   }
 
+  function getPhotoPreviewValue(row, key) {
+    if (!row) {
+      return "";
+    }
+    if (key === "presentTotal") {
+      return calcPresentTotal(state.snapshot, row);
+    }
+    if (key === "leaveTotal") {
+      return calcLeaveTotal(state.snapshot, row);
+    }
+    return getEffectiveValue(state.snapshot, row, key);
+  }
+
   function calcPresentTotal(snapshot, row) {
     return row.presentKeys.reduce((sum, key) => sum + getNumber(snapshot, row, key), 0);
   }
@@ -1322,7 +1336,7 @@
       .map((item) => `
         <div class="photo-import-result-item">
           <span>Ячейка ${escapeHtml(item.label)}</span>
-          <strong>${escapeHtml(getDisplayValue(row.values[item.key]) || "—")}</strong>
+          <strong>${escapeHtml(getDisplayValue(getPhotoPreviewValue(row, item.key)) || "—")}</strong>
         </div>
       `)
       .join("");
@@ -1791,6 +1805,7 @@
     );
     const applicableFields = getRecognizablePhotoFields(row);
     const appliedKeys = [];
+    const previewKeys = [];
 
     applicableFields.forEach((field) => {
       if (!Object.prototype.hasOwnProperty.call(values, field.key) || !recognizedKeys.has(field.key)) {
@@ -1801,10 +1816,15 @@
       row.values[field.key] = normalized;
       if (normalized !== null) {
         appliedKeys.push(field.key);
+        previewKeys.push(field.key);
       }
     });
 
-    state.photoImport.lastAppliedKeys = appliedKeys;
+    if (appliedKeys.length > 0 && applicableFields.some((field) => field.key === "presentTotal")) {
+      previewKeys.push("presentTotal");
+    }
+
+    state.photoImport.lastAppliedKeys = previewKeys;
     state.photoImport.lastReportDate = typeof payload.reportDate === "string" ? payload.reportDate : "";
     state.photoImport.notes = Array.isArray(payload.notes)
       ? payload.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
