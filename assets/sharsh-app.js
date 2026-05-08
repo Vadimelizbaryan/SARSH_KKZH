@@ -18,7 +18,7 @@
   const archiveAutoPrint = queryParams.get("autoprint") !== "0";
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
   const DEFAULT_DOCUMENT_TITLE = document.title;
-  const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
+  const SAVE_RULE_TEXT = "13-21 = (1 + 4 + 11) - (7 + 10)";
   const SAVE_RULE_TEXT_SHORT = "сумма блока АРКА Э = (1 + 4 + 11) - (7 + 10)";
   const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
   const ARCHIVE_TIMEZONE = "Asia/Yerevan";
@@ -27,6 +27,8 @@
   const DEPARTMENT_UNLOCK_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:department-unlock:`;
   const PHOTO_MAX_DIMENSION = 1800;
   const PHOTO_JPEG_QUALITY = 0.88;
+  const MAIN_PHOTO_ROUTE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-photo-route:v1`;
+  const MAIN_PHOTO_ROUTE_MAX_AGE_MS = 15 * 60 * 1000;
   const PHOTO_FIELD_DEFINITIONS = [
     { cell: 1, key: "beenTotal", label: "1" },
     { cell: 2, key: "beenSoldier", label: "2" },
@@ -42,13 +44,12 @@
     { cell: 13, key: "currentShar", label: "13" },
     { cell: 14, key: "currentSpa", label: "14" },
     { cell: 15, key: "currentPaym", label: "15" },
-    { cell: 16, key: "zh", label: "16" },
-    { cell: 17, key: "family", label: "17" },
-    { cell: 18, key: "officer", label: "18" },
-    { cell: 19, key: "civil", label: "19" },
-    { cell: 20, key: "leaveSharq", label: "20" },
-    { cell: 21, key: "leaveSpa", label: "21" },
-    { cell: 22, key: "leavePaym", label: "22" }
+    { cell: 16, key: "family", label: "16" },
+    { cell: 17, key: "officer", label: "17" },
+    { cell: 18, key: "civil", label: "18" },
+    { cell: 19, key: "leaveSharq", label: "19" },
+    { cell: 20, key: "leaveSpa", label: "20" },
+    { cell: 21, key: "leavePaym", label: "21" }
   ];
 
   function buildInitialPhotoImportState() {
@@ -59,6 +60,19 @@
       lastReportDate: "",
       lastAppliedKeys: [],
       draftMode: false,
+      isProcessing: false,
+      isError: false,
+      status: ""
+    };
+  }
+
+  function buildInitialMainPhotoRouteState() {
+    return {
+      imageName: "",
+      imageDataUrl: "",
+      notes: [],
+      detectedDepartmentId: "",
+      detectedBy: "",
       isProcessing: false,
       isError: false,
       status: ""
@@ -82,7 +96,8 @@
     archiveRecords: [],
     selectedArchiveKey: "",
     initialized: false,
-    photoImport: buildInitialPhotoImportState()
+    photoImport: buildInitialPhotoImportState(),
+    mainPhotoRoute: buildInitialMainPhotoRouteState()
   };
 
   function deepCopy(value) {
@@ -180,6 +195,58 @@
     context.drawImage(image, 0, 0, width, height);
 
     return canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
+  }
+
+  function setMainPhotoRouteStatus(message, isError) {
+    state.mainPhotoRoute.status = String(message || "");
+    state.mainPhotoRoute.isError = Boolean(isError);
+  }
+
+  function storePendingMainPhotoRoute(payload) {
+    try {
+      sessionStorage.setItem(MAIN_PHOTO_ROUTE_STORAGE_KEY, JSON.stringify({
+        departmentId: payload.departmentId || "",
+        imageName: payload.imageName || "",
+        imageDataUrl: payload.imageDataUrl || "",
+        createdAt: Date.now()
+      }));
+    } catch (_error) {
+    }
+  }
+
+  function takePendingMainPhotoRoute(departmentIdToMatch) {
+    try {
+      const raw = sessionStorage.getItem(MAIN_PHOTO_ROUTE_STORAGE_KEY);
+      if (!raw) {
+        return null;
+      }
+
+      sessionStorage.removeItem(MAIN_PHOTO_ROUTE_STORAGE_KEY);
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        return null;
+      }
+
+      const departmentId = typeof parsed.departmentId === "string" ? parsed.departmentId : "";
+      const imageDataUrl = typeof parsed.imageDataUrl === "string" ? parsed.imageDataUrl : "";
+      const imageName = typeof parsed.imageName === "string" ? parsed.imageName : "";
+      const createdAt = Number(parsed.createdAt || 0);
+
+      if (!departmentId || departmentId !== departmentIdToMatch || !imageDataUrl.startsWith("data:image/")) {
+        return null;
+      }
+      if (!Number.isFinite(createdAt) || (Date.now() - createdAt) > MAIN_PHOTO_ROUTE_MAX_AGE_MS) {
+        return null;
+      }
+
+      return {
+        departmentId,
+        imageName,
+        imageDataUrl
+      };
+    } catch (_error) {
+      return null;
+    }
   }
 
   function getCurrentDepartmentDefinition() {
@@ -736,7 +803,7 @@
       expected,
       message: isValid
         ? `Проверка пройдена: ${SAVE_RULE_TEXT}.`
-        : `Сохранение заблокировано: сумма 13-22 = ${actual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${expected}.`
+        : `Сохранение заблокировано: сумма 13-21 = ${actual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${expected}.`
     };
   }
 
@@ -795,18 +862,14 @@
   }
 
   function renderColgroup() {
+    const dataCols = config.columns
+      .map((key) => `<col class="${key === "leaveTotal" ? "wide-col" : "num-col"}">`)
+      .join("");
+
     return `
       <colgroup>
         <col class="dept-col">
-        <col class="num-col"><col class="num-col"><col class="num-col">
-        <col class="num-col"><col class="num-col"><col class="num-col">
-        <col class="num-col"><col class="num-col"><col class="num-col">
-        <col class="num-col"><col class="num-col">
-        <col class="num-col">
-        <col class="num-col"><col class="num-col"><col class="num-col">
-        <col class="num-col"><col class="num-col"><col class="num-col"><col class="num-col">
-        <col class="num-col"><col class="num-col"><col class="num-col">
-        <col class="wide-col">
+        ${dataCols}
       </colgroup>
     `;
   }
@@ -838,14 +901,13 @@
           <th colspan="3" rowspan="2" class="hdr-peach group-end">ԸՆՈՒՆՎԵԼ Է</th>
           <th colspan="3" rowspan="2" class="hdr-peach group-end">Դ/Գ</th>
           <th colspan="2" rowspan="2" class="hdr-peach group-end major-left">Տեղափոխ</th>
-          <th colspan="8" class="hdr-peach major-left">ԱՌԿԱ Է</th>
+          <th colspan="7" class="hdr-peach major-left">ԱՌԿԱ Է</th>
           <th colspan="3" class="hdr-peach major-left">որոնցից բուժական</th>
           <th class="hdr-yellow major-left">&nbsp;</th>
         </tr>
         <tr>
           <th rowspan="2" class="hdr-yellow major-left">ԸՆԴԱՄ</th>
           <th colspan="3" class="hdr-peach">Զինծառայող</th>
-          <th rowspan="2" class="hdr-peach">Զ/Հ</th>
           <th rowspan="2" class="hdr-peach">Զ/Ծ ԸՆՏ</th>
           <th rowspan="2" class="hdr-peach">Զ/Պ</th>
           <th rowspan="2" class="hdr-peach">Ք-ի</th>
@@ -1160,6 +1222,8 @@
               }</p>
             </div>
 
+            ${renderMainPhotoRoutePanel()}
+
             <div class="zoom-target">
               <div class="sheet-shell">
                 <p class="status-line no-print">
@@ -1247,6 +1311,7 @@
       </div>
     `;
   }
+
 
   function renderPhotoImportPanel(row) {
     const canRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
@@ -1703,7 +1768,7 @@
     saveBtn.setAttribute("aria-disabled", String(!validation.isValid));
     saveBtn.title = validation.isValid
       ? "Формула совпадает, можно сохранять."
-      : "Исправь данные: кнопка станет активной, когда сумма 13-22 совпадет с формулой.";
+      : "Исправь данные: кнопка станет активной, когда сумма 13-21 совпадет с формулой.";
     saveBtn.classList.add(validation.isValid ? "save-ready" : "save-blocked");
 
     if (ruleText) {
@@ -1838,6 +1903,199 @@
     }
     state.photoImport = next;
     renderPage();
+  }
+
+  async function handleMainPhotoRouteSelection(file) {
+    if (!file) {
+      return;
+    }
+
+    state.mainPhotoRoute = buildInitialMainPhotoRouteState();
+    state.mainPhotoRoute.isProcessing = true;
+    state.mainPhotoRoute.imageName = file.name || "";
+    setMainPhotoRouteStatus("Подготавливаю фото для определения отделения...", false);
+    renderPage();
+
+    try {
+      state.mainPhotoRoute.imageDataUrl = await compressImageFile(file);
+      state.mainPhotoRoute.isProcessing = false;
+      const canAutoDetect = sync.hasRemoteSync() && typeof sync.detectDepartmentPhoto === "function";
+      if (canAutoDetect) {
+        setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}. Автоматически определяю отделение...`, false);
+        renderPage();
+        await handleMainPhotoRouteDetection();
+        return;
+      }
+
+      setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}. Нажмите "Определить и открыть".`, false);
+      renderPage();
+    } catch (error) {
+      state.mainPhotoRoute = buildInitialMainPhotoRouteState();
+      setMainPhotoRouteStatus(
+        error instanceof Error ? error.message : "Не удалось подготовить фото для определения отделения.",
+        true
+      );
+      renderPage();
+    }
+  }
+
+
+  function clearMainPhotoRouteSelection() {
+    state.mainPhotoRoute = buildInitialMainPhotoRouteState();
+    renderPage();
+  }
+
+  function renderMainPhotoRoutePanel() {
+    const canDetect = sync.hasRemoteSync() && typeof sync.detectDepartmentPhoto === "function";
+    const routeState = state.mainPhotoRoute || buildInitialMainPhotoRouteState();
+    const detectedDepartment = routeState.detectedDepartmentId
+      ? config.getDepartmentById(routeState.detectedDepartmentId)
+      : null;
+
+    return `
+      <section class="panel no-print photo-import-panel">
+        <h2>Фото бланка в отделение</h2>
+        <p>Загрузите фото бланка на главном файле. После загрузки система сама определит отделение по крупному маркеру отделения или по шапке бланка, откроет нужную страницу и автоматически начнёт подстановку цифр в поля этого отделения.</p>
+        <div class="photo-import-actions">
+          <label class="button-link photo-file-label${routeState.isProcessing ? " is-disabled" : ""}">
+            <input type="file" id="mainPhotoRouteFile" accept="image/*" ${routeState.isProcessing ? "disabled" : ""}>
+            Выбрать фото
+          </label>
+          <button type="button" id="mainPhotoRouteDetectBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
+            ${routeState.isProcessing ? "Определяю..." : "Определить и открыть"}
+          </button>
+          <button type="button" id="mainPhotoRouteClearBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>Очистить</button>
+        </div>
+        <p class="hint${routeState.isError ? " warning-note" : ""}" id="mainPhotoRouteStatus">${
+          escapeHtml(
+            routeState.status
+            || (canDetect
+              ? "Лучше всего работает фото всего бланка с видимым маркером отделения и четкой шапкой."
+              : "Определение отделения доступно только в онлайн-режиме владельца.")
+          )
+        }</p>
+        ${routeState.imageDataUrl ? `
+          <div class="photo-import-preview">
+            <img src="${escapeHtml(routeState.imageDataUrl)}" alt="Фото для определения отделения">
+          </div>
+        ` : ""}
+        ${detectedDepartment || (routeState.notes && routeState.notes.length) ? `
+          <div class="photo-import-results">
+            ${detectedDepartment ? `
+              <div class="photo-import-result-grid">
+                <div class="photo-import-result-item">
+                  <span>Определённое отделение</span>
+                  <strong>${escapeHtml(detectedDepartment.department)}</strong>
+                </div>
+                ${detectedDepartment.marker ? `
+                  <div class="photo-import-result-item">
+                    <span>Маркер</span>
+                    <strong>${escapeHtml(detectedDepartment.marker)}</strong>
+                  </div>
+                ` : ""}
+              </div>
+            ` : ""}
+            ${routeState.notes && routeState.notes.length ? `
+              <div class="photo-import-notes">
+                ${routeState.notes.map((note) => `<p class="hint warning-note">${escapeHtml(note)}</p>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        ` : ""}
+      </section>
+    `;
+  }
+
+  async function handleMainPhotoRouteDetection() {
+    if (!state.mainPhotoRoute.imageDataUrl) {
+      setMainPhotoRouteStatus("Сначала выберите фото бланка.", true);
+      renderPage();
+      return;
+    }
+
+    if (!sync.hasRemoteSync() || typeof sync.detectDepartmentPhoto !== "function") {
+      setMainPhotoRouteStatus("Определение отделения доступно только в онлайн-режиме владельца.", true);
+      renderPage();
+      return;
+    }
+
+    state.mainPhotoRoute.isProcessing = true;
+    state.mainPhotoRoute.notes = [];
+    state.mainPhotoRoute.detectedDepartmentId = "";
+    state.mainPhotoRoute.detectedBy = "";
+    setMainPhotoRouteStatus("Определяю отделение по маркеру и шапке бланка...", false);
+    renderPage();
+
+    try {
+      const detection = await sync.detectDepartmentPhoto(state.mainPhotoRoute.imageDataUrl);
+      const detectedDepartmentId = detection && typeof detection.departmentId === "string"
+        ? detection.departmentId
+        : "";
+      const detectedBy = detectedDepartmentId ? "vision" : "";
+      const notes = Array.isArray(detection?.notes)
+        ? detection.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
+        : [];
+
+      state.mainPhotoRoute.isProcessing = false;
+      state.mainPhotoRoute.detectedDepartmentId = detectedDepartmentId;
+      state.mainPhotoRoute.detectedBy = detectedBy;
+      state.mainPhotoRoute.notes = notes;
+
+      if (!detectedDepartmentId) {
+        setMainPhotoRouteStatus("Не удалось уверенно определить отделение. Попробуйте фото с более чётким маркером и шапкой.", true);
+        renderPage();
+        return;
+      }
+
+      const department = config.getDepartmentById(detectedDepartmentId);
+      if (!department) {
+        setMainPhotoRouteStatus("Определилось неизвестное отделение. Попробуйте ещё раз.", true);
+        renderPage();
+        return;
+      }
+
+      storePendingMainPhotoRoute({
+        departmentId: detectedDepartmentId,
+        imageName: state.mainPhotoRoute.imageName,
+        imageDataUrl: state.mainPhotoRoute.imageDataUrl
+      });
+
+      setMainPhotoRouteStatus(`Открываю страницу отделения: ${department.department}.`, false);
+      renderPage();
+      window.location.href = appendShareQuery(config.getDepartmentPagePath(basePath, detectedDepartmentId));
+    } catch (error) {
+      state.mainPhotoRoute.isProcessing = false;
+      setMainPhotoRouteStatus(
+        error instanceof Error ? error.message : "Не удалось определить отделение по фото.",
+        true
+      );
+      renderPage();
+    }
+  }
+
+  async function maybeResumeTransferredPhotoImport() {
+    if (mode !== "department") {
+      return;
+    }
+
+    const pending = takePendingMainPhotoRoute(departmentId);
+    if (!pending) {
+      return;
+    }
+
+    state.photoImport = buildInitialPhotoImportState();
+    state.photoImport.imageName = pending.imageName || "";
+    state.photoImport.imageDataUrl = pending.imageDataUrl || "";
+    setPhotoImportStatus("Фото перенесено с главного файла. Начинаю распознавание для этого отделения...", false);
+    renderPage();
+
+    if (!sync.hasRemoteSync() || typeof sync.recognizeDepartmentPhoto !== "function") {
+      setPhotoImportStatus("Фото перенесено на страницу отделения. Для распознавания нужен онлайн-режим владельца.", true);
+      renderPage();
+      return;
+    }
+
+    await handlePhotoRecognition();
   }
 
   function getStylesheetUrl() {
@@ -2057,6 +2315,7 @@
       startAutoRefreshIfNeeded();
       startFreshnessTicker();
       startClockTicker();
+      await maybeResumeTransferredPhotoImport();
     } catch (error) {
       clearCurrentDepartmentUnlock();
       setGateStatusText(
@@ -2295,6 +2554,27 @@
       });
     });
 
+    const mainPhotoRouteFile = document.getElementById("mainPhotoRouteFile");
+    if (mainPhotoRouteFile instanceof HTMLInputElement) {
+      mainPhotoRouteFile.addEventListener("change", () => {
+        const [file] = Array.from(mainPhotoRouteFile.files || []);
+        handleMainPhotoRouteSelection(file || null);
+      });
+    }
+
+    const mainPhotoRouteDetectBtn = document.getElementById("mainPhotoRouteDetectBtn");
+    if (mainPhotoRouteDetectBtn) {
+      mainPhotoRouteDetectBtn.addEventListener("click", () => {
+        handleMainPhotoRouteDetection();
+      });
+    }
+
+    const mainPhotoRouteClearBtn = document.getElementById("mainPhotoRouteClearBtn");
+    if (mainPhotoRouteClearBtn) {
+      mainPhotoRouteClearBtn.addEventListener("click", () => {
+        clearMainPhotoRouteSelection();
+      });
+    }
 
     const photoImportFile = document.getElementById("photoImportFile");
     if (photoImportFile instanceof HTMLInputElement) {
@@ -2506,6 +2786,7 @@
     startAutoRefreshIfNeeded();
     startFreshnessTicker();
     startClockTicker();
+    await maybeResumeTransferredPhotoImport();
   }
 
   init().catch((error) => {
@@ -2519,3 +2800,5 @@
     `;
   });
 })();
+
+

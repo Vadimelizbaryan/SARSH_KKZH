@@ -23,7 +23,6 @@
     "currentShar",
     "currentSpa",
     "currentPaym",
-    "zh",
     "family",
     "officer",
     "civil",
@@ -48,7 +47,6 @@
     "currentShar",
     "currentSpa",
     "currentPaym",
-    "zh",
     "family",
     "officer",
     "civil",
@@ -62,7 +60,7 @@
     "admittedTotal", "admittedSoldier", "admittedSeries",
     "dgTotal", "dgSoldier", "dgSeries",
     "currentShar", "currentSpa", "currentPaym",
-    "zh", "family", "officer", "civil",
+    "family", "officer", "civil",
     "leaveSharq", "leaveSpa", "leavePaym"
   ];
 
@@ -71,14 +69,13 @@
     "admittedTotal", "admittedSoldier", "admittedSeries",
     "dgTotal", "dgSoldier", "dgSeries",
     "currentShar", "currentSpa", "currentPaym",
-    "zh", "family", "officer"
+    "family", "officer"
   ];
 
   const primaryPresentKeys = [
     "currentShar",
     "currentSpa",
     "currentPaym",
-    "zh",
     "family",
     "officer",
     "civil",
@@ -91,7 +88,6 @@
     "currentShar",
     "currentSpa",
     "currentPaym",
-    "zh",
     "family",
     "officer"
   ];
@@ -100,6 +96,7 @@
     {
       id: "r4",
       slug: "te9625wg",
+      marker: "SR-4",
       group: "primary",
       department: "Վիրաբուժական",
       editableKeys: primaryEditableKeys,
@@ -109,6 +106,7 @@
     {
       id: "r5",
       slug: "1ei6dnv2",
+      marker: "SR-5",
       group: "primary",
       department: "Դ/Ծ վ/բ բաժանմունք",
       editableKeys: primaryEditableKeys,
@@ -118,6 +116,7 @@
     {
       id: "r6",
       slug: "du9wa6oq",
+      marker: "SR-6",
       group: "primary",
       department: "Քիթ-կոկորդ բ-ք",
       editableKeys: primaryEditableKeys,
@@ -127,6 +126,7 @@
     {
       id: "r7",
       slug: "08xa44ew",
+      marker: "SR-7",
       group: "primary",
       department: "Ակնաբուժական",
       editableKeys: primaryEditableKeys,
@@ -136,6 +136,7 @@
     {
       id: "r8",
       slug: "v1914tm9",
+      marker: "SR-8",
       group: "primary",
       department: "Վնասվածքաբանական",
       editableKeys: primaryEditableKeys,
@@ -145,6 +146,7 @@
     {
       id: "r9",
       slug: "c3usp3r9",
+      marker: "SR-9",
       group: "primary",
       department: "Կրծքային վ/բ",
       editableKeys: primaryEditableKeys,
@@ -154,6 +156,7 @@
     {
       id: "r10",
       slug: "g5u3jca0",
+      marker: "SR-10",
       group: "primary",
       department: "Ուռոլոգիական",
       editableKeys: primaryEditableKeys,
@@ -163,6 +166,7 @@
     {
       id: "r11",
       slug: "4k6uv2xu",
+      marker: "SR-11",
       group: "primary",
       department: "Նեյրովիրաբուժական",
       editableKeys: primaryEditableKeys,
@@ -172,6 +176,7 @@
     {
       id: "r12",
       slug: "ltndeohl",
+      marker: "SR-12",
       group: "primary",
       department: "Թռիչքային",
       editableKeys: primaryEditableKeys,
@@ -181,6 +186,7 @@
     {
       id: "r13",
       slug: "ptf9nvbv",
+      marker: "SR-13",
       group: "primary",
       department: "Թերապիա",
       editableKeys: primaryEditableKeys,
@@ -190,6 +196,7 @@
     {
       id: "r14",
       slug: "9htuxle8",
+      marker: "SR-14",
       group: "primary",
       department: "Վերակենդանացման",
       editableKeys: primaryEditableKeys,
@@ -199,6 +206,7 @@
     {
       id: "r15",
       slug: "ldvp99z7",
+      marker: "SR-15",
       group: "primary",
       department: "Նյարդաբանական",
       editableKeys: primaryEditableKeys,
@@ -208,6 +216,7 @@
     {
       id: "r16",
       slug: "zzphaoqo",
+      marker: "SR-16",
       group: "primary",
       department: "Գինեկոլոգիական",
       editableKeys: primaryEditableKeys,
@@ -217,6 +226,7 @@
     {
       id: "r17",
       slug: "4zby7qi3",
+      marker: "SR-17",
       group: "primary",
       department: "Անոթային",
       editableKeys: primaryEditableKeys,
@@ -226,6 +236,7 @@
     {
       id: "r19",
       slug: "c5mv5bh4",
+      marker: "SR-19",
       group: "extra",
       department: "ԻՆՖ",
       editableKeys: extraEditableKeys,
@@ -235,6 +246,7 @@
     {
       id: "r20",
       slug: "5s7rrwg9",
+      marker: "SR-20",
       group: "extra",
       department: "ԱՏԴ",
       editableKeys: extraEditableKeys,
@@ -244,6 +256,7 @@
     {
       id: "r21",
       slug: "3ofsacp6",
+      marker: "SR-21",
       group: "extra",
       department: "Ք/Հ",
       editableKeys: extraEditableKeys,
@@ -257,6 +270,18 @@
   const summaryAccentKeys = new Set(["beenSoldier", "presentTotal", "currentShar", "leaveTotal"]);
   const columnOrder = new Map(columns.map((key, index) => [key, index]));
   const departmentById = new Map(departmentDefinitions.map((item) => [item.id, item]));
+  const departmentBySlug = new Map(departmentDefinitions.map((item) => [item.slug, item]));
+  const departmentByMarker = new Map(
+    departmentDefinitions
+      .map((item) => [normalizeDepartmentMarker(item.marker || ""), item])
+      .filter(([marker]) => marker)
+  );
+
+  function normalizeDepartmentMarker(text) {
+    return String(text || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+  }
 
   function deepCopy(value) {
     return JSON.parse(JSON.stringify(value));
@@ -278,7 +303,6 @@
       currentShar: 0,
       currentSpa: 0,
       currentPaym: 0,
-      zh: 0,
       family: 0,
       officer: 0,
       civil: 0,
@@ -316,6 +340,7 @@
     return {
       id: definition.id,
       slug: definition.slug,
+      marker: definition.marker || "",
       group: definition.group,
       department: definition.department,
       editableKeys: [...definition.editableKeys],
@@ -369,6 +394,39 @@
 
   function getDepartmentById(id) {
     return departmentById.get(id) || null;
+  }
+
+  function getDepartmentBySlug(slug) {
+    return departmentBySlug.get(slug) || null;
+  }
+
+  function detectDepartmentIdFromText(text) {
+    if (typeof text !== "string" || !text.trim()) {
+      return "";
+    }
+
+    const normalized = text.trim();
+    const normalizedMarkerText = normalizeDepartmentMarker(normalized);
+
+    if (normalizedMarkerText) {
+      for (const [marker, definition] of departmentByMarker.entries()) {
+        if (normalizedMarkerText.includes(marker)) {
+          return definition.id;
+        }
+      }
+    }
+
+    for (const definition of departmentDefinitions) {
+      if (
+        normalized.includes(`${definition.slug}.html`)
+        || normalized.includes(`${DEPARTMENT_DIRECTORY}/${definition.slug}`)
+        || normalized.includes(definition.slug)
+      ) {
+        return definition.id;
+      }
+    }
+
+    return "";
   }
 
   function buildSiteProxyPath(relativePath) {
@@ -445,6 +503,8 @@
     buildDefaultSnapshot,
     buildSnapshotFromSaved,
     getDepartmentById,
+    getDepartmentBySlug,
+    detectDepartmentIdFromText,
     getDepartmentPagePath,
     getMainPagePath,
     getSetupPagePath,

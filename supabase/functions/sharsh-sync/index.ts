@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+﻿import { createClient } from "npm:@supabase/supabase-js@2";
 
 const DEFAULT_DATE = "05,05,26";
 const VALUE_KEYS = [
@@ -16,7 +16,6 @@ const VALUE_KEYS = [
   "currentShar",
   "currentSpa",
   "currentPaym",
-  "zh",
   "family",
   "officer",
   "civil",
@@ -28,47 +27,46 @@ const VALUE_KEYS = [
 const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-mini").trim();
 
 const PHOTO_FIELD_MAPPINGS = [
-  { cell: 1, key: "beenTotal", label: "ЕГЕЛ Э / ընդ" },
-  { cell: 2, key: "beenSoldier", label: "ЕГЕЛ Э / ժ/ծ" },
-  { cell: 3, key: "beenSeries", label: "ЕГЕЛ Э / շարք" },
-  { cell: 4, key: "admittedTotal", label: "ԸՆԴՈՒՆՎԵԼ Է / ընդ" },
-  { cell: 5, key: "admittedSoldier", label: "ԸՆԴՈՒՆՎԵԼ Է / ժ/ծ" },
-  { cell: 6, key: "admittedSeries", label: "ԸՆԴՈՒՆՎԵԼ Է / շարք" },
-  { cell: 7, key: "dgTotal", label: "Դ/Գ / ընդ" },
-  { cell: 8, key: "dgSoldier", label: "Դ/Գ / ժ/ծ" },
-  { cell: 9, key: "dgSeries", label: "Դ/Գ / շարք" },
-  { cell: 10, key: "transferFromDepartment", label: "Տեղափոխ / բաժնից" },
-  { cell: 11, key: "transferToDepartment", label: "Տեղափոխ / բաժին" },
-  { cell: 13, key: "currentShar", label: "Առկա է / շարք" },
-  { cell: 14, key: "currentSpa", label: "Առկա է / սպա" },
-  { cell: 15, key: "currentPaym", label: "Առկա է / պայման" },
-  { cell: 16, key: "zh", label: "Առկա է / ժ-հ" },
-  { cell: 17, key: "family", label: "Առկա է / գ/վ" },
-  { cell: 18, key: "officer", label: "Առկա է / գ/ծ ընդ" },
-  { cell: 19, key: "civil", label: "Առկա է / ք-հ" },
-  { cell: 20, key: "leaveSharq", label: "Արձակուրդ / շարք" },
-  { cell: 21, key: "leaveSpa", label: "Արձակուրդ / սպա" },
-  { cell: 22, key: "leavePaym", label: "Արձակուրդ / պայման" }
+  { cell: 1, key: "beenTotal", label: "Ð•Ð“Ð•Ð› Ð­ / Õ¨Õ¶Õ¤" },
+  { cell: 2, key: "beenSoldier", label: "Ð•Ð“Ð•Ð› Ð­ / Õª/Õ®" },
+  { cell: 3, key: "beenSeries", label: "Ð•Ð“Ð•Ð› Ð­ / Õ·Õ¡Ö€Ö„" },
+  { cell: 4, key: "admittedTotal", label: "Ô¸Õ†Ô´ÕˆÕ’Õ†ÕŽÔµÔ¼ Ô· / Õ¨Õ¶Õ¤" },
+  { cell: 5, key: "admittedSoldier", label: "Ô¸Õ†Ô´ÕˆÕ’Õ†ÕŽÔµÔ¼ Ô· / Õª/Õ®" },
+  { cell: 6, key: "admittedSeries", label: "Ô¸Õ†Ô´ÕˆÕ’Õ†ÕŽÔµÔ¼ Ô· / Õ·Õ¡Ö€Ö„" },
+  { cell: 7, key: "dgTotal", label: "Ô´/Ô³ / Õ¨Õ¶Õ¤" },
+  { cell: 8, key: "dgSoldier", label: "Ô´/Ô³ / Õª/Õ®" },
+  { cell: 9, key: "dgSeries", label: "Ô´/Ô³ / Õ·Õ¡Ö€Ö„" },
+  { cell: 10, key: "transferFromDepartment", label: "ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­ / Õ¢Õ¡ÕªÕ¶Õ«Ö" },
+  { cell: 11, key: "transferToDepartment", label: "ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­ / Õ¢Õ¡ÕªÕ«Õ¶" },
+  { cell: 13, key: "currentShar", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ·Õ¡Ö€Ö„" },
+  { cell: 14, key: "currentSpa", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ½ÕºÕ¡" },
+  { cell: 15, key: "currentPaym", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / ÕºÕ¡ÕµÕ´Õ¡Õ¶" },
+  { cell: 16, key: "family", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ£/Õ¾" },
+  { cell: 17, key: "officer", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ£/Õ® Õ¨Õ¶Õ¤" },
+  { cell: 18, key: "civil", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Ö„-Õ°" },
+  { cell: 19, key: "leaveSharq", label: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ / Õ·Õ¡Ö€Ö„" },
+  { cell: 20, key: "leaveSpa", label: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ / Õ½ÕºÕ¡" },
+  { cell: 21, key: "leavePaym", label: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ / ÕºÕ¡ÕµÕ´Õ¡Õ¶" }
 ] as const;
 
 const DEPARTMENTS = {
-  r4: { department: "Վիրաբուժական", group: "primary" },
-  r5: { department: "Դ/Ծ վ/բ բաժանմունք", group: "primary" },
-  r6: { department: "Քիթ-կոկորդ բ-ք", group: "primary" },
-  r7: { department: "Ակնաբուժական", group: "primary" },
-  r8: { department: "Վնասվածքաբանական", group: "primary" },
-  r9: { department: "Կրծքային վ/բ", group: "primary" },
-  r10: { department: "Ուռոլոգիական", group: "primary" },
-  r11: { department: "Նեյրովիրաբուժական", group: "primary" },
-  r12: { department: "Թռիչքային", group: "primary" },
-  r13: { department: "Թերապիա", group: "primary" },
-  r14: { department: "Վերակենդանացման", group: "primary" },
-  r15: { department: "Նյարդաբանական", group: "primary" },
-  r16: { department: "Գինեկոլոգիական", group: "primary" },
-  r17: { department: "Անոթային", group: "primary" },
-  r19: { department: "ԻՆՖ", group: "extra" },
-  r20: { department: "ԱՏԴ", group: "extra" },
-  r21: { department: "Ք/Հ", group: "extra" }
+  r4: { department: "ÕŽÕ«Ö€Õ¡Õ¢Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶", group: "primary", marker: "SR-4" },
+  r5: { department: "Ô´/Ô¾ Õ¾/Õ¢ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„", group: "primary", marker: "SR-5" },
+  r6: { department: "Õ”Õ«Õ©-Õ¯Õ¸Õ¯Õ¸Ö€Õ¤ Õ¢-Ö„", group: "primary", marker: "SR-6" },
+  r7: { department: "Ô±Õ¯Õ¶Õ¡Õ¢Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶", group: "primary", marker: "SR-7" },
+  r8: { department: "ÕŽÕ¶Õ¡Õ½Õ¾Õ¡Õ®Ö„Õ¡Õ¢Õ¡Õ¶Õ¡Õ¯Õ¡Õ¶", group: "primary", marker: "SR-8" },
+  r9: { department: "Ô¿Ö€Õ®Ö„Õ¡ÕµÕ«Õ¶ Õ¾/Õ¢", group: "primary", marker: "SR-9" },
+  r10: { department: "ÕˆÖ‚Õ¼Õ¸Õ¬Õ¸Õ£Õ«Õ¡Õ¯Õ¡Õ¶", group: "primary", marker: "SR-10" },
+  r11: { department: "Õ†Õ¥ÕµÖ€Õ¸Õ¾Õ«Ö€Õ¡Õ¢Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶", group: "primary", marker: "SR-11" },
+  r12: { department: "Ô¹Õ¼Õ«Õ¹Ö„Õ¡ÕµÕ«Õ¶", group: "primary", marker: "SR-12" },
+  r13: { department: "Ô¹Õ¥Ö€Õ¡ÕºÕ«Õ¡", group: "primary", marker: "SR-13" },
+  r14: { department: "ÕŽÕ¥Ö€Õ¡Õ¯Õ¥Õ¶Õ¤Õ¡Õ¶Õ¡ÖÕ´Õ¡Õ¶", group: "primary", marker: "SR-14" },
+  r15: { department: "Õ†ÕµÕ¡Ö€Õ¤Õ¡Õ¢Õ¡Õ¶Õ¡Õ¯Õ¡Õ¶", group: "primary", marker: "SR-15" },
+  r16: { department: "Ô³Õ«Õ¶Õ¥Õ¯Õ¸Õ¬Õ¸Õ£Õ«Õ¡Õ¯Õ¡Õ¶", group: "primary", marker: "SR-16" },
+  r17: { department: "Ô±Õ¶Õ¸Õ©Õ¡ÕµÕ«Õ¶", group: "primary", marker: "SR-17" },
+  r19: { department: "Ô»Õ†Õ–", group: "extra", marker: "SR-19" },
+  r20: { department: "Ô±ÕÔ´", group: "extra", marker: "SR-20" },
+  r21: { department: "Õ”/Õ€", group: "extra", marker: "SR-21" }
 } as const;
 
 const corsHeaders = {
@@ -122,6 +120,72 @@ function getOpenAiApiKey() {
   return secret && secret.trim() ? secret.trim() : "";
 }
 
+async function requestOpenAiStructuredVision(
+  prompt: string,
+  imageDataUrl: string,
+  schemaName: string,
+  schema: Record<string, unknown>
+) {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured on the server.");
+  }
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: PHOTO_RECOGNITION_MODEL,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: prompt
+            },
+            {
+              type: "input_image",
+              image_url: imageDataUrl,
+              detail: "high"
+            }
+          ]
+        }
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: schemaName,
+          strict: true,
+          schema
+        }
+      }
+    })
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload || typeof payload !== "object") {
+    const message = payload && typeof payload === "object" && typeof (payload as { error?: { message?: string } }).error?.message === "string"
+      ? (payload as { error: { message: string } }).error.message
+      : `OpenAI photo recognition request failed (${response.status}).`;
+    throw new Error(message);
+  }
+
+  const outputText = extractOpenAiOutputText(payload as Record<string, unknown>);
+  if (!outputText) {
+    throw new Error("OpenAI photo recognition returned an empty response.");
+  }
+
+  try {
+    return JSON.parse(outputText) as Record<string, unknown>;
+  } catch (_error) {
+    throw new Error("OpenAI photo recognition returned invalid JSON.");
+  }
+}
+
 function buildPhotoRecognitionSchema() {
   const valueProperties = Object.fromEntries(
     VALUE_KEYS.map((key) => [key, { type: ["integer", "null"] }])
@@ -144,6 +208,23 @@ function buildPhotoRecognitionSchema() {
       }
     },
     required: ["reportDate", "values", "notes"]
+  };
+}
+
+function buildDepartmentDetectionSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      departmentId: {
+        type: ["string", "null"]
+      },
+      notes: {
+        type: "array",
+        items: { type: "string" }
+      }
+    },
+    required: ["departmentId", "notes"]
   };
 }
 
@@ -181,11 +262,6 @@ async function recognizeDepartmentPhoto(
   departmentId: string,
   imageDataUrl: string
 ) {
-  const apiKey = getOpenAiApiKey();
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured on the server.");
-  }
-
   const departmentMeta = DEPARTMENTS[departmentId as keyof typeof DEPARTMENTS];
   if (!departmentMeta) {
     throw new Error("Unknown department.");
@@ -209,60 +285,12 @@ async function recognizeDepartmentPhoto(
     "Use notes for short uncertainty comments only when needed."
   ].join("\n");
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: PHOTO_RECOGNITION_MODEL,
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: prompt
-            },
-            {
-              type: "input_image",
-              image_url: imageDataUrl,
-              detail: "high"
-            }
-          ]
-        }
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "department_photo_recognition",
-          strict: true,
-          schema: buildPhotoRecognitionSchema()
-        }
-      }
-    })
-  });
-
-  const payload = await response.json().catch(() => null);
-  if (!response.ok || !payload || typeof payload !== "object") {
-    const message = payload && typeof payload === "object" && typeof (payload as { error?: { message?: string } }).error?.message === "string"
-      ? (payload as { error: { message: string } }).error.message
-      : `OpenAI photo recognition request failed (${response.status}).`;
-    throw new Error(message);
-  }
-
-  const outputText = extractOpenAiOutputText(payload as Record<string, unknown>);
-  if (!outputText) {
-    throw new Error("OpenAI photo recognition returned an empty response.");
-  }
-
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(outputText) as Record<string, unknown>;
-  } catch (_error) {
-    throw new Error("OpenAI photo recognition returned invalid JSON.");
-  }
+  const parsed = await requestOpenAiStructuredVision(
+    prompt,
+    imageDataUrl,
+    "department_photo_recognition",
+    buildPhotoRecognitionSchema()
+  );
 
   const sanitizedValues = sanitizeValues(parsed.values as Record<string, unknown> | undefined);
 
@@ -272,6 +300,41 @@ async function recognizeDepartmentPhoto(
     recognizedKeys: Object.entries(sanitizedValues)
       .filter(([, value]) => value !== null)
       .map(([key]) => key),
+    notes: Array.isArray(parsed.notes)
+      ? parsed.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
+      : []
+  };
+}
+
+async function detectDepartmentFromPhoto(imageDataUrl: string) {
+  const departmentInstructions = Object.entries(DEPARTMENTS)
+    .map(([id, meta]) => `- ${id}: ${meta.department} (marker: ${meta.marker})`)
+    .join("\n");
+
+  const prompt = [
+    "You determine which Armenian hospital department blank is shown in a photo.",
+    "Use the printed department title in the header, the large department marker such as SR-4, or any clearly readable identifying text.",
+    "Do not use handwritten notes in the lower part to guess the department unless they explicitly repeat the printed department name.",
+    "Choose exactly one departmentId from this list when confident:",
+    departmentInstructions,
+    "If the image is too unclear or you are not confident, return departmentId as null.",
+    "Use notes for short comments such as marker found, title found, or uncertain header."
+  ].join("\n");
+
+  const parsed = await requestOpenAiStructuredVision(
+    prompt,
+    imageDataUrl,
+    "department_photo_detection",
+    buildDepartmentDetectionSchema()
+  );
+
+  const rawDepartmentId = typeof parsed.departmentId === "string" ? parsed.departmentId.trim() : "";
+  const departmentId = Object.prototype.hasOwnProperty.call(DEPARTMENTS, rawDepartmentId)
+    ? rawDepartmentId
+    : null;
+
+  return {
+    departmentId,
     notes: Array.isArray(parsed.notes)
       ? parsed.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
       : []
@@ -324,7 +387,7 @@ function getDepartmentAccessError(departmentId: string, accessCode: unknown) {
   const normalizedAccessCode = String(accessCode ?? "").trim();
   return expectedCode === normalizedAccessCode
     ? null
-    : "Неверный код отделения.";
+    : "ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ ÐºÐ¾Ð´ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.";
 }
 
 function extractBearerToken(request: Request) {
@@ -487,6 +550,16 @@ Deno.serve(async (request) => {
       return jsonResponse(recognition);
     }
 
+    if (type === "detect_department_photo") {
+      const imageDataUrl = typeof payload.imageDataUrl === "string" ? payload.imageDataUrl.trim() : "";
+      if (!imageDataUrl.startsWith("data:image/")) {
+        return jsonResponse({ error: "A valid image is required." }, 400);
+      }
+
+      const detection = await detectDepartmentFromPhoto(imageDataUrl);
+      return jsonResponse(detection);
+    }
+
     if (type !== "save_department") {
       return jsonResponse({ error: "Unknown request type." }, 400);
     }
@@ -538,3 +611,5 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: message }, 500);
   }
 });
+
+
