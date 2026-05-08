@@ -29,6 +29,7 @@ jobs:
           cp eti77ylq.html _site/
           cp -R assets _site/
           cp -R bgej6lyx _site/
+          cp -R "Отделения" _site/
           touch _site/.nojekyll
 
       - name: Upload artifact
