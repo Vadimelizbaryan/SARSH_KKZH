@@ -25,6 +25,45 @@
   const ARCHIVE_CAPTURE_HOUR = 10;
   const MAX_ARCHIVE_RECORDS = 60;
   const DEPARTMENT_UNLOCK_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:department-unlock:`;
+  const PHOTO_MAX_DIMENSION = 1800;
+  const PHOTO_JPEG_QUALITY = 0.88;
+  const PHOTO_FIELD_DEFINITIONS = [
+    { cell: 1, key: "beenTotal", label: "1" },
+    { cell: 2, key: "beenSoldier", label: "2" },
+    { cell: 3, key: "beenSeries", label: "3" },
+    { cell: 4, key: "admittedTotal", label: "4" },
+    { cell: 5, key: "admittedSoldier", label: "5" },
+    { cell: 6, key: "admittedSeries", label: "6" },
+    { cell: 7, key: "dgTotal", label: "7" },
+    { cell: 8, key: "dgSoldier", label: "8" },
+    { cell: 9, key: "dgSeries", label: "9" },
+    { cell: 10, key: "transferFromDepartment", label: "10" },
+    { cell: 11, key: "transferToDepartment", label: "11" },
+    { cell: 13, key: "currentShar", label: "13" },
+    { cell: 14, key: "currentSpa", label: "14" },
+    { cell: 15, key: "currentPaym", label: "15" },
+    { cell: 16, key: "zh", label: "16" },
+    { cell: 17, key: "family", label: "17" },
+    { cell: 18, key: "officer", label: "18" },
+    { cell: 19, key: "civil", label: "19" },
+    { cell: 20, key: "leaveSharq", label: "20" },
+    { cell: 21, key: "leaveSpa", label: "21" },
+    { cell: 22, key: "leavePaym", label: "22" }
+  ];
+
+  function buildInitialPhotoImportState() {
+    return {
+      imageName: "",
+      imageDataUrl: "",
+      notes: [],
+      lastReportDate: "",
+      lastAppliedKeys: [],
+      draftMode: false,
+      isProcessing: false,
+      isError: false,
+      status: ""
+    };
+  }
 
   const state = {
     snapshot: config.buildDefaultSnapshot(),
@@ -42,7 +81,8 @@
     clockIntervalId: 0,
     archiveRecords: [],
     selectedArchiveKey: "",
-    initialized: false
+    initialized: false,
+    photoImport: buildInitialPhotoImportState()
   };
 
   function deepCopy(value) {
@@ -55,6 +95,91 @@
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
+  }
+
+  function getRecognizablePhotoFields(row) {
+    if (!row) {
+      return [];
+    }
+
+    const allowedKeys = new Set([
+      "transferFromDepartment",
+      "transferToDepartment",
+      ...(Array.isArray(row.editableKeys) ? row.editableKeys : [])
+    ]);
+
+    return PHOTO_FIELD_DEFINITIONS.filter((item) => allowedKeys.has(item.key));
+  }
+
+  function hasPhotoImportDraft() {
+    return mode === "department" && Boolean(state.photoImport && state.photoImport.draftMode);
+  }
+
+  function blockPhotoImportDraftAction(message) {
+    if (!hasPhotoImportDraft()) {
+      return false;
+    }
+
+    setInfo(
+      message || "Распознанные значения пока сохранены только локально. Сначала проверьте их и нажмите Сохранить.",
+      false
+    );
+    return true;
+  }
+
+  function setPhotoImportStatus(message, isError) {
+    state.photoImport.status = String(message || "");
+    state.photoImport.isError = Boolean(isError);
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Не удалось прочитать файл изображения."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function loadImageFromDataUrl(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Не удалось подготовить изображение для распознавания."));
+      image.src = dataUrl;
+    });
+  }
+
+  async function compressImageFile(file) {
+    const sourceDataUrl = await readFileAsDataUrl(file);
+    if (!sourceDataUrl.startsWith("data:image/")) {
+      throw new Error("Нужен файл изображения.");
+    }
+
+    const image = await loadImageFromDataUrl(sourceDataUrl);
+    const originalWidth = image.naturalWidth || image.width;
+    const originalHeight = image.naturalHeight || image.height;
+    if (!originalWidth || !originalHeight) {
+      throw new Error("Не удалось определить размер изображения.");
+    }
+
+    const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(originalWidth, originalHeight));
+    const width = Math.max(1, Math.round(originalWidth * scale));
+    const height = Math.max(1, Math.round(originalHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Браузер не поддерживает подготовку фото.");
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    return canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
   }
 
   function getCurrentDepartmentDefinition() {
@@ -757,7 +882,15 @@
   }
 
   function renderDetailCell(snapshot, row, key, interactive) {
-    const classes = getCellClasses(key, row, "detail");
+    const recognizedFields = mode === "department" && state.photoImport
+      ? new Set(state.photoImport.lastAppliedKeys || [])
+      : null;
+    const classes = [
+      getCellClasses(key, row, "detail"),
+      recognizedFields && recognizedFields.has(key) ? "recognized-cell" : ""
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     if (key === "presentTotal") {
       return `<td class="${classes}"><span data-output="presentTotal" data-row="${row.id}"></span></td>`;
@@ -1115,6 +1248,63 @@
     `;
   }
 
+  function renderPhotoImportPanel(row) {
+    const canRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
+    const photoState = state.photoImport || buildInitialPhotoImportState();
+    const recognizedFields = new Set(photoState.lastAppliedKeys || []);
+    const previewItems = getRecognizablePhotoFields(row)
+      .filter((item) => recognizedFields.has(item.key))
+      .map((item) => `
+        <div class="photo-import-result-item">
+          <span>Ячейка ${escapeHtml(item.label)}</span>
+          <strong>${escapeHtml(getDisplayValue(row.values[item.key]) || "—")}</strong>
+        </div>
+      `)
+      .join("");
+
+    return `
+      <section class="panel no-print photo-import-panel">
+        <h2>Загрузка фото бланка</h2>
+        <p>Загрузите фото верхней части бланка. Значения подставятся в ячейки локально, потом вы их проверите и сохраните обычной кнопкой.</p>
+        <div class="photo-import-actions">
+          <label class="button-link photo-file-label${photoState.isProcessing ? " is-disabled" : ""}">
+            <input type="file" id="photoImportFile" accept="image/*" ${photoState.isProcessing ? "disabled" : ""}>
+            Выбрать фото
+          </label>
+          <button type="button" id="photoRecognizeBtn" ${!photoState.imageDataUrl || photoState.isProcessing || !canRecognize ? "disabled" : ""}>
+            ${photoState.isProcessing ? "Распознаю..." : "Распознать"}
+          </button>
+          <button type="button" id="photoClearBtn" ${!photoState.imageDataUrl || photoState.isProcessing ? "disabled" : ""}>Очистить</button>
+        </div>
+        <p class="hint${photoState.isError ? " warning-note" : ""}" id="photoImportStatus">${
+          escapeHtml(
+            photoState.status
+            || (canRecognize
+              ? "Лучше всего работает фото сверху, без сильного наклона и с чёткими цифрами."
+              : "Распознавание фото доступно только в онлайн-режиме владельца.")
+          )
+        }</p>
+        ${photoState.imageDataUrl ? `
+          <div class="photo-import-preview">
+            <img src="${escapeHtml(photoState.imageDataUrl)}" alt="Загруженный бланк">
+          </div>
+        ` : ""}
+        ${previewItems || photoState.lastReportDate || (photoState.notes && photoState.notes.length) ? `
+          <div class="photo-import-results">
+            ${photoState.lastReportDate ? `<p class="hint">Дата на фото: <strong>${escapeHtml(photoState.lastReportDate)}</strong></p>` : ""}
+            ${previewItems ? `<div class="photo-import-result-grid">${previewItems}</div>` : ""}
+            ${photoState.notes && photoState.notes.length ? `
+              <div class="photo-import-notes">
+                ${photoState.notes.map((note) => `<p class="hint warning-note">${escapeHtml(note)}</p>`).join("")}
+              </div>
+            ` : ""}
+            ${photoState.draftMode ? `<p class="hint"><strong>Автоотправка временно приостановлена.</strong> Проверьте ячейки и нажмите Сохранить.</p>` : ""}
+          </div>
+        ` : ""}
+      </section>
+    `;
+  }
+
   function renderDepartmentPage() {
     if (isDepartmentAccessProtected() && !isDepartmentUnlocked()) {
       renderDepartmentAccessGate();
@@ -1189,6 +1379,8 @@
             <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
             <p class="hint save-rule-note" id="saveRuleText"></p>
           </div>
+
+          ${renderPhotoImportPanel(row)}
 
           <div class="zoom-target">
             <div class="sheet-shell">
@@ -1520,6 +1712,134 @@
     }
   }
 
+  function applyRecognizedDepartmentValues(payload) {
+    const row = getCurrentRow();
+    if (!row || !payload || typeof payload !== "object") {
+      return 0;
+    }
+
+    const values = payload.values && typeof payload.values === "object" ? payload.values : {};
+    const recognizedKeys = new Set(
+      Array.isArray(payload.recognizedKeys)
+        ? payload.recognizedKeys.filter((item) => typeof item === "string")
+        : []
+    );
+    const applicableFields = getRecognizablePhotoFields(row);
+    const appliedKeys = [];
+
+    applicableFields.forEach((field) => {
+      if (!Object.prototype.hasOwnProperty.call(values, field.key) || !recognizedKeys.has(field.key)) {
+        return;
+      }
+
+      const normalized = config.normalizeCellValue(values[field.key]);
+      row.values[field.key] = normalized;
+      if (normalized !== null) {
+        appliedKeys.push(field.key);
+      }
+    });
+
+    state.photoImport.lastAppliedKeys = appliedKeys;
+    state.photoImport.lastReportDate = typeof payload.reportDate === "string" ? payload.reportDate : "";
+    state.photoImport.notes = Array.isArray(payload.notes)
+      ? payload.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
+      : [];
+    state.photoImport.draftMode = appliedKeys.length > 0;
+
+    return appliedKeys.length;
+  }
+
+  async function handlePhotoImportSelection(file) {
+    if (!file) {
+      return;
+    }
+
+    state.photoImport.isProcessing = true;
+    state.photoImport.imageName = file.name || "";
+    state.photoImport.imageDataUrl = "";
+    state.photoImport.lastAppliedKeys = [];
+    state.photoImport.lastReportDate = "";
+    state.photoImport.notes = [];
+    setPhotoImportStatus("Подготавливаю фото для распознавания...", false);
+    renderPage();
+
+    try {
+      state.photoImport.imageDataUrl = await compressImageFile(file);
+      state.photoImport.isProcessing = false;
+      setPhotoImportStatus(`Фото готово: ${file.name || "image"}. Нажмите "Распознать".`, false);
+      renderPage();
+    } catch (error) {
+      state.photoImport = buildInitialPhotoImportState();
+      setPhotoImportStatus(
+        error instanceof Error ? error.message : "Не удалось подготовить фото.",
+        true
+      );
+      renderPage();
+    }
+  }
+
+  async function handlePhotoRecognition() {
+    const row = getCurrentRow();
+    if (!row) {
+      return;
+    }
+
+    if (!sync.hasRemoteSync() || typeof sync.recognizeDepartmentPhoto !== "function") {
+      setInfo("Распознавание фото доступно только в онлайн-режиме владельца.", true);
+      return;
+    }
+
+    if (!state.photoImport.imageDataUrl) {
+      setPhotoImportStatus("Сначала выберите фото бланка.", true);
+      renderPage();
+      return;
+    }
+
+    state.photoImport.isProcessing = true;
+    setPhotoImportStatus("Распознаю цифры на бланке...", false);
+    renderPage();
+
+    try {
+      const result = await sync.recognizeDepartmentPhoto(departmentId, state.photoImport.imageDataUrl);
+      const appliedCount = applyRecognizedDepartmentValues(result);
+      state.photoImport.isProcessing = false;
+
+      if (!appliedCount) {
+        setPhotoImportStatus("Не удалось уверенно распознать цифры. Попробуйте другое фото или введите значения вручную.", true);
+        renderPage();
+        return;
+      }
+
+      setPhotoImportStatus("Значения подставлены локально. Проверьте ячейки и нажмите Сохранить.", false);
+      renderPage();
+      refreshTableData();
+      setInfo("Распознанные значения подставлены локально. После проверки нажмите Сохранить.", false);
+    } catch (error) {
+      state.photoImport.isProcessing = false;
+      setPhotoImportStatus(
+        error instanceof Error ? error.message : "Не удалось распознать фото бланка.",
+        true
+      );
+      renderPage();
+    }
+  }
+
+  function clearPhotoImportSelection() {
+    const keepDraft = hasPhotoImportDraft();
+    const next = buildInitialPhotoImportState();
+    next.draftMode = keepDraft;
+    if (keepDraft && state.photoImport) {
+      next.lastAppliedKeys = Array.isArray(state.photoImport.lastAppliedKeys)
+        ? [...state.photoImport.lastAppliedKeys]
+        : [];
+      next.lastReportDate = state.photoImport.lastReportDate || "";
+      next.notes = Array.isArray(state.photoImport.notes) ? [...state.photoImport.notes] : [];
+      next.status = "Распознанные значения остаются в таблице локально. Проверьте их и нажмите Сохранить.";
+    }
+    state.photoImport = next;
+    renderPage();
+  }
+
   function getStylesheetUrl() {
     if (basePath === "@site") {
       return `${window.location.origin}/functions/v1/site?path=${encodeURIComponent("assets/sharsh.css")}`;
@@ -1708,6 +2028,7 @@
     state.archiveRecords = readArchiveRecords();
     state.initialized = true;
     state.info = "";
+    state.photoImport = buildInitialPhotoImportState();
   }
 
   async function handleDepartmentAccessSubmit(event) {
@@ -1780,6 +2101,7 @@
       state.loadedSnapshot = deepCopy(result.snapshot);
       state.source = result.source;
       state.warning = "";
+      state.photoImport.draftMode = false;
       setInfo(manual ? "Данные отделения сохранены." : "Изменения отправлены в общий файл.", false);
       refreshTableData();
     } catch (error) {
@@ -1807,6 +2129,10 @@
     window.clearTimeout(state.saveTimer);
     const validation = getDepartmentValidationState();
     if (validation.applicable && !validation.isValid) {
+      return;
+    }
+    if (hasPhotoImportDraft()) {
+      setInfo("Распознанные значения пока сохранены только локально. Проверьте их и нажмите Сохранить.", false);
       return;
     }
     if (!sync.runtime.autoSync) {
@@ -1853,6 +2179,10 @@
   }
 
   async function refreshFromSource() {
+    if (blockPhotoImportDraftAction("Сначала сохраните распознанные значения, потом обновите данные с сервера.")) {
+      return;
+    }
+
     syncCurrentReportDate();
     setInfo("Обновляю данные...", false);
     const result = await sync.loadSnapshot();
@@ -1860,6 +2190,7 @@
     state.loadedSnapshot = deepCopy(result.snapshot);
     state.source = result.source;
     state.warning = result.warning || "";
+    state.photoImport = buildInitialPhotoImportState();
     setInfo("Данные обновлены.", false);
     renderPage();
   }
@@ -1871,6 +2202,7 @@
     }
 
     currentRow.values = deepCopy(config.zeroValues());
+    state.photoImport = buildInitialPhotoImportState();
     if (sync.runtime.autoSync) {
       renderPage();
       setInfo("Поля сброшены в 0. Отправляю изменения в общий файл...", false);
@@ -1963,6 +2295,28 @@
       });
     });
 
+
+    const photoImportFile = document.getElementById("photoImportFile");
+    if (photoImportFile instanceof HTMLInputElement) {
+      photoImportFile.addEventListener("change", () => {
+        const [file] = Array.from(photoImportFile.files || []);
+        handlePhotoImportSelection(file || null);
+      });
+    }
+
+    const photoRecognizeBtn = document.getElementById("photoRecognizeBtn");
+    if (photoRecognizeBtn) {
+      photoRecognizeBtn.addEventListener("click", () => {
+        handlePhotoRecognition();
+      });
+    }
+
+    const photoClearBtn = document.getElementById("photoClearBtn");
+    if (photoClearBtn) {
+      photoClearBtn.addEventListener("click", () => {
+        clearPhotoImportSelection();
+      });
+    }
     const signOutButton = document.querySelector("[data-owner-signout]");
     if (signOutButton && auth && typeof auth.signOut === "function") {
       signOutButton.addEventListener("click", () => {
@@ -1998,6 +2352,18 @@
         printArchiveRecord(archiveKey);
       });
       app.dataset.archiveDownloadBound = "1";
+    }
+
+    if (!window.__sharshPhotoDraftGuardBound) {
+      window.addEventListener("beforeunload", (event) => {
+        if (!hasPhotoImportDraft()) {
+          return;
+        }
+
+        event.preventDefault();
+        event.returnValue = "";
+      });
+      window.__sharshPhotoDraftGuardBound = true;
     }
 
     if (mode !== "department" || !sheetBody) {

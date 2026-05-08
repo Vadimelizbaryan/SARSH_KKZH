@@ -254,6 +254,37 @@
     return payload;
   }
 
+  async function recognizeDepartmentPhoto(departmentId, imageDataUrl) {
+    ensureOwnerAuth();
+    if (!hasRemoteSync()) {
+      throw new Error("Распознавание фото доступно только в онлайн-режиме владельца.");
+    }
+
+    if (typeof imageDataUrl !== "string" || !imageDataUrl.startsWith("data:image/")) {
+      throw new Error("Нужен файл изображения для распознавания.");
+    }
+
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "recognize_department_photo",
+        departmentId,
+        imageDataUrl
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось распознать фото бланка");
+    }
+
+    return payload;
+  }
+
   async function saveDepartment(departmentId, reportDate, values, accessCode) {
     const localSnapshot = loadLocalSnapshot();
     const rowMap = new Map(localSnapshot.rows.map((row) => [row.id, row]));
@@ -338,6 +369,7 @@
     saveDepartment,
     saveReportDate,
     verifyDepartmentAccess,
+    recognizeDepartmentPhoto,
     loadLocalSnapshot,
     writeLocalSnapshot,
     getSourceLabel,
