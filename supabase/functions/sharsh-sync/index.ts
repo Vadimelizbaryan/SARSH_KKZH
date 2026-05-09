@@ -283,6 +283,9 @@ async function recognizeDepartmentPhoto(
   const prompt = [
     "You extract handwritten numeric values from a standardized Armenian hospital department form.",
     `Department id: ${departmentId}. Department name: ${departmentMeta.department}.`,
+    "The department is already fixed by the current page.",
+    "Do not determine or change the department from SR markers, headers, or any other text in the image.",
+    "If the photo is missing SR markers or the printed title is unclear, continue extracting values for the given department anyway.",
     "Read only the top numeric table and the handwritten report date near the header.",
     "Ignore the handwritten descriptive text in the lower part of the page.",
     "Return null for any cell that is blank, crossed out, unreadable, or uncertain.",

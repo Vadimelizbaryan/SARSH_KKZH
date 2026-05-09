@@ -1440,7 +1440,7 @@
     return `
       <section class="panel no-print photo-import-panel">
         <h2>Загрузка фото бланка</h2>
-        <p>Загрузите фото верхней части бланка. Значения подставятся в ячейки локально, потом вы их проверите и сохраните обычной кнопкой.</p>
+        <p>Загрузите фото верхней части бланка. На странице отделения фото всегда относится к текущему отделению: маркер SR здесь не проверяется и не нужен. Значения подставятся в ячейки локально, потом вы их проверите и сохраните обычной кнопкой.</p>
         <div class="photo-import-actions">
           <label class="button-link photo-file-label${photoState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="photoImportFile" accept="image/*" capture="environment" ${photoState.isProcessing ? "disabled" : ""}>
@@ -1455,7 +1455,7 @@
           escapeHtml(
             photoState.status
             || (canRecognize
-              ? "Лучше всего работает фото сверху, без сильного наклона и с чёткими цифрами."
+              ? "Лучше всего работает фото сверху, без сильного наклона и с чёткими цифрами. На этой странице система читает цифры только для текущего отделения и не использует SR."
               : "Распознавание фото доступно только в онлайн-режиме владельца.")
           )
         }</p>
@@ -1996,7 +1996,7 @@
     }
 
     state.photoImport.isProcessing = true;
-    setPhotoImportStatus("Распознаю цифры на бланке...", false);
+    setPhotoImportStatus("Распознаю цифры на бланке для текущего отделения. Маркер SR здесь игнорируется.", false);
     setPhotoImportStatus(
       state.photoImport.queueRemainingCount > 0
         ? `Фото перенесено с главного файла. Начинаю распознавание для этого отделения. После сохранения откроется следующее фото, осталось: ${state.photoImport.queueRemainingCount}.`
@@ -2004,7 +2004,7 @@
       false
     );
     if (!state.photoImport.queueMode) {
-      setPhotoImportStatus("Распознаю цифры на бланке...", false);
+      setPhotoImportStatus("Распознаю цифры на бланке для текущего отделения. Маркер SR здесь игнорируется.", false);
     }
     renderPage();
 
