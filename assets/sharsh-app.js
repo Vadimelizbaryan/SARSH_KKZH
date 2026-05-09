@@ -17,7 +17,6 @@
   const archiveKeyFromQuery = queryParams.get("archive") || "";
   const archiveAutoPrint = queryParams.get("autoprint") !== "0";
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
-  const DEFAULT_DOCUMENT_TITLE = document.title;
   const SAVE_RULE_TEXT = "13-21 = (1 + 4 + 11) - (7 + 10)";
   const SAVE_RULE_TEXT_SHORT = "сумма блока АРКА Э = (1 + 4 + 11) - (7 + 10)";
   const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
@@ -58,6 +57,9 @@
       imageName: "",
       imageDataUrl: "",
       notes: [],
+      queueMode: false,
+      queueRemainingCount: 0,
+      queueNextDepartmentName: "",
       lastReportDate: "",
       lastAppliedKeys: [],
       draftMode: false,
@@ -1240,6 +1242,18 @@
     return PRINT_REPORT_TITLE;
   }
 
+  function getAppDocumentTitle() {
+    if (mode === "department") {
+      const definition = getCurrentDepartmentDefinition();
+      return definition ? `${definition.department} | SARSH_KKZH` : "SARSH_KKZH";
+    }
+    if (mode === "archive") {
+      const record = getArchiveRecordByKey(archiveKeyFromQuery);
+      return record ? `Архив ${record.archiveLabel} | SARSH_KKZH` : "Архив | SARSH_KKZH";
+    }
+    return "MAINFLOW";
+  }
+
   function renderMainPage() {
     const sourceLabel = sync.getSourceLabel(state.source);
     const freshnessStats = buildFreshnessStats(state.snapshot.rows);
@@ -1405,6 +1419,11 @@
   function renderPhotoImportPanel(row) {
     const canRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
     const photoState = state.photoImport || buildInitialPhotoImportState();
+    const queueInfoText = photoState.queueMode
+      ? (photoState.queueRemainingCount > 0
+        ? `Это фото пришло из общей очереди. После сохранения автоматически откроется следующее фото. Осталось после текущего: ${photoState.queueRemainingCount}.${photoState.queueNextDepartmentName ? ` Следующее отделение: ${photoState.queueNextDepartmentName}.` : ""}`
+        : "Это последнее фото из общей очереди. После сохранения очередь завершится.")
+      : "";
     const recognizedFields = new Set(photoState.lastAppliedKeys || []);
     const previewItems = getRecognizablePhotoFields(row)
       .filter((item) => recognizedFields.has(item.key))
@@ -1438,6 +1457,7 @@
               : "Распознавание фото доступно только в онлайн-режиме владельца.")
           )
         }</p>
+        ${queueInfoText ? `<p class="hint"><strong>${escapeHtml(queueInfoText)}</strong></p>` : ""}
         ${photoState.imageDataUrl ? `
           <div class="photo-import-preview">
             <img src="${escapeHtml(photoState.imageDataUrl)}" alt="Загруженный бланк">
@@ -1626,6 +1646,7 @@
       renderMainPage();
     }
 
+    document.title = getAppDocumentTitle();
     attachCommonEvents();
     applyZoom(loadZoom());
     if (mode === "archive") {
@@ -1927,6 +1948,9 @@
     state.photoImport.lastAppliedKeys = [];
     state.photoImport.lastReportDate = "";
     state.photoImport.notes = [];
+    state.photoImport.queueMode = false;
+    state.photoImport.queueRemainingCount = 0;
+    state.photoImport.queueNextDepartmentName = "";
     setPhotoImportStatus("Подготавливаю фото для распознавания...", false);
     renderPage();
 
@@ -1971,6 +1995,15 @@
 
     state.photoImport.isProcessing = true;
     setPhotoImportStatus("Распознаю цифры на бланке...", false);
+    setPhotoImportStatus(
+      state.photoImport.queueRemainingCount > 0
+        ? `Фото перенесено с главного файла. Начинаю распознавание для этого отделения. После сохранения откроется следующее фото, осталось: ${state.photoImport.queueRemainingCount}.`
+        : "Фото перенесено с главного файла. Начинаю распознавание для этого отделения. Это последнее фото из очереди.",
+      false
+    );
+    if (!state.photoImport.queueMode) {
+      setPhotoImportStatus("Распознаю цифры на бланке...", false);
+    }
     renderPage();
 
     try {
@@ -2504,6 +2537,11 @@
     state.photoImport = buildInitialPhotoImportState();
     state.photoImport.imageName = pending.imageName || "";
     state.photoImport.imageDataUrl = pending.imageDataUrl || "";
+    state.photoImport.queueMode = true;
+    state.photoImport.queueRemainingCount = getPendingMainPhotoRouteCount();
+    const nextPendingRoute = peekPendingMainPhotoRoute();
+    const nextDepartment = nextPendingRoute ? config.getDepartmentById(nextPendingRoute.departmentId) : null;
+    state.photoImport.queueNextDepartmentName = nextDepartment ? nextDepartment.department : "";
     setPhotoImportStatus("Фото перенесено с главного файла. Начинаю распознавание для этого отделения...", false);
     renderPage();
 
@@ -2799,6 +2837,9 @@
       if (openNextPendingRoute()) {
         return;
       }
+      if (manual && state.photoImport.queueMode) {
+        setInfo("Данные отделения сохранены. Очередь фото завершена.", false);
+      }
     } catch (error) {
       setInfo(error instanceof Error ? error.message : "Не удалось сохранить данные отделения.", true);
     }
@@ -2938,7 +2979,7 @@
       });
 
       window.addEventListener("afterprint", () => {
-        document.title = DEFAULT_DOCUMENT_TITLE;
+        document.title = getAppDocumentTitle();
       });
 
       state.printHandlersAttached = true;
