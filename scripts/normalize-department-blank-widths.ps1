@@ -9,6 +9,61 @@ $wordPdfFormat = 17
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+$cp1252 = [System.Text.Encoding]::GetEncoding(1252)
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Repair-MojibakeText {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+
+    $needsFix = $false
+    foreach ($char in $Value.ToCharArray()) {
+        $code = [int][char]$char
+        if ($code -ge 0x00C0 -and $code -le 0x00FF) {
+            $needsFix = $true
+            break
+        }
+    }
+
+    if (-not $needsFix) {
+        return $Value
+    }
+
+    try {
+        $bytes = $cp1252.GetBytes($Value)
+        $fixed = [System.Text.Encoding]::UTF8.GetString($bytes)
+        if ($fixed -and $fixed -ne $Value) {
+            return $fixed
+        }
+    } catch {
+    }
+
+    return $Value
+}
+
+function Save-XmlUtf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Xml.XmlDocument]$XmlDocument,
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $settings = New-Object System.Xml.XmlWriterSettings
+    $settings.Encoding = $utf8NoBom
+    $settings.Indent = $false
+    $settings.NewLineHandling = [System.Xml.NewLineHandling]::None
+
+    $writer = [System.Xml.XmlWriter]::Create($Path, $settings)
+    try {
+        $XmlDocument.Save($writer)
+    } finally {
+        $writer.Close()
+    }
+}
+
 function Update-DocxGrid {
     param(
         [Parameter(Mandatory = $true)]
@@ -26,9 +81,19 @@ function Update-DocxGrid {
         [System.IO.Compression.ZipFile]::ExtractToDirectory($DocxPath, $tempRoot)
 
         $xmlPath = Join-Path $tempRoot "word\document.xml"
-        [xml]$xml = Get-Content $xmlPath
+        $xml = New-Object System.Xml.XmlDocument
+        $xml.PreserveWhitespace = $true
+        $xml.Load($xmlPath)
         $ns = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
         $ns.AddNamespace("w", "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+
+        $textNodes = $xml.SelectNodes("//w:t", $ns)
+        foreach ($textNode in $textNodes) {
+            $fixedText = Repair-MojibakeText -Value $textNode.InnerText
+            if ($fixedText -ne $textNode.InnerText) {
+                $textNode.InnerText = $fixedText
+            }
+        }
 
         $table = $xml.SelectSingleNode("//w:tbl[1]", $ns)
         if (-not $table) {
@@ -89,7 +154,7 @@ function Update-DocxGrid {
             }
         }
 
-        $xml.Save($xmlPath)
+        Save-XmlUtf8NoBom -XmlDocument $xml -Path $xmlPath
 
         if (Test-Path $zipPath) {
             Remove-Item $zipPath -Force
@@ -123,7 +188,9 @@ function Get-ReferenceTableOuterXml {
             [System.IO.Compression.ZipFile]::ExtractToDirectory($docxPath, $tempRoot)
 
             $xmlPath = Join-Path $tempRoot "word\document.xml"
-            [xml]$xml = Get-Content $xmlPath
+            $xml = New-Object System.Xml.XmlDocument
+            $xml.PreserveWhitespace = $true
+            $xml.Load($xmlPath)
             $ns = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
             $ns.AddNamespace("w", "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
 
@@ -193,6 +260,7 @@ function Get-DepartmentsRoots {
 }
 
 $departmentsRoots = Get-DepartmentsRoots -RootPath $projectRoot
+$lockedFiles = New-Object System.Collections.Generic.List[string]
 
 foreach ($departmentsRoot in $departmentsRoots) {
     $docxFiles = Get-ChildItem -Path $departmentsRoot -Recurse -File | Where-Object {
@@ -206,7 +274,12 @@ foreach ($departmentsRoot in $departmentsRoots) {
     $referenceTableOuterXml = Get-ReferenceTableOuterXml -DocxPaths $docxFiles.FullName -ExpectedGridCount $targetGridWidths.Count
 
     foreach ($file in $docxFiles) {
-        Update-DocxGrid -DocxPath $file.FullName -Widths $targetGridWidths -ReferenceTableOuterXml $referenceTableOuterXml
+        try {
+            Update-DocxGrid -DocxPath $file.FullName -Widths $targetGridWidths -ReferenceTableOuterXml $referenceTableOuterXml
+        } catch {
+            $lockedFiles.Add($file.FullName) | Out-Null
+            Write-Warning "skip locked or busy file $($file.FullName)"
+        }
     }
 
     $word = $null
@@ -216,7 +289,14 @@ foreach ($departmentsRoot in $departmentsRoots) {
         $word.DisplayAlerts = 0
 
         foreach ($file in $docxFiles) {
-            Refresh-PdfFromDocx -Word $word -DocxPath $file.FullName
+            if ($lockedFiles.Contains($file.FullName)) {
+                continue
+            }
+            try {
+                Refresh-PdfFromDocx -Word $word -DocxPath $file.FullName
+            } catch {
+                Write-Warning "skip pdf refresh for $($file.FullName)"
+            }
         }
     } finally {
         if ($word) {
@@ -225,5 +305,13 @@ foreach ($departmentsRoot in $departmentsRoots) {
             } catch {
             }
         }
+    }
+}
+
+if ($lockedFiles.Count -gt 0) {
+    Write-Output ""
+    Write-Output "busy files:"
+    foreach ($locked in $lockedFiles) {
+        Write-Output $locked
     }
 }
