@@ -24,6 +24,7 @@
     "currentShar",
     "currentSpa",
     "currentPaym",
+    "currentZh",
     "family",
     "officer",
     "civil",
@@ -48,6 +49,7 @@
     "currentShar",
     "currentSpa",
     "currentPaym",
+    "currentZh",
     "family",
     "officer",
     "civil",
@@ -60,7 +62,7 @@
     "beenTotal", "beenSoldier", "beenSeries",
     "admittedTotal", "admittedSoldier", "admittedSeries",
     "dgTotal", "dgSoldier", "dgSeries",
-    "currentShar", "currentSpa", "currentPaym",
+    "currentShar", "currentSpa", "currentPaym", "currentZh",
     "family", "officer", "civil",
     "leaveSharq", "leaveSpa", "leavePaym"
   ];
@@ -69,7 +71,7 @@
     "beenTotal", "beenSoldier", "beenSeries",
     "admittedTotal", "admittedSoldier", "admittedSeries",
     "dgTotal", "dgSoldier", "dgSeries",
-    "currentShar", "currentSpa", "currentPaym",
+    "currentShar", "currentSpa", "currentPaym", "currentZh",
     "family", "officer"
   ];
 
@@ -77,6 +79,7 @@
     "currentShar",
     "currentSpa",
     "currentPaym",
+    "currentZh",
     "family",
     "officer",
     "civil",
@@ -89,6 +92,7 @@
     "currentShar",
     "currentSpa",
     "currentPaym",
+    "currentZh",
     "family",
     "officer"
   ];
@@ -323,6 +327,7 @@
       currentShar: 0,
       currentSpa: 0,
       currentPaym: 0,
+      currentZh: 0,
       family: 0,
       officer: 0,
       civil: 0,

@@ -17,7 +17,7 @@
   const archiveKeyFromQuery = queryParams.get("archive") || "";
   const archiveAutoPrint = queryParams.get("autoprint") !== "0";
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
-  const SAVE_RULE_TEXT = "13-21 = (1 + 4 + 11) - (7 + 10)";
+  const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
   const SAVE_RULE_TEXT_SHORT = "сумма блока АРКА Э = (1 + 4 + 11) - (7 + 10)";
   const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
   const ARCHIVE_TIMEZONE = "Asia/Yerevan";
@@ -44,12 +44,13 @@
     { cell: 13, key: "currentShar", label: "13" },
     { cell: 14, key: "currentSpa", label: "14" },
     { cell: 15, key: "currentPaym", label: "15" },
-    { cell: 16, key: "family", label: "16" },
-    { cell: 17, key: "officer", label: "17" },
-    { cell: 18, key: "civil", label: "18" },
-    { cell: 19, key: "leaveSharq", label: "19" },
-    { cell: 20, key: "leaveSpa", label: "20" },
-    { cell: 21, key: "leavePaym", label: "21" }
+    { cell: 16, key: "currentZh", label: "16" },
+    { cell: 17, key: "family", label: "17" },
+    { cell: 18, key: "officer", label: "18" },
+    { cell: 19, key: "civil", label: "19" },
+    { cell: 20, key: "leaveSharq", label: "20" },
+    { cell: 21, key: "leaveSpa", label: "21" },
+    { cell: 22, key: "leavePaym", label: "22" }
   ];
 
   function buildInitialPhotoImportState() {
@@ -894,7 +895,7 @@
       expected,
       message: isValid
         ? `Проверка пройдена: ${SAVE_RULE_TEXT}.`
-        : `Сохранение заблокировано: сумма 13-21 = ${actual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${expected}.`
+        : `Сохранение заблокировано: сумма 13-22 = ${actual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${expected}.`
     };
   }
 
@@ -992,13 +993,14 @@
           <th colspan="3" rowspan="2" class="hdr-peach group-end">ԸՆՈՒՆՎԵԼ Է</th>
           <th colspan="3" rowspan="2" class="hdr-peach group-end">Դ/Գ</th>
           <th colspan="2" rowspan="2" class="hdr-peach group-end major-left">Տեղափոխ</th>
-          <th colspan="7" class="hdr-peach major-left">ԱՌԿԱ Է</th>
+          <th colspan="8" class="hdr-peach major-left">ԱՌԿԱ Է</th>
           <th colspan="3" class="hdr-peach major-left">որոնցից բուժական</th>
           <th class="hdr-yellow major-left">&nbsp;</th>
         </tr>
         <tr>
           <th rowspan="2" class="hdr-yellow major-left">ԸՆԴԱՄ</th>
           <th colspan="3" class="hdr-peach">Զինծառայող</th>
+          <th rowspan="2" class="hdr-peach">Զ/Հ</th>
           <th rowspan="2" class="hdr-peach">Զ/Ծ ԸՆՏ</th>
           <th rowspan="2" class="hdr-peach">Զ/Պ</th>
           <th rowspan="2" class="hdr-peach">Ք-ի</th>
@@ -1885,7 +1887,7 @@
     saveBtn.setAttribute("aria-disabled", String(!validation.isValid));
     saveBtn.title = validation.isValid
       ? "Формула совпадает, можно сохранять."
-      : "Исправь данные: кнопка станет активной, когда сумма 13-21 совпадет с формулой.";
+      : "Исправь данные: кнопка станет активной, когда сумма 13-22 совпадет с формулой.";
     saveBtn.classList.add(validation.isValid ? "save-ready" : "save-blocked");
 
     if (ruleText) {
