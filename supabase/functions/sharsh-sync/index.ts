@@ -1,4 +1,4 @@
-﻿import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const DEFAULT_DATE = "05,05,26";
 const VALUE_KEYS = [
@@ -16,6 +16,7 @@ const VALUE_KEYS = [
   "currentShar",
   "currentSpa",
   "currentPaym",
+  "currentZh",
   "family",
   "officer",
   "civil",
@@ -39,15 +40,16 @@ const PHOTO_FIELD_MAPPINGS = [
   { cell: 10, key: "transferFromDepartment", label: "ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­ / Õ¢Õ¡ÕªÕ¶Õ«Ö" },
   { cell: 11, key: "transferToDepartment", label: "ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­ / Õ¢Õ¡ÕªÕ«Õ¶" },
   { cell: 12, key: "photoCell12Derived", label: "derived total / ignored by app" },
-  { cell: 13, key: "currentShar", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ·Õ¡Ö€Ö„" },
-  { cell: 14, key: "currentSpa", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ½ÕºÕ¡" },
-  { cell: 15, key: "currentPaym", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / ÕºÕ¡ÕµÕ´Õ¡Õ¶" },
-  { cell: 16, key: "family", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ£/Õ¾" },
-  { cell: 17, key: "officer", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Õ£/Õ® Õ¨Õ¶Õ¤" },
-  { cell: 18, key: "civil", label: "Ô±Õ¼Õ¯Õ¡ Õ§ / Ö„-Õ°" },
-  { cell: 19, key: "leaveSharq", label: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ / Õ·Õ¡Ö€Ö„" },
-  { cell: 20, key: "leaveSpa", label: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ / Õ½ÕºÕ¡" },
-  { cell: 21, key: "leavePaym", label: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ / ÕºÕ¡ÕµÕ´Õ¡Õ¶" }
+  { cell: 13, key: "currentShar", label: "present / shar / first soldier column" },
+  { cell: 14, key: "currentSpa", label: "present / spa / second soldier column" },
+  { cell: 15, key: "currentPaym", label: "present / paym / third soldier column" },
+  { cell: 16, key: "currentZh", label: "present / zh / single column immediately after the three soldier columns" },
+  { cell: 17, key: "family", label: "present / zts-ent / single column immediately after currentZh" },
+  { cell: 18, key: "officer", label: "present / z-p / single column immediately after family" },
+  { cell: 19, key: "civil", label: "present / q-i / single column immediately after officer" },
+  { cell: 20, key: "leaveSharq", label: "leave / sharq" },
+  { cell: 21, key: "leaveSpa", label: "leave / spa" },
+  { cell: 22, key: "leavePaym", label: "leave / paym" }
 ] as const;
 
 const PHOTO_SCHEMA_VALUE_KEYS = PHOTO_FIELD_MAPPINGS
@@ -285,9 +287,13 @@ async function recognizeDepartmentPhoto(
     "Ignore the handwritten descriptive text in the lower part of the page.",
     "Return null for any cell that is blank, crossed out, unreadable, or uncertain.",
     "Do not infer values from formulas. Do not copy printed column numbers.",
+    "After the three soldier columns in the 'present' block there are four consecutive single-column fields.",
+    "Those four single-column fields must be read strictly in this order: cell 16 currentZh, cell 17 family, cell 18 officer, cell 19 civil.",
+    "Do not shift handwritten values left or right between cells 16, 17, 18, and 19.",
     "Map the handwritten values into these fields:",
     fieldInstructions,
     "Cell 12 is a derived total between cell 11 and cell 13. Return it only under photoCell12Derived and never assign that handwritten number to currentShar or any later field.",
+    "If the photo clearly shows a handwritten value under the single column between the three soldier columns and the family column, that value belongs to currentZh.",
     "The top table also contains derived totals. Do not return those derived totals unless they correspond to one of the listed fields above.",
     "Return reportDate in dd.mm.yy or dd.mm.yyyy when visible, otherwise null.",
     "Use notes for short uncertainty comments only when needed."
