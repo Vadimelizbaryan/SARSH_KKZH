@@ -74,6 +74,10 @@
       notes: [],
       detectedDepartmentId: "",
       detectedBy: "",
+      batchItems: [],
+      batchTotalCount: 0,
+      batchDetectedCount: 0,
+      batchFailedCount: 0,
       isProcessing: false,
       isError: false,
       status: ""
@@ -203,51 +207,122 @@
     state.mainPhotoRoute.isError = Boolean(isError);
   }
 
-  function storePendingMainPhotoRoute(payload) {
-    try {
-      sessionStorage.setItem(MAIN_PHOTO_ROUTE_STORAGE_KEY, JSON.stringify({
-        departmentId: payload.departmentId || "",
-        imageName: payload.imageName || "",
-        imageDataUrl: payload.imageDataUrl || "",
-        createdAt: Date.now()
-      }));
-    } catch (_error) {
+  function normalizePendingMainPhotoRouteItem(payload) {
+    if (!payload || typeof payload !== "object") {
+      return null;
     }
+
+    const departmentId = typeof payload.departmentId === "string" ? payload.departmentId.trim() : "";
+    const imageName = typeof payload.imageName === "string" ? payload.imageName.trim() : "";
+    const imageDataUrl = typeof payload.imageDataUrl === "string" ? payload.imageDataUrl : "";
+    const detectedBy = typeof payload.detectedBy === "string" ? payload.detectedBy.trim() : "";
+    const notes = Array.isArray(payload.notes)
+      ? payload.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
+      : [];
+
+    if (!departmentId || !imageDataUrl.startsWith("data:image/")) {
+      return null;
+    }
+
+    return {
+      departmentId,
+      imageName,
+      imageDataUrl,
+      detectedBy,
+      notes
+    };
   }
 
-  function takePendingMainPhotoRoute(departmentIdToMatch) {
+  function readPendingMainPhotoRouteQueue() {
     try {
       const raw = sessionStorage.getItem(MAIN_PHOTO_ROUTE_STORAGE_KEY);
       if (!raw) {
         return null;
       }
 
-      sessionStorage.removeItem(MAIN_PHOTO_ROUTE_STORAGE_KEY);
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") {
         return null;
       }
 
-      const departmentId = typeof parsed.departmentId === "string" ? parsed.departmentId : "";
-      const imageDataUrl = typeof parsed.imageDataUrl === "string" ? parsed.imageDataUrl : "";
-      const imageName = typeof parsed.imageName === "string" ? parsed.imageName : "";
       const createdAt = Number(parsed.createdAt || 0);
-
-      if (!departmentId || departmentId !== departmentIdToMatch || !imageDataUrl.startsWith("data:image/")) {
+      if (!Number.isFinite(createdAt) || (Date.now() - createdAt) > MAIN_PHOTO_ROUTE_MAX_AGE_MS) {
+        sessionStorage.removeItem(MAIN_PHOTO_ROUTE_STORAGE_KEY);
         return null;
       }
-      if (!Number.isFinite(createdAt) || (Date.now() - createdAt) > MAIN_PHOTO_ROUTE_MAX_AGE_MS) {
+
+      const rawItems = Array.isArray(parsed.items)
+        ? parsed.items
+        : [parsed];
+      const items = rawItems
+        .map((item) => normalizePendingMainPhotoRouteItem(item))
+        .filter(Boolean);
+
+      if (!items.length) {
+        sessionStorage.removeItem(MAIN_PHOTO_ROUTE_STORAGE_KEY);
         return null;
       }
 
       return {
-        departmentId,
-        imageName,
-        imageDataUrl
+        createdAt,
+        items
       };
     } catch (_error) {
+      sessionStorage.removeItem(MAIN_PHOTO_ROUTE_STORAGE_KEY);
       return null;
     }
+  }
+
+  function writePendingMainPhotoRouteQueue(items) {
+    const normalizedItems = Array.isArray(items)
+      ? items.map((item) => normalizePendingMainPhotoRouteItem(item)).filter(Boolean)
+      : [];
+
+    if (!normalizedItems.length) {
+      sessionStorage.removeItem(MAIN_PHOTO_ROUTE_STORAGE_KEY);
+      return;
+    }
+
+    try {
+      sessionStorage.setItem(MAIN_PHOTO_ROUTE_STORAGE_KEY, JSON.stringify({
+        createdAt: Date.now(),
+        items: normalizedItems
+      }));
+    } catch (_error) {
+    }
+  }
+
+  function storePendingMainPhotoRoute(payload) {
+    writePendingMainPhotoRouteQueue([payload]);
+  }
+
+  function storePendingMainPhotoRoutes(items) {
+    writePendingMainPhotoRouteQueue(items);
+  }
+
+  function peekPendingMainPhotoRoute() {
+    const queue = readPendingMainPhotoRouteQueue();
+    return queue && queue.items.length ? queue.items[0] : null;
+  }
+
+  function getPendingMainPhotoRouteCount() {
+    const queue = readPendingMainPhotoRouteQueue();
+    return queue ? queue.items.length : 0;
+  }
+
+  function takePendingMainPhotoRoute(departmentIdToMatch) {
+    const queue = readPendingMainPhotoRouteQueue();
+    if (!queue || !queue.items.length) {
+      return null;
+    }
+
+    const [nextItem, ...restItems] = queue.items;
+    if (!nextItem || !nextItem.departmentId || nextItem.departmentId !== departmentIdToMatch) {
+      return null;
+    }
+
+    writePendingMainPhotoRouteQueue(restItems);
+    return nextItem;
   }
 
   function getCurrentDepartmentDefinition() {
@@ -1937,8 +2012,191 @@
     state.photoImport = next;
     renderPage();
   }
+  function buildMainPhotoRouteBatchItem(file, index) {
+    return {
+      id: `batch-${Date.now()}-${index}`,
+      imageName: file && file.name ? String(file.name) : `image-${index + 1}`,
+      imageDataUrl: "",
+      detectedDepartmentId: "",
+      detectedBy: "",
+      notes: [],
+      stage: "queued"
+    };
+  }
 
-  async function handleMainPhotoRouteSelection(file) {
+  function buildMainPhotoRouteBatchSummary(routeState) {
+    const items = Array.isArray(routeState.batchItems) ? routeState.batchItems : [];
+    if (!items.length) {
+      return "";
+    }
+
+    return items.map((item, index) => {
+      const department = item.detectedDepartmentId
+        ? config.getDepartmentById(item.detectedDepartmentId)
+        : null;
+      const title = department
+        ? `${department.marker || item.detectedDepartmentId} - ${department.department}`
+        : ({
+          queued: "В очереди",
+          preparing: "Подготавливается",
+          ready: "Готово к отправке",
+          detecting: "Определяется",
+          detected: "Определено",
+          failed: "Не распознано"
+        }[item.stage] || "Ожидание");
+
+      return `
+        <div class="photo-import-result-item">
+          <span>${escapeHtml(`${index + 1}. ${item.imageName || "image"}`)}</span>
+          <strong>${escapeHtml(title)}</strong>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function navigateToQueuedDepartment(item) {
+    if (!item || !item.departmentId) {
+      return false;
+    }
+
+    const department = config.getDepartmentById(item.departmentId);
+    if (!department) {
+      return false;
+    }
+
+    renderPage();
+    window.location.href = appendShareQuery(config.getDepartmentPagePath(basePath, item.departmentId));
+    return true;
+  }
+
+  function isSupportedMainPhotoFile(file) {
+    if (!file || typeof file !== "object") {
+      return false;
+    }
+
+    const fileName = typeof file.name === "string" ? file.name.toLowerCase() : "";
+    const fileType = typeof file.type === "string" ? file.type.toLowerCase() : "";
+    if (fileType.startsWith("image/")) {
+      return true;
+    }
+
+    return /\.(jpg|jpeg|png|webp|bmp|gif|tif|tiff|heic|heif)$/i.test(fileName);
+  }
+
+  function normalizeMainPhotoRouteSelection(files) {
+    const rawFiles = Array.isArray(files)
+      ? files.filter(Boolean)
+      : (files ? [files] : []);
+    const imageFiles = rawFiles.filter((file) => isSupportedMainPhotoFile(file));
+
+    return imageFiles.sort((leftFile, rightFile) => {
+      const leftPath = String(leftFile.webkitRelativePath || leftFile.name || "").toLowerCase();
+      const rightPath = String(rightFile.webkitRelativePath || rightFile.name || "").toLowerCase();
+      return leftPath.localeCompare(rightPath, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }
+
+  async function handleMainPhotoRouteSelection(files) {
+    const rawSelectedFiles = Array.isArray(files)
+      ? files.filter(Boolean)
+      : (files ? [files] : []);
+    const selectedFiles = normalizeMainPhotoRouteSelection(rawSelectedFiles);
+    const file = selectedFiles[0] || null;
+    const isFolderSelection = rawSelectedFiles.some((item) => typeof item?.webkitRelativePath === "string" && item.webkitRelativePath);
+    const skippedFilesCount = Math.max(0, rawSelectedFiles.length - selectedFiles.length);
+    const folderName = isFolderSelection
+      ? String((rawSelectedFiles.find((item) => typeof item?.webkitRelativePath === "string" && item.webkitRelativePath)?.webkitRelativePath || "").split("/")[0] || "").trim()
+      : "";
+    const selectionNotes = [];
+
+    if (isFolderSelection && folderName) {
+      selectionNotes.push(`Папка проверена: ${folderName}.`);
+    }
+    if (skippedFilesCount > 0) {
+      selectionNotes.push(`Пропущено файлов без подходящего изображения: ${skippedFilesCount}.`);
+    }
+
+    if (!selectedFiles.length) {
+      state.mainPhotoRoute = buildInitialMainPhotoRouteState();
+      state.mainPhotoRoute.notes = selectionNotes;
+      setMainPhotoRouteStatus(
+        isFolderSelection
+          ? "В выбранной папке не найдено подходящих фотографий бланков."
+          : "Не найдено подходящих файлов изображений.",
+        true
+      );
+      renderPage();
+      return;
+    }
+
+    if (selectedFiles.length > 1) {
+      state.mainPhotoRoute = buildInitialMainPhotoRouteState();
+      state.mainPhotoRoute.isProcessing = true;
+      state.mainPhotoRoute.imageName = selectedFiles[0].name || "";
+      state.mainPhotoRoute.batchItems = selectedFiles.map((item, index) => buildMainPhotoRouteBatchItem(item, index));
+      state.mainPhotoRoute.batchTotalCount = selectedFiles.length;
+      state.mainPhotoRoute.notes = selectionNotes;
+      setMainPhotoRouteStatus(`Подготавливаю ${selectedFiles.length} фото для пакетной обработки...`, false);
+      renderPage();
+      if (isFolderSelection) {
+        setMainPhotoRouteStatus(`Папка проверена: найдено ${selectedFiles.length} подходящих фото. Подготавливаю их к отправке...`, false);
+        renderPage();
+      }
+
+      try {
+        const preparedItems = [];
+        for (let index = 0; index < selectedFiles.length; index += 1) {
+          const currentFile = selectedFiles[index];
+          const batchItem = state.mainPhotoRoute.batchItems[index];
+          if (batchItem) {
+            batchItem.stage = "preparing";
+          }
+          setMainPhotoRouteStatus(
+            `Подготавливаю фото ${index + 1} из ${selectedFiles.length}: ${currentFile.name || "image"}`,
+            false
+          );
+          renderPage();
+
+          const imageDataUrl = await compressImageFile(currentFile);
+          if (batchItem) {
+            batchItem.imageDataUrl = imageDataUrl;
+            batchItem.stage = "ready";
+          }
+          if (index === 0) {
+            state.mainPhotoRoute.imageDataUrl = imageDataUrl;
+          }
+          preparedItems.push({
+            imageName: currentFile.name || "",
+            imageDataUrl
+          });
+        }
+
+        state.mainPhotoRoute.isProcessing = false;
+        const canAutoDetect = sync.hasRemoteSync() && typeof sync.detectDepartmentPhoto === "function";
+        if (canAutoDetect) {
+          setMainPhotoRouteStatus(
+            `Фото готовы. Последовательно отправляю ${preparedItems.length} снимков на сервер...`,
+            false
+          );
+          renderPage();
+          await handleMainPhotoRouteDetection(preparedItems);
+          return;
+        }
+
+        setMainPhotoRouteStatus("Пакетная отправка фото доступна только в онлайн-режиме владельца.", true);
+        renderPage();
+        return;
+      } catch (error) {
+        state.mainPhotoRoute = buildInitialMainPhotoRouteState();
+        setMainPhotoRouteStatus(
+          error instanceof Error ? error.message : "Не удалось подготовить фото для определения отделения.",
+          true
+        );
+        renderPage();
+        return;
+      }
+    }
+
     if (!file) {
       return;
     }
@@ -1946,6 +2204,7 @@
     state.mainPhotoRoute = buildInitialMainPhotoRouteState();
     state.mainPhotoRoute.isProcessing = true;
     state.mainPhotoRoute.imageName = file.name || "";
+    state.mainPhotoRoute.notes = selectionNotes;
     setMainPhotoRouteStatus("Подготавливаю фото для определения отделения...", false);
     renderPage();
 
@@ -1975,6 +2234,7 @@
 
   function clearMainPhotoRouteSelection() {
     state.mainPhotoRoute = buildInitialMainPhotoRouteState();
+    writePendingMainPhotoRouteQueue([]);
     renderPage();
   }
 
@@ -1984,6 +2244,7 @@
     const detectedDepartment = routeState.detectedDepartmentId
       ? config.getDepartmentById(routeState.detectedDepartmentId)
       : null;
+    const batchPreviewItems = buildMainPhotoRouteBatchSummary(routeState);
 
     return `
       <section class="panel no-print photo-import-panel">
@@ -1991,8 +2252,12 @@
         <p>Загрузите фото бланка на главном файле. После загрузки система сама определит отделение по крупному маркеру отделения или по шапке бланка, откроет нужную страницу и автоматически начнёт подстановку цифр в поля этого отделения.</p>
         <div class="photo-import-actions">
           <label class="button-link photo-file-label${routeState.isProcessing ? " is-disabled" : ""}">
-            <input type="file" id="mainPhotoRouteFile" accept="image/*" capture="environment" ${routeState.isProcessing ? "disabled" : ""}>
+            <input type="file" id="mainPhotoRouteFile" accept="image/*" capture="environment" multiple ${routeState.isProcessing ? "disabled" : ""}>
             Выбрать фото
+          </label>
+          <label class="button-link photo-file-label${routeState.isProcessing ? " is-disabled" : ""}">
+            <input type="file" id="mainPhotoRouteFolder" accept="image/*" webkitdirectory directory multiple ${routeState.isProcessing ? "disabled" : ""}>
+            Выбрать папку
           </label>
           <button type="button" id="mainPhotoRouteDetectBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
             ${routeState.isProcessing ? "Определяю..." : "Определить и открыть"}
@@ -2012,7 +2277,7 @@
             <img src="${escapeHtml(routeState.imageDataUrl)}" alt="Фото для определения отделения">
           </div>
         ` : ""}
-        ${detectedDepartment || (routeState.notes && routeState.notes.length) ? `
+        ${detectedDepartment || batchPreviewItems || (routeState.notes && routeState.notes.length) ? `
           <div class="photo-import-results">
             ${detectedDepartment ? `
               <div class="photo-import-result-grid">
@@ -2028,6 +2293,7 @@
                 ` : ""}
               </div>
             ` : ""}
+            ${batchPreviewItems ? `<div class="photo-import-result-grid">${batchPreviewItems}</div>` : ""}
             ${routeState.notes && routeState.notes.length ? `
               <div class="photo-import-notes">
                 ${routeState.notes.map((note) => `<p class="hint warning-note">${escapeHtml(note)}</p>`).join("")}
@@ -2039,7 +2305,126 @@
     `;
   }
 
-  async function handleMainPhotoRouteDetection() {
+  async function handleMainPhotoRouteDetection(preparedItemsOverride) {
+    const preparedItems = Array.isArray(preparedItemsOverride)
+      ? preparedItemsOverride.filter((item) => item && typeof item.imageDataUrl === "string" && item.imageDataUrl.startsWith("data:image/"))
+      : [];
+
+    if (preparedItems.length > 1) {
+      if (!sync.hasRemoteSync() || typeof sync.detectDepartmentPhoto !== "function") {
+        setMainPhotoRouteStatus("Определение отделения доступно только в онлайн-режиме владельца.", true);
+        renderPage();
+        return;
+      }
+
+      state.mainPhotoRoute.isProcessing = true;
+      state.mainPhotoRoute.notes = [];
+      state.mainPhotoRoute.detectedDepartmentId = "";
+      state.mainPhotoRoute.detectedBy = "";
+      state.mainPhotoRoute.batchTotalCount = preparedItems.length;
+      state.mainPhotoRoute.batchDetectedCount = 0;
+      state.mainPhotoRoute.batchFailedCount = 0;
+      state.mainPhotoRoute.batchItems = preparedItems.map((item, index) => ({
+        id: `prepared-${Date.now()}-${index}`,
+        imageName: item.imageName || `image-${index + 1}`,
+        imageDataUrl: item.imageDataUrl || "",
+        detectedDepartmentId: "",
+        detectedBy: "",
+        notes: [],
+        stage: "ready"
+      }));
+      setMainPhotoRouteStatus(`Определяю отделения по ${preparedItems.length} фото...`, false);
+      renderPage();
+
+      try {
+        const recognizedQueue = [];
+        const batchNotes = [];
+
+        for (let index = 0; index < preparedItems.length; index += 1) {
+          const preparedItem = preparedItems[index];
+          const batchItem = state.mainPhotoRoute.batchItems[index];
+          if (batchItem) {
+            batchItem.stage = "detecting";
+          }
+          setMainPhotoRouteStatus(
+            `Отправляю фото ${index + 1} из ${preparedItems.length}: ${preparedItem.imageName || "image"}`,
+            false
+          );
+          renderPage();
+
+          const detection = await sync.detectDepartmentPhoto(preparedItem.imageDataUrl);
+          const detectedDepartmentId = detection && typeof detection.departmentId === "string"
+            ? detection.departmentId
+            : "";
+          const notes = Array.isArray(detection?.notes)
+            ? detection.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
+            : [];
+          const department = detectedDepartmentId
+            ? config.getDepartmentById(detectedDepartmentId)
+            : null;
+
+          if (batchItem) {
+            batchItem.detectedDepartmentId = department ? detectedDepartmentId : "";
+            batchItem.detectedBy = department ? "vision" : "";
+            batchItem.notes = notes;
+            batchItem.stage = department ? "detected" : "failed";
+          }
+
+          if (department) {
+            recognizedQueue.push({
+              departmentId: detectedDepartmentId,
+              imageName: preparedItem.imageName,
+              imageDataUrl: preparedItem.imageDataUrl,
+              detectedBy: "vision",
+              notes
+            });
+            state.mainPhotoRoute.batchDetectedCount += 1;
+          } else {
+            state.mainPhotoRoute.batchFailedCount += 1;
+            batchNotes.push(`${preparedItem.imageName || `Фото ${index + 1}`}: отделение не определилось уверенно.`);
+          }
+        }
+
+        state.mainPhotoRoute.isProcessing = false;
+        state.mainPhotoRoute.notes = batchNotes;
+        state.mainPhotoRoute.detectedDepartmentId = recognizedQueue.length === 1 ? recognizedQueue[0].departmentId : "";
+        state.mainPhotoRoute.detectedBy = recognizedQueue.length === 1 ? "vision" : "";
+
+        if (!recognizedQueue.length) {
+          setMainPhotoRouteStatus(
+            "Не удалось уверенно определить отделения по выбранным фото. Попробуйте более чёткие снимки с видимым SR и шапкой.",
+            true
+          );
+          renderPage();
+          return;
+        }
+
+        storePendingMainPhotoRoutes(recognizedQueue);
+        const firstItem = peekPendingMainPhotoRoute();
+        const firstDepartment = firstItem ? config.getDepartmentById(firstItem.departmentId) : null;
+        if (!firstItem || !firstDepartment) {
+          setMainPhotoRouteStatus("Очередь фото подготовилась, но открыть отделение не удалось.", true);
+          renderPage();
+          return;
+        }
+
+        setMainPhotoRouteStatus(
+          `Пакет готов: распознано ${recognizedQueue.length} из ${preparedItems.length}. Открываю первое отделение: ${firstDepartment.department}.`,
+          false
+        );
+        renderPage();
+        navigateToQueuedDepartment(firstItem);
+        return;
+      } catch (error) {
+        state.mainPhotoRoute.isProcessing = false;
+        setMainPhotoRouteStatus(
+          error instanceof Error ? error.message : "Не удалось определить отделение по фото.",
+          true
+        );
+        renderPage();
+        return;
+      }
+    }
     if (!state.mainPhotoRoute.imageDataUrl) {
       setMainPhotoRouteStatus("Сначала выберите фото бланка.", true);
       renderPage();
@@ -2394,8 +2779,26 @@
       state.source = result.source;
       state.warning = "";
       state.photoImport.draftMode = false;
+      const nextPendingRoute = manual ? peekPendingMainPhotoRoute() : null;
+      const openNextPendingRoute = () => {
+        if (!nextPendingRoute || !nextPendingRoute.departmentId) {
+          return false;
+        }
+
+        const nextDepartment = config.getDepartmentById(nextPendingRoute.departmentId);
+        if (!nextDepartment) {
+          return false;
+        }
+
+        setInfo(`Данные сохранены. Открываю следующее отделение: ${nextDepartment.department}.`, false);
+        navigateToQueuedDepartment(nextPendingRoute);
+        return true;
+      };
       setInfo(manual ? "Данные отделения сохранены." : "Изменения отправлены в общий файл.", false);
       refreshTableData();
+      if (openNextPendingRoute()) {
+        return;
+      }
     } catch (error) {
       setInfo(error instanceof Error ? error.message : "Не удалось сохранить данные отделения.", true);
     }
@@ -2590,8 +2993,16 @@
     const mainPhotoRouteFile = document.getElementById("mainPhotoRouteFile");
     if (mainPhotoRouteFile instanceof HTMLInputElement) {
       mainPhotoRouteFile.addEventListener("change", () => {
-        const [file] = Array.from(mainPhotoRouteFile.files || []);
-        handleMainPhotoRouteSelection(file || null);
+        const files = Array.from(mainPhotoRouteFile.files || []);
+        handleMainPhotoRouteSelection(files);
+      });
+    }
+
+    const mainPhotoRouteFolder = document.getElementById("mainPhotoRouteFolder");
+    if (mainPhotoRouteFolder instanceof HTMLInputElement) {
+      mainPhotoRouteFolder.addEventListener("change", () => {
+        const files = Array.from(mainPhotoRouteFolder.files || []);
+        handleMainPhotoRouteSelection(files);
       });
     }
 
