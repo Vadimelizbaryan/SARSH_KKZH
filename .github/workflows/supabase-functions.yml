@@ -28,7 +28,7 @@ jobs:
         if: env.SUPABASE_ACCESS_TOKEN != ''
         uses: supabase/setup-cli@v1
         with:
-          version: v2.98.2
+          version: latest
 
       - name: Deploy sharsh-sync
         if: env.SUPABASE_ACCESS_TOKEN != ''
