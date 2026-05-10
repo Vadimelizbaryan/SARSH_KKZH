@@ -103,6 +103,9 @@
     clockIntervalId: 0,
     updateAudioContext: null,
     updateAudioBound: false,
+    updateAttentionIntervalId: 0,
+    updateAttentionTimeoutId: 0,
+    updateAttentionBound: false,
     archiveRecords: [],
     selectedArchiveKey: "",
     initialized: false,
@@ -184,6 +187,53 @@
     window.addEventListener("pointerdown", unlock, { passive: true });
     window.addEventListener("keydown", unlock, { passive: true });
     state.updateAudioBound = true;
+  }
+
+  function stopUpdateAttention() {
+    window.clearInterval(state.updateAttentionIntervalId);
+    window.clearTimeout(state.updateAttentionTimeoutId);
+    state.updateAttentionIntervalId = 0;
+    state.updateAttentionTimeoutId = 0;
+    document.title = getAppDocumentTitle();
+  }
+
+  function bindUpdateAttentionReset() {
+    if (state.updateAttentionBound) {
+      return;
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        stopUpdateAttention();
+      }
+    });
+
+    state.updateAttentionBound = true;
+  }
+
+  function triggerBackgroundUpdateAttention(kind) {
+    if (!document.hidden) {
+      return;
+    }
+
+    bindUpdateAttentionReset();
+    stopUpdateAttention();
+
+    const baseTitle = getAppDocumentTitle();
+    const alertTitle = kind === "complete"
+      ? "🔔 Все отделения обновлены"
+      : "🔔 Есть обновление";
+    let showAlert = true;
+
+    document.title = alertTitle;
+    state.updateAttentionIntervalId = window.setInterval(() => {
+      document.title = showAlert ? alertTitle : baseTitle;
+      showAlert = !showAlert;
+    }, 900);
+
+    state.updateAttentionTimeoutId = window.setTimeout(() => {
+      stopUpdateAttention();
+    }, 12000);
   }
 
   async function prepareUpdateAudioContext() {
@@ -273,8 +323,10 @@
 
     if (shouldSignal && hasUpdate) {
       if (nextOverall.level === "fresh" && previousOverall.level !== "fresh") {
+        triggerBackgroundUpdateAttention("complete");
         playCompleteUpdateSound();
       } else {
+        triggerBackgroundUpdateAttention("regular");
         playUpdateSound();
       }
     }
