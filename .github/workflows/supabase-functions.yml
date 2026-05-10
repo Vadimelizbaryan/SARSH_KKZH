@@ -6,11 +6,12 @@ on:
       - main
     paths:
       - "supabase/functions/sharsh-sync/**"
+      - "supabase/functions/sharsh-telegram/**"
       - "supabase/config.toml"
   workflow_dispatch:
 
 jobs:
-  deploy-sharsh-sync:
+  deploy-supabase-functions:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -33,3 +34,7 @@ jobs:
       - name: Deploy sharsh-sync
         if: env.SUPABASE_ACCESS_TOKEN != ''
         run: supabase functions deploy sharsh-sync --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Deploy sharsh-telegram
+        if: env.SUPABASE_ACCESS_TOKEN != ''
+        run: supabase functions deploy sharsh-telegram --project-ref "$SUPABASE_PROJECT_REF"
