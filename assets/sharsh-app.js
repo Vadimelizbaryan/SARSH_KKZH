@@ -60,7 +60,7 @@
   const QH_CALC_DEPARTMENT_ID = "r21";
   const QH_CALC_FIELD_ROWS = [
     {
-      label: "Поступил",
+      label: "Ընդունվել է",
       cells: [
         { key: "qhIncomingSoldier", marker: "A", role: "input" },
         { key: "qhIncomingOfficer", marker: "B", role: "input" },
@@ -68,7 +68,7 @@
       ]
     },
     {
-      label: "Выписан",
+      label: "Դուրս է գրվել",
       cells: [
         { key: "qhDischargedSoldier", marker: "D", role: "input" },
         { key: "qhDischargedOfficer", marker: "E", role: "input" },
@@ -76,7 +76,7 @@
       ]
     },
     {
-      label: "Было",
+      label: "Եղել է",
       cells: [
         { key: "currentShar", marker: "G", role: "linked" },
         { key: "currentSpa", marker: "H", role: "linked" },
@@ -84,7 +84,7 @@
       ]
     },
     {
-      label: "Осталось",
+      label: "Մնացել է",
       cells: [
         { key: "qhRemainingSoldier", marker: "J", role: "output" },
         { key: "qhRemainingOfficer", marker: "K", role: "output" },
@@ -2313,16 +2313,16 @@
 
     return `
       <div class="panel qh-calc-panel">
-        <h2>Расчётная таблица</h2>
-        <p>Дополнительная таблица для страницы Ք/Հ. Значения G, H и I берутся из ячеек 13, 14 и 15 основной таблицы, а J, K и L считаются автоматически.</p>
+        <h2>Հաշվարկային աղյուսակ</h2>
+        <p>Լրացուցիչ աղյուսակ էջի Ք/Հ համար։ G, H և I արժեքները վերցվում են հիմնական աղյուսակի 13, 14 և 15 բջիջներից, իսկ J, K և L արժեքները հաշվարկվում են ավտոմատ։</p>
         <div class="qh-calc-wrap" id="qhCalcPanel">
           <table class="qh-calc-table">
             <thead>
               <tr>
                 <th></th>
-                <th>Срочники</th>
-                <th>Офицеры</th>
-                <th>Наёмники</th>
+                <th>ՇԱՐ</th>
+                <th>ՍՊԱ</th>
+                <th>ՊԱՅՄ</th>
               </tr>
             </thead>
             <tbody>
@@ -2335,7 +2335,7 @@
             <span>L = (I + C) - F</span>
           </div>
           <div class="qh-calc-actions">
-            <button type="button" id="qhCalcApplyBtn">Рассчитать и подставить</button>
+            <button type="button" id="qhCalcApplyBtn">Հաշվել և տեղադրել</button>
           </div>
         </div>
       </div>
