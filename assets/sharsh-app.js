@@ -92,6 +92,14 @@
       ]
     }
   ];
+  const QH_CALC_INPUT_KEYS = new Set([
+    "qhIncomingSoldier",
+    "qhIncomingOfficer",
+    "qhIncomingContract",
+    "qhDischargedSoldier",
+    "qhDischargedOfficer",
+    "qhDischargedContract"
+  ]);
 
   function buildInitialPhotoImportState() {
     return {
@@ -1312,7 +1320,11 @@
       return getDisplayValue(calcQhRemainingValue(row, "contract"));
     }
 
-    return getDisplayValue(getQhCalcSourceValue(row, key));
+    const value = getQhCalcSourceValue(row, key);
+    if (QH_CALC_INPUT_KEYS.has(key) && (value === null || value === "" || typeof value === "undefined")) {
+      return "0";
+    }
+    return getDisplayValue(value);
   }
 
   function applyQhCalcToDepartment() {
@@ -1351,9 +1363,16 @@
     row.values.dgSoldier = dischargedTotal;
     row.values.dgSeries = dischargedSoldier;
 
+    row.values.qhIncomingSoldier = 0;
+    row.values.qhIncomingOfficer = 0;
+    row.values.qhIncomingContract = 0;
+    row.values.qhDischargedSoldier = 0;
+    row.values.qhDischargedOfficer = 0;
+    row.values.qhDischargedContract = 0;
+
     refreshTableData();
     queueDepartmentSave();
-    setInfo("Հաշվարկային աղյուսակի արժեքները տեղափոխվել են հիմնական բջիջներ։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
+    setInfo("Հաշվարկային աղյուսակի արժեքները տեղափոխվել են հիմնական բջիջներ, իսկ A-F մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
   }
 
   function getPhotoPreviewValue(row, key) {
