@@ -3851,6 +3851,12 @@
             applyLoadedSnapshot(result);
             setPendingMainSaveNotice("", false);
 
+            if (isQhCalcDepartment(row)) {
+              QH_CALC_INPUT_KEYS.forEach((key) => {
+                row.values[key] = 0;
+              });
+            }
+
             const nextRows = result.snapshot.rows || [];
             const nextStats = buildFreshnessStats(nextRows);
             const nextOverall = getOverallUpdateStatus(nextStats, nextRows.length);
