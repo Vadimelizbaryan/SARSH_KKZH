@@ -1321,11 +1321,6 @@
       return;
     }
 
-    const currentPresentTotal = calcPresentTotal(state.snapshot, row) || 0;
-    const currentShar = getQhCalcSourceValue(row, "currentShar") || 0;
-    const currentSpa = getQhCalcSourceValue(row, "currentSpa") || 0;
-    const currentPaym = getQhCalcSourceValue(row, "currentPaym") || 0;
-
     const incomingSoldier = getQhCalcSourceValue(row, "qhIncomingSoldier") || 0;
     const incomingOfficer = getQhCalcSourceValue(row, "qhIncomingOfficer") || 0;
     const incomingContract = getQhCalcSourceValue(row, "qhIncomingContract") || 0;
@@ -1339,18 +1334,22 @@
     const remainingOfficer = calcQhRemainingValue(row, "officer") || 0;
     const remainingContract = calcQhRemainingValue(row, "contract") || 0;
 
-    row.values.beenTotal = currentPresentTotal;
-    row.values.beenSoldier = currentShar + currentSpa + currentPaym;
-    row.values.beenSeries = currentShar;
+    row.values.currentShar = remainingSoldier;
+    row.values.currentSpa = remainingOfficer;
+    row.values.currentPaym = remainingContract;
+
+    const updatedPresentTotal = calcPresentTotal(state.snapshot, row) || 0;
+    const updatedCurrentSum = remainingSoldier + remainingOfficer + remainingContract;
+
+    row.values.beenTotal = updatedPresentTotal;
+    row.values.beenSoldier = updatedCurrentSum;
+    row.values.beenSeries = remainingSoldier;
     row.values.admittedTotal = incomingTotal;
     row.values.admittedSoldier = incomingTotal;
     row.values.admittedSeries = incomingSoldier;
     row.values.dgTotal = dischargedTotal;
     row.values.dgSoldier = dischargedTotal;
     row.values.dgSeries = dischargedSoldier;
-    row.values.currentShar = remainingSoldier;
-    row.values.currentSpa = remainingOfficer;
-    row.values.currentPaym = remainingContract;
 
     refreshTableData();
     queueDepartmentSave();
