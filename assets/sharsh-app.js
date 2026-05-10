@@ -101,6 +101,8 @@
     refreshIntervalId: 0,
     freshnessIntervalId: 0,
     clockIntervalId: 0,
+    updateAudioContext: null,
+    updateAudioBound: false,
     archiveRecords: [],
     selectedArchiveKey: "",
     initialized: false,
@@ -118,6 +120,110 @@
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
+  }
+
+  function getSnapshotUpdateSignature(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.rows)) {
+      return "";
+    }
+
+    return [
+      snapshot.reportDate || "",
+      snapshot.updatedAt || "",
+      ...snapshot.rows.map((row) => `${row.id}:${row.updatedAt || ""}`)
+    ].join("|");
+  }
+
+  function getUpdateAudioContext() {
+    if (state.updateAudioContext) {
+      return state.updateAudioContext;
+    }
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      return null;
+    }
+
+    state.updateAudioContext = new AudioContextClass();
+    return state.updateAudioContext;
+  }
+
+  async function unlockUpdateAudio() {
+    const audioContext = getUpdateAudioContext();
+    if (!audioContext) {
+      return;
+    }
+
+    if (audioContext.state === "suspended") {
+      try {
+        await audioContext.resume();
+      } catch (_error) {
+      }
+    }
+  }
+
+  function bindUpdateAudioUnlock() {
+    if (state.updateAudioBound) {
+      return;
+    }
+
+    const unlock = () => {
+      unlockUpdateAudio();
+    };
+
+    window.addEventListener("pointerdown", unlock, { passive: true });
+    window.addEventListener("keydown", unlock, { passive: true });
+    state.updateAudioBound = true;
+  }
+
+  async function playUpdateSound() {
+    if (mode !== "main") {
+      return;
+    }
+
+    const audioContext = getUpdateAudioContext();
+    if (!audioContext) {
+      return;
+    }
+
+    try {
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+    } catch (_error) {
+      return;
+    }
+
+    const now = audioContext.currentTime;
+    const gainNode = audioContext.createGain();
+    gainNode.connect(audioContext.destination);
+    gainNode.gain.setValueAtTime(0.0001, now);
+    gainNode.gain.linearRampToValueAtTime(0.05, now + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, now);
+    oscillator.frequency.linearRampToValueAtTime(1174, now + 0.16);
+    oscillator.connect(gainNode);
+    oscillator.start(now);
+    oscillator.stop(now + 0.35);
+  }
+
+  function applyLoadedSnapshot(result, options = {}) {
+    const previousSignature = getSnapshotUpdateSignature(state.snapshot);
+    const nextSignature = getSnapshotUpdateSignature(result.snapshot);
+    const shouldSignal = Boolean(options.signalOnChange) && mode === "main" && state.initialized;
+    const hasUpdate = Boolean(previousSignature && nextSignature && previousSignature !== nextSignature);
+
+    state.snapshot = deepCopy(result.snapshot);
+    state.loadedSnapshot = deepCopy(result.snapshot);
+    state.source = result.source;
+    state.warning = result.warning || "";
+
+    if (shouldSignal && hasUpdate) {
+      playUpdateSound();
+    }
   }
 
   function getRecognizablePhotoFields(row) {
@@ -2778,10 +2884,7 @@
 
   async function loadWorkingSnapshot() {
     const result = await sync.loadSnapshot();
-    state.snapshot = deepCopy(result.snapshot);
-    state.loadedSnapshot = deepCopy(result.snapshot);
-    state.source = result.source;
-    state.warning = result.warning || "";
+    applyLoadedSnapshot(result);
     state.archiveRecords = readArchiveRecords();
     state.initialized = true;
     state.info = "";
@@ -2965,10 +3068,7 @@
     syncCurrentReportDate();
     setInfo("Обновляю данные...", false);
     const result = await sync.loadSnapshot();
-    state.snapshot = deepCopy(result.snapshot);
-    state.loadedSnapshot = deepCopy(result.snapshot);
-    state.source = result.source;
-    state.warning = result.warning || "";
+    applyLoadedSnapshot(result, { signalOnChange: true });
     state.photoImport = buildInitialPhotoImportState();
     setInfo("Данные обновлены.", false);
     renderPage();
@@ -3003,6 +3103,8 @@
     const accessCodeField = document.getElementById("accessCodeField");
     const accessForm = document.getElementById("departmentAccessForm");
     const sheetBody = document.getElementById("sheetBody");
+
+    bindUpdateAudioUnlock();
 
     if (zoomRange) {
       zoomRange.addEventListener("input", () => {
@@ -3254,10 +3356,7 @@
     state.refreshIntervalId = window.setInterval(async () => {
       try {
         const result = await sync.loadSnapshot();
-        state.snapshot = deepCopy(result.snapshot);
-        state.loadedSnapshot = deepCopy(result.snapshot);
-        state.source = result.source;
-        state.warning = result.warning || "";
+        applyLoadedSnapshot(result, { signalOnChange: true });
         refreshTableData();
       } catch (error) {
         state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
