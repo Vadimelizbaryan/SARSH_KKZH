@@ -2619,6 +2619,14 @@
       });
 
       if (isQhCalcDepartment(row)) {
+        QH_CALC_INPUT_KEYS.forEach((key) => {
+          document.querySelectorAll(`[data-qh-calc-key="${key}"]`).forEach((element) => {
+            if (element instanceof HTMLInputElement) {
+              element.value = getQhCalcDisplayValue(row, key) || "0";
+            }
+          });
+        });
+
         [
           "currentShar",
           "currentSpa",
