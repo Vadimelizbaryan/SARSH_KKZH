@@ -230,21 +230,23 @@
   async function playUpdateSound() {
     const audioContext = await prepareUpdateAudioContext();
     if (!audioContext) {
-      return;
+      return false;
     }
 
     const now = audioContext.currentTime;
     scheduleTone(audioContext, now, 0.48, 740, 1047, 0.12, "triangle");
+    return true;
   }
 
   async function playCompleteUpdateSound() {
     const audioContext = await prepareUpdateAudioContext();
     if (!audioContext) {
-      return;
+      return false;
     }
 
     const now = audioContext.currentTime;
     scheduleTone(audioContext, now, 0.78, 880, 1568, 0.16, "sawtooth");
+    return true;
   }
 
   function applyLoadedSnapshot(result, options = {}) {
@@ -1459,6 +1461,7 @@
             </div>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="refreshBtn">Обновить</button>
+            <button type="button" id="testSoundBtn">Проверить звук</button>
             <button type="button" id="printBtn">Печать</button>
           </div>
         </div>
@@ -3143,6 +3146,7 @@
     const zoomRange = document.getElementById("zoomRange");
     const printBtn = document.getElementById("printBtn");
     const refreshBtn = document.getElementById("refreshBtn");
+    const testSoundBtn = document.getElementById("testSoundBtn");
     const resetBtn = document.getElementById("resetBtn");
     const saveBtn = document.getElementById("saveBtn");
     const accessCodeField = document.getElementById("accessCodeField");
@@ -3182,6 +3186,17 @@
         } catch (error) {
           state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
           setInfo("Не удалось обновить данные.", true);
+        }
+      });
+    }
+
+    if (testSoundBtn) {
+      testSoundBtn.addEventListener("click", async () => {
+        const played = await playCompleteUpdateSound();
+        if (played) {
+          setInfo("Тестовый звуковой сигнал воспроизведён.", false);
+        } else {
+          setInfo("Браузер пока не дал доступ к звуку. Попробуй кликнуть по странице и нажать кнопку ещё раз.", true);
         }
       });
     }
