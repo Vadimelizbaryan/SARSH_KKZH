@@ -380,44 +380,19 @@
       return "";
     }
 
-    const recognizedMarkers = reviews
-      .filter((review) => review.status === "recognized")
-      .map((review, index) => {
-        const center = (review.left + (review.width / 2)) / 10;
-        const lane = index % 2;
-        const titleParts = [
-          `Ячейка ${review.label}`,
-          review.valueText ? `значение: ${review.valueText}` : "",
-          "распознано уверенно"
-        ].filter(Boolean);
-
-        return `
-          <div
-            class="photo-import-cell-marker photo-import-cell-marker--recognized"
-            style="left:${center.toFixed(2)}%; top:${lane === 0 ? "18px" : "44px"};"
-            title="${escapeHtml(titleParts.join(" • "))}"
-          >
-            <span>${escapeHtml(String(review.cell))}</span>
-          </div>
-        `;
-      })
-      .join("");
-
-    const reviewBoxes = reviews
-      .filter((review) => review.status === "review")
-      .map((review) => {
+    const boxes = reviews.map((review) => {
       const titleParts = [
         `Ячейка ${review.label}`,
         review.valueText ? `значение: ${review.valueText}` : "",
-        review.reason || ""
+        review.status === "recognized" ? "распознано уверенно" : (review.reason || "проверьте вручную")
       ].filter(Boolean);
       return `
         <div
-          class="photo-import-cell-box photo-import-cell-box--review"
+          class="photo-import-cell-box photo-import-cell-box--${escapeHtml(review.status)}"
           style="left:${(review.left / 10).toFixed(2)}%; top:${(review.top / 10).toFixed(2)}%; width:${(review.width / 10).toFixed(2)}%; height:${(review.height / 10).toFixed(2)}%;"
           title="${escapeHtml(titleParts.join(" • "))}"
         >
-          <span>${escapeHtml(`Яч.${review.label}`)}</span>
+          ${review.status === "review" ? `<span>${escapeHtml(`Яч.${review.label}`)}</span>` : ""}
         </div>
       `;
     })
@@ -429,11 +404,10 @@
     return `
       <div class="photo-import-overlay-wrap">
         <div class="photo-import-overlay">
-          ${recognizedMarkers}
-          ${reviewBoxes}
+          ${boxes}
         </div>
         <div class="photo-import-overlay-legend">
-          ${recognizedCount ? `<span class="photo-import-overlay-chip photo-import-overlay-chip--recognized">Уверенно: ${recognizedCount}</span>` : ""}
+          ${recognizedCount ? `<span class="photo-import-overlay-chip photo-import-overlay-chip--recognized">Распознано: ${recognizedCount}</span>` : ""}
           ${reviewCount ? `<span class="photo-import-overlay-chip photo-import-overlay-chip--review">Проверить: ${reviewCount}</span>` : ""}
         </div>
       </div>
