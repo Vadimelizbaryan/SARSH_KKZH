@@ -1365,8 +1365,12 @@
     const dischargedOfficer = getQhCalcSourceValue(row, "qhDischargedOfficer") || 0;
     const dischargedContract = getQhCalcSourceValue(row, "qhDischargedContract") || 0;
 
-    const cell4 = incomingSoldier + incomingOfficer + incomingContract;
-    const cell7 = dischargedSoldier + dischargedOfficer + dischargedContract;
+    const cell4 = incomingSoldier;
+    const cell5 = incomingOfficer;
+    const cell6 = incomingContract;
+    const cell7 = dischargedSoldier;
+    const cell8 = dischargedOfficer;
+    const cell9 = dischargedContract;
     const cell13 = calcQhRemainingValue(row, "soldier") || 0;
     const cell14 = calcQhRemainingValue(row, "officer") || 0;
     const cell15 = calcQhRemainingValue(row, "contract") || 0;
@@ -1382,11 +1386,11 @@
     row.values.beenSoldier = cell2;
     row.values.beenSeries = cell13;
     row.values.admittedTotal = cell4;
-    row.values.admittedSoldier = cell4;
-    row.values.admittedSeries = incomingSoldier;
+    row.values.admittedSoldier = cell5;
+    row.values.admittedSeries = cell6;
     row.values.dgTotal = cell7;
-    row.values.dgSoldier = cell7;
-    row.values.dgSeries = dischargedSoldier;
+    row.values.dgSoldier = cell8;
+    row.values.dgSeries = cell9;
 
     [
       ["beenTotal", row.values.beenTotal],
