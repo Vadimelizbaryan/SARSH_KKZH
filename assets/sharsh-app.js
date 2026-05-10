@@ -1351,6 +1351,25 @@
     input.value = value === null || value === "" || typeof value === "undefined" ? "0" : String(value);
   }
 
+  function refreshQhCalcDisplay(row) {
+    if (!row || !isQhCalcDepartment(row)) {
+      return;
+    }
+
+    [
+      "currentShar",
+      "currentSpa",
+      "currentPaym",
+      "qhRemainingSoldier",
+      "qhRemainingOfficer",
+      "qhRemainingContract"
+    ].forEach((key) => {
+      document.querySelectorAll(`[data-qh-output="${key}"]`).forEach((element) => {
+        element.textContent = getQhCalcDisplayValue(row, key);
+      });
+    });
+  }
+
   function applyQhCalcToDepartment() {
     const row = getCurrentRow();
     if (!row || !isQhCalcDepartment(row)) {
@@ -4279,7 +4298,10 @@
         const sanitized = sanitizeNumericInput(input.value);
         input.value = sanitized.text;
         row.values[key] = sanitized.value;
-        refreshTableData();
+        if (key === "currentShar" || key === "currentSpa" || key === "currentPaym") {
+          syncDepartmentRowInput(row.id, key, sanitized.value);
+        }
+        refreshQhCalcDisplay(row);
         queueDepartmentSave();
       });
     }
