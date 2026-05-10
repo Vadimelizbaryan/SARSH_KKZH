@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Настройка синхронизации | SARSH_KKZH</title>
+  <link rel="stylesheet" href="assets/sharsh.css?v=20260510e">
+  <script defer src="assets/sharsh-runtime-config.js?v=20260510e"></script>
+  <script defer src="assets/sharsh-auth.js?v=20260510e"></script>
+  <script defer src="assets/sharsh-config.js?v=20260510e"></script>
+  <script defer src="assets/sharsh-setup.js?v=20260510e"></script>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <div>
+        <h1>Настройка синхронизации</h1>
+        <p>Включите общую интернет-синхронизацию для всех отделений и получите рабочие ссылки, которые будут открываться на других компьютерах.</p>
+      </div>
+      <div class="toolbar-actions">
+        <span class="pill local" id="setupSourceLabel">Локально</span>
+        <a class="button-link" id="openMainBtn" href="./index.html">Открыть главный файл</a>
+      </div>
+    </div>
+
+    <div class="setup-grid">
+      <div class="info-stack">
+        <div class="panel">
+          <h2>Подключение к серверу</h2>
+          <p>Сюда вставляются только публичные данные клиента Supabase. Ключ <code>service_role</code> сюда вставлять нельзя.</p>
+
+          <div class="setup-form">
+            <label class="setup-checkbox">
+              <input type="checkbox" id="syncEnabledField">
+              Включить Supabase-синхронизацию
+            </label>
+
+            <label class="setup-field">
+              <span>Supabase URL</span>
+              <input type="text" id="supabaseUrlField" placeholder="https://xxxx.supabase.co">
+            </label>
+
+            <label class="setup-field">
+              <span>Supabase anon key</span>
+              <input type="text" id="supabaseAnonKeyField" placeholder="eyJhbGciOi...">
+            </label>
+            <p class="hint">Для этого проекта используйте именно <code>Legacy API Keys → anon</code>. Не вставляйте <code>service_role</code>.</p>
+
+            <label class="setup-field">
+              <span>Имя функции</span>
+              <input type="text" id="functionNameField" value="sharsh-sync">
+            </label>
+
+            <label class="setup-field">
+              <span>Интервал обновления, мс</span>
+              <input type="text" id="refreshIntervalField" value="30000">
+            </label>
+
+            <label class="setup-checkbox">
+              <input type="checkbox" id="requireAccessCodeField">
+              Показывать поле кода отделения
+            </label>
+
+            <label class="setup-checkbox">
+              <input type="checkbox" id="requireOwnerAuthField">
+              Только вход владельца
+            </label>
+
+            <div class="setup-actions">
+              <button type="button" id="testConnectionBtn">Проверить подключение</button>
+              <button type="button" id="saveBrowserBtn">Сохранить в браузере</button>
+              <button type="button" id="clearBrowserBtn">Вернуть локальный режим</button>
+            </div>
+
+            <p class="hint" id="setupStatusText"></p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Готовые ссылки</h2>
+          <p>Сначала откройте главную ссылку. После этого можно копировать ссылки отделений либо отсюда, либо из главного файла.</p>
+
+          <div class="setup-output">
+            <label class="setup-field">
+              <span>Главная ссылка</span>
+              <textarea id="mainLinkField" readonly></textarea>
+            </label>
+
+            <div class="setup-link-list" id="departmentLinks"></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel setup-aside">
+        <h2>Что делать дальше</h2>
+        <ol>
+          <li>Создайте проект Supabase.</li>
+          <li>Запустите SQL из <code>supabase/migrations/20260506_create_sharsh_tables.sql</code>.</li>
+          <li>Разверните функцию из <code>supabase/functions/sharsh-sync/index.ts</code>.</li>
+          <li>Вставьте сюда <code>Project URL</code> и <code>Legacy anon key</code>.</li>
+          <li>Откройте главную ссылку и раздайте ссылки отделениям.</li>
+        </ol>
+        <p>Если включите коды отделений на сервере, оставьте включённым пункт <code>Показывать поле кода отделения</code>.</p>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

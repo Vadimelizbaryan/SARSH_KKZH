@@ -1,5 +1,6 @@
 _*.png
 ~$*.docx
+~$*.xlsx
 Thumbs.db
 Desktop.ini
 scripts/.sarsh-local-server.pid

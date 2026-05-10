@@ -3,9 +3,9 @@
   const LEGACY_MAIN_STORAGE_KEY = "sharsh-kkzh-05-05-26-zero-v1";
   const LEGACY_ZOOM_STORAGE_KEY = `${LEGACY_MAIN_STORAGE_KEY}-zoom`;
   const DEFAULT_DATE = "05,05,26";
-  const MAIN_PAGE_FILENAME = "ykow8ru3.html";
+  const MAIN_PAGE_FILENAME = "index.html";
   const MAIN_BLANK_PDF_FILENAME = "Общий бланк отделений.pdf";
-  const SETUP_PAGE_FILENAME = "eti77ylq.html";
+  const SETUP_PAGE_FILENAME = "setup.html";
   const FEEDBACK_PAGE_FILENAME = "ocr-feedback.html";
   const DEPARTMENT_DIRECTORY = "bgej6lyx";
   const DEPARTMENT_BLANKS_DIRECTORY = "Отделения";

@@ -4,21 +4,25 @@
 
 ## Рабочие ссылки
 
-- Основной файл: `https://vadimelizbaryan.github.io/SARSH_KKZH/ykow8ru3.html`
+- Основной файл: `https://vadimelizbaryan.github.io/SARSH_KKZH/index.html`
+- Страница настройки: `https://vadimelizbaryan.github.io/SARSH_KKZH/setup.html`
+- Журнал OCR feedback: `https://vadimelizbaryan.github.io/SARSH_KKZH/ocr-feedback.html`
 - Список ссылок отделений: `department-links.txt`
 
 ## Что находится в проекте
 
-- `ykow8ru3.html` - основной общий файл.
-- `bgej6lyx/*.html` - отдельные страницы отделений.
-- `assets/` - общая логика и стили.
-- `department-links.txt` - готовый список рабочих ссылок.
-- `department-instructions.html` - краткая инструкция для сотрудников.
-- `department-instructions.pdf` - печатная версия инструкции.
-- `qr-codes/` - QR-коды отделений.
-- `qr-sheet.html` и `qr-sheet.pdf` - общий лист QR-кодов.
-- `Отделения/` - Word-бланки отделений с QR-кодами.
-- `supabase/` - серверная часть синхронизации.
+- `index.html` — основной общий файл.
+- `setup.html` — страница настройки синхронизации.
+- `ocr-feedback.html` — отдельная страница журнала OCR feedback.
+- `bgej6lyx/*.html` — отдельные страницы отделений.
+- `assets/` — общая логика и стили.
+- `department-links.txt` — готовый список рабочих ссылок.
+- `department-instructions.html` — краткая инструкция для сотрудников.
+- `department-instructions.pdf` — печатная версия инструкции.
+- `qr-codes/` — QR-коды отделений.
+- `qr-sheet.html` и `qr-sheet.pdf` — общий лист QR-кодов.
+- `Отделения/` — Word/PDF-бланки отделений.
+- `supabase/` — серверная часть синхронизации.
 
 ## Как это работает
 
@@ -32,12 +36,21 @@
 
 Онлайн-синхронизация уже включена по умолчанию через Supabase.
 
-Если нужно изменить параметры синхронизации вручную, можно открыть:
+Если нужно изменить параметры синхронизации вручную, используйте:
 
+- `setup.html`
+
+## Совместимость
+
+Старые адреса:
+
+- `ykow8ru3.html`
 - `eti77ylq.html`
+
+сохранены как редиректы, чтобы старые ссылки не ломались.
 
 ## Важно
 
-- Не удаляйте `assets/`, `bgej6lyx/` и `supabase/` - это рабочие части системы.
+- Не удаляйте `assets/`, `bgej6lyx/` и `supabase/` — это рабочие части системы.
 - Для сотрудников обычно достаточно их личной ссылки или QR-кода.
 - Основной файл нужен для общей сводки и печати.

@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MAINFLOW</title>
-  <link rel="stylesheet" href="assets/sharsh.css?v=20260510e">
-  <script defer src="assets/sharsh-runtime-config.js?v=20260510e"></script>
-  <script defer src="assets/sharsh-auth.js?v=20260510e"></script>
-  <script defer src="assets/sharsh-config.js?v=20260510e"></script>
-  <script defer src="assets/sharsh-sync.js?v=20260510e"></script>
-  <script defer src="assets/sharsh-app.js?v=20260510e"></script>
+  <title>Переход на главную страницу</title>
+  <meta http-equiv="refresh" content="0; url=./index.html">
+  <link rel="canonical" href="./index.html">
+  <script>
+    const target = `./index.html${window.location.search}${window.location.hash}`;
+    window.location.replace(target);
+  </script>
 </head>
-<body data-view="main" data-base-path=".">
-  <div id="app"></div>
+<body>
+  <p>Открывается <a href="./index.html">главная страница</a>…</p>
 </body>
 </html>
