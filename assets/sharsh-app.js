@@ -2581,6 +2581,12 @@
         if (span) {
           span.textContent = getDisplayValue(getEffectiveValue(state.snapshot, row, key));
         }
+
+        const input = body.querySelector(`input[data-row="${row.id}"][data-key="${key}"]`);
+        if (input instanceof HTMLInputElement) {
+          const nextValue = getDisplayValue(getEffectiveValue(state.snapshot, row, key));
+          input.value = nextValue === "" ? "0" : nextValue;
+        }
       });
 
       if (isQhCalcDepartment(row)) {
