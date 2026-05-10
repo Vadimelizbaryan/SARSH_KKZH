@@ -1370,7 +1370,7 @@
     const dischargedOfficer = getQhCalcSourceValue(row, "qhDischargedOfficer") || 0;
     const dischargedContract = getQhCalcSourceValue(row, "qhDischargedContract") || 0;
 
-    const cell4 = incomingSoldier;
+    const cell4 = incomingSoldier + incomingOfficer + incomingContract;
     const cell5 = incomingOfficer;
     const cell6 = incomingContract;
     const cell7 = dischargedSoldier;
