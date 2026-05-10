@@ -57,6 +57,41 @@
     { cell: 21, key: "leaveSpa", label: "21" },
     { cell: 22, key: "leavePaym", label: "22" }
   ];
+  const QH_CALC_DEPARTMENT_ID = "r21";
+  const QH_CALC_FIELD_ROWS = [
+    {
+      label: "Поступил",
+      cells: [
+        { key: "qhIncomingSoldier", marker: "A", role: "input" },
+        { key: "qhIncomingOfficer", marker: "B", role: "input" },
+        { key: "qhIncomingContract", marker: "C", role: "input" }
+      ]
+    },
+    {
+      label: "Выписан",
+      cells: [
+        { key: "qhDischargedSoldier", marker: "D", role: "input" },
+        { key: "qhDischargedOfficer", marker: "E", role: "input" },
+        { key: "qhDischargedContract", marker: "F", role: "input" }
+      ]
+    },
+    {
+      label: "Было",
+      cells: [
+        { key: "currentShar", marker: "G", role: "linked" },
+        { key: "currentSpa", marker: "H", role: "linked" },
+        { key: "currentPaym", marker: "I", role: "linked" }
+      ]
+    },
+    {
+      label: "Осталось",
+      cells: [
+        { key: "qhRemainingSoldier", marker: "J", role: "output" },
+        { key: "qhRemainingOfficer", marker: "K", role: "output" },
+        { key: "qhRemainingContract", marker: "L", role: "output" }
+      ]
+    }
+  ];
 
   function buildInitialPhotoImportState() {
     return {
@@ -1212,6 +1247,74 @@
     return value === null || value === "" || typeof value === "undefined" ? "" : String(value);
   }
 
+  function isQhCalcDepartment(row) {
+    return Boolean(row && row.id === QH_CALC_DEPARTMENT_ID);
+  }
+
+  function getQhCalcSourceValue(row, key) {
+    if (!row) {
+      return null;
+    }
+    return config.normalizeCellValue(getEffectiveValue(state.snapshot, row, key));
+  }
+
+  function calcQhRemainingValue(row, type) {
+    if (!row) {
+      return null;
+    }
+
+    const keyMap = {
+      soldier: {
+        previous: "currentShar",
+        incoming: "qhIncomingSoldier",
+        discharged: "qhDischargedSoldier"
+      },
+      officer: {
+        previous: "currentSpa",
+        incoming: "qhIncomingOfficer",
+        discharged: "qhDischargedOfficer"
+      },
+      contract: {
+        previous: "currentPaym",
+        incoming: "qhIncomingContract",
+        discharged: "qhDischargedContract"
+      }
+    };
+
+    const source = keyMap[type];
+    if (!source) {
+      return null;
+    }
+
+    const previous = getQhCalcSourceValue(row, source.previous);
+    const incoming = getQhCalcSourceValue(row, source.incoming);
+    const discharged = getQhCalcSourceValue(row, source.discharged);
+
+    if (previous === null && incoming === null && discharged === null) {
+      return null;
+    }
+
+    return (previous || 0) + (incoming || 0) - (discharged || 0);
+  }
+
+  function getQhCalcDisplayValue(row, key) {
+    if (!row) {
+      return "";
+    }
+
+    if (key === "qhRemainingSoldier") {
+      return getDisplayValue(calcQhRemainingValue(row, "soldier"));
+    }
+    if (key === "qhRemainingOfficer") {
+      return getDisplayValue(calcQhRemainingValue(row, "officer"));
+    }
+    if (key === "qhRemainingContract") {
+      return getDisplayValue(calcQhRemainingValue(row, "contract"));
+    }
+
+    return getDisplayValue(getQhCalcSourceValue(row, key));
+  }
+
   function getPhotoPreviewValue(row, key) {
     if (!row) {
       return "";
@@ -2119,6 +2222,81 @@
     `;
   }
 
+  function renderQhCalcPanel(row) {
+    if (!isQhCalcDepartment(row)) {
+      return "";
+    }
+
+    const bodyRows = QH_CALC_FIELD_ROWS.map((definition, rowIndex) => `
+      <tr>
+        <th scope="row">${escapeHtml(definition.label)}</th>
+        ${definition.cells.map((cell, columnIndex) => {
+          if (cell.role === "output") {
+            return `
+              <td class="qh-calc-cell qh-calc-cell--output">
+                <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
+                <strong data-qh-output="${escapeHtml(cell.key)}">${escapeHtml(getQhCalcDisplayValue(row, cell.key))}</strong>
+              </td>
+            `;
+          }
+
+          if (cell.role === "linked") {
+            return `
+              <td class="qh-calc-cell qh-calc-cell--linked">
+                <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
+                <strong data-qh-output="${escapeHtml(cell.key)}">${escapeHtml(getQhCalcDisplayValue(row, cell.key))}</strong>
+              </td>
+            `;
+          }
+
+          return `
+            <td class="qh-calc-cell">
+              <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                inputmode="numeric"
+                value="${escapeHtml(getQhCalcDisplayValue(row, cell.key))}"
+                data-qh-calc-key="${escapeHtml(cell.key)}"
+                data-qh-calc-row="${rowIndex}"
+                data-qh-calc-col="${columnIndex}"
+                aria-label="${escapeHtml(`${definition.label} ${cell.marker}`)}"
+              >
+            </td>
+          `;
+        }).join("")}
+      </tr>
+    `).join("");
+
+    return `
+      <div class="panel qh-calc-panel">
+        <h2>Расчётная таблица</h2>
+        <p>Дополнительная таблица для страницы Ք/Հ. Значения G, H и I берутся из ячеек 13, 14 и 15 основной таблицы, а J, K и L считаются автоматически.</p>
+        <div class="qh-calc-wrap" id="qhCalcPanel">
+          <table class="qh-calc-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Срочники</th>
+                <th>Офицеры</th>
+                <th>Наёмники</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyRows}
+            </tbody>
+          </table>
+          <div class="qh-calc-formulas">
+            <span>J = (G + A) - D</span>
+            <span>K = (H + B) - E</span>
+            <span>L = (I + C) - F</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderDepartmentPage() {
     if (isDepartmentAccessProtected() && !isDepartmentUnlocked()) {
       renderDepartmentAccessGate();
@@ -2203,6 +2381,7 @@
           </div>
 
           ${renderPhotoImportPanel(row)}
+          ${renderQhCalcPanel(row)}
 
           <div class="zoom-target">
             <div class="sheet-shell">
@@ -2323,6 +2502,21 @@
           span.textContent = getDisplayValue(getEffectiveValue(state.snapshot, row, key));
         }
       });
+
+      if (isQhCalcDepartment(row)) {
+        [
+          "currentShar",
+          "currentSpa",
+          "currentPaym",
+          "qhRemainingSoldier",
+          "qhRemainingOfficer",
+          "qhRemainingContract"
+        ].forEach((key) => {
+          document.querySelectorAll(`[data-qh-output="${key}"]`).forEach((element) => {
+            element.textContent = getQhCalcDisplayValue(row, key);
+          });
+        });
+      }
     });
 
     Object.keys(config.linkedCells).forEach((linkedKey) => {
@@ -3724,6 +3918,7 @@
     const accessCodeField = document.getElementById("accessCodeField");
     const accessForm = document.getElementById("departmentAccessForm");
     const sheetBody = document.getElementById("sheetBody");
+    const qhCalcPanel = document.getElementById("qhCalcPanel");
 
     bindUpdateAudioUnlock();
 
@@ -3909,6 +4104,31 @@
         event.returnValue = "";
       });
       window.__sharshPhotoDraftGuardBound = true;
+    }
+
+    if (mode === "department" && qhCalcPanel) {
+      qhCalcPanel.addEventListener("input", (event) => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement)) {
+          return;
+        }
+
+        const key = input.dataset.qhCalcKey;
+        if (!key) {
+          return;
+        }
+
+        const row = getCurrentRow();
+        if (!row || !isQhCalcDepartment(row)) {
+          return;
+        }
+
+        const sanitized = sanitizeNumericInput(input.value);
+        input.value = sanitized.text;
+        row.values[key] = sanitized.value;
+        refreshTableData();
+        queueDepartmentSave();
+      });
     }
 
     if (mode !== "department" || !sheetBody) {

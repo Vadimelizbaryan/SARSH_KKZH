@@ -57,7 +57,13 @@
     "civil",
     "leaveSharq",
     "leaveSpa",
-    "leavePaym"
+    "leavePaym",
+    "qhIncomingSoldier",
+    "qhIncomingOfficer",
+    "qhIncomingContract",
+    "qhDischargedSoldier",
+    "qhDischargedOfficer",
+    "qhDischargedContract"
   ];
 
   const primaryEditableKeys = [
@@ -335,7 +341,13 @@
       civil: 0,
       leaveSharq: 0,
       leaveSpa: 0,
-      leavePaym: 0
+      leavePaym: 0,
+      qhIncomingSoldier: 0,
+      qhIncomingOfficer: 0,
+      qhIncomingContract: 0,
+      qhDischargedSoldier: 0,
+      qhDischargedOfficer: 0,
+      qhDischargedContract: 0
     };
   }
 

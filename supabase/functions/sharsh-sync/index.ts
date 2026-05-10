@@ -22,7 +22,13 @@ const VALUE_KEYS = [
   "civil",
   "leaveSharq",
   "leaveSpa",
-  "leavePaym"
+  "leavePaym",
+  "qhIncomingSoldier",
+  "qhIncomingOfficer",
+  "qhIncomingContract",
+  "qhDischargedSoldier",
+  "qhDischargedOfficer",
+  "qhDischargedContract"
 ];
 
 const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-mini").trim();
