@@ -305,30 +305,11 @@
     return true;
   }
 
-  function applyLoadedSnapshot(result, options = {}) {
-    const previousSignature = getSnapshotUpdateSignature(state.snapshot);
-    const nextSignature = getSnapshotUpdateSignature(result.snapshot);
-    const shouldSignal = Boolean(options.signalOnChange) && mode !== "archive" && state.initialized;
-    const hasUpdate = Boolean(previousSignature && nextSignature && previousSignature !== nextSignature);
-    const previousStats = buildFreshnessStats(state.snapshot.rows || []);
-    const nextStats = buildFreshnessStats(result.snapshot.rows || []);
-    const previousOverall = getOverallUpdateStatus(previousStats, (state.snapshot.rows || []).length);
-    const nextOverall = getOverallUpdateStatus(nextStats, (result.snapshot.rows || []).length);
-
+  function applyLoadedSnapshot(result) {
     state.snapshot = deepCopy(result.snapshot);
     state.loadedSnapshot = deepCopy(result.snapshot);
     state.source = result.source;
     state.warning = result.warning || "";
-
-    if (shouldSignal && hasUpdate) {
-      if (nextOverall.level === "fresh" && previousOverall.level !== "fresh") {
-        triggerBackgroundUpdateAttention("complete");
-        playCompleteUpdateSound();
-      } else {
-        triggerBackgroundUpdateAttention("regular");
-        playUpdateSound();
-      }
-    }
   }
 
   function getRecognizablePhotoFields(row) {
@@ -1123,6 +1104,40 @@
       message: isValid
         ? `Проверка пройдена: ${SAVE_RULE_TEXT}.`
         : `Сохранение заблокировано: сумма 13-22 = ${actual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${expected}.`
+    };
+  }
+
+  function verifySavedDepartmentResult(expectedValues, resultSnapshot) {
+    const savedRow = getDepartmentRow(resultSnapshot, departmentId);
+    if (!savedRow) {
+      return {
+        ok: false,
+        reason: "Сервер не вернул сохранённую строку отделения."
+      };
+    }
+
+    const expectedNormalized = config.normalizeRowValues(expectedValues);
+    const savedNormalized = config.normalizeRowValues(savedRow.values);
+
+    for (const key of config.valueKeys) {
+      if (expectedNormalized[key] !== savedNormalized[key]) {
+        return {
+          ok: false,
+          reason: `После сохранения поле ${key} вернулось как ${savedNormalized[key] ?? ""}, ожидалось ${expectedNormalized[key] ?? ""}.`
+        };
+      }
+    }
+
+    if (!savedRow.updatedAt) {
+      return {
+        ok: false,
+        reason: "Сервер не прислал время успешного обновления отделения."
+      };
+    }
+
+    return {
+      ok: true,
+      savedRow
     };
   }
 
@@ -3071,6 +3086,10 @@
       return;
     }
 
+    const expectedValues = config.normalizeRowValues(row.values);
+    const previousRows = state.snapshot.rows || [];
+    const previousStats = buildFreshnessStats(previousRows);
+    const previousOverall = getOverallUpdateStatus(previousStats, previousRows.length);
     const saveId = ++state.saveSequence;
     setInfo(manual ? "Сохраняю данные отделения..." : "Отправляю изменения в общий файл...", false);
 
@@ -3079,11 +3098,11 @@
       if (saveId !== state.saveSequence) {
         return;
       }
-      state.snapshot = deepCopy(result.snapshot);
-      state.loadedSnapshot = deepCopy(result.snapshot);
-      state.source = result.source;
-      state.warning = "";
-      state.photoImport.draftMode = false;
+      const verification = verifySavedDepartmentResult(expectedValues, result.snapshot);
+      applyLoadedSnapshot(result);
+      const nextRows = result.snapshot.rows || [];
+      const nextStats = buildFreshnessStats(nextRows);
+      const nextOverall = getOverallUpdateStatus(nextStats, nextRows.length);
       const nextPendingRoute = manual ? peekPendingMainPhotoRoute() : null;
       const openNextPendingRoute = () => {
         if (!nextPendingRoute || !nextPendingRoute.departmentId) {
@@ -3099,13 +3118,28 @@
         navigateToQueuedDepartment(nextPendingRoute);
         return true;
       };
-      setInfo(manual ? "Данные отделения сохранены." : "Изменения отправлены в общий файл.", false);
+
+      if (!verification.ok) {
+        setInfo(`Ответ получен, но проверка сохранения не пройдена: ${verification.reason}`, true);
+        refreshTableData();
+        return;
+      }
+
+      state.photoImport.draftMode = false;
+
+      if (nextOverall.level === "fresh" && previousOverall.level !== "fresh") {
+        await playCompleteUpdateSound();
+      } else {
+        await playUpdateSound();
+      }
+
+      setInfo(manual ? "Данные отделения сохранены. Проверка записи пройдена." : "Изменения отправлены и проверка записи пройдена.", false);
       refreshTableData();
       if (openNextPendingRoute()) {
         return;
       }
       if (manual && state.photoImport.queueMode) {
-        setInfo("Данные отделения сохранены. Очередь фото завершена.", false);
+        setInfo("Данные отделения сохранены, проверка записи пройдена. Очередь фото завершена.", false);
       }
     } catch (error) {
       setInfo(error instanceof Error ? error.message : "Не удалось сохранить данные отделения.", true);
@@ -3183,7 +3217,7 @@
     syncCurrentReportDate();
     setInfo("Обновляю данные...", false);
     const result = await sync.loadSnapshot();
-    applyLoadedSnapshot(result, { signalOnChange: true });
+    applyLoadedSnapshot(result);
     state.photoImport = buildInitialPhotoImportState();
     setInfo("Данные обновлены.", false);
     renderPage();
@@ -3480,7 +3514,7 @@
 
       try {
         const result = await sync.loadSnapshot();
-        applyLoadedSnapshot(result, { signalOnChange: true });
+        applyLoadedSnapshot(result);
         refreshTableData();
       } catch (error) {
         state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
