@@ -176,14 +176,14 @@
     state.updateAudioBound = true;
   }
 
-  async function playUpdateSound() {
+  async function prepareUpdateAudioContext() {
     if (mode !== "main") {
-      return;
+      return null;
     }
 
     const audioContext = getUpdateAudioContext();
     if (!audioContext) {
-      return;
+      return null;
     }
 
     try {
@@ -191,23 +191,46 @@
         await audioContext.resume();
       }
     } catch (_error) {
+      return null;
+    }
+
+    return audioContext;
+  }
+
+  function scheduleTone(audioContext, startTime, duration, fromFrequency, toFrequency, peakGain) {
+    const gainNode = audioContext.createGain();
+    gainNode.connect(audioContext.destination);
+    gainNode.gain.setValueAtTime(0.0001, startTime);
+    gainNode.gain.linearRampToValueAtTime(peakGain, startTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(fromFrequency, startTime);
+    oscillator.frequency.linearRampToValueAtTime(toFrequency, startTime + (duration * 0.6));
+    oscillator.connect(gainNode);
+    oscillator.start(startTime);
+    oscillator.stop(startTime + duration);
+  }
+
+  async function playUpdateSound() {
+    const audioContext = await prepareUpdateAudioContext();
+    if (!audioContext) {
       return;
     }
 
     const now = audioContext.currentTime;
-    const gainNode = audioContext.createGain();
-    gainNode.connect(audioContext.destination);
-    gainNode.gain.setValueAtTime(0.0001, now);
-    gainNode.gain.linearRampToValueAtTime(0.05, now + 0.02);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+    scheduleTone(audioContext, now, 0.35, 880, 1174, 0.05);
+  }
 
-    const oscillator = audioContext.createOscillator();
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, now);
-    oscillator.frequency.linearRampToValueAtTime(1174, now + 0.16);
-    oscillator.connect(gainNode);
-    oscillator.start(now);
-    oscillator.stop(now + 0.35);
+  async function playCompleteUpdateSound() {
+    const audioContext = await prepareUpdateAudioContext();
+    if (!audioContext) {
+      return;
+    }
+
+    const now = audioContext.currentTime;
+    scheduleTone(audioContext, now, 0.58, 880, 1480, 0.075);
   }
 
   function applyLoadedSnapshot(result, options = {}) {
@@ -215,6 +238,10 @@
     const nextSignature = getSnapshotUpdateSignature(result.snapshot);
     const shouldSignal = Boolean(options.signalOnChange) && mode === "main" && state.initialized;
     const hasUpdate = Boolean(previousSignature && nextSignature && previousSignature !== nextSignature);
+    const previousStats = buildFreshnessStats(state.snapshot.rows || []);
+    const nextStats = buildFreshnessStats(result.snapshot.rows || []);
+    const previousOverall = getOverallUpdateStatus(previousStats, (state.snapshot.rows || []).length);
+    const nextOverall = getOverallUpdateStatus(nextStats, (result.snapshot.rows || []).length);
 
     state.snapshot = deepCopy(result.snapshot);
     state.loadedSnapshot = deepCopy(result.snapshot);
@@ -222,7 +249,11 @@
     state.warning = result.warning || "";
 
     if (shouldSignal && hasUpdate) {
-      playUpdateSound();
+      if (nextOverall.level === "fresh" && previousOverall.level !== "fresh") {
+        playCompleteUpdateSound();
+      } else {
+        playUpdateSound();
+      }
     }
   }
 
