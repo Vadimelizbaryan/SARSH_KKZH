@@ -28,6 +28,9 @@
   const PHOTO_JPEG_QUALITY = 0.88;
   const MAIN_PHOTO_ROUTE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-photo-route:v1`;
   const MAIN_PHOTO_ROUTE_MAX_AGE_MS = 15 * 60 * 1000;
+  const MAIN_SAVE_NOTICE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-save-notice:v1`;
+  const SAVE_VERIFICATION_ATTEMPTS = 3;
+  const SAVE_VERIFICATION_DELAY_MS = 700;
   const PHOTO_FIELD_DEFINITIONS = [
     { cell: 1, key: "beenTotal", label: "1" },
     { cell: 2, key: "beenSoldier", label: "2" },
@@ -400,6 +403,72 @@
   function setMainPhotoRouteStatus(message, isError) {
     state.mainPhotoRoute.status = String(message || "");
     state.mainPhotoRoute.isError = Boolean(isError);
+  }
+
+  function setPendingMainSaveNotice(message, isError) {
+    const normalizedMessage = String(message || "").trim();
+    if (!normalizedMessage) {
+      localStorage.removeItem(MAIN_SAVE_NOTICE_STORAGE_KEY);
+      return;
+    }
+
+    try {
+      localStorage.setItem(MAIN_SAVE_NOTICE_STORAGE_KEY, JSON.stringify({
+        message: normalizedMessage,
+        isError: Boolean(isError),
+        createdAt: Date.now()
+      }));
+    } catch (_error) {
+    }
+  }
+
+  function consumePendingMainSaveNotice() {
+    try {
+      const raw = localStorage.getItem(MAIN_SAVE_NOTICE_STORAGE_KEY);
+      if (!raw) {
+        return null;
+      }
+
+      localStorage.removeItem(MAIN_SAVE_NOTICE_STORAGE_KEY);
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        return null;
+      }
+
+      const message = typeof parsed.message === "string" ? parsed.message.trim() : "";
+      if (!message) {
+        return null;
+      }
+
+      return {
+        message,
+        isError: Boolean(parsed.isError)
+      };
+    } catch (_error) {
+      localStorage.removeItem(MAIN_SAVE_NOTICE_STORAGE_KEY);
+      return null;
+    }
+  }
+
+  function restorePendingMainSaveNotice() {
+    if (mode !== "main") {
+      return false;
+    }
+
+    const notice = consumePendingMainSaveNotice();
+    if (!notice) {
+      return false;
+    }
+
+    state.info = notice.message;
+    state.infoIsError = notice.isError;
+    return true;
+  }
+
+  function wait(ms) {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, Math.max(0, Number(ms) || 0));
+    });
   }
 
   function normalizePendingMainPhotoRouteItem(payload) {
@@ -1548,7 +1617,6 @@
             </div>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="refreshBtn">Обновить</button>
-            <button type="button" id="testSoundBtn">Проверить звук</button>
             <button type="button" id="printBtn">Печать</button>
           </div>
         </div>
@@ -1565,7 +1633,7 @@
                 <span class="pill ${getSourceClass()}" id="sheetSourcePill">${escapeHtml(sourceLabel)}</span>
               </div>
               <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
-              <p class="hint" id="syncInfoText">${escapeHtml(state.info || "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.")}</p>
+              <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.")}</p>
               <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
               <div class="update-health-banner update-health-banner--${overallUpdateStatus.level}" id="overallUpdateBanner">
                 <strong id="overallUpdateLabel">${escapeHtml(overallUpdateStatus.label)}</strong>
@@ -1805,7 +1873,6 @@
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="saveBtn">Сохранить</button>
             <button type="button" id="refreshBtn">Обновить</button>
-            <button type="button" id="testSoundBtn">Проверить звук</button>
             <button type="button" id="resetBtn">Сбросить</button>
             <button type="button" id="printBtn">Печать</button>
             <a class="button-link" href="${escapeHtml(mainPath)}">К главному</a>
@@ -1828,7 +1895,7 @@
               ` : ""}
             </div>
             <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
-            <p class="hint" id="syncInfoText">${escapeHtml(state.info || "Изменения сохраняются локально. В общий файл они отправятся только после нажатия Сохранить.")}</p>
+            <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Изменения сохраняются локально. В общий файл они отправятся только после нажатия Сохранить.")}</p>
             <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
             <p class="hint save-rule-note" id="saveRuleText"></p>
           </div>
@@ -2015,6 +2082,7 @@
       syncInfoText.textContent = state.info || (mode === "department"
         ? "Изменения сохраняются локально. В общий файл они отправятся только после нажатия Сохранить."
         : "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.");
+      syncInfoText.className = `hint${state.infoIsError ? " warning-note" : ""}`;
     }
     if (warningText) {
       warningText.textContent = state.warning || "";
@@ -3024,7 +3092,9 @@
     state.archiveRecords = readArchiveRecords();
     state.initialized = true;
     state.info = "";
+    state.infoIsError = false;
     state.photoImport = buildInitialPhotoImportState();
+    restorePendingMainSaveNotice();
   }
 
   async function handleDepartmentAccessSubmit(event) {
@@ -3087,6 +3157,7 @@
     }
 
     const expectedValues = config.normalizeRowValues(row.values);
+    const payloadValues = deepCopy(expectedValues);
     const previousRows = state.snapshot.rows || [];
     const previousStats = buildFreshnessStats(previousRows);
     const previousOverall = getOverallUpdateStatus(previousStats, previousRows.length);
@@ -3094,53 +3165,86 @@
     setInfo(manual ? "Сохраняю данные отделения..." : "Отправляю изменения в общий файл...", false);
 
     try {
-      const result = await sync.saveDepartment(departmentId, state.snapshot.reportDate, row.values, getAccessCode());
-      if (saveId !== state.saveSequence) {
-        return;
-      }
-      const verification = verifySavedDepartmentResult(expectedValues, result.snapshot);
-      applyLoadedSnapshot(result);
-      const nextRows = result.snapshot.rows || [];
-      const nextStats = buildFreshnessStats(nextRows);
-      const nextOverall = getOverallUpdateStatus(nextStats, nextRows.length);
-      const nextPendingRoute = manual ? peekPendingMainPhotoRoute() : null;
-      const openNextPendingRoute = () => {
-        if (!nextPendingRoute || !nextPendingRoute.departmentId) {
-          return false;
+      let lastError = null;
+      let lastVerificationReason = "";
+
+      for (let attempt = 1; attempt <= SAVE_VERIFICATION_ATTEMPTS; attempt += 1) {
+        let result = null;
+
+        try {
+          result = await sync.saveDepartment(departmentId, state.snapshot.reportDate, payloadValues, getAccessCode());
+        } catch (error) {
+          lastError = error;
         }
 
-        const nextDepartment = config.getDepartmentById(nextPendingRoute.departmentId);
-        if (!nextDepartment) {
-          return false;
+        if (saveId !== state.saveSequence) {
+          return;
         }
 
-        setInfo(`Данные сохранены. Открываю следующее отделение: ${nextDepartment.department}.`, false);
-        navigateToQueuedDepartment(nextPendingRoute);
-        return true;
-      };
+        if (result) {
+          const verification = verifySavedDepartmentResult(expectedValues, result.snapshot);
+          if (verification.ok) {
+            applyLoadedSnapshot(result);
+            setPendingMainSaveNotice("", false);
 
-      if (!verification.ok) {
-        setInfo(`Ответ получен, но проверка сохранения не пройдена: ${verification.reason}`, true);
-        refreshTableData();
-        return;
+            const nextRows = result.snapshot.rows || [];
+            const nextStats = buildFreshnessStats(nextRows);
+            const nextOverall = getOverallUpdateStatus(nextStats, nextRows.length);
+            const nextPendingRoute = manual ? peekPendingMainPhotoRoute() : null;
+            const openNextPendingRoute = () => {
+              if (!nextPendingRoute || !nextPendingRoute.departmentId) {
+                return false;
+              }
+
+              const nextDepartment = config.getDepartmentById(nextPendingRoute.departmentId);
+              if (!nextDepartment) {
+                return false;
+              }
+
+              setInfo(`Данные сохранены. Открываю следующее отделение: ${nextDepartment.department}.`, false);
+              navigateToQueuedDepartment(nextPendingRoute);
+              return true;
+            };
+
+            state.photoImport.draftMode = false;
+
+            if (nextOverall.level === "fresh" && previousOverall.level !== "fresh") {
+              await playCompleteUpdateSound();
+            } else {
+              await playUpdateSound();
+            }
+
+            setInfo(manual ? "Данные отделения сохранены. Проверка записи пройдена." : "Изменения отправлены и проверка записи пройдена.", false);
+            refreshTableData();
+            if (openNextPendingRoute()) {
+              return;
+            }
+            if (manual && state.photoImport.queueMode) {
+              setInfo("Данные отделения сохранены, проверка записи пройдена. Очередь фото завершена.", false);
+            }
+            return;
+          }
+
+          lastVerificationReason = verification.reason;
+          lastError = null;
+        }
+
+        if (attempt < SAVE_VERIFICATION_ATTEMPTS) {
+          setInfo(
+            `Подтверждение записи не прошло. Повторяю сохранение (${attempt + 1}/${SAVE_VERIFICATION_ATTEMPTS})...`,
+            false
+          );
+          await wait(SAVE_VERIFICATION_DELAY_MS);
+        }
       }
 
-      state.photoImport.draftMode = false;
+      const failureMessage = lastError
+        ? `Не удалось сохранить данные отделения после ${SAVE_VERIFICATION_ATTEMPTS} попыток: ${lastError instanceof Error ? lastError.message : "ошибка синхронизации"}.`
+        : `Не удалось подтвердить сохранение данных после ${SAVE_VERIFICATION_ATTEMPTS} попыток: ${lastVerificationReason || "сервер вернул неподтверждённый результат"}.`;
 
-      if (nextOverall.level === "fresh" && previousOverall.level !== "fresh") {
-        await playCompleteUpdateSound();
-      } else {
-        await playUpdateSound();
-      }
-
-      setInfo(manual ? "Данные отделения сохранены. Проверка записи пройдена." : "Изменения отправлены и проверка записи пройдена.", false);
+      setPendingMainSaveNotice(`${row.department}: ${failureMessage}`, true);
+      setInfo(failureMessage, true);
       refreshTableData();
-      if (openNextPendingRoute()) {
-        return;
-      }
-      if (manual && state.photoImport.queueMode) {
-        setInfo("Данные отделения сохранены, проверка записи пройдена. Очередь фото завершена.", false);
-      }
     } catch (error) {
       setInfo(error instanceof Error ? error.message : "Не удалось сохранить данные отделения.", true);
     }
@@ -3219,7 +3323,11 @@
     const result = await sync.loadSnapshot();
     applyLoadedSnapshot(result);
     state.photoImport = buildInitialPhotoImportState();
-    setInfo("Данные обновлены.", false);
+    if (restorePendingMainSaveNotice()) {
+      refreshTableData();
+    } else {
+      setInfo("Данные обновлены.", false);
+    }
     renderPage();
   }
 
@@ -3240,7 +3348,6 @@
     const zoomRange = document.getElementById("zoomRange");
     const printBtn = document.getElementById("printBtn");
     const refreshBtn = document.getElementById("refreshBtn");
-    const testSoundBtn = document.getElementById("testSoundBtn");
     const resetBtn = document.getElementById("resetBtn");
     const saveBtn = document.getElementById("saveBtn");
     const accessCodeField = document.getElementById("accessCodeField");
@@ -3280,17 +3387,6 @@
         } catch (error) {
           state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
           setInfo("Не удалось обновить данные.", true);
-        }
-      });
-    }
-
-    if (testSoundBtn) {
-      testSoundBtn.addEventListener("click", async () => {
-        const played = await playCompleteUpdateSound();
-        if (played) {
-          setInfo("Тестовый звуковой сигнал воспроизведён.", false);
-        } else {
-          setInfo("Браузер пока не дал доступ к звуку. Попробуй кликнуть по странице и нажать кнопку ещё раз.", true);
         }
       });
     }
@@ -3515,6 +3611,7 @@
       try {
         const result = await sync.loadSnapshot();
         applyLoadedSnapshot(result);
+        restorePendingMainSaveNotice();
         refreshTableData();
       } catch (error) {
         state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
