@@ -1354,7 +1354,7 @@
 
     refreshTableData();
     queueDepartmentSave();
-    setInfo("Расчётная таблица перенесена в основные ячейки страницы. Нажмите Сохранить для отправки.", false);
+    setInfo("Հաշվարկային աղյուսակի արժեքները տեղափոխվել են հիմնական բջիջներ։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
   }
 
   function getPhotoPreviewValue(row, key) {
