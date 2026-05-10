@@ -1344,6 +1344,14 @@
     return getDisplayValue(value);
   }
 
+  function syncDepartmentRowInput(rowId, key, value) {
+    const input = document.querySelector(`input[data-row="${rowId}"][data-key="${key}"]`);
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+    input.value = value === null || value === "" || typeof value === "undefined" ? "0" : String(value);
+  }
+
   function applyQhCalcToDepartment() {
     const row = getCurrentRow();
     if (!row || !isQhCalcDepartment(row)) {
@@ -1379,6 +1387,23 @@
     row.values.dgTotal = cell7;
     row.values.dgSoldier = cell7;
     row.values.dgSeries = dischargedSoldier;
+
+    [
+      ["beenTotal", row.values.beenTotal],
+      ["beenSoldier", row.values.beenSoldier],
+      ["beenSeries", row.values.beenSeries],
+      ["admittedTotal", row.values.admittedTotal],
+      ["admittedSoldier", row.values.admittedSoldier],
+      ["admittedSeries", row.values.admittedSeries],
+      ["dgTotal", row.values.dgTotal],
+      ["dgSoldier", row.values.dgSoldier],
+      ["dgSeries", row.values.dgSeries],
+      ["currentShar", row.values.currentShar],
+      ["currentSpa", row.values.currentSpa],
+      ["currentPaym", row.values.currentPaym]
+    ].forEach(([key, value]) => {
+      syncDepartmentRowInput(row.id, key, value);
+    });
 
     row.values.qhIncomingSoldier = 0;
     row.values.qhIncomingOfficer = 0;
