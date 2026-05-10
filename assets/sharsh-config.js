@@ -80,7 +80,8 @@
     "admittedTotal", "admittedSoldier", "admittedSeries",
     "dgTotal", "dgSoldier", "dgSeries",
     "currentShar", "currentSpa", "currentPaym", "currentZh",
-    "family", "officer"
+    "family", "officer", "civil",
+    "leaveSharq", "leaveSpa", "leavePaym"
   ];
 
   const primaryPresentKeys = [
@@ -102,7 +103,11 @@
     "currentPaym",
     "currentZh",
     "family",
-    "officer"
+    "officer",
+    "civil",
+    "leaveSharq",
+    "leaveSpa",
+    "leavePaym"
   ];
 
   const departmentDefinitions = [
@@ -254,7 +259,7 @@
       department: "ԻՆՖ",
       editableKeys: extraEditableKeys,
       presentKeys: extraPresentKeys,
-      hasLeaveTotal: false
+      hasLeaveTotal: true
     },
     {
       id: "r20",
@@ -264,7 +269,7 @@
       department: "ԱՏԴ",
       editableKeys: extraEditableKeys,
       presentKeys: extraPresentKeys,
-      hasLeaveTotal: false
+      hasLeaveTotal: true
     },
     {
       id: "r21",
@@ -274,7 +279,7 @@
       department: "Ք/Հ",
       editableKeys: extraEditableKeys,
       presentKeys: extraPresentKeys,
-      hasLeaveTotal: false
+      hasLeaveTotal: true
     }
   ];
 
