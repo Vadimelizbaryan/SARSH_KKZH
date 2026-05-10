@@ -131,7 +131,6 @@
     }
 
     return [
-      snapshot.reportDate || "",
       snapshot.updatedAt || "",
       ...snapshot.rows.map((row) => `${row.id}:${row.updatedAt || ""}`)
     ].join("|");
