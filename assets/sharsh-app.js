@@ -10,7 +10,9 @@
 
   const mode = document.body.dataset.view === "department"
     ? "department"
-    : (document.body.dataset.view === "archive" ? "archive" : "main");
+    : (document.body.dataset.view === "archive"
+      ? "archive"
+      : (document.body.dataset.view === "feedback" ? "feedback" : "main"));
   const departmentId = document.body.dataset.departmentId || "";
   const basePath = document.body.dataset.basePath || ".";
   const queryParams = new URLSearchParams(window.location.search);
@@ -60,6 +62,7 @@
     return {
       imageName: "",
       imageDataUrl: "",
+      recognizedValues: {},
       notes: [],
       cellReviews: [],
       queueMode: false,
@@ -91,6 +94,15 @@
     };
   }
 
+  function buildInitialFeedbackState() {
+    return {
+      records: [],
+      isLoading: false,
+      error: "",
+      loaded: false
+    };
+  }
+
   const state = {
     snapshot: config.buildDefaultSnapshot(),
     loadedSnapshot: config.buildDefaultSnapshot(),
@@ -114,7 +126,8 @@
     selectedArchiveKey: "",
     initialized: false,
     photoImport: buildInitialPhotoImportState(),
-    mainPhotoRoute: buildInitialMainPhotoRouteState()
+    mainPhotoRoute: buildInitialMainPhotoRouteState(),
+    feedback: buildInitialFeedbackState()
   };
 
   function deepCopy(value) {
@@ -537,6 +550,37 @@
     return new Promise((resolve) => {
       window.setTimeout(resolve, Math.max(0, Number(ms) || 0));
     });
+  }
+
+  async function loadFeedbackRecords(showLoading = true) {
+    if (mode !== "feedback") {
+      return;
+    }
+
+    if (!sync.hasRemoteSync() || typeof sync.listOcrFeedback !== "function") {
+      state.feedback.records = [];
+      state.feedback.loaded = true;
+      state.feedback.error = "Журнал OCR feedback доступен только в онлайн-режиме владельца.";
+      state.feedback.isLoading = false;
+      return;
+    }
+
+    if (showLoading) {
+      state.feedback.isLoading = true;
+      state.feedback.error = "";
+    }
+
+    try {
+      state.feedback.records = await sync.listOcrFeedback(120);
+      state.feedback.loaded = true;
+      state.feedback.error = "";
+    } catch (error) {
+      state.feedback.records = [];
+      state.feedback.loaded = true;
+      state.feedback.error = error instanceof Error ? error.message : "Не удалось загрузить OCR feedback.";
+    } finally {
+      state.feedback.isLoading = false;
+    }
   }
 
   function normalizePendingMainPhotoRouteItem(payload) {
@@ -1575,6 +1619,112 @@
     return appendShareQuery(config.getSetupPagePath(basePath));
   }
 
+  function getFeedbackPath() {
+    return appendShareQuery(config.getFeedbackPagePath(basePath));
+  }
+
+  function getFeedbackStatusLabel(status) {
+    return status === "corrected_by_operator" ? "Исправлено оператором" : "Принято без правок";
+  }
+
+  function getFeedbackStatusClass(status) {
+    return status === "corrected_by_operator" ? "review" : "accepted";
+  }
+
+  function getFeedbackChangedLabel(changedKeys) {
+    const keys = Array.isArray(changedKeys) ? changedKeys.filter((item) => typeof item === "string" && item) : [];
+    if (!keys.length) {
+      return "Без исправлений";
+    }
+
+    return keys
+      .map((key) => {
+        const meta = getPhotoFieldMetaByKey(key);
+        return meta ? `Яч.${meta.label}` : key;
+      })
+      .join(", ");
+  }
+
+  function buildFeedbackSummary(records) {
+    const accepted = records.filter((item) => item.status === "accepted_as_is").length;
+    const corrected = records.filter((item) => item.status === "corrected_by_operator").length;
+    const withPhotos = records.filter((item) => typeof item.imageDataUrl === "string" && item.imageDataUrl.startsWith("data:image/")).length;
+
+    return {
+      total: records.length,
+      accepted,
+      corrected,
+      withPhotos
+    };
+  }
+
+  function buildFeedbackValueList(values, keys) {
+    const list = Array.isArray(keys) && keys.length ? keys : config.valueKeys.filter((key) => values && values[key] !== null);
+    if (!list.length) {
+      return '<div class="feedback-value-empty">Нет значений</div>';
+    }
+
+    return list.map((key) => {
+      const meta = getPhotoFieldMetaByKey(key);
+      return `
+        <div class="feedback-value-item">
+          <span>${escapeHtml(meta ? `Ячейка ${meta.label}` : key)}</span>
+          <strong>${escapeHtml(getDisplayValue(values?.[key]) || "—")}</strong>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function buildFeedbackCard(record) {
+    const statusClass = getFeedbackStatusClass(record.status);
+    const changedKeys = Array.isArray(record.changedKeys) ? record.changedKeys : [];
+    const detailKeys = changedKeys.length ? changedKeys : (Array.isArray(record.recognizedKeys) ? record.recognizedKeys : []);
+
+    return `
+      <article class="feedback-card">
+        <div class="feedback-card-head">
+          <div>
+            <strong>${escapeHtml(record.departmentName || record.departmentId || "Отделение")}</strong>
+            <div class="feedback-card-meta">${escapeHtml(formatTimestamp(record.createdAt) || "—")} • ${escapeHtml(record.reportDate || "—")}</div>
+          </div>
+          <span class="status-chip status-chip--${statusClass}">${escapeHtml(getFeedbackStatusLabel(record.status))}</span>
+        </div>
+        <div class="feedback-card-submeta">
+          <span><strong>Исправленные ячейки:</strong> ${escapeHtml(getFeedbackChangedLabel(changedKeys))}</span>
+          ${record.photoReportDate ? `<span><strong>Дата на фото:</strong> ${escapeHtml(record.photoReportDate)}</span>` : ""}
+          ${record.imageName ? `<span><strong>Файл:</strong> ${escapeHtml(record.imageName)}</span>` : ""}
+        </div>
+        ${record.imageDataUrl ? `
+          <div class="feedback-card-preview">
+            <img src="${escapeHtml(record.imageDataUrl)}" alt="OCR feedback photo preview">
+          </div>
+        ` : ""}
+        <details class="feedback-card-details">
+          <summary>Детали OCR</summary>
+          <div class="feedback-values-grid">
+            <div class="feedback-values-panel">
+              <h3>OCR распознал</h3>
+              <div class="feedback-value-list">
+                ${buildFeedbackValueList(record.recognizedValues || {}, detailKeys)}
+              </div>
+            </div>
+            <div class="feedback-values-panel">
+              <h3>Сохранено в итоге</h3>
+              <div class="feedback-value-list">
+                ${buildFeedbackValueList(record.finalValues || {}, detailKeys)}
+              </div>
+            </div>
+          </div>
+          ${Array.isArray(record.notes) && record.notes.length ? `
+            <div class="photo-import-notes">
+              ${record.notes.map((note) => `<p class="hint warning-note">${escapeHtml(note)}</p>`).join("")}
+            </div>
+          ` : ""}
+        </details>
+      </article>
+    `;
+  }
+
   function buildDepartmentUpdateItem(row) {
     const freshness = getRowFreshnessMeta(row);
     return `
@@ -1639,6 +1789,9 @@
       const definition = getCurrentDepartmentDefinition();
       return definition ? `${definition.department} | SARSH_KKZH` : "SARSH_KKZH";
     }
+    if (mode === "feedback") {
+      return "OCR feedback | SARSH_KKZH";
+    }
     if (mode === "archive") {
       const record = getArchiveRecordByKey(archiveKeyFromQuery);
       return record ? `Архив ${record.archiveLabel} | SARSH_KKZH` : "Архив | SARSH_KKZH";
@@ -1680,6 +1833,7 @@
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
+            <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR feedback</a>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="refreshBtn">Обновить</button>
             <button type="button" id="printBtn">Печать</button>
@@ -1776,6 +1930,69 @@
               ${config.departmentDefinitions.map(buildCopyCard).join("")}
             </div>
           </aside>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderFeedbackPage() {
+    const sourceLabel = sync.getSourceLabel(state.source);
+    const records = Array.isArray(state.feedback.records) ? state.feedback.records : [];
+    const summary = buildFeedbackSummary(records);
+    const mainPath = appendShareQuery(config.getMainPagePath(basePath));
+
+    app.innerHTML = `
+      <div class="page">
+        <div class="toolbar no-print">
+          <div>
+            <h1>OCR feedback</h1>
+            <p>Отдельный журнал случаев распознавания: что было принято без правок и что исправил оператор перед подтверждённым сохранением.</p>
+          </div>
+          <div class="toolbar-actions">
+            <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
+            ${buildOwnerAuthActions()}
+            <button type="button" id="refreshBtn">Обновить</button>
+            <a class="button-link" href="${escapeHtml(mainPath)}">К главному</a>
+          </div>
+        </div>
+
+        <div class="info-stack">
+          <section class="panel no-print">
+            <h2>Сводка OCR feedback</h2>
+            <p class="hint${state.feedback.error ? " warning-note" : ""}">${
+              escapeHtml(
+                state.feedback.error
+                  || (state.feedback.isLoading
+                    ? "Загружаю OCR feedback..."
+                    : "Записи сохраняются автоматически после успешного и подтверждённого сохранения данных отделения.")
+              )
+            }</p>
+            <div class="freshness-overview">
+              <div class="freshness-stat freshness-stat--fresh">
+                <span>Всего</span>
+                <strong>${summary.total}</strong>
+              </div>
+              <div class="freshness-stat freshness-stat--fresh">
+                <span>Без правок</span>
+                <strong>${summary.accepted}</strong>
+              </div>
+              <div class="freshness-stat freshness-stat--stale">
+                <span>Исправлено</span>
+                <strong>${summary.corrected}</strong>
+              </div>
+              <div class="freshness-stat freshness-stat--warning">
+                <span>Фото сохранено</span>
+                <strong>${summary.withPhotos}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel no-print">
+            <h2>Последние случаи</h2>
+            ${records.length
+              ? `<div class="feedback-list">${records.map((record) => buildFeedbackCard(record)).join("")}</div>`
+              : `<div class="archive-empty">${escapeHtml(state.feedback.isLoading ? "Загружаю записи..." : "Пока нет сохранённых OCR feedback записей.")}</div>`}
+          </section>
         </div>
       </div>
     `;
@@ -1954,6 +2171,7 @@
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
+            <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR feedback</a>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="saveBtn">Сохранить</button>
             <button type="button" id="refreshBtn">Обновить</button>
@@ -2063,6 +2281,8 @@
   function renderPage() {
     if (mode === "department") {
       renderDepartmentPage();
+    } else if (mode === "feedback") {
+      renderFeedbackPage();
     } else if (mode === "archive") {
       renderArchivePage();
     } else {
@@ -2364,6 +2584,7 @@
       previewKeys.push("presentTotal");
     }
 
+    state.photoImport.recognizedValues = config.normalizeRowValues(values);
     state.photoImport.lastAppliedKeys = previewKeys;
     state.photoImport.lastReportDate = typeof payload.reportDate === "string" ? payload.reportDate : "";
     state.photoImport.notes = Array.isArray(payload.notes)
@@ -2383,6 +2604,7 @@
     state.photoImport.isProcessing = true;
     state.photoImport.imageName = file.name || "";
     state.photoImport.imageDataUrl = "";
+    state.photoImport.recognizedValues = {};
     state.photoImport.lastAppliedKeys = [];
     state.photoImport.lastReportDate = "";
     state.photoImport.notes = [];
@@ -2474,6 +2696,9 @@
     const next = buildInitialPhotoImportState();
     next.draftMode = keepDraft;
     if (keepDraft && state.photoImport) {
+      next.recognizedValues = state.photoImport.recognizedValues && typeof state.photoImport.recognizedValues === "object"
+        ? deepCopy(state.photoImport.recognizedValues)
+        : {};
       next.lastAppliedKeys = Array.isArray(state.photoImport.lastAppliedKeys)
         ? [...state.photoImport.lastAppliedKeys]
         : [];
@@ -3226,6 +3451,44 @@
     }
   }
 
+  function buildPendingOcrFeedback(row, finalValues) {
+    if (mode !== "department" || !state.photoImport || !state.photoImport.draftMode) {
+      return null;
+    }
+
+    const recognizedValues = state.photoImport.recognizedValues && typeof state.photoImport.recognizedValues === "object"
+      ? config.normalizeRowValues(state.photoImport.recognizedValues)
+      : null;
+    if (!recognizedValues) {
+      return null;
+    }
+
+    const recognizedKeys = config.valueKeys.filter((key) => recognizedValues[key] !== null);
+    if (!recognizedKeys.length) {
+      return null;
+    }
+
+    const normalizedFinalValues = config.normalizeRowValues(finalValues);
+    const changedKeys = recognizedKeys.filter((key) => recognizedValues[key] !== normalizedFinalValues[key]);
+    const status = changedKeys.length > 0 ? "corrected_by_operator" : "accepted_as_is";
+
+    return {
+      departmentId: row.id,
+      departmentName: row.department,
+      reportDate: state.snapshot.reportDate,
+      photoReportDate: state.photoImport.lastReportDate || "",
+      imageName: state.photoImport.imageName || "",
+      imageDataUrl: status === "corrected_by_operator" ? (state.photoImport.imageDataUrl || "") : "",
+      status,
+      recognizedKeys,
+      changedKeys,
+      recognizedValues,
+      finalValues: normalizedFinalValues,
+      notes: Array.isArray(state.photoImport.notes) ? [...state.photoImport.notes] : [],
+      cellReviews: Array.isArray(state.photoImport.cellReviews) ? deepCopy(state.photoImport.cellReviews) : []
+    };
+  }
+
   async function persistDepartment(manual) {
     const row = getCurrentRow();
     if (!row) {
@@ -3248,6 +3511,7 @@
 
     const expectedValues = config.normalizeRowValues(row.values);
     const payloadValues = deepCopy(expectedValues);
+    const ocrFeedback = buildPendingOcrFeedback(row, expectedValues);
     const previousRows = state.snapshot.rows || [];
     const previousStats = buildFreshnessStats(previousRows);
     const previousOverall = getOverallUpdateStatus(previousStats, previousRows.length);
@@ -3281,6 +3545,7 @@
             const nextStats = buildFreshnessStats(nextRows);
             const nextOverall = getOverallUpdateStatus(nextStats, nextRows.length);
             const nextPendingRoute = manual ? peekPendingMainPhotoRoute() : null;
+            let feedbackWarning = "";
             const openNextPendingRoute = () => {
               if (!nextPendingRoute || !nextPendingRoute.departmentId) {
                 return false;
@@ -3298,6 +3563,16 @@
 
             state.photoImport.draftMode = false;
 
+            if (ocrFeedback && typeof sync.saveOcrFeedback === "function") {
+              try {
+                await sync.saveOcrFeedback(ocrFeedback);
+              } catch (feedbackError) {
+                feedbackWarning = feedbackError instanceof Error
+                  ? feedbackError.message
+                  : "Не удалось сохранить OCR feedback.";
+              }
+            }
+
             if (nextOverall.level === "fresh" && previousOverall.level !== "fresh") {
               await playCompleteUpdateSound();
             } else {
@@ -3305,6 +3580,7 @@
             }
 
             setInfo(manual ? "Данные отделения сохранены. Проверка записи пройдена." : "Изменения отправлены и проверка записи пройдена.", false);
+            state.warning = feedbackWarning;
             refreshTableData();
             if (openNextPendingRoute()) {
               return;
@@ -3413,6 +3689,11 @@
     const result = await sync.loadSnapshot();
     applyLoadedSnapshot(result);
     state.photoImport = buildInitialPhotoImportState();
+    if (mode === "feedback") {
+      await loadFeedbackRecords(false);
+      renderPage();
+      return;
+    }
     if (restorePendingMainSaveNotice()) {
       refreshTableData();
     } else {
@@ -3715,6 +3996,11 @@
       try {
         const result = await sync.loadSnapshot();
         applyLoadedSnapshot(result);
+        if (mode === "feedback") {
+          await loadFeedbackRecords(false);
+          renderPage();
+          return;
+        }
         restorePendingMainSaveNotice();
         refreshTableData();
       } catch (error) {
@@ -3768,6 +4054,9 @@
     syncCurrentReportDate();
     setInfo("Загружаю данные...", false);
     await loadWorkingSnapshot();
+    if (mode === "feedback") {
+      await loadFeedbackRecords(true);
+    }
     renderPage();
     startAutoRefreshIfNeeded();
     startFreshnessTicker();

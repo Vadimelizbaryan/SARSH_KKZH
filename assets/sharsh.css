@@ -842,6 +842,116 @@ a {
   background: #fff6e9;
 }
 
+.feedback-list {
+  display: grid;
+  gap: 12px;
+}
+
+.feedback-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.feedback-card-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.feedback-card-head strong {
+  font-size: 16px;
+}
+
+.feedback-card-meta,
+.feedback-card-submeta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.feedback-card-submeta {
+  display: grid;
+  gap: 4px;
+}
+
+.feedback-card-preview {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  width: min(100%, 260px);
+}
+
+.feedback-card-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.feedback-card-details {
+  display: grid;
+  gap: 10px;
+}
+
+.feedback-card-details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.feedback-values-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.feedback-values-panel {
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.feedback-values-panel h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.feedback-value-list {
+  display: grid;
+  gap: 8px;
+}
+
+.feedback-value-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(17, 17, 17, 0.04);
+}
+
+.feedback-value-item span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.feedback-value-item strong {
+  font-size: 16px;
+}
+
+.feedback-value-empty {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .sheet-shell {
   background: var(--paper);
   border-radius: 20px;
@@ -903,6 +1013,14 @@ a {
 
 .status-chip--missing {
   color: var(--missing);
+}
+
+.status-chip--accepted {
+  color: #146c43;
+}
+
+.status-chip--review {
+  color: #9a3412;
 }
 
 .warning-note {

@@ -6,6 +6,7 @@
   const MAIN_PAGE_FILENAME = "ykow8ru3.html";
   const MAIN_BLANK_PDF_FILENAME = "Общий бланк отделений.pdf";
   const SETUP_PAGE_FILENAME = "eti77ylq.html";
+  const FEEDBACK_PAGE_FILENAME = "ocr-feedback.html";
   const DEPARTMENT_DIRECTORY = "bgej6lyx";
   const DEPARTMENT_BLANKS_DIRECTORY = "Отделения";
 
@@ -509,6 +510,14 @@
     return `${prefix}${SETUP_PAGE_FILENAME}`;
   }
 
+  function getFeedbackPagePath(basePath) {
+    if (basePath === "@site") {
+      return buildSiteProxyPath(FEEDBACK_PAGE_FILENAME);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return `${prefix}${FEEDBACK_PAGE_FILENAME}`;
+  }
+
   function getDepartmentStorageKey(departmentId) {
     return `${STORAGE_NAMESPACE}:department:${departmentId}`;
   }
@@ -537,6 +546,7 @@
     MAIN_PAGE_FILENAME,
     MAIN_BLANK_PDF_FILENAME,
     SETUP_PAGE_FILENAME,
+    FEEDBACK_PAGE_FILENAME,
     DEPARTMENT_DIRECTORY,
     DEPARTMENT_BLANKS_DIRECTORY,
     columns,
@@ -560,6 +570,7 @@
     getMainPagePath,
     getMainBlankPdfPath,
     getSetupPagePath,
+    getFeedbackPagePath,
     getDepartmentStorageKey,
     getReportDateStorageKey,
     getMainCacheStorageKey,

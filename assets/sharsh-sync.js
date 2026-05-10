@@ -352,6 +352,58 @@
     };
   }
 
+  async function listOcrFeedback(limit) {
+    if (!hasRemoteSync()) {
+      return [];
+    }
+
+    ensureOwnerAuth();
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "list_ocr_feedback",
+        limit: Number.isFinite(Number(limit)) ? Number(limit) : 100
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось загрузить OCR feedback");
+    }
+
+    return Array.isArray(payload?.records) ? payload.records : [];
+  }
+
+  async function saveOcrFeedback(feedback) {
+    if (!hasRemoteSync() || !feedback || typeof feedback !== "object") {
+      return { ok: false };
+    }
+
+    ensureOwnerAuth();
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "save_ocr_feedback",
+        feedback
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось сохранить OCR feedback");
+    }
+
+    return payload;
+  }
+
   async function saveReportDate(reportDate) {
     const localSnapshot = loadLocalSnapshot();
     localSnapshot.reportDate = typeof reportDate === "string" && reportDate.trim()
@@ -397,7 +449,9 @@
     hasRemoteSync,
     loadSnapshot,
     saveDepartment,
+    saveOcrFeedback,
     saveReportDate,
+    listOcrFeedback,
     verifyDepartmentAccess,
     detectDepartmentPhoto,
     recognizeDepartmentPhoto,

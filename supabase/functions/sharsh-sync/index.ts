@@ -26,6 +26,7 @@ const VALUE_KEYS = [
 ];
 
 const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-mini").trim();
+const OCR_FEEDBACK_STATUSES = ["accepted_as_is", "corrected_by_operator"] as const;
 
 const PHOTO_FIELD_MAPPINGS = [
   { cell: 1, key: "beenTotal", label: "Ð•Ð“Ð•Ð› Ð­ / Õ¨Õ¶Õ¤" },
@@ -201,6 +202,66 @@ function sanitizePhotoCellReviews(value: unknown) {
   }
 
   return items;
+}
+
+function sanitizeFeedbackKeys(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string" && VALUE_KEYS.includes(item))
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function sanitizeFeedbackNotes(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string" && item.trim())
+    .map((item) => item.trim());
+}
+
+function sanitizeOcrFeedbackPayload(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  const departmentId = typeof payload.departmentId === "string" ? payload.departmentId.trim() : "";
+  const departmentName = typeof payload.departmentName === "string" ? payload.departmentName.trim() : "";
+  const reportDate = typeof payload.reportDate === "string" ? payload.reportDate.trim() : "";
+  const photoReportDate = typeof payload.photoReportDate === "string" ? payload.photoReportDate.trim() : "";
+  const imageName = typeof payload.imageName === "string" ? payload.imageName.trim() : "";
+  const imageDataUrl = typeof payload.imageDataUrl === "string" && payload.imageDataUrl.startsWith("data:image/")
+    ? payload.imageDataUrl
+    : "";
+  const saveStatus = typeof payload.status === "string" && OCR_FEEDBACK_STATUSES.includes(payload.status as (typeof OCR_FEEDBACK_STATUSES)[number])
+    ? payload.status as (typeof OCR_FEEDBACK_STATUSES)[number]
+    : null;
+
+  if (!departmentId || !departmentName || !reportDate || !saveStatus) {
+    return null;
+  }
+
+  return {
+    departmentId,
+    departmentName,
+    reportDate,
+    photoReportDate: photoReportDate || null,
+    imageName: imageName || null,
+    imageDataUrl: imageDataUrl || null,
+    saveStatus,
+    recognizedKeys: sanitizeFeedbackKeys(payload.recognizedKeys),
+    changedKeys: sanitizeFeedbackKeys(payload.changedKeys),
+    ocrRaw: sanitizeValues(payload.recognizedValues as Record<string, unknown> | undefined),
+    finalValues: sanitizeValues(payload.finalValues as Record<string, unknown> | undefined),
+    notes: sanitizeFeedbackNotes(payload.notes),
+    cellReviews: sanitizePhotoCellReviews(payload.cellReviews)
+  };
 }
 
 function getOpenAiApiKey() {
@@ -592,6 +653,69 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
   };
 }
 
+async function listOcrFeedbackRecords(supabase: ReturnType<typeof createClient>, limit: number) {
+  const safeLimit = Math.min(200, Math.max(1, Math.trunc(limit || 100)));
+  const { data, error } = await supabase
+    .from("sharsh_ocr_feedback")
+    .select("id, created_at, department_id, department_name, report_date, photo_report_date, save_status, image_name, image_data_url, recognized_keys, changed_keys, ocr_raw, final_values, notes, cell_reviews")
+    .order("created_at", { ascending: false })
+    .limit(safeLimit);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []).map((row) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    departmentId: row.department_id,
+    departmentName: row.department_name,
+    reportDate: row.report_date,
+    photoReportDate: row.photo_report_date,
+    status: row.save_status,
+    imageName: row.image_name,
+    imageDataUrl: row.image_data_url,
+    recognizedKeys: Array.isArray(row.recognized_keys) ? row.recognized_keys : [],
+    changedKeys: Array.isArray(row.changed_keys) ? row.changed_keys : [],
+    recognizedValues: sanitizeValues(row.ocr_raw as Record<string, unknown> | undefined),
+    finalValues: sanitizeValues(row.final_values as Record<string, unknown> | undefined),
+    notes: sanitizeFeedbackNotes(row.notes),
+    cellReviews: sanitizePhotoCellReviews(row.cell_reviews)
+  }));
+}
+
+async function insertOcrFeedbackRecord(
+  supabase: ReturnType<typeof createClient>,
+  feedback: ReturnType<typeof sanitizeOcrFeedbackPayload>
+) {
+  if (!feedback) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("sharsh_ocr_feedback")
+    .insert({
+      department_id: feedback.departmentId,
+      department_name: feedback.departmentName,
+      report_date: feedback.reportDate,
+      photo_report_date: feedback.photoReportDate,
+      save_status: feedback.saveStatus,
+      image_name: feedback.imageName,
+      image_data_url: feedback.saveStatus === "corrected_by_operator" ? feedback.imageDataUrl : null,
+      recognized_keys: feedback.recognizedKeys,
+      changed_keys: feedback.changedKeys,
+      ocr_raw: feedback.ocrRaw,
+      final_values: feedback.finalValues,
+      notes: feedback.notes,
+      cell_reviews: feedback.cellReviews,
+      created_at: new Date().toISOString()
+    });
+
+  if (error) {
+    throw error;
+  }
+}
+
 function createSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -687,6 +811,23 @@ Deno.serve(async (request) => {
 
       const detection = await detectDepartmentFromPhoto(imageDataUrl);
       return jsonResponse(detection);
+    }
+
+    if (type === "list_ocr_feedback") {
+      const limit = Number(payload?.limit);
+      return jsonResponse({
+        records: await listOcrFeedbackRecords(supabase, Number.isFinite(limit) ? limit : 100)
+      });
+    }
+
+    if (type === "save_ocr_feedback") {
+      const feedback = sanitizeOcrFeedbackPayload(payload.feedback);
+      if (!feedback) {
+        return jsonResponse({ error: "A valid OCR feedback payload is required." }, 400);
+      }
+
+      await insertOcrFeedbackRecord(supabase, feedback);
+      return jsonResponse({ ok: true });
     }
 
     if (type !== "save_department") {
