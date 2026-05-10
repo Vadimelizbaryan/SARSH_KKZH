@@ -68,6 +68,31 @@ $entries = foreach ($mapping in $mappings) {
   }
 }
 
+$specialEntries = @(
+  [PSCustomObject]@{
+    Folder = "Main page"
+    Slug = "main-index"
+    Url = "https://vadimelizbaryan.github.io/SARSH_KKZH/index.html"
+    DocPath = $null
+    DocName = "index.html"
+    QrPath = (Join-Path $qrRoot "main-index.png")
+  },
+  [PSCustomObject]@{
+    Folder = "Setup page"
+    Slug = "setup-sync"
+    Url = "https://vadimelizbaryan.github.io/SARSH_KKZH/setup.html"
+    DocPath = $null
+    DocName = "setup.html"
+    QrPath = (Join-Path $qrRoot "setup-sync.png")
+  }
+)
+
+foreach ($entry in $specialEntries) {
+  $encodedUrl = [System.Uri]::EscapeDataString($entry.Url)
+  $qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=${QrImageSize}x${QrImageSize}&margin=0&data=$encodedUrl"
+  Invoke-WebRequest -Uri $qrApiUrl -OutFile $entry.QrPath
+}
+
 $word = New-Object -ComObject Word.Application
 $word.Visible = $false
 $word.DisplayAlerts = 0
@@ -121,7 +146,7 @@ $manifestLines = @(
   ""
 )
 
-foreach ($entry in $entries) {
+foreach ($entry in ($specialEntries + $entries)) {
   $manifestLines += $entry.Folder
   $manifestLines += "Document: $($entry.DocName)"
   $manifestLines += "HTML: $($entry.Url)"
