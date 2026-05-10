@@ -230,7 +230,7 @@
     }
 
     const now = audioContext.currentTime;
-    scheduleBellStrike(audioContext, now, 1046.5, 0.08);
+    scheduleBellStrike(audioContext, now, 1046.5, 0.105);
     return true;
   }
 
@@ -241,8 +241,8 @@
     }
 
     const now = audioContext.currentTime;
-    scheduleBellStrike(audioContext, now, 1046.5, 0.085);
-    scheduleBellStrike(audioContext, now + 0.42, 1318.5, 0.09);
+    scheduleBellStrike(audioContext, now, 1046.5, 0.11);
+    scheduleBellStrike(audioContext, now + 0.42, 1318.5, 0.115);
     return true;
   }
 
