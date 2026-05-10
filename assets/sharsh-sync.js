@@ -430,6 +430,32 @@
     };
   }
 
+  async function notifyOwnerLogin(details) {
+    if (!hasRemoteSync()) {
+      return { ok: false, reason: "remote-sync-disabled" };
+    }
+
+    ensureOwnerAuth();
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "notify_owner_login",
+        details: details && typeof details === "object" ? details : {}
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Ð¡ÐµÑÑÐ¸Ñ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð° Ð½ÐµÐ´ÐµÐ¹ÑÑ‚Ð²Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ð°. Ð’Ð¾Ð¹Ð´Ð¸Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°.");
+      }
+      throw buildResponseError(response, payload, "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Telegram-ÑƒÐ²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ðµ");
+    }
+
+    return payload;
+  }
+
   function getSourceLabel(source) {
     if (source === "remote") {
       return "Онлайн-синхронизация";
@@ -451,6 +477,7 @@
     saveDepartment,
     saveOcrFeedback,
     saveReportDate,
+    notifyOwnerLogin,
     listOcrFeedback,
     verifyDepartmentAccess,
     detectDepartmentPhoto,

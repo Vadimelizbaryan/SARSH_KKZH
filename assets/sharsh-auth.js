@@ -84,6 +84,24 @@
     return `${window.location.origin}${window.location.pathname}${window.location.search}`;
   }
 
+  async function notifyLoginToTelegram(email) {
+    const sync = window.SHARSH_SYNC || null;
+    if (!sync || typeof sync.notifyOwnerLogin !== "function") {
+      return;
+    }
+
+    try {
+      await sync.notifyOwnerLogin({
+        email: email || "",
+        pageTitle: document.title || "",
+        pagePath: `${window.location.pathname}${window.location.search}`,
+        userAgent: navigator.userAgent || "",
+        happenedAt: new Date().toISOString()
+      });
+    } catch (_error) {
+    }
+  }
+
   function renderOverlay(message, isError) {
     if (!requiresOwnerAuth()) {
       removeOverlay();
@@ -170,6 +188,7 @@
           }
 
           setLastEmail(email);
+          await notifyLoginToTelegram(email);
           removeOverlay();
           ensureReadyResolved();
         } catch (error) {

@@ -275,6 +275,85 @@ function getOpenAiApiKey() {
   return secret && secret.trim() ? secret.trim() : "";
 }
 
+function getTelegramBotToken() {
+  const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
+  return token && token.trim() ? token.trim() : "";
+}
+
+function getTelegramNotifyChatIds() {
+  const raw = Deno.env.get("TELEGRAM_NOTIFY_CHAT_IDS") || Deno.env.get("TELEGRAM_ALLOWED_CHAT_IDS") || "";
+  return raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function getTelegramApiBaseUrl() {
+  const token = getTelegramBotToken();
+  if (!token) {
+    return "";
+  }
+  return `https://api.telegram.org/bot${token}`;
+}
+
+async function callTelegramApi(method: string, body: Record<string, unknown>) {
+  const apiBaseUrl = getTelegramApiBaseUrl();
+  if (!apiBaseUrl) {
+    throw new Error("TELEGRAM_BOT_TOKEN is not configured on the server.");
+  }
+
+  const response = await fetch(`${apiBaseUrl}/${method}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload || payload.ok !== true) {
+    const message = payload && typeof payload.description === "string" && payload.description.trim()
+      ? payload.description.trim()
+      : `Telegram API call ${method} failed (${response.status}).`;
+    throw new Error(message);
+  }
+
+  return payload.result ?? null;
+}
+
+async function sendTelegramMessage(chatId: string, text: string) {
+  await callTelegramApi("sendMessage", {
+    chat_id: chatId,
+    text
+  });
+}
+
+async function notifyOwnerLogin(details: Record<string, unknown> | null | undefined) {
+  const chatIds = getTelegramNotifyChatIds();
+  if (!chatIds.length) {
+    return { ok: false, skipped: true, reason: "no-chat-ids" };
+  }
+
+  const email = typeof details?.email === "string" ? details.email.trim() : "";
+  const pageTitle = typeof details?.pageTitle === "string" ? details.pageTitle.trim() : "";
+  const pagePath = typeof details?.pagePath === "string" ? details.pagePath.trim() : "";
+  const happenedAt = typeof details?.happenedAt === "string" ? details.happenedAt.trim() : new Date().toISOString();
+
+  const lines = [
+    "Mainflow: site login",
+    email ? `Email: ${email}` : "",
+    pageTitle ? `Page: ${pageTitle}` : "",
+    pagePath ? `Path: ${pagePath}` : "",
+    `Time: ${happenedAt}`
+  ].filter(Boolean);
+
+  for (const chatId of chatIds) {
+    await sendTelegramMessage(chatId, lines.join("\n"));
+  }
+
+  return { ok: true, sent: chatIds.length };
+}
+
 async function requestOpenAiStructuredVision(
   prompt: string,
   imageDataUrl: string,
@@ -834,6 +913,11 @@ Deno.serve(async (request) => {
 
       await insertOcrFeedbackRecord(supabase, feedback);
       return jsonResponse({ ok: true });
+    }
+
+    if (type === "notify_owner_login") {
+      const details = payload && typeof payload.details === "object" ? payload.details as Record<string, unknown> : {};
+      return jsonResponse(await notifyOwnerLogin(details));
     }
 
     if (type !== "save_department") {
