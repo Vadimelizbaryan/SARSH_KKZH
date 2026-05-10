@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+// deploy-touch: 2026-05-10
 const DEFAULT_DATE = "05,05,26";
 const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-mini").trim();
 const DEFAULT_SITE_BASE_URL = "https://vadimelizbaryan.github.io/SARSH_KKZH";
