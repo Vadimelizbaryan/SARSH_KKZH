@@ -57,7 +57,7 @@
     { cell: 21, key: "leaveSpa", label: "21" },
     { cell: 22, key: "leavePaym", label: "22" }
   ];
-  const QH_CALC_DEPARTMENT_IDS = new Set(["r19", "r21"]);
+  const QH_CALC_DEPARTMENT_IDS = new Set(["r19", "r20", "r21"]);
   const QH_CALC_FIELD_ROWS = [
     {
       label: "Ընդունվել է",
