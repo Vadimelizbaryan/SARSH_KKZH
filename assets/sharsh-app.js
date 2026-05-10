@@ -1814,7 +1814,7 @@
               ` : ""}
             </div>
             <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
-            <p class="hint" id="syncInfoText">${escapeHtml(state.info || "Изменения сохраняются локально сразу. Если онлайн-синхронизация включена, они автоматически отправляются в общий файл.")}</p>
+            <p class="hint" id="syncInfoText">${escapeHtml(state.info || "Изменения сохраняются локально. В общий файл они отправятся только после нажатия Сохранить.")}</p>
             <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
             <p class="hint save-rule-note" id="saveRuleText"></p>
           </div>
@@ -1999,7 +1999,7 @@
     }
     if (syncInfoText) {
       syncInfoText.textContent = state.info || (mode === "department"
-        ? "Изменения сохраняются локально сразу. Если онлайн-синхронизация включена, они автоматически отправляются в общий файл."
+        ? "Изменения сохраняются локально. В общий файл они отправятся только после нажатия Сохранить."
         : "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.");
     }
     if (warningText) {
@@ -3139,13 +3139,7 @@
       setInfo("Распознанные значения пока сохранены только локально. Проверьте их и нажмите Сохранить.", false);
       return;
     }
-    if (!sync.runtime.autoSync) {
-      setInfo("Изменения сохранены локально. Нажми Сохранить для отправки.", false);
-      return;
-    }
-    state.saveTimer = window.setTimeout(() => {
-      persistDepartment(false);
-    }, 900);
+    setInfo("Изменения сохранены локально. Нажми Сохранить для отправки.", false);
   }
 
   function loadZoom() {
@@ -3204,13 +3198,6 @@
 
     currentRow.values = deepCopy(config.zeroValues());
     state.photoImport = buildInitialPhotoImportState();
-    if (sync.runtime.autoSync) {
-      renderPage();
-      setInfo("Поля сброшены в 0. Отправляю изменения в общий файл...", false);
-      queueDepartmentSave();
-      return;
-    }
-
     renderPage();
     setInfo("Поля сброшены в 0. Нажми Сохранить для отправки.", false);
     return;
