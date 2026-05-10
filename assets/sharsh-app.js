@@ -197,34 +197,30 @@
     return audioContext;
   }
 
-  function scheduleTone(audioContext, startTime, duration, fromFrequency, toFrequency, peakGain, waveType = "triangle") {
-    const gainNode = audioContext.createGain();
-    gainNode.connect(audioContext.destination);
-    gainNode.gain.setValueAtTime(0.0001, startTime);
-    gainNode.gain.linearRampToValueAtTime(peakGain, startTime + 0.015);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  function scheduleBellStrike(audioContext, startTime, baseFrequency, peakGain) {
+    const partials = [
+      { ratio: 1.0, gain: 1.0, duration: 1.35, detune: 0 },
+      { ratio: 2.0, gain: 0.52, duration: 1.1, detune: 3 },
+      { ratio: 2.42, gain: 0.34, duration: 0.92, detune: -5 },
+      { ratio: 3.16, gain: 0.22, duration: 0.78, detune: 4 },
+      { ratio: 4.83, gain: 0.14, duration: 0.58, detune: -7 }
+    ];
 
-    const oscillator = audioContext.createOscillator();
-    oscillator.type = waveType;
-    oscillator.frequency.setValueAtTime(fromFrequency, startTime);
-    oscillator.frequency.linearRampToValueAtTime(toFrequency, startTime + (duration * 0.6));
-    oscillator.connect(gainNode);
-    oscillator.start(startTime);
-    oscillator.stop(startTime + duration);
+    partials.forEach((partial) => {
+      const gainNode = audioContext.createGain();
+      gainNode.connect(audioContext.destination);
+      gainNode.gain.setValueAtTime(0.0001, startTime);
+      gainNode.gain.linearRampToValueAtTime(peakGain * partial.gain, startTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + partial.duration);
 
-    const accentGain = audioContext.createGain();
-    accentGain.connect(audioContext.destination);
-    accentGain.gain.setValueAtTime(0.0001, startTime);
-    accentGain.gain.linearRampToValueAtTime(peakGain * 0.35, startTime + 0.015);
-    accentGain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-
-    const accentOscillator = audioContext.createOscillator();
-    accentOscillator.type = "sine";
-    accentOscillator.frequency.setValueAtTime(fromFrequency * 2, startTime);
-    accentOscillator.frequency.linearRampToValueAtTime(toFrequency * 2, startTime + (duration * 0.5));
-    accentOscillator.connect(accentGain);
-    accentOscillator.start(startTime);
-    accentOscillator.stop(startTime + duration);
+      const oscillator = audioContext.createOscillator();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(baseFrequency * partial.ratio, startTime);
+      oscillator.detune.setValueAtTime(partial.detune, startTime);
+      oscillator.connect(gainNode);
+      oscillator.start(startTime);
+      oscillator.stop(startTime + partial.duration);
+    });
   }
 
   async function playUpdateSound() {
@@ -234,7 +230,7 @@
     }
 
     const now = audioContext.currentTime;
-    scheduleTone(audioContext, now, 0.48, 740, 1047, 0.12, "triangle");
+    scheduleBellStrike(audioContext, now, 1046.5, 0.08);
     return true;
   }
 
@@ -245,7 +241,8 @@
     }
 
     const now = audioContext.currentTime;
-    scheduleTone(audioContext, now, 0.78, 880, 1568, 0.16, "sawtooth");
+    scheduleBellStrike(audioContext, now, 1046.5, 0.085);
+    scheduleBellStrike(audioContext, now + 0.42, 1318.5, 0.09);
     return true;
   }
 
