@@ -424,8 +424,8 @@ a {
   gap: 4px;
   padding: 10px;
   border-radius: 14px;
-  border: 1px solid rgba(31, 141, 73, 0.18);
-  background: rgba(31, 141, 73, 0.08);
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  background: rgba(255, 255, 255, 0.84);
 }
 
 .photo-import-result-item span {
@@ -436,6 +436,34 @@ a {
 .photo-import-result-item strong {
   font-size: 18px;
   line-height: 1;
+}
+
+.photo-import-result-item small {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.photo-import-result-item--recognized {
+  border-color: rgba(31, 141, 73, 0.22);
+  background: rgba(31, 141, 73, 0.08);
+}
+
+.photo-import-result-item--recognized strong {
+  color: var(--fresh);
+}
+
+.photo-import-result-item--review {
+  border-color: rgba(177, 58, 45, 0.25);
+  background: rgba(177, 58, 45, 0.09);
+}
+
+.photo-import-result-item--review strong {
+  color: var(--stale);
+}
+
+.photo-import-result-item--review small {
+  color: #8f3a31;
 }
 
 .recognized-cell {
