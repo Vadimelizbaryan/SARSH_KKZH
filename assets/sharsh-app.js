@@ -1373,7 +1373,7 @@
     const cell4 = incomingSoldier + incomingOfficer + incomingContract;
     const cell5 = incomingOfficer;
     const cell6 = incomingContract;
-    const cell7 = dischargedSoldier;
+    const cell7 = dischargedSoldier + dischargedOfficer + dischargedContract;
     const cell8 = dischargedOfficer;
     const cell9 = dischargedContract;
     const cell13 = calcQhRemainingValue(row, "soldier") || 0;
