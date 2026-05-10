@@ -583,6 +583,38 @@ a {
   background: rgba(255, 255, 255, 0.74);
 }
 
+.qh-calc-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.qh-calc-actions button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  box-shadow: 0 10px 24px rgba(17, 17, 17, 0.08);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.qh-calc-actions button:hover {
+  transform: translateY(-1px);
+  background: #ffffff;
+}
+
+.qh-calc-actions button:active {
+  transform: translateY(0);
+}
+
 @media (max-width: 860px) {
   .qh-calc-table {
     display: block;

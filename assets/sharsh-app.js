@@ -1315,6 +1315,48 @@
     return getDisplayValue(getQhCalcSourceValue(row, key));
   }
 
+  function applyQhCalcToDepartment() {
+    const row = getCurrentRow();
+    if (!row || !isQhCalcDepartment(row)) {
+      return;
+    }
+
+    const currentPresentTotal = calcPresentTotal(state.snapshot, row) || 0;
+    const currentShar = getQhCalcSourceValue(row, "currentShar") || 0;
+    const currentSpa = getQhCalcSourceValue(row, "currentSpa") || 0;
+    const currentPaym = getQhCalcSourceValue(row, "currentPaym") || 0;
+
+    const incomingSoldier = getQhCalcSourceValue(row, "qhIncomingSoldier") || 0;
+    const incomingOfficer = getQhCalcSourceValue(row, "qhIncomingOfficer") || 0;
+    const incomingContract = getQhCalcSourceValue(row, "qhIncomingContract") || 0;
+    const dischargedSoldier = getQhCalcSourceValue(row, "qhDischargedSoldier") || 0;
+    const dischargedOfficer = getQhCalcSourceValue(row, "qhDischargedOfficer") || 0;
+    const dischargedContract = getQhCalcSourceValue(row, "qhDischargedContract") || 0;
+
+    const incomingTotal = incomingSoldier + incomingOfficer + incomingContract;
+    const dischargedTotal = dischargedSoldier + dischargedOfficer + dischargedContract;
+    const remainingSoldier = calcQhRemainingValue(row, "soldier") || 0;
+    const remainingOfficer = calcQhRemainingValue(row, "officer") || 0;
+    const remainingContract = calcQhRemainingValue(row, "contract") || 0;
+
+    row.values.beenTotal = currentPresentTotal;
+    row.values.beenSoldier = currentShar + currentSpa + currentPaym;
+    row.values.beenSeries = currentShar;
+    row.values.admittedTotal = incomingTotal;
+    row.values.admittedSoldier = incomingTotal;
+    row.values.admittedSeries = incomingSoldier;
+    row.values.dgTotal = dischargedTotal;
+    row.values.dgSoldier = dischargedTotal;
+    row.values.dgSeries = dischargedSoldier;
+    row.values.currentShar = remainingSoldier;
+    row.values.currentSpa = remainingOfficer;
+    row.values.currentPaym = remainingContract;
+
+    refreshTableData();
+    queueDepartmentSave();
+    setInfo("Расчётная таблица перенесена в основные ячейки страницы. Нажмите Сохранить для отправки.", false);
+  }
+
   function getPhotoPreviewValue(row, key) {
     if (!row) {
       return "";
@@ -2291,6 +2333,9 @@
             <span>J = (G + A) - D</span>
             <span>K = (H + B) - E</span>
             <span>L = (I + C) - F</span>
+          </div>
+          <div class="qh-calc-actions">
+            <button type="button" id="qhCalcApplyBtn">Рассчитать и подставить</button>
           </div>
         </div>
       </div>
@@ -3919,6 +3964,7 @@
     const accessForm = document.getElementById("departmentAccessForm");
     const sheetBody = document.getElementById("sheetBody");
     const qhCalcPanel = document.getElementById("qhCalcPanel");
+    const qhCalcApplyBtn = document.getElementById("qhCalcApplyBtn");
 
     bindUpdateAudioUnlock();
 
@@ -4128,6 +4174,12 @@
         row.values[key] = sanitized.value;
         refreshTableData();
         queueDepartmentSave();
+      });
+    }
+
+    if (mode === "department" && qhCalcApplyBtn) {
+      qhCalcApplyBtn.addEventListener("click", () => {
+        applyQhCalcToDepartment();
       });
     }
 
