@@ -1,5 +1,7 @@
 # Telegram bot setup
 
+<!-- deploy-touch: Mainflow-telegram -->
+
 Этот проект уже умеет принимать фото бланков через Telegram-бота и сохранять данные в систему через новую Supabase Edge Function `Mainflow-telegram`.
 
 ## Что бот умеет сейчас
