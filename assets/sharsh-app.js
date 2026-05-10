@@ -1358,6 +1358,11 @@
       return;
     }
 
+    const originalCell12 = calcPresentTotal(state.snapshot, row) || 0;
+    const originalCell13 = getNumber(state.snapshot, row, "currentShar") || 0;
+    const originalCell14 = getNumber(state.snapshot, row, "currentSpa") || 0;
+    const originalCell15 = getNumber(state.snapshot, row, "currentPaym") || 0;
+
     const incomingSoldier = getQhCalcSourceValue(row, "qhIncomingSoldier") || 0;
     const incomingOfficer = getQhCalcSourceValue(row, "qhIncomingOfficer") || 0;
     const incomingContract = getQhCalcSourceValue(row, "qhIncomingContract") || 0;
@@ -1379,12 +1384,9 @@
     row.values.currentSpa = cell14;
     row.values.currentPaym = cell15;
 
-    const cell12 = calcPresentTotal(state.snapshot, row) || 0;
-    const cell2 = cell13 + cell14 + cell15;
-
-    row.values.beenTotal = cell12;
-    row.values.beenSoldier = cell2;
-    row.values.beenSeries = cell13;
+    row.values.beenTotal = originalCell12;
+    row.values.beenSoldier = originalCell13 + originalCell14 + originalCell15;
+    row.values.beenSeries = originalCell13;
     row.values.admittedTotal = cell4;
     row.values.admittedSoldier = cell5;
     row.values.admittedSeries = cell6;
