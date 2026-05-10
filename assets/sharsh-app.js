@@ -797,6 +797,22 @@
     };
   }
 
+  function getOverallUpdateStatus(stats, totalRows) {
+    const freshCount = stats && stats.counts ? stats.counts.fresh : 0;
+    const warningCount = stats && stats.counts ? stats.counts.warning : 0;
+    const staleCount = stats && stats.counts ? stats.counts.stale : 0;
+    const missingCount = stats && stats.counts ? stats.counts.missing : 0;
+    const allUpdated = totalRows > 0 && freshCount === totalRows;
+
+    return {
+      level: allUpdated ? "fresh" : "stale",
+      label: allUpdated ? "Все отделения обновлены" : "Не все отделения обновлены",
+      detail: allUpdated
+        ? `Свежие данные есть у всех ${totalRows} отделений.`
+        : `Свежие: ${freshCount} из ${totalRows}. Проверить: ${warningCount}, старые: ${staleCount}, нет данных: ${missingCount}.`
+    };
+  }
+
   function getDepartmentRow(snapshot, rowId) {
     return snapshot.rows.find((row) => row.id === rowId) || null;
   }
@@ -1259,6 +1275,7 @@
   function renderMainPage() {
     const sourceLabel = sync.getSourceLabel(state.source);
     const freshnessStats = buildFreshnessStats(state.snapshot.rows);
+    const overallUpdateStatus = getOverallUpdateStatus(freshnessStats, state.snapshot.rows.length);
     const summaryFreshness = getFreshnessMeta(state.snapshot.updatedAt);
     const currentDateTime = getCurrentDateTimeParts();
     const archiveRecords = ensureArchiveRecordsLoaded();
@@ -1309,6 +1326,10 @@
               <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
               <p class="hint" id="syncInfoText">${escapeHtml(state.info || "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.")}</p>
               <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
+              <div class="update-health-banner update-health-banner--${overallUpdateStatus.level}" id="overallUpdateBanner">
+                <strong id="overallUpdateLabel">${escapeHtml(overallUpdateStatus.label)}</strong>
+                <span id="overallUpdateDetail">${escapeHtml(overallUpdateStatus.detail)}</span>
+              </div>
               <div class="freshness-overview">
                 <div class="freshness-stat freshness-stat--fresh">
                   <span>Свежие</span>
@@ -1785,11 +1806,15 @@
     if (mode === "main") {
       maybeCaptureDailyArchive();
       const stats = buildFreshnessStats(state.snapshot.rows);
+      const overallUpdateStatus = getOverallUpdateStatus(stats, state.snapshot.rows.length);
       const freshCount = document.getElementById("freshCount");
       const warningCount = document.getElementById("warningCount");
       const staleCount = document.getElementById("staleCount");
       const missingCount = document.getElementById("missingCount");
       const oldestText = document.getElementById("freshnessOldestText");
+      const overallUpdateBanner = document.getElementById("overallUpdateBanner");
+      const overallUpdateLabel = document.getElementById("overallUpdateLabel");
+      const overallUpdateDetail = document.getElementById("overallUpdateDetail");
       const archiveSummaryText = document.getElementById("archiveSummaryText");
       const archiveList = document.getElementById("archiveList");
       const archiveRecords = ensureArchiveRecordsLoaded();
@@ -1810,6 +1835,15 @@
         oldestText.textContent = stats.oldestRow
           ? `Самые старые данные: ${stats.oldestRow.department} — ${formatTimestamp(stats.oldestRow.updatedAt)} (${formatAge(stats.oldestRow.updatedAt)})`
           : "Нет ни одного отделения с отправленными данными.";
+      }
+      if (overallUpdateBanner) {
+        overallUpdateBanner.className = `update-health-banner update-health-banner--${overallUpdateStatus.level}`;
+      }
+      if (overallUpdateLabel) {
+        overallUpdateLabel.textContent = overallUpdateStatus.label;
+      }
+      if (overallUpdateDetail) {
+        overallUpdateDetail.textContent = overallUpdateStatus.detail;
       }
 
       if (archiveSummaryText) {

@@ -409,6 +409,43 @@ a {
   margin-top: 12px;
 }
 
+.update-health-banner {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  display: grid;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.update-health-banner strong {
+  font-size: 16px;
+}
+
+.update-health-banner span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.update-health-banner--fresh {
+  border-color: rgba(31, 141, 73, 0.22);
+  background: rgba(31, 141, 73, 0.1);
+}
+
+.update-health-banner--fresh strong {
+  color: var(--fresh);
+}
+
+.update-health-banner--stale {
+  border-color: rgba(177, 58, 45, 0.22);
+  background: rgba(177, 58, 45, 0.08);
+}
+
+.update-health-banner--stale strong {
+  color: var(--stale);
+}
+
 .freshness-stat {
   border: 1px solid rgba(17, 17, 17, 0.08);
   border-radius: 14px;
