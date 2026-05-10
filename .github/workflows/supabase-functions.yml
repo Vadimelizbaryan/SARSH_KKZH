@@ -37,4 +37,4 @@ jobs:
 
       - name: Deploy Mainflow-telegram
         if: env.SUPABASE_ACCESS_TOKEN != ''
-        run: supabase functions deploy Mainflow-telegram --project-ref "$SUPABASE_PROJECT_REF"
+        run: supabase functions deploy Mainflow-telegram --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
