@@ -334,6 +334,25 @@
     return PHOTO_FIELD_DEFINITIONS.find((item) => item.key === key) || null;
   }
 
+  function getPhotoFieldReviewStatus(key) {
+    if (mode !== "department" || !state.photoImport) {
+      return "";
+    }
+
+    const review = Array.isArray(state.photoImport.cellReviews)
+      ? state.photoImport.cellReviews.find((item) => item && item.key === key)
+      : null;
+    if (review?.status === "review") {
+      return "review-cell";
+    }
+    if (review?.status === "recognized") {
+      return "recognized-cell";
+    }
+
+    const recognizedFields = new Set(state.photoImport.lastAppliedKeys || []);
+    return recognizedFields.has(key) ? "recognized-cell" : "";
+  }
+
   function normalizePhotoCellReviews(payload) {
     if (!payload || typeof payload !== "object" || !Array.isArray(payload.cellReviews)) {
       return [];
@@ -1397,12 +1416,9 @@
   }
 
   function renderDetailCell(snapshot, row, key, interactive) {
-    const recognizedFields = mode === "department" && state.photoImport
-      ? new Set(state.photoImport.lastAppliedKeys || [])
-      : null;
     const classes = [
       getCellClasses(key, row, "detail"),
-      recognizedFields && recognizedFields.has(key) ? "recognized-cell" : ""
+      getPhotoFieldReviewStatus(key)
     ]
       .filter(Boolean)
       .join(" ");

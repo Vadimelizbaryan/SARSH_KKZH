@@ -475,6 +475,16 @@ a {
   font-weight: 700;
 }
 
+.review-cell {
+  background: rgba(177, 58, 45, 0.12) !important;
+}
+
+.review-cell input,
+.review-cell span {
+  font-weight: 700;
+  color: var(--stale);
+}
+
 .info-stack {
   display: grid;
   gap: 12px;
