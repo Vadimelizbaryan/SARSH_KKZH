@@ -61,6 +61,7 @@
       imageName: "",
       imageDataUrl: "",
       notes: [],
+      cellReviews: [],
       queueMode: false,
       queueRemainingCount: 0,
       queueNextDepartmentName: "",
@@ -327,6 +328,89 @@
     ]);
 
     return PHOTO_FIELD_DEFINITIONS.filter((item) => item.key === "presentTotal" || allowedKeys.has(item.key));
+  }
+
+  function getPhotoFieldMetaByKey(key) {
+    return PHOTO_FIELD_DEFINITIONS.find((item) => item.key === key) || null;
+  }
+
+  function normalizePhotoCellReviews(payload) {
+    if (!payload || typeof payload !== "object" || !Array.isArray(payload.cellReviews)) {
+      return [];
+    }
+
+    return payload.cellReviews
+      .map((item) => {
+        if (!item || typeof item !== "object") {
+          return null;
+        }
+
+        const key = typeof item.key === "string" ? item.key.trim() : "";
+        const status = item.status === "recognized" || item.status === "review"
+          ? item.status
+          : "";
+        const meta = getPhotoFieldMetaByKey(key);
+        const left = Number(item.left);
+        const top = Number(item.top);
+        const width = Number(item.width);
+        const height = Number(item.height);
+        if (!key || !status || !meta || ![left, top, width, height].every(Number.isFinite)) {
+          return null;
+        }
+
+        return {
+          key,
+          cell: Number.isFinite(Number(item.cell)) ? Number(item.cell) : meta.cell,
+          label: meta.label || String(meta.cell),
+          status,
+          valueText: typeof item.valueText === "string" ? item.valueText.trim() : "",
+          reason: typeof item.reason === "string" ? item.reason.trim() : "",
+          left: Math.max(0, Math.min(1000, left)),
+          top: Math.max(0, Math.min(1000, top)),
+          width: Math.max(1, Math.min(1000, width)),
+          height: Math.max(1, Math.min(1000, height))
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function renderPhotoReviewOverlay(photoState) {
+    const reviews = Array.isArray(photoState?.cellReviews) ? photoState.cellReviews : [];
+    if (!reviews.length) {
+      return "";
+    }
+
+    const boxes = reviews.map((review) => {
+      const titleParts = [
+        `Ячейка ${review.label}`,
+        review.valueText ? `значение: ${review.valueText}` : "",
+        review.reason || ""
+      ].filter(Boolean);
+      return `
+        <div
+          class="photo-import-cell-box photo-import-cell-box--${escapeHtml(review.status)}"
+          style="left:${(review.left / 10).toFixed(2)}%; top:${(review.top / 10).toFixed(2)}%; width:${(review.width / 10).toFixed(2)}%; height:${(review.height / 10).toFixed(2)}%;"
+          title="${escapeHtml(titleParts.join(" • "))}"
+        >
+          <span>${escapeHtml(`Яч.${review.label}`)}</span>
+        </div>
+      `;
+    }).join("");
+
+    const recognizedCount = reviews.filter((item) => item.status === "recognized").length;
+    const reviewCount = reviews.filter((item) => item.status === "review").length;
+
+    return `
+      <div class="photo-import-overlay-wrap">
+        <div class="photo-import-overlay">
+          ${boxes}
+        </div>
+        <div class="photo-import-overlay-legend">
+          ${recognizedCount ? `<span class="photo-import-overlay-chip photo-import-overlay-chip--recognized">Зелёным: распознано уверенно (${recognizedCount})</span>` : ""}
+          ${reviewCount ? `<span class="photo-import-overlay-chip photo-import-overlay-chip--review">Красным: проверьте вручную (${reviewCount})</span>` : ""}
+        </div>
+      </div>
+    `;
   }
 
   function hasPhotoImportDraft() {
@@ -1802,7 +1886,10 @@
         ${queueInfoText ? `<p class="hint"><strong>${escapeHtml(queueInfoText)}</strong></p>` : ""}
         ${photoState.imageDataUrl ? `
           <div class="photo-import-preview">
-            <img src="${escapeHtml(photoState.imageDataUrl)}" alt="Загруженный бланк">
+            <div class="photo-import-preview-frame">
+              <img src="${escapeHtml(photoState.imageDataUrl)}" alt="Загруженный бланк">
+              ${renderPhotoReviewOverlay(photoState)}
+            </div>
           </div>
         ` : ""}
         ${previewItems || photoState.lastReportDate || (photoState.notes && photoState.notes.length) ? `
@@ -2288,6 +2375,7 @@
     state.photoImport.notes = Array.isArray(payload.notes)
       ? payload.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
       : [];
+    state.photoImport.cellReviews = normalizePhotoCellReviews(payload);
     state.photoImport.draftMode = appliedKeys.length > 0;
 
     return appliedKeys.length;
@@ -2304,6 +2392,7 @@
     state.photoImport.lastAppliedKeys = [];
     state.photoImport.lastReportDate = "";
     state.photoImport.notes = [];
+    state.photoImport.cellReviews = [];
     state.photoImport.queueMode = false;
     state.photoImport.queueRemainingCount = 0;
     state.photoImport.queueNextDepartmentName = "";
@@ -2396,6 +2485,7 @@
         : [];
       next.lastReportDate = state.photoImport.lastReportDate || "";
       next.notes = Array.isArray(state.photoImport.notes) ? [...state.photoImport.notes] : [];
+      next.cellReviews = Array.isArray(state.photoImport.cellReviews) ? [...state.photoImport.cellReviews] : [];
       next.status = "Распознанные значения остаются в таблице локально. Проверьте их и нажмите Сохранить.";
     }
     state.photoImport = next;

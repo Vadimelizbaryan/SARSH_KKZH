@@ -56,6 +56,17 @@ const PHOTO_SCHEMA_VALUE_KEYS = PHOTO_FIELD_MAPPINGS
   .map((item) => item.key)
   .filter((key): key is string => typeof key === "string");
 
+const PHOTO_CELL_REVIEW_KEYS = PHOTO_FIELD_MAPPINGS
+  .filter((item) => item.key !== "photoCell12Derived")
+  .map((item) => item.key)
+  .filter((key): key is string => typeof key === "string");
+
+const PHOTO_CELL_REVIEW_CELL_MAP = Object.fromEntries(
+  PHOTO_FIELD_MAPPINGS
+    .filter((item) => item.key !== "photoCell12Derived")
+    .map((item) => [item.key, item.cell])
+) as Record<string, number>;
+
 const DEPARTMENTS = {
   r4: { department: "ÕŽÕ«Ö€Õ¡Õ¢Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶", group: "primary", marker: "SR-4" },
   r5: { department: "Ô´/Ô¾ Õ¾/Õ¢ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„", group: "primary", marker: "SR-5" },
@@ -120,6 +131,76 @@ function sanitizeReportDate(value: unknown) {
   }
 
   return /^\d{2}\.\d{2}\.\d{2,4}$/.test(normalized) ? normalized : null;
+}
+
+function sanitizePhotoCellReviews(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const items: Array<{
+    key: string;
+    cell: number;
+    status: "recognized" | "review";
+    valueText: string | null;
+    reason: string | null;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }> = [];
+
+  for (const rawItem of value) {
+    if (!rawItem || typeof rawItem !== "object") {
+      continue;
+    }
+
+    const key = typeof (rawItem as { key?: unknown }).key === "string"
+      ? String((rawItem as { key: string }).key).trim()
+      : "";
+    if (!PHOTO_CELL_REVIEW_KEYS.includes(key)) {
+      continue;
+    }
+
+    const rawStatus = typeof (rawItem as { status?: unknown }).status === "string"
+      ? String((rawItem as { status: string }).status).trim()
+      : "";
+    const status = rawStatus === "recognized" || rawStatus === "review"
+      ? rawStatus
+      : null;
+    if (!status) {
+      continue;
+    }
+
+    const left = Number((rawItem as { left?: unknown }).left);
+    const top = Number((rawItem as { top?: unknown }).top);
+    const width = Number((rawItem as { width?: unknown }).width);
+    const height = Number((rawItem as { height?: unknown }).height);
+    if (![left, top, width, height].every(Number.isFinite)) {
+      continue;
+    }
+
+    const valueText = typeof (rawItem as { valueText?: unknown }).valueText === "string"
+      ? String((rawItem as { valueText: string }).valueText).trim()
+      : "";
+    const reason = typeof (rawItem as { reason?: unknown }).reason === "string"
+      ? String((rawItem as { reason: string }).reason).trim()
+      : "";
+
+    items.push({
+      key,
+      cell: PHOTO_CELL_REVIEW_CELL_MAP[key],
+      status,
+      valueText: valueText || null,
+      reason: reason || null,
+      left: Math.max(0, Math.min(1000, left)),
+      top: Math.max(0, Math.min(1000, top)),
+      width: Math.max(1, Math.min(1000, width)),
+      height: Math.max(1, Math.min(1000, height))
+    });
+  }
+
+  return items;
 }
 
 function getOpenAiApiKey() {
@@ -212,9 +293,34 @@ function buildPhotoRecognitionSchema() {
       notes: {
         type: "array",
         items: { type: "string" }
+      },
+      cellReviews: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            key: {
+              type: "string",
+              enum: PHOTO_CELL_REVIEW_KEYS
+            },
+            cell: { type: "integer" },
+            status: {
+              type: "string",
+              enum: ["recognized", "review"]
+            },
+            valueText: { type: ["string", "null"] },
+            reason: { type: ["string", "null"] },
+            left: { type: "number" },
+            top: { type: "number" },
+            width: { type: "number" },
+            height: { type: "number" }
+          },
+          required: ["key", "cell", "status", "valueText", "reason", "left", "top", "width", "height"]
+        }
       }
     },
-    required: ["reportDate", "values", "notes"]
+    required: ["reportDate", "values", "notes", "cellReviews"]
   };
 }
 
@@ -299,6 +405,11 @@ async function recognizeDepartmentPhoto(
     "If the photo clearly shows a handwritten value under the single column between the three soldier columns and the family column, that value belongs to currentZh.",
     "The top table also contains derived totals. Do not return those derived totals unless they correspond to one of the listed fields above.",
     "Return reportDate in dd.mm.yy or dd.mm.yyyy when visible, otherwise null.",
+    "Return cellReviews only for cells where you see handwritten content in the top numeric table.",
+    "For cellReviews use status recognized when the handwritten value is read confidently, and status review when the cell has handwriting but the read is uncertain or may be wrong.",
+    "For each cellReviews item return approximate bounding box coordinates relative to the full image: left, top, width, height in a 0..1000 scale.",
+    "Do not add blank cells to cellReviews.",
+    "Do not include the derived helper cell 12 in cellReviews.",
     "Use notes for short uncertainty comments only when needed."
   ].join("\n");
 
@@ -319,7 +430,8 @@ async function recognizeDepartmentPhoto(
       .map(([key]) => key),
     notes: Array.isArray(parsed.notes)
       ? parsed.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
-      : []
+      : [],
+    cellReviews: sanitizePhotoCellReviews(parsed.cellReviews)
   };
 }
 
