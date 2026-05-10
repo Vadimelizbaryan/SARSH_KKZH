@@ -197,20 +197,34 @@
     return audioContext;
   }
 
-  function scheduleTone(audioContext, startTime, duration, fromFrequency, toFrequency, peakGain) {
+  function scheduleTone(audioContext, startTime, duration, fromFrequency, toFrequency, peakGain, waveType = "triangle") {
     const gainNode = audioContext.createGain();
     gainNode.connect(audioContext.destination);
     gainNode.gain.setValueAtTime(0.0001, startTime);
-    gainNode.gain.linearRampToValueAtTime(peakGain, startTime + 0.02);
+    gainNode.gain.linearRampToValueAtTime(peakGain, startTime + 0.015);
     gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
     const oscillator = audioContext.createOscillator();
-    oscillator.type = "sine";
+    oscillator.type = waveType;
     oscillator.frequency.setValueAtTime(fromFrequency, startTime);
     oscillator.frequency.linearRampToValueAtTime(toFrequency, startTime + (duration * 0.6));
     oscillator.connect(gainNode);
     oscillator.start(startTime);
     oscillator.stop(startTime + duration);
+
+    const accentGain = audioContext.createGain();
+    accentGain.connect(audioContext.destination);
+    accentGain.gain.setValueAtTime(0.0001, startTime);
+    accentGain.gain.linearRampToValueAtTime(peakGain * 0.35, startTime + 0.015);
+    accentGain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+    const accentOscillator = audioContext.createOscillator();
+    accentOscillator.type = "sine";
+    accentOscillator.frequency.setValueAtTime(fromFrequency * 2, startTime);
+    accentOscillator.frequency.linearRampToValueAtTime(toFrequency * 2, startTime + (duration * 0.5));
+    accentOscillator.connect(accentGain);
+    accentOscillator.start(startTime);
+    accentOscillator.stop(startTime + duration);
   }
 
   async function playUpdateSound() {
@@ -220,7 +234,7 @@
     }
 
     const now = audioContext.currentTime;
-    scheduleTone(audioContext, now, 0.35, 880, 1174, 0.05);
+    scheduleTone(audioContext, now, 0.48, 740, 1047, 0.12, "triangle");
   }
 
   async function playCompleteUpdateSound() {
@@ -230,7 +244,7 @@
     }
 
     const now = audioContext.currentTime;
-    scheduleTone(audioContext, now, 0.58, 880, 1480, 0.075);
+    scheduleTone(audioContext, now, 0.78, 880, 1568, 0.16, "sawtooth");
   }
 
   function applyLoadedSnapshot(result, options = {}) {
