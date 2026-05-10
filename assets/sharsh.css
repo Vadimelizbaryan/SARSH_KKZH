@@ -333,19 +333,42 @@ a {
   inset: 0;
 }
 
+.photo-import-cell-marker {
+  position: absolute;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(17, 17, 17, 0.18);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+.photo-import-cell-marker span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.photo-import-cell-marker--recognized {
+  background: rgba(31, 141, 73, 0.92);
+}
+
 .photo-import-cell-box {
   position: absolute;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 2px solid;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
-  backdrop-filter: saturate(1.1);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.75), 0 10px 24px rgba(17, 17, 17, 0.12);
 }
 
 .photo-import-cell-box span {
   position: absolute;
-  top: -22px;
-  left: 0;
-  padding: 2px 7px;
+  top: 6px;
+  left: 6px;
+  padding: 3px 8px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
@@ -353,52 +376,45 @@ a {
   white-space: nowrap;
 }
 
-.photo-import-cell-box--recognized {
-  border-color: rgba(31, 141, 73, 0.95);
-  background: rgba(31, 141, 73, 0.12);
-}
-
-.photo-import-cell-box--recognized span {
-  background: rgba(31, 141, 73, 0.95);
-}
-
 .photo-import-cell-box--review {
-  border-color: rgba(177, 58, 45, 0.95);
-  background: rgba(177, 58, 45, 0.12);
+  border-color: rgba(177, 58, 45, 0.92);
+  background: rgba(177, 58, 45, 0.1);
 }
 
 .photo-import-cell-box--review span {
-  background: rgba(177, 58, 45, 0.95);
+  background: rgba(177, 58, 45, 0.92);
 }
 
 .photo-import-overlay-legend {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-start;
 }
 
 .photo-import-overlay-chip {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
-  padding: 5px 10px;
+  min-height: 30px;
+  padding: 6px 12px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
   color: #ffffff;
-  box-shadow: 0 8px 20px rgba(17, 17, 17, 0.16);
+  box-shadow: 0 10px 22px rgba(17, 17, 17, 0.16);
+  backdrop-filter: blur(8px);
 }
 
 .photo-import-overlay-chip--recognized {
-  background: rgba(31, 141, 73, 0.94);
+  background: rgba(31, 141, 73, 0.88);
 }
 
 .photo-import-overlay-chip--review {
-  background: rgba(177, 58, 45, 0.94);
+  background: rgba(177, 58, 45, 0.88);
 }
 
 .photo-import-results {
