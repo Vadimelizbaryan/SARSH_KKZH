@@ -57,7 +57,7 @@
     { cell: 21, key: "leaveSpa", label: "21" },
     { cell: 22, key: "leavePaym", label: "22" }
   ];
-  const QH_CALC_DEPARTMENT_ID = "r21";
+  const QH_CALC_DEPARTMENT_IDS = new Set(["r19", "r21"]);
   const QH_CALC_FIELD_ROWS = [
     {
       label: "Ընդունվել է",
@@ -1248,7 +1248,7 @@
   }
 
   function isQhCalcDepartment(row) {
-    return Boolean(row && row.id === QH_CALC_DEPARTMENT_ID);
+    return Boolean(row && QH_CALC_DEPARTMENT_IDS.has(row.id));
   }
 
   function getQhCalcSourceValue(row, key) {
@@ -2313,7 +2313,7 @@
     return `
       <div class="panel qh-calc-panel">
         <h2>Հաշվարկային աղյուսակ</h2>
-        <p>Լրացուցիչ աղյուսակ էջի Ք/Հ համար։ G, H և I արժեքները վերցվում են հիմնական աղյուսակի 13, 14 և 15 բջիջներից, իսկ J, K և L արժեքները հաշվարկվում են ավտոմատ։</p>
+        <p>Լրացուցիչ աղյուսակ այս էջի համար։ G, H և I արժեքները վերցվում են հիմնական աղյուսակի 13, 14 և 15 բջիջներից, իսկ J, K և L արժեքները հաշվարկվում են ավտոմատ։</p>
         <div class="qh-calc-wrap" id="qhCalcPanel">
           <table class="qh-calc-table">
             <thead>
