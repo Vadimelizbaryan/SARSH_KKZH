@@ -3864,8 +3864,15 @@
             setPendingMainSaveNotice("", false);
 
             if (isQhCalcDepartment(row)) {
+              const currentSavedRow = getCurrentRow();
+              const currentLoadedRow = getCurrentLoadedRow();
               QH_CALC_INPUT_KEYS.forEach((key) => {
-                row.values[key] = 0;
+                if (currentSavedRow && currentSavedRow.values) {
+                  currentSavedRow.values[key] = 0;
+                }
+                if (currentLoadedRow && currentLoadedRow.values) {
+                  currentLoadedRow.values[key] = 0;
+                }
               });
             }
 
