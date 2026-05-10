@@ -1263,6 +1263,12 @@
     const currentDateTime = getCurrentDateTimeParts();
     const archiveRecords = ensureArchiveRecordsLoaded();
     const latestArchive = archiveRecords[0] || null;
+    const mainBlankPdfPath = config.getMainBlankPdfPath
+      ? config.getMainBlankPdfPath(basePath)
+      : null;
+    const downloadMainPdfButtonHtml = mainBlankPdfPath
+      ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">Скачать PDF</a>`
+      : "";
 
     app.innerHTML = `
       <div class="page">
@@ -1277,6 +1283,7 @@
           <div class="toolbar-actions">
             <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
             ${buildOwnerAuthActions()}
+            ${downloadMainPdfButtonHtml}
             <div class="zoom-control">
               <label for="zoomRange">Масштаб</label>
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">

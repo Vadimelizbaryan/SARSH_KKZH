@@ -4,6 +4,7 @@
   const LEGACY_ZOOM_STORAGE_KEY = `${LEGACY_MAIN_STORAGE_KEY}-zoom`;
   const DEFAULT_DATE = "05,05,26";
   const MAIN_PAGE_FILENAME = "ykow8ru3.html";
+  const MAIN_BLANK_PDF_FILENAME = "Общий бланк отделений.pdf";
   const SETUP_PAGE_FILENAME = "eti77ylq.html";
   const DEPARTMENT_DIRECTORY = "bgej6lyx";
   const DEPARTMENT_BLANKS_DIRECTORY = "Отделения";
@@ -491,6 +492,15 @@
     return `${prefix}${MAIN_PAGE_FILENAME}`;
   }
 
+  function getMainBlankPdfPath(basePath) {
+    const relativePath = `${DEPARTMENT_BLANKS_DIRECTORY}/${MAIN_BLANK_PDF_FILENAME}`;
+    if (basePath === "@site") {
+      return buildSiteProxyPath(relativePath);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return `${prefix}${relativePath}`;
+  }
+
   function getSetupPagePath(basePath) {
     if (basePath === "@site") {
       return buildSiteProxyPath(SETUP_PAGE_FILENAME);
@@ -525,6 +535,7 @@
     LEGACY_ZOOM_STORAGE_KEY,
     DEFAULT_DATE,
     MAIN_PAGE_FILENAME,
+    MAIN_BLANK_PDF_FILENAME,
     SETUP_PAGE_FILENAME,
     DEPARTMENT_DIRECTORY,
     DEPARTMENT_BLANKS_DIRECTORY,
@@ -547,6 +558,7 @@
     getDepartmentPagePath,
     getDepartmentBlankPdfPath,
     getMainPagePath,
+    getMainBlankPdfPath,
     getSetupPagePath,
     getDepartmentStorageKey,
     getReportDateStorageKey,
