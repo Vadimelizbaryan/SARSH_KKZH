@@ -101,6 +101,23 @@
     "qhDischargedContract"
   ]);
 
+  function resetQhCalcInputs(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.rows)) {
+      return snapshot;
+    }
+
+    snapshot.rows.forEach((row) => {
+      if (!isQhCalcDepartment(row) || !row.values || typeof row.values !== "object") {
+        return;
+      }
+      QH_CALC_INPUT_KEYS.forEach((key) => {
+        row.values[key] = 0;
+      });
+    });
+
+    return snapshot;
+  }
+
   function buildInitialPhotoImportState() {
     return {
       imageName: "",
@@ -366,8 +383,8 @@
   }
 
   function applyLoadedSnapshot(result) {
-    state.snapshot = deepCopy(result.snapshot);
-    state.loadedSnapshot = deepCopy(result.snapshot);
+    state.snapshot = resetQhCalcInputs(deepCopy(result.snapshot));
+    state.loadedSnapshot = resetQhCalcInputs(deepCopy(result.snapshot));
     state.source = result.source;
     state.warning = result.warning || "";
   }
@@ -3768,6 +3785,11 @@
 
     const expectedValues = config.normalizeRowValues(row.values);
     const payloadValues = deepCopy(expectedValues);
+    if (isQhCalcDepartment(row)) {
+      QH_CALC_INPUT_KEYS.forEach((key) => {
+        payloadValues[key] = 0;
+      });
+    }
     const ocrFeedback = buildPendingOcrFeedback(row, expectedValues);
     const previousRows = state.snapshot.rows || [];
     const previousStats = buildFreshnessStats(previousRows);
