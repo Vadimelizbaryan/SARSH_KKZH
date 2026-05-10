@@ -1786,6 +1786,9 @@
           <button type="button" id="photoRecognizeBtn" ${!photoState.imageDataUrl || photoState.isProcessing || !canRecognize ? "disabled" : ""}>
             ${photoState.isProcessing ? "Распознаю..." : "Распознать"}
           </button>
+          <button type="button" id="photoRecheckBtn" ${!photoState.imageDataUrl || photoState.isProcessing || !canRecognize ? "disabled" : ""}>
+            Проверить заново
+          </button>
           <button type="button" id="photoClearBtn" ${!photoState.imageDataUrl || photoState.isProcessing ? "disabled" : ""}>Очистить</button>
         </div>
         <p class="hint${photoState.isError ? " warning-note" : ""}" id="photoImportStatus">${
@@ -2648,6 +2651,9 @@
           <button type="button" id="mainPhotoRouteDetectBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
             ${routeState.isProcessing ? "Определяю..." : "Определить и открыть"}
           </button>
+          <button type="button" id="mainPhotoRouteRecheckBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
+            Проверить заново
+          </button>
           <button type="button" id="mainPhotoRouteClearBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>Очистить</button>
         </div>
         <p class="hint${routeState.isError ? " warning-note" : ""}" id="mainPhotoRouteStatus">${
@@ -3449,6 +3455,13 @@
       });
     }
 
+    const mainPhotoRouteRecheckBtn = document.getElementById("mainPhotoRouteRecheckBtn");
+    if (mainPhotoRouteRecheckBtn) {
+      mainPhotoRouteRecheckBtn.addEventListener("click", () => {
+        handleMainPhotoRouteDetection();
+      });
+    }
+
     const mainPhotoRouteClearBtn = document.getElementById("mainPhotoRouteClearBtn");
     if (mainPhotoRouteClearBtn) {
       mainPhotoRouteClearBtn.addEventListener("click", () => {
@@ -3467,6 +3480,13 @@
     const photoRecognizeBtn = document.getElementById("photoRecognizeBtn");
     if (photoRecognizeBtn) {
       photoRecognizeBtn.addEventListener("click", () => {
+        handlePhotoRecognition();
+      });
+    }
+
+    const photoRecheckBtn = document.getElementById("photoRecheckBtn");
+    if (photoRecheckBtn) {
+      photoRecheckBtn.addEventListener("click", () => {
         handlePhotoRecognition();
       });
     }
