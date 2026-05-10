@@ -1357,27 +1357,27 @@
     const dischargedOfficer = getQhCalcSourceValue(row, "qhDischargedOfficer") || 0;
     const dischargedContract = getQhCalcSourceValue(row, "qhDischargedContract") || 0;
 
-    const incomingTotal = incomingSoldier + incomingOfficer + incomingContract;
-    const dischargedTotal = dischargedSoldier + dischargedOfficer + dischargedContract;
-    const remainingSoldier = calcQhRemainingValue(row, "soldier") || 0;
-    const remainingOfficer = calcQhRemainingValue(row, "officer") || 0;
-    const remainingContract = calcQhRemainingValue(row, "contract") || 0;
+    const cell4 = incomingSoldier + incomingOfficer + incomingContract;
+    const cell7 = dischargedSoldier + dischargedOfficer + dischargedContract;
+    const cell13 = calcQhRemainingValue(row, "soldier") || 0;
+    const cell14 = calcQhRemainingValue(row, "officer") || 0;
+    const cell15 = calcQhRemainingValue(row, "contract") || 0;
 
-    row.values.currentShar = remainingSoldier;
-    row.values.currentSpa = remainingOfficer;
-    row.values.currentPaym = remainingContract;
+    row.values.currentShar = cell13;
+    row.values.currentSpa = cell14;
+    row.values.currentPaym = cell15;
 
-    const updatedPresentTotal = calcPresentTotal(state.snapshot, row) || 0;
-    const updatedCurrentSum = remainingSoldier + remainingOfficer + remainingContract;
+    const cell12 = calcPresentTotal(state.snapshot, row) || 0;
+    const cell2 = cell13 + cell14 + cell15;
 
-    row.values.beenTotal = updatedPresentTotal;
-    row.values.beenSoldier = updatedCurrentSum;
-    row.values.beenSeries = remainingSoldier;
-    row.values.admittedTotal = incomingTotal;
-    row.values.admittedSoldier = incomingTotal;
+    row.values.beenTotal = cell12;
+    row.values.beenSoldier = cell2;
+    row.values.beenSeries = cell13;
+    row.values.admittedTotal = cell4;
+    row.values.admittedSoldier = cell4;
     row.values.admittedSeries = incomingSoldier;
-    row.values.dgTotal = dischargedTotal;
-    row.values.dgSoldier = dischargedTotal;
+    row.values.dgTotal = cell7;
+    row.values.dgSoldier = cell7;
     row.values.dgSeries = dischargedSoldier;
 
     row.values.qhIncomingSoldier = 0;
