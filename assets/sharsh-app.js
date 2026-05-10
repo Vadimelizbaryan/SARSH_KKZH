@@ -100,7 +100,6 @@
     "qhDischargedOfficer",
     "qhDischargedContract"
   ]);
-
   function resetQhCalcInputs(snapshot) {
     if (!snapshot || !Array.isArray(snapshot.rows)) {
       return snapshot;
@@ -2348,11 +2347,21 @@
             `;
           }
 
-          if (cell.role === "linked") {
+          if (cell.role === "linked" || cell.role === "input") {
             return `
-              <td class="qh-calc-cell qh-calc-cell--linked">
+              <td class="qh-calc-cell${cell.role === "linked" ? " qh-calc-cell--linked" : ""}">
                 <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
-                <strong data-qh-output="${escapeHtml(cell.key)}">${escapeHtml(getQhCalcDisplayValue(row, cell.key))}</strong>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  value="${escapeHtml(getQhCalcDisplayValue(row, cell.key) || "0")}"
+                  data-qh-calc-key="${escapeHtml(cell.key)}"
+                  data-qh-calc-row="${rowIndex}"
+                  data-qh-calc-col="${columnIndex}"
+                  aria-label="${escapeHtml(`${definition.label} ${cell.marker}`)}"
+                >
               </td>
             `;
           }
