@@ -5,3 +5,5 @@ Desktop.ini
 scripts/.sarsh-local-server.pid
 .tools/
 supabase/.temp/
+tools/PdfMergeTool/bin/
+tools/PdfMergeTool/obj/
