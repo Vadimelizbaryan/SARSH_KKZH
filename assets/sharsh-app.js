@@ -134,6 +134,16 @@
     ].join("|");
   }
 
+  function getRowValueSignature(row) {
+    if (!row || !row.values || typeof row.values !== "object") {
+      return "";
+    }
+
+    return config.valueKeys
+      .map((key) => `${key}:${row.values[key] === null || typeof row.values[key] === "undefined" ? "" : row.values[key]}`)
+      .join("|");
+  }
+
   function getUpdateAudioContext() {
     if (state.updateAudioContext) {
       return state.updateAudioContext;
@@ -177,7 +187,7 @@
   }
 
   async function prepareUpdateAudioContext() {
-    if (mode !== "main") {
+    if (mode === "archive") {
       return null;
     }
 
@@ -249,7 +259,7 @@
   function applyLoadedSnapshot(result, options = {}) {
     const previousSignature = getSnapshotUpdateSignature(state.snapshot);
     const nextSignature = getSnapshotUpdateSignature(result.snapshot);
-    const shouldSignal = Boolean(options.signalOnChange) && mode === "main" && state.initialized;
+    const shouldSignal = Boolean(options.signalOnChange) && mode !== "archive" && state.initialized;
     const hasUpdate = Boolean(previousSignature && nextSignature && previousSignature !== nextSignature);
     const previousStats = buildFreshnessStats(state.snapshot.rows || []);
     const nextStats = buildFreshnessStats(result.snapshot.rows || []);
@@ -1311,6 +1321,20 @@
     return mode === "department" ? getDepartmentRow(state.loadedSnapshot, departmentId) : null;
   }
 
+  function hasDepartmentPendingLocalChanges() {
+    if (mode !== "department") {
+      return false;
+    }
+
+    if (hasPhotoImportDraft()) {
+      return true;
+    }
+
+    const currentRow = getCurrentRow();
+    const loadedRow = getCurrentLoadedRow();
+    return getRowValueSignature(currentRow) !== getRowValueSignature(loadedRow);
+  }
+
   function buildCopyCard(definition) {
     const row = getDepartmentRow(state.snapshot, definition.id);
     const freshness = getRowFreshnessMeta(row);
@@ -1715,6 +1739,7 @@
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="saveBtn">Сохранить</button>
             <button type="button" id="refreshBtn">Обновить</button>
+            <button type="button" id="testSoundBtn">Проверить звук</button>
             <button type="button" id="resetBtn">Сбросить</button>
             <button type="button" id="printBtn">Печать</button>
             <a class="button-link" href="${escapeHtml(mainPath)}">К главному</a>
@@ -3406,11 +3431,15 @@
 
   function startAutoRefreshIfNeeded() {
     window.clearInterval(state.refreshIntervalId);
-    if (mode !== "main" || !sync.hasRemoteSync() || !Number.isFinite(sync.runtime.refreshIntervalMs) || sync.runtime.refreshIntervalMs <= 0) {
+    if (mode === "archive" || !sync.hasRemoteSync() || !Number.isFinite(sync.runtime.refreshIntervalMs) || sync.runtime.refreshIntervalMs <= 0) {
       return;
     }
 
     state.refreshIntervalId = window.setInterval(async () => {
+      if (mode === "department" && hasDepartmentPendingLocalChanges()) {
+        return;
+      }
+
       try {
         const result = await sync.loadSnapshot();
         applyLoadedSnapshot(result, { signalOnChange: true });
