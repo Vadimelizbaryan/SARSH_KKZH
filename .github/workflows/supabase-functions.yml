@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - "supabase/functions/sharsh-sync/**"
-      - "supabase/functions/sharsh-telegram/**"
+      - "supabase/functions/Mainflow-telegram/**"
       - "supabase/config.toml"
   workflow_dispatch:
 
@@ -35,6 +35,6 @@ jobs:
         if: env.SUPABASE_ACCESS_TOKEN != ''
         run: supabase functions deploy sharsh-sync --project-ref "$SUPABASE_PROJECT_REF"
 
-      - name: Deploy sharsh-telegram
+      - name: Deploy Mainflow-telegram
         if: env.SUPABASE_ACCESS_TOKEN != ''
-        run: supabase functions deploy sharsh-telegram --project-ref "$SUPABASE_PROJECT_REF"
+        run: supabase functions deploy Mainflow-telegram --project-ref "$SUPABASE_PROJECT_REF"

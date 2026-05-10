@@ -1,5 +1,5 @@
 [functions.sharsh-sync]
 verify_jwt = true
 
-[functions.sharsh-telegram]
+[functions.Mainflow-telegram]
 verify_jwt = false

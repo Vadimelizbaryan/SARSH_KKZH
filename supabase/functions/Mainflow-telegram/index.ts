@@ -902,7 +902,7 @@ Deno.serve(async (request) => {
   if (request.method === "GET") {
     return jsonResponse({
       ok: true,
-      service: "sharsh-telegram",
+      service: "Mainflow-telegram",
       status: "ready"
     });
   }
