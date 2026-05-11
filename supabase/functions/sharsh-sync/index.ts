@@ -301,6 +301,32 @@ function getOcrTemplateBlankImageUrl() {
   return `${getPublicSiteBaseUrl()}${OCR_TEMPLATE_BLANK_IMAGE_PATH}`;
 }
 
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const chunk = bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+async function fetchImageAsDataUrl(url: string) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "image/*"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load reference image (${response.status}) from ${url}.`);
+  }
+
+  const contentType = response.headers.get("content-type")?.trim() || "image/jpeg";
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  return `data:${contentType};base64,${bytesToBase64(bytes)}`;
+}
+
 function getTelegramBotToken() {
   const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
   return token && token.trim() ? token.trim() : "";
@@ -392,16 +418,20 @@ async function requestOpenAiStructuredVision(
     throw new Error("OPENAI_API_KEY is not configured on the server.");
   }
 
+  const referenceImageDataUrls = await Promise.all(
+    referenceImageUrls
+      .filter((url) => typeof url === "string" && url.trim())
+      .map((url) => fetchImageAsDataUrl(url.trim()))
+  );
+
   const content = [
     {
       type: "input_text",
       text: prompt
     },
-    ...referenceImageUrls
-      .filter((url) => typeof url === "string" && url.trim())
-      .map((url) => ({
+    ...referenceImageDataUrls.map((dataUrl) => ({
         type: "input_image",
-        image_url: url.trim(),
+        image_url: dataUrl,
         detail: "high"
       })),
     {
