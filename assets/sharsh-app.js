@@ -3951,6 +3951,18 @@
     }
 
     if (selectedFiles.length > 1) {
+      const batchTabTargets = selectedFiles.map((_item, index) => {
+        const openedTab = window.open("about:blank", "_blank");
+        if (openedTab && !openedTab.closed) {
+          try {
+            openedTab.document.title = `\u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435 ${index + 1}/${selectedFiles.length}`;
+            openedTab.document.body.innerHTML = `<p style="font:16px/1.5 Segoe UI, Arial, sans-serif; padding:24px;">\u041f\u043e\u0434\u0433\u043e\u0442\u0430\u0432\u043b\u0438\u0432\u0430\u044e \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u044f \u0434\u043b\u044f \u0444\u043e\u0442\u043e ${index + 1} \u0438\u0437 ${selectedFiles.length}...</p>`;
+          } catch (_error) {
+          }
+        }
+        return openedTab;
+      });
+
       state.mainPhotoRoute = buildInitialMainPhotoRouteState();
       state.mainPhotoRoute.isProcessing = true;
       state.mainPhotoRoute.imageName = selectedFiles[0].name || "";
@@ -3988,7 +4000,8 @@
           }
           preparedItems.push({
             imageName: currentFile.name || "",
-            imageDataUrl
+            imageDataUrl,
+            targetWindow: batchTabTargets[index] || null
           });
         }
 
@@ -4157,8 +4170,11 @@
         notes: [],
         stage: "ready"
       }));
-      const batchTabTargets = preparedItems.map((_item, index) => {
-        const openedTab = window.open("about:blank", "_blank");
+      const batchTabTargets = preparedItems.map((preparedItem, index) => {
+        const existingWindow = preparedItem && preparedItem.targetWindow && !preparedItem.targetWindow.closed
+          ? preparedItem.targetWindow
+          : null;
+        const openedTab = existingWindow || window.open("about:blank", "_blank");
         if (openedTab && !openedTab.closed) {
           try {
             openedTab.document.title = `\u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435 ${index + 1}/${preparedItems.length}`;
