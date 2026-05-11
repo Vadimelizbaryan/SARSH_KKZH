@@ -466,6 +466,19 @@ a {
   color: #8f3a31;
 }
 
+.photo-import-result-item--suspect {
+  border-color: rgba(191, 132, 24, 0.3);
+  background: rgba(191, 132, 24, 0.12);
+}
+
+.photo-import-result-item--suspect strong {
+  color: #8a5b0f;
+}
+
+.photo-import-result-item--suspect small {
+  color: #8a5b0f;
+}
+
 .qh-calc-panel {
   display: grid;
   gap: 14px;
@@ -643,6 +656,16 @@ a {
 .review-cell span {
   font-weight: 700;
   color: var(--stale);
+}
+
+.suspect-cell {
+  background: rgba(191, 132, 24, 0.12) !important;
+}
+
+.suspect-cell input,
+.suspect-cell span {
+  font-weight: 700;
+  color: #8a5b0f;
 }
 
 .info-stack {

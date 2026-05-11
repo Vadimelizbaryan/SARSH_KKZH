@@ -129,6 +129,8 @@
       recognizedValues: {},
       notes: [],
       cellReviews: [],
+      suspectKeys: [],
+      suspectReason: "",
       queueMode: false,
       queueRemainingCount: 0,
       queueNextDepartmentName: "",
@@ -414,6 +416,11 @@
   function getPhotoFieldReviewStatus(key) {
     if (mode !== "department" || !state.photoImport) {
       return "";
+    }
+
+    const suspectKeys = new Set(Array.isArray(state.photoImport.suspectKeys) ? state.photoImport.suspectKeys : []);
+    if (suspectKeys.has(key)) {
+      return "suspect-cell";
     }
 
     const review = Array.isArray(state.photoImport.cellReviews)
@@ -2029,6 +2036,44 @@
     };
   }
 
+  function getPhotoImportSuspectDetails(row, recognizedKeys) {
+    if (!row || !hasDepartmentSaveRule(row)) {
+      return {
+        suspectKeys: [],
+        suspectReason: ""
+      };
+    }
+
+    const validation = getDepartmentValidationState();
+    if (!validation.applicable || validation.isValid) {
+      return {
+        suspectKeys: [],
+        suspectReason: ""
+      };
+    }
+
+    const photoBlockFields = PHOTO_FIELD_DEFINITIONS
+      .filter((item) => item.cell >= 13 && item.cell <= 22)
+      .map((item) => item.key);
+    const recognizedInBlock = photoBlockFields.filter((key) => recognizedKeys.has(key));
+    const activeBlockKeys = photoBlockFields.filter((key) => getNumber(state.snapshot, row, key) !== 0);
+    const suspectKeys = recognizedInBlock.length
+      ? recognizedInBlock
+      : (activeBlockKeys.length ? activeBlockKeys : photoBlockFields);
+    const labels = suspectKeys
+      .map((key) => getPhotoFieldMetaByKey(key))
+      .filter(Boolean)
+      .map((item) => item.label);
+    const suspectReason = labels.length
+      ? `Формула не сошлась. Проверьте ячейки ${labels.join(", ")}.`
+      : "Формула не сошлась. Проверьте блок ячеек 13-22.";
+
+    return {
+      suspectKeys,
+      suspectReason
+    };
+  }
+
   function verifySavedDepartmentResult(expectedValues, resultSnapshot) {
     const savedRow = getDepartmentRow(resultSnapshot, departmentId);
     if (!savedRow) {
@@ -2793,19 +2838,24 @@
         : "Это последнее фото из общей очереди. После сохранения очередь завершится.")
       : "";
     const recognizedFields = new Set(photoState.lastAppliedKeys || []);
+    const suspectFields = new Set(Array.isArray(photoState.suspectKeys) ? photoState.suspectKeys : []);
     const reviewByKey = new Map(
       (Array.isArray(photoState.cellReviews) ? photoState.cellReviews : []).map((item) => [item.key, item])
     );
     const previewItems = getRecognizablePhotoFields(row)
-      .filter((item) => reviewByKey.has(item.key) || recognizedFields.has(item.key))
+      .filter((item) => reviewByKey.has(item.key) || recognizedFields.has(item.key) || suspectFields.has(item.key))
       .map((item) => {
         const review = reviewByKey.get(item.key) || null;
-        const status = review?.status === "review"
-          ? "review"
-          : (review?.status === "recognized" || recognizedFields.has(item.key) ? "recognized" : "neutral");
-        const statusText = status === "review"
-          ? (review?.reason || "Проверьте вручную")
-          : "Распознано уверенно";
+        const status = suspectFields.has(item.key)
+          ? "suspect"
+          : (review?.status === "review"
+            ? "review"
+            : (review?.status === "recognized" || recognizedFields.has(item.key) ? "recognized" : "neutral"));
+        const statusText = status === "suspect"
+          ? (photoState.suspectReason || "Проверьте вручную: формула не сошлась.")
+          : (status === "review"
+            ? (review?.reason || "Проверьте вручную")
+            : "Распознано уверенно");
         return `
           <div class="photo-import-result-item photo-import-result-item--${status}">
             <span>Ячейка ${escapeHtml(item.label)}</span>
@@ -2859,6 +2909,7 @@
                 ${photoState.notes.map((note) => `<p class="hint warning-note">${escapeHtml(note)}</p>`).join("")}
               </div>
             ` : ""}
+            ${photoState.suspectReason ? `<p class="hint warning-note"><strong>${escapeHtml(photoState.suspectReason)}</strong></p>` : ""}
             ${photoState.draftMode ? `<p class="hint"><strong>Автоотправка временно приостановлена.</strong> Проверьте ячейки и нажмите Сохранить.</p>` : ""}
           </div>
         ` : ""}
@@ -3449,6 +3500,8 @@
       previewKeys.push("presentTotal");
     }
 
+    const suspectDetails = getPhotoImportSuspectDetails(row, recognizedKeys);
+
     state.photoImport.recognizedValues = config.normalizeRowValues(values);
     state.photoImport.lastAppliedKeys = previewKeys;
     state.photoImport.lastReportDate = typeof payload.reportDate === "string" ? payload.reportDate : "";
@@ -3456,6 +3509,8 @@
       ? payload.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
       : [];
     state.photoImport.cellReviews = normalizePhotoCellReviews(payload);
+    state.photoImport.suspectKeys = suspectDetails.suspectKeys;
+    state.photoImport.suspectReason = suspectDetails.suspectReason;
     state.photoImport.draftMode = appliedKeys.length > 0;
 
     return appliedKeys.length;
@@ -3474,6 +3529,8 @@
     state.photoImport.lastReportDate = "";
     state.photoImport.notes = [];
     state.photoImport.cellReviews = [];
+    state.photoImport.suspectKeys = [];
+    state.photoImport.suspectReason = "";
     state.photoImport.queueMode = false;
     state.photoImport.queueRemainingCount = 0;
     state.photoImport.queueNextDepartmentName = "";
@@ -3555,7 +3612,12 @@
         return;
       }
 
-      setPhotoImportStatus("Значения подставлены локально. Проверьте ячейки и нажмите Сохранить.", false);
+      setPhotoImportStatus(
+        state.photoImport.suspectReason
+          ? `Значения подставлены локально, но формула не сошлась. ${state.photoImport.suspectReason}`
+          : "Значения подставлены локально. Проверьте ячейки и нажмите Сохранить.",
+        false
+      );
       renderPage();
       refreshTableData();
       setInfo("Распознанные значения подставлены локально. После проверки нажмите Сохранить.", false);
