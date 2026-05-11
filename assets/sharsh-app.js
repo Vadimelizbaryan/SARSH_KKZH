@@ -2055,11 +2055,18 @@
     const photoBlockFields = PHOTO_FIELD_DEFINITIONS
       .filter((item) => item.cell >= 13 && item.cell <= 22)
       .map((item) => item.key);
-    const recognizedInBlock = photoBlockFields.filter((key) => recognizedKeys.has(key));
     const activeBlockKeys = photoBlockFields.filter((key) => getNumber(state.snapshot, row, key) !== 0);
-    const suspectKeys = recognizedInBlock.length
-      ? recognizedInBlock
-      : (activeBlockKeys.length ? activeBlockKeys : photoBlockFields);
+    const reviewBlockKeys = Array.isArray(state.photoImport?.cellReviews)
+      ? state.photoImport.cellReviews
+        .filter((item) => item && item.status === "review" && photoBlockFields.includes(item.key))
+        .map((item) => item.key)
+      : [];
+    const recognizedInBlock = photoBlockFields.filter((key) => recognizedKeys.has(key));
+    const suspectKeys = activeBlockKeys.length
+      ? activeBlockKeys
+      : (reviewBlockKeys.length
+        ? reviewBlockKeys
+        : (recognizedInBlock.length ? recognizedInBlock : photoBlockFields));
     const labels = suspectKeys
       .map((key) => getPhotoFieldMetaByKey(key))
       .filter(Boolean)
