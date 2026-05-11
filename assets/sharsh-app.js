@@ -387,8 +387,8 @@
   }
 
   function applyLoadedSnapshot(result) {
-    state.snapshot = resetQhCalcInputs(deepCopy(result.snapshot));
-    state.loadedSnapshot = resetQhCalcInputs(deepCopy(result.snapshot));
+    state.snapshot = syncQhCalculatedTargets(resetQhCalcInputs(deepCopy(result.snapshot)));
+    state.loadedSnapshot = syncQhCalculatedTargets(resetQhCalcInputs(deepCopy(result.snapshot)));
     state.source = result.source;
     state.warning = result.warning || "";
   }
@@ -1280,14 +1280,14 @@
     return Boolean(row && QH_CALC_DEPARTMENT_IDS.has(row.id));
   }
 
-  function getQhCalcSourceValue(row, key) {
+  function getQhCalcSourceValue(row, key, snapshot = state.snapshot) {
     if (!row) {
       return null;
     }
-    return config.normalizeCellValue(getEffectiveValue(state.snapshot, row, key));
+    return config.normalizeCellValue(getEffectiveValue(snapshot, row, key));
   }
 
-  function calcQhRemainingValue(row, type) {
+  function calcQhRemainingValue(row, type, snapshot = state.snapshot) {
     if (!row) {
       return null;
     }
@@ -1315,15 +1315,33 @@
       return null;
     }
 
-    const previous = getQhCalcSourceValue(row, source.previous);
-    const incoming = getQhCalcSourceValue(row, source.incoming);
-    const discharged = getQhCalcSourceValue(row, source.discharged);
+    const previous = getQhCalcSourceValue(row, source.previous, snapshot);
+    const incoming = getQhCalcSourceValue(row, source.incoming, snapshot);
+    const discharged = getQhCalcSourceValue(row, source.discharged, snapshot);
 
     if (previous === null && incoming === null && discharged === null) {
       return null;
     }
 
     return (previous || 0) + (incoming || 0) - (discharged || 0);
+  }
+
+  function syncQhCalculatedTargets(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.rows)) {
+      return snapshot;
+    }
+
+    snapshot.rows.forEach((row) => {
+      if (!isQhCalcDepartment(row) || !row.values || typeof row.values !== "object") {
+        return;
+      }
+
+      row.values.currentShar = calcQhRemainingValue(row, "soldier", snapshot) || 0;
+      row.values.currentSpa = calcQhRemainingValue(row, "officer", snapshot) || 0;
+      row.values.currentPaym = calcQhRemainingValue(row, "contract", snapshot) || 0;
+    });
+
+    return snapshot;
   }
 
   function getQhCalcDisplayValue(row, key) {
