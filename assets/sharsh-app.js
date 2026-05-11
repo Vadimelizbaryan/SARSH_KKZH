@@ -2702,7 +2702,7 @@
       });
 
       if (isQhCalcDepartment(row)) {
-        QH_CALC_INPUT_KEYS.forEach((key) => {
+        [...QH_CALC_INPUT_KEYS, ...QH_CALC_OPTIONAL_INPUT_KEYS].forEach((key) => {
           document.querySelectorAll(`[data-qh-calc-key="${key}"]`).forEach((element) => {
             if (element instanceof HTMLInputElement) {
               element.value = getQhCalcDisplayValue(row, key) || "0";
@@ -3910,6 +3910,11 @@
     }
 
     const expectedValues = config.normalizeRowValues(row.values);
+    if (isQhCalcDepartment(row)) {
+      expectedValues.qhBaseSoldier = expectedValues.currentShar || 0;
+      expectedValues.qhBaseOfficer = expectedValues.currentSpa || 0;
+      expectedValues.qhBaseContract = expectedValues.currentPaym || 0;
+    }
     const payloadValues = deepCopy(expectedValues);
     if (isQhCalcDepartment(row)) {
       QH_CALC_INPUT_KEYS.forEach((key) => {
