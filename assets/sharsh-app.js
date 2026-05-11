@@ -387,8 +387,8 @@
   }
 
   function applyLoadedSnapshot(result) {
-    state.snapshot = syncQhCalculatedTargets(resetQhCalcInputs(deepCopy(result.snapshot)));
-    state.loadedSnapshot = syncQhCalculatedTargets(resetQhCalcInputs(deepCopy(result.snapshot)));
+    state.snapshot = syncQhCalculatedTargets(primeQhBaseInputs(resetQhCalcInputs(deepCopy(result.snapshot))));
+    state.loadedSnapshot = syncQhCalculatedTargets(primeQhBaseInputs(resetQhCalcInputs(deepCopy(result.snapshot))));
     state.source = result.source;
     state.warning = result.warning || "";
   }
@@ -1324,6 +1324,35 @@
     }
 
     return (previous || 0) + (incoming || 0) - (discharged || 0);
+  }
+
+  function primeQhBaseInputs(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.rows)) {
+      return snapshot;
+    }
+
+    snapshot.rows.forEach((row) => {
+      if (!isQhCalcDepartment(row) || !row.values || typeof row.values !== "object") {
+        return;
+      }
+
+      const hasBaseValues =
+        (row.values.qhBaseSoldier || 0) !== 0
+        || (row.values.qhBaseOfficer || 0) !== 0
+        || (row.values.qhBaseContract || 0) !== 0;
+      const hasCurrentValues =
+        (row.values.currentShar || 0) !== 0
+        || (row.values.currentSpa || 0) !== 0
+        || (row.values.currentPaym || 0) !== 0;
+
+      if (!hasBaseValues && hasCurrentValues) {
+        row.values.qhBaseSoldier = row.values.currentShar || 0;
+        row.values.qhBaseOfficer = row.values.currentSpa || 0;
+        row.values.qhBaseContract = row.values.currentPaym || 0;
+      }
+    });
+
+    return snapshot;
   }
 
   function syncQhCalculatedTargets(snapshot) {
