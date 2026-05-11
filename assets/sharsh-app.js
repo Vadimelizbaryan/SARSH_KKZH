@@ -1581,8 +1581,14 @@
 
     const expectedNormalized = config.normalizeRowValues(expectedValues);
     const savedNormalized = config.normalizeRowValues(savedRow.values);
+    const ignoredKeys = isQhCalcDepartment(savedRow)
+      ? new Set(["qhBaseSoldier", "qhBaseOfficer", "qhBaseContract"])
+      : null;
 
     for (const key of config.valueKeys) {
+      if (ignoredKeys?.has(key)) {
+        continue;
+      }
       if (expectedNormalized[key] !== savedNormalized[key]) {
         return {
           ok: false,
