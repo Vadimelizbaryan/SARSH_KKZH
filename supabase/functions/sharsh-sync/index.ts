@@ -94,6 +94,19 @@ const DEPARTMENTS = {
   r21: { department: "Ք/Հ", group: "extra", marker: "SR-21" }
 } as const;
 
+const PHOTO_TEMPLATE_GUIDE = [
+  "Template layout of the 22 handwritten cells from left to right:",
+  "- cells 1, 2, 3: first three-cell block on the far left",
+  "- cells 4, 5, 6: second three-cell block",
+  "- cells 7, 8, 9: third three-cell block",
+  "- cells 10, 11: two narrow transfer cells",
+  "- cell 12: one narrow single cell immediately after cell 11",
+  "- cells 13, 14, 15: one three-cell group immediately after cell 12",
+  "- cells 16, 17, 18, 19: four consecutive single cells immediately after cells 13-15",
+  "- cells 20, 21, 22: final three-cell leave block on the far right",
+  "Use the printed vertical borders of the table as the main source of separation between neighboring cells."
+].join("\n");
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -528,7 +541,7 @@ async function recognizeDepartmentPhoto(
 
   const fieldInstructions = PHOTO_FIELD_MAPPINGS
     .map((item) => item.cell === 12
-      ? `- cell ${item.cell}: ${item.key} (${item.label}). Return the handwritten value here, but the app will ignore it.`
+      ? `- cell ${item.cell}: ${item.key} (${item.label}). Do not extract or return this cell at all because the app calculates cell 12 automatically.`
       : `- cell ${item.cell}: ${item.key} (${item.label})`)
     .join("\n");
 
@@ -540,14 +553,21 @@ async function recognizeDepartmentPhoto(
     "If the photo is missing SR markers or the printed title is unclear, continue extracting values for the given department anyway.",
     "Read only the top numeric table and the handwritten report date near the header.",
     "Ignore the handwritten descriptive text in the lower part of the page.",
+    "The standard top numeric row always contains exactly 22 handwritten cells from left to right.",
+    PHOTO_TEMPLATE_GUIDE,
     "Return null for any cell that is blank, crossed out, unreadable, or uncertain.",
     "Do not infer values from formulas. Do not copy printed column numbers.",
+    "Cells 10 and 11 are the two transfer columns. Immediately after cell 11 there is exactly one narrow single column: that is cell 12 only.",
+    "Cell 12 is never entered by the operator and must not be extracted. The app calculates cell 12 automatically.",
+    "Immediately after cell 12 there are exactly three adjacent cells under the soldier subgroup: those are cell 13 currentShar, cell 14 currentSpa, and cell 15 currentPaym in that strict left-to-right order.",
+    "Do not merge cell 12 with cells 13-15. Do not shift values between cells 12, 13, 14, and 15 even when the handwriting is close to the border lines.",
+    "If you see any writing in the narrow column for cell 12, ignore it completely and still read the next three values as cells 13, 14, and 15.",
     "After the three soldier columns in the 'present' block there are four consecutive single-column fields.",
     "Those four single-column fields must be read strictly in this order: cell 16 currentZh, cell 17 family, cell 18 officer, cell 19 civil.",
     "Do not shift handwritten values left or right between cells 16, 17, 18, and 19.",
     "Map the handwritten values into these fields:",
     fieldInstructions,
-    "Cell 12 is a derived total between cell 11 and cell 13. Return it only under photoCell12Derived and never assign that handwritten number to currentShar or any later field.",
+    "Cell 12 is a derived total between cell 11 and cell 13. Do not return it in values and never assign it to currentShar or any later field.",
     "If the photo clearly shows a handwritten value under the single column between the three soldier columns and the family column, that value belongs to currentZh.",
     "The top table also contains derived totals. Do not return those derived totals unless they correspond to one of the listed fields above.",
     "Return reportDate in dd.mm.yy or dd.mm.yyyy when visible, otherwise null.",
@@ -555,7 +575,7 @@ async function recognizeDepartmentPhoto(
     "For cellReviews use status recognized when the handwritten value is read confidently, and status review when the cell has handwriting but the read is uncertain or may be wrong.",
     "For each cellReviews item return approximate bounding box coordinates relative to the full image: left, top, width, height in a 0..1000 scale.",
     "Do not add blank cells to cellReviews.",
-    "Do not include the derived helper cell 12 in cellReviews.",
+    "Do not include cell 12 in values or in cellReviews.",
     "Use notes for short uncertainty comments only when needed."
   ].join("\n");
 
