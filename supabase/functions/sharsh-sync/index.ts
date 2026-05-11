@@ -60,6 +60,7 @@ const PHOTO_FIELD_MAPPINGS = [
 ] as const;
 
 const PHOTO_SCHEMA_VALUE_KEYS = PHOTO_FIELD_MAPPINGS
+  .filter((item) => item.key !== "photoCell12Derived")
   .map((item) => item.key)
   .filter((key): key is string => typeof key === "string");
 
