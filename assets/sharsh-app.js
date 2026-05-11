@@ -750,6 +750,16 @@
     return canvas;
   }
 
+  async function rotateImageDataUrl(sourceDataUrl, rotation = 90) {
+    if (typeof sourceDataUrl !== "string" || !sourceDataUrl.startsWith("data:image/")) {
+      throw new Error("Нужно подготовленное изображение для поворота.");
+    }
+
+    const image = await loadImageFromDataUrl(sourceDataUrl);
+    const rotatedCanvas = buildRotatedCanvasFromImage(image, rotation);
+    return rotatedCanvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
+  }
+
   function measureCanvasRegionDarkness(imageData, left, top, width, height) {
     const { data } = imageData;
     const xStart = Math.max(0, Math.min(imageData.width - 1, Math.floor(left)));
@@ -3461,6 +3471,7 @@
             <input type="file" id="photoImportFile" accept="image/*" capture="environment" ${photoState.isProcessing ? "disabled" : ""}>
             Выбрать фото
           </label>
+          <button type="button" id="photoRotateBtn" ${!photoState.imageDataUrl || photoState.isProcessing ? "disabled" : ""}>Повернуть 90°</button>
           <button type="button" id="photoRecognizeBtn" ${!photoState.imageDataUrl || photoState.isProcessing || !canRecognize ? "disabled" : ""}>
             ${photoState.isProcessing ? "Распознаю..." : "Распознать"}
           </button>
@@ -4149,6 +4160,38 @@
     }
   }
 
+  async function handlePhotoImportRotate() {
+    if (!state.photoImport.imageDataUrl || state.photoImport.isProcessing) {
+      return;
+    }
+
+    state.photoImport.isProcessing = true;
+    setPhotoImportStatus("Поворачиваю фото для более удобной проверки...", false);
+    renderPage();
+
+    try {
+      state.photoImport.imageDataUrl = await rotateImageDataUrl(state.photoImport.imageDataUrl, 90);
+      state.photoImport.recognizedValues = {};
+      state.photoImport.lastAppliedKeys = [];
+      state.photoImport.lastReportDate = "";
+      state.photoImport.notes = [];
+      state.photoImport.cellReviews = [];
+      state.photoImport.suspectKeys = [];
+      state.photoImport.suspectReason = "";
+      state.photoImport.draftMode = false;
+      state.photoImport.isProcessing = false;
+      setPhotoImportStatus("Фото вручную повернуто на 90°. Проверьте ориентацию и нажмите «Распознать».", false);
+      renderPage();
+    } catch (error) {
+      state.photoImport.isProcessing = false;
+      setPhotoImportStatus(
+        error instanceof Error ? error.message : "Не удалось повернуть фото.",
+        true
+      );
+      renderPage();
+    }
+  }
+
   async function handlePhotoRecognition() {
     const row = getCurrentRow();
     if (!row) {
@@ -4536,6 +4579,7 @@
             <input type="file" id="mainPhotoRouteFolder" accept="image/*" webkitdirectory directory multiple ${routeState.isProcessing ? "disabled" : ""}>
             Выбрать папку
           </label>
+          <button type="button" id="mainPhotoRouteRotateBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>Повернуть 90°</button>
           <button type="button" id="mainPhotoRouteDetectBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
             ${routeState.isProcessing ? "Определяю..." : "Определить и открыть"}
           </button>
@@ -5054,6 +5098,32 @@
     }
   }
 
+  async function handleMainPhotoRouteRotate() {
+    if (!state.mainPhotoRoute.imageDataUrl || state.mainPhotoRoute.isProcessing) {
+      return;
+    }
+
+    state.mainPhotoRoute.isProcessing = true;
+    setMainPhotoRouteStatus("Поворачиваю фото для проверки ориентации...", false);
+    renderPage();
+
+    try {
+      state.mainPhotoRoute.imageDataUrl = await rotateImageDataUrl(state.mainPhotoRoute.imageDataUrl, 90);
+      state.mainPhotoRoute.detectedDepartmentId = "";
+      state.mainPhotoRoute.detectedDepartmentName = "";
+      state.mainPhotoRoute.isProcessing = false;
+      setMainPhotoRouteStatus("Фото вручную повернуто на 90°. Если ориентация правильная, запускайте определение отделения.", false);
+      renderPage();
+    } catch (error) {
+      state.mainPhotoRoute.isProcessing = false;
+      setMainPhotoRouteStatus(
+        error instanceof Error ? error.message : "Не удалось повернуть фото.",
+        true
+      );
+      renderPage();
+    }
+  }
+
   function buildPendingOcrFeedback(row, finalValues) {
     if (mode !== "department" || !state.photoImport || !state.photoImport.draftMode) {
       return null;
@@ -5448,6 +5518,13 @@
       });
     }
 
+    const mainPhotoRouteRotateBtn = document.getElementById("mainPhotoRouteRotateBtn");
+    if (mainPhotoRouteRotateBtn) {
+      mainPhotoRouteRotateBtn.addEventListener("click", () => {
+        handleMainPhotoRouteRotate();
+      });
+    }
+
     const mainPhotoRouteRecheckBtn = document.getElementById("mainPhotoRouteRecheckBtn");
     if (mainPhotoRouteRecheckBtn) {
       mainPhotoRouteRecheckBtn.addEventListener("click", () => {
@@ -5474,6 +5551,13 @@
     if (photoRecognizeBtn) {
       photoRecognizeBtn.addEventListener("click", () => {
         handlePhotoRecognition();
+      });
+    }
+
+    const photoRotateBtn = document.getElementById("photoRotateBtn");
+    if (photoRotateBtn) {
+      photoRotateBtn.addEventListener("click", () => {
+        handlePhotoImportRotate();
       });
     }
 
