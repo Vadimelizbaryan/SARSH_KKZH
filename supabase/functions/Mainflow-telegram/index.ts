@@ -134,6 +134,57 @@ function sanitizeValues(values: Record<string, unknown> | null | undefined) {
   return output;
 }
 
+const OCR_POST12_KEYS = [
+  "currentShar",
+  "currentSpa",
+  "currentPaym",
+  "currentZh",
+  "family",
+  "officer",
+  "civil",
+  "leaveSharq",
+  "leaveSpa",
+  "leavePaym"
+] as const;
+
+function computeDerivedPhotoCell12(values: Record<string, number | null>) {
+  const beenTotal = values.beenTotal ?? 0;
+  const admittedTotal = values.admittedTotal ?? 0;
+  const transferToDepartment = values.transferToDepartment ?? 0;
+  const dgTotal = values.dgTotal ?? 0;
+  const transferFromDepartment = values.transferFromDepartment ?? 0;
+  return Math.max(0, beenTotal + admittedTotal + transferToDepartment - dgTotal - transferFromDepartment);
+}
+
+function normalizeShiftedPostCell12Values(values: Record<string, number | null>) {
+  const derivedCell12 = computeDerivedPhotoCell12(values);
+  const currentShar = values.currentShar;
+  const tailValues = OCR_POST12_KEYS.slice(1).map((key) => values[key]);
+  const populatedTailCount = tailValues.filter((value) => value !== null).length;
+
+  if (
+    currentShar === null ||
+    currentShar !== derivedCell12 ||
+    populatedTailCount < 4
+  ) {
+    return {
+      values,
+      autoShifted: false
+    };
+  }
+
+  const normalized = { ...values };
+  for (let index = 0; index < OCR_POST12_KEYS.length - 1; index += 1) {
+    normalized[OCR_POST12_KEYS[index]] = values[OCR_POST12_KEYS[index + 1]];
+  }
+  normalized[OCR_POST12_KEYS[OCR_POST12_KEYS.length - 1]] = null;
+
+  return {
+    values: normalized,
+    autoShifted: true
+  };
+}
+
 function sanitizeReportDate(value: unknown) {
   if (typeof value !== "string") {
     return null;
@@ -410,16 +461,22 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
   );
 
   const sanitizedValues = sanitizeValues(parsed.values as Record<string, unknown> | undefined);
+  const normalizedShift = normalizeShiftedPostCell12Values(sanitizedValues);
+  const finalValues = normalizedShift.values;
+  const baseNotes = Array.isArray(parsed.notes)
+    ? parsed.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
+    : [];
+  const notes = normalizedShift.autoShifted
+    ? [...baseNotes, "Автокоррекция OCR: блок ячеек 13-22 был сдвинут влево после ложного чтения ячейки 12."]
+    : baseNotes;
 
   return {
     reportDate: sanitizeReportDate(parsed.reportDate),
-    values: sanitizedValues,
-    recognizedKeys: Object.entries(sanitizedValues)
+    values: finalValues,
+    recognizedKeys: Object.entries(finalValues)
       .filter(([, value]) => value !== null)
       .map(([key]) => key),
-    notes: Array.isArray(parsed.notes)
-      ? parsed.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
-      : []
+    notes
   };
 }
 
