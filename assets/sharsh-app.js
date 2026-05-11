@@ -527,6 +527,17 @@
     bottomRatio: 0.58
   };
 
+  const OCR_RIGHT_CELL_REGION = {
+    startRatio: 0.08,
+    endRatio: 0.98,
+    totalCellSlots: 11,
+    firstTargetSlotIndex: 1,
+    targetCellCount: 10,
+    innerXPaddingRatio: 0.08,
+    topRatio: 0.12,
+    bottomRatio: 0.90
+  };
+
   async function compressImageFile(file) {
     const sourceDataUrl = await readFileAsDataUrl(file);
     if (!sourceDataUrl.startsWith("data:image/")) {
@@ -653,6 +664,73 @@
     );
 
     return canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
+  }
+
+  async function buildRightCellCropDataUrls(sourceDataUrl) {
+    const rightCropDataUrl = await buildCroppedImageDataUrl(sourceDataUrl, OCR_RIGHT_FOCUS_CROP);
+    const image = await loadImageFromDataUrl(rightCropDataUrl);
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    if (!sourceWidth || !sourceHeight) {
+      throw new Error("Не удалось определить размер правого OCR-фрагмента.");
+    }
+
+    const {
+      startRatio,
+      endRatio,
+      totalCellSlots,
+      firstTargetSlotIndex,
+      targetCellCount,
+      innerXPaddingRatio,
+      topRatio,
+      bottomRatio
+    } = OCR_RIGHT_CELL_REGION;
+
+    const regionLeft = Math.max(0, Math.floor(sourceWidth * startRatio));
+    const regionRight = Math.min(sourceWidth, Math.ceil(sourceWidth * endRatio));
+    const regionWidth = Math.max(1, regionRight - regionLeft);
+    const slotWidth = regionWidth / totalCellSlots;
+    const padX = slotWidth * innerXPaddingRatio;
+    const cropTop = Math.max(0, Math.floor(sourceHeight * topRatio));
+    const cropBottom = Math.min(sourceHeight, Math.ceil(sourceHeight * bottomRatio));
+    const cropHeight = Math.max(1, cropBottom - cropTop);
+
+    const items = [];
+
+    for (let offset = 0; offset < targetCellCount; offset += 1) {
+      const slotIndex = firstTargetSlotIndex + offset;
+      const slotLeft = regionLeft + (slotIndex * slotWidth);
+      const slotRight = regionLeft + ((slotIndex + 1) * slotWidth);
+      const cropLeft = Math.max(0, Math.floor(slotLeft + padX));
+      const cropRight = Math.min(sourceWidth, Math.ceil(slotRight - padX));
+      const cropWidth = Math.max(1, cropRight - cropLeft);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = cropWidth;
+      canvas.height = cropHeight;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        throw new Error("Браузер не поддерживает подготовку OCR-ячейки.");
+      }
+
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, cropWidth, cropHeight);
+      context.drawImage(
+        image,
+        cropLeft,
+        cropTop,
+        cropWidth,
+        cropHeight,
+        0,
+        0,
+        cropWidth,
+        cropHeight
+      );
+
+      items.push(canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY));
+    }
+
+    return items;
   }
 
   function setMainPhotoRouteStatus(message, isError) {
@@ -3186,7 +3264,12 @@
     try {
       const ocrImageDataUrl = await buildFocusedOcrImageDataUrl(state.photoImport.imageDataUrl);
       const rightOcrImageDataUrl = await buildCroppedImageDataUrl(state.photoImport.imageDataUrl, OCR_RIGHT_FOCUS_CROP);
-      const result = await sync.recognizeDepartmentPhoto(departmentId, ocrImageDataUrl, [rightOcrImageDataUrl]);
+      const rightCellCropDataUrls = await buildRightCellCropDataUrls(state.photoImport.imageDataUrl);
+      const result = await sync.recognizeDepartmentPhoto(
+        departmentId,
+        ocrImageDataUrl,
+        [rightOcrImageDataUrl, ...rightCellCropDataUrls]
+      );
       const appliedCount = applyRecognizedDepartmentValues(result);
       state.photoImport.isProcessing = false;
 
