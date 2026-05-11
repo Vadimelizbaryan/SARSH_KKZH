@@ -294,7 +294,16 @@ function getOpenAiApiKey() {
 
 function getPublicSiteBaseUrl() {
   const raw = Deno.env.get("PUBLIC_SITE_BASE_URL") || DEFAULT_SITE_BASE_URL;
-  return raw.trim().replace(/\/+$/, "");
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return trimmed;
+    }
+  } catch (_error) {
+    // Fall back to the known-good public site URL below.
+  }
+  return DEFAULT_SITE_BASE_URL;
 }
 
 function getOcrTemplateBlankImageUrl() {
