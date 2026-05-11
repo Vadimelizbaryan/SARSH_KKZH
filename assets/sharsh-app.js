@@ -2686,12 +2686,9 @@
         return `
           <div class="hospital-report-divider">
             <div class="hospital-report-divider-title">${escapeHtml(item.label)}</div>
-            ${item.totalCell ? `
-              <div class="hospital-report-divider-total">
-                <span>Ячейка ${escapeHtml(String(item.totalCell))}</span>
-                <strong>${escapeHtml(String(item.totalValue || 0))}</strong>
-              </div>
-            ` : ""}
+            <div class="hospital-report-divider-total">
+              <strong>${escapeHtml(String(item.totalValue || 0))}</strong>
+            </div>
           </div>
         `;
       }
@@ -2736,7 +2733,7 @@
         return `
           <tr class="hospital-report-print-section">
             <td colspan="2">${escapeHtml(item.label)}</td>
-            <td>${item.totalCell ? escapeHtml(String(item.totalCell)) : ""}</td>
+            <td></td>
             <td>${item.totalValue === null || typeof item.totalValue === "undefined" ? "" : escapeHtml(String(item.totalValue || 0))}</td>
           </tr>
         `;

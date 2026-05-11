@@ -1774,13 +1774,15 @@ a {
 
 .hospital-report-divider-total {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
   color: var(--muted);
 }
 
 .hospital-report-divider-total strong {
+  display: block;
+  min-width: 72px;
+  text-align: right;
   color: #8b4d00;
   font-size: 24px;
   line-height: 1;
