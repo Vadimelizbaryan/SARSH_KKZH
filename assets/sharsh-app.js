@@ -78,9 +78,9 @@
     {
       label: "Եղել է",
       cells: [
-        { key: "currentShar", marker: "G", role: "linked" },
-        { key: "currentSpa", marker: "H", role: "linked" },
-        { key: "currentPaym", marker: "I", role: "linked" }
+        { key: "qhBaseSoldier", marker: "G", role: "input" },
+        { key: "qhBaseOfficer", marker: "H", role: "input" },
+        { key: "qhBaseContract", marker: "I", role: "input" }
       ]
     },
     {
@@ -99,6 +99,11 @@
     "qhDischargedSoldier",
     "qhDischargedOfficer",
     "qhDischargedContract"
+  ]);
+  const QH_CALC_OPTIONAL_INPUT_KEYS = new Set([
+    "qhBaseSoldier",
+    "qhBaseOfficer",
+    "qhBaseContract"
   ]);
   function resetQhCalcInputs(snapshot) {
     if (!snapshot || !Array.isArray(snapshot.rows)) {
@@ -1289,17 +1294,17 @@
 
     const keyMap = {
       soldier: {
-        previous: "currentShar",
+        previous: "qhBaseSoldier",
         incoming: "qhIncomingSoldier",
         discharged: "qhDischargedSoldier"
       },
       officer: {
-        previous: "currentSpa",
+        previous: "qhBaseOfficer",
         incoming: "qhIncomingOfficer",
         discharged: "qhDischargedOfficer"
       },
       contract: {
-        previous: "currentPaym",
+        previous: "qhBaseContract",
         incoming: "qhIncomingContract",
         discharged: "qhDischargedContract"
       }
@@ -1337,7 +1342,8 @@
     }
 
     const value = getQhCalcSourceValue(row, key);
-    if (QH_CALC_INPUT_KEYS.has(key) && (value === null || value === "" || typeof value === "undefined")) {
+    if ((QH_CALC_INPUT_KEYS.has(key) || QH_CALC_OPTIONAL_INPUT_KEYS.has(key))
+      && (value === null || value === "" || typeof value === "undefined")) {
       return "0";
     }
     return getDisplayValue(value);
