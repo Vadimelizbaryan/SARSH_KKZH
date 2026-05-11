@@ -538,6 +538,51 @@
     bottomRatio: 0.90
   };
 
+  const OCR_ALIGNMENT_ANALYSIS_MAX_WIDTH = 1200;
+  const OCR_ALIGNMENT_MARKER_WINDOW_RATIO = 0.018;
+  const OCR_ALIGNMENT_MARKER_INSET_RATIO = 0.35;
+  const OCR_ALIGNMENT_CORNER_WINDOWS = {
+    topLeft: { leftRatio: 0.0, rightRatio: 0.18, topRatio: 0.18, bottomRatio: 0.52 },
+    topRight: { leftRatio: 0.82, rightRatio: 1.0, topRatio: 0.18, bottomRatio: 0.52 },
+    bottomLeft: { leftRatio: 0.0, rightRatio: 0.18, topRatio: 0.42, bottomRatio: 0.84 },
+    bottomRight: { leftRatio: 0.82, rightRatio: 1.0, topRatio: 0.42, bottomRatio: 0.84 }
+  };
+
+  const OCR_ALIGNED_RIGHT_FOCUS_CROP = {
+    leftRatio: 0.50,
+    topRatio: 0.40,
+    rightRatio: 0.02,
+    bottomRatio: 0.98
+  };
+
+  const OCR_ALIGNED_RIGHT_CELL_REGION = {
+    startRatio: 0.02,
+    endRatio: 0.98,
+    totalCellSlots: 11,
+    firstTargetSlotIndex: 1,
+    targetCellCount: 10,
+    innerXPaddingRatio: 0.08,
+    topRatio: 0.12,
+    bottomRatio: 0.94
+  };
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function interpolatePoint(start, end, progress) {
+    return {
+      x: start.x + ((end.x - start.x) * progress),
+      y: start.y + ((end.y - start.y) * progress)
+    };
+  }
+
+  function measurePointDistance(first, second) {
+    const dx = second.x - first.x;
+    const dy = second.y - first.y;
+    return Math.sqrt((dx * dx) + (dy * dy));
+  }
+
   async function compressImageFile(file) {
     const sourceDataUrl = await readFileAsDataUrl(file);
     if (!sourceDataUrl.startsWith("data:image/")) {
@@ -570,6 +615,238 @@
     return canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
   }
 
+  function buildCropBounds(sourceWidth, sourceHeight, cropConfig) {
+    const left = Math.max(0, Math.floor(sourceWidth * cropConfig.leftRatio));
+    const top = Math.max(0, Math.floor(sourceHeight * cropConfig.topRatio));
+    const right = Math.min(sourceWidth, Math.ceil(sourceWidth * (1 - cropConfig.rightRatio)));
+    const bottom = Math.min(sourceHeight, Math.ceil(sourceHeight * cropConfig.bottomRatio));
+
+    return {
+      left,
+      top,
+      right,
+      bottom,
+      width: Math.max(1, right - left),
+      height: Math.max(1, bottom - top)
+    };
+  }
+
+  function createCanvasFromImageCrop(image, cropConfig) {
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    const bounds = buildCropBounds(sourceWidth, sourceHeight, cropConfig);
+    const canvas = document.createElement("canvas");
+    canvas.width = bounds.width;
+    canvas.height = bounds.height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, bounds.width, bounds.height);
+    context.drawImage(
+      image,
+      bounds.left,
+      bounds.top,
+      bounds.width,
+      bounds.height,
+      0,
+      0,
+      bounds.width,
+      bounds.height
+    );
+
+    return canvas;
+  }
+
+  function buildDarknessIntegral(imageData) {
+    const { width, height, data } = imageData;
+    const integral = new Float64Array((width + 1) * (height + 1));
+
+    for (let y = 0; y < height; y += 1) {
+      let rowSum = 0;
+      for (let x = 0; x < width; x += 1) {
+        const pixelIndex = (y * width * 4) + (x * 4);
+        const luminance = ((data[pixelIndex] * 299) + (data[pixelIndex + 1] * 587) + (data[pixelIndex + 2] * 114)) / 1000;
+        rowSum += (255 - luminance);
+        integral[((y + 1) * (width + 1)) + (x + 1)] = integral[(y * (width + 1)) + (x + 1)] + rowSum;
+      }
+    }
+
+    return integral;
+  }
+
+  function sumIntegralRegion(integral, width, left, top, regionWidth, regionHeight) {
+    const right = left + regionWidth;
+    const bottom = top + regionHeight;
+    return integral[(bottom * (width + 1)) + right]
+      - integral[(top * (width + 1)) + right]
+      - integral[(bottom * (width + 1)) + left]
+      + integral[(top * (width + 1)) + left];
+  }
+
+  function findMarkerWindowCenter(integral, width, height, searchWindow, markerSize) {
+    const startX = clamp(Math.floor(width * searchWindow.leftRatio), 0, Math.max(0, width - markerSize));
+    const endX = clamp(Math.ceil(width * searchWindow.rightRatio) - markerSize, startX, Math.max(0, width - markerSize));
+    const startY = clamp(Math.floor(height * searchWindow.topRatio), 0, Math.max(0, height - markerSize));
+    const endY = clamp(Math.ceil(height * searchWindow.bottomRatio) - markerSize, startY, Math.max(0, height - markerSize));
+    let best = null;
+
+    for (let y = startY; y <= endY; y += 2) {
+      for (let x = startX; x <= endX; x += 2) {
+        const darkness = sumIntegralRegion(integral, width, x, y, markerSize, markerSize) / (markerSize * markerSize);
+        if (!best || darkness > best.darkness) {
+          best = {
+            x: x + (markerSize / 2),
+            y: y + (markerSize / 2),
+            darkness
+          };
+        }
+      }
+    }
+
+    if (!best || best.darkness < 45) {
+      return null;
+    }
+
+    return best;
+  }
+
+  function sampleBilinearRgba(data, width, height, x, y) {
+    const clampedX = clamp(x, 0, Math.max(0, width - 1));
+    const clampedY = clamp(y, 0, Math.max(0, height - 1));
+    const x0 = Math.floor(clampedX);
+    const y0 = Math.floor(clampedY);
+    const x1 = Math.min(width - 1, x0 + 1);
+    const y1 = Math.min(height - 1, y0 + 1);
+    const tx = clampedX - x0;
+    const ty = clampedY - y0;
+    const index00 = (y0 * width * 4) + (x0 * 4);
+    const index10 = (y0 * width * 4) + (x1 * 4);
+    const index01 = (y1 * width * 4) + (x0 * 4);
+    const index11 = (y1 * width * 4) + (x1 * 4);
+    const rgba = [0, 0, 0, 0];
+
+    for (let channel = 0; channel < 4; channel += 1) {
+      const topValue = (data[index00 + channel] * (1 - tx)) + (data[index10 + channel] * tx);
+      const bottomValue = (data[index01 + channel] * (1 - tx)) + (data[index11 + channel] * tx);
+      rgba[channel] = Math.round((topValue * (1 - ty)) + (bottomValue * ty));
+    }
+
+    return rgba;
+  }
+
+  function warpQuadCanvas(sourceCanvas, corners) {
+    const sourceWidth = sourceCanvas.width;
+    const sourceHeight = sourceCanvas.height;
+    const topEdgeLength = measurePointDistance(corners.topLeft, corners.topRight);
+    const bottomEdgeLength = measurePointDistance(corners.bottomLeft, corners.bottomRight);
+    const leftEdgeLength = measurePointDistance(corners.topLeft, corners.bottomLeft);
+    const rightEdgeLength = measurePointDistance(corners.topRight, corners.bottomRight);
+    const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(topEdgeLength, bottomEdgeLength, leftEdgeLength, rightEdgeLength));
+    const destinationWidth = Math.max(1, Math.round(((topEdgeLength + bottomEdgeLength) / 2) * scale));
+    const destinationHeight = Math.max(1, Math.round(((leftEdgeLength + rightEdgeLength) / 2) * scale));
+    const sourceContext = sourceCanvas.getContext("2d");
+    if (!sourceContext) {
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
+    }
+
+    const sourceImageData = sourceContext.getImageData(0, 0, sourceWidth, sourceHeight);
+    const destinationCanvas = document.createElement("canvas");
+    destinationCanvas.width = destinationWidth;
+    destinationCanvas.height = destinationHeight;
+    const destinationContext = destinationCanvas.getContext("2d");
+    if (!destinationContext) {
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
+    }
+
+    const destinationImageData = destinationContext.createImageData(destinationWidth, destinationHeight);
+
+    for (let y = 0; y < destinationHeight; y += 1) {
+      const verticalProgress = destinationHeight > 1 ? y / (destinationHeight - 1) : 0;
+      const leftPoint = interpolatePoint(corners.topLeft, corners.bottomLeft, verticalProgress);
+      const rightPoint = interpolatePoint(corners.topRight, corners.bottomRight, verticalProgress);
+
+      for (let x = 0; x < destinationWidth; x += 1) {
+        const horizontalProgress = destinationWidth > 1 ? x / (destinationWidth - 1) : 0;
+        const sourcePoint = interpolatePoint(leftPoint, rightPoint, horizontalProgress);
+        const rgba = sampleBilinearRgba(sourceImageData.data, sourceWidth, sourceHeight, sourcePoint.x, sourcePoint.y);
+        const destinationIndex = (y * destinationWidth * 4) + (x * 4);
+        destinationImageData.data[destinationIndex] = rgba[0];
+        destinationImageData.data[destinationIndex + 1] = rgba[1];
+        destinationImageData.data[destinationIndex + 2] = rgba[2];
+        destinationImageData.data[destinationIndex + 3] = rgba[3];
+      }
+    }
+
+    destinationContext.putImageData(destinationImageData, 0, 0);
+    return destinationCanvas;
+  }
+
+  async function buildAlignedTableImageDataUrl(sourceDataUrl) {
+    if (typeof sourceDataUrl !== "string" || !sourceDataUrl.startsWith("data:image/")) {
+      throw new Error("Нужен файл изображения.");
+    }
+
+    const image = await loadImageFromDataUrl(sourceDataUrl);
+    const sourceCropCanvas = createCanvasFromImageCrop(image, OCR_FOCUS_CROP);
+    const analysisScale = Math.min(1, OCR_ALIGNMENT_ANALYSIS_MAX_WIDTH / sourceCropCanvas.width);
+    const analysisWidth = Math.max(1, Math.round(sourceCropCanvas.width * analysisScale));
+    const analysisHeight = Math.max(1, Math.round(sourceCropCanvas.height * analysisScale));
+    const analysisCanvas = document.createElement("canvas");
+    analysisCanvas.width = analysisWidth;
+    analysisCanvas.height = analysisHeight;
+    const analysisContext = analysisCanvas.getContext("2d");
+    if (!analysisContext) {
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
+    }
+
+    analysisContext.fillStyle = "#ffffff";
+    analysisContext.fillRect(0, 0, analysisWidth, analysisHeight);
+    analysisContext.drawImage(sourceCropCanvas, 0, 0, analysisWidth, analysisHeight);
+
+    const analysisImageData = analysisContext.getImageData(0, 0, analysisWidth, analysisHeight);
+    const integral = buildDarknessIntegral(analysisImageData);
+    const markerSize = clamp(Math.round(analysisWidth * OCR_ALIGNMENT_MARKER_WINDOW_RATIO), 12, 28);
+    const topLeftMarker = findMarkerWindowCenter(integral, analysisWidth, analysisHeight, OCR_ALIGNMENT_CORNER_WINDOWS.topLeft, markerSize);
+    const topRightMarker = findMarkerWindowCenter(integral, analysisWidth, analysisHeight, OCR_ALIGNMENT_CORNER_WINDOWS.topRight, markerSize);
+    const bottomLeftMarker = findMarkerWindowCenter(integral, analysisWidth, analysisHeight, OCR_ALIGNMENT_CORNER_WINDOWS.bottomLeft, markerSize);
+    const bottomRightMarker = findMarkerWindowCenter(integral, analysisWidth, analysisHeight, OCR_ALIGNMENT_CORNER_WINDOWS.bottomRight, markerSize);
+
+    if (!topLeftMarker || !topRightMarker || !bottomLeftMarker || !bottomRightMarker) {
+      return null;
+    }
+
+    const inverseScale = 1 / analysisScale;
+    const markerInset = (markerSize * inverseScale) * OCR_ALIGNMENT_MARKER_INSET_RATIO;
+    const corners = {
+      topLeft: { x: (topLeftMarker.x * inverseScale) + markerInset, y: (topLeftMarker.y * inverseScale) + markerInset },
+      topRight: { x: (topRightMarker.x * inverseScale) - markerInset, y: (topRightMarker.y * inverseScale) + markerInset },
+      bottomLeft: { x: (bottomLeftMarker.x * inverseScale) + markerInset, y: (bottomLeftMarker.y * inverseScale) - markerInset },
+      bottomRight: { x: (bottomRightMarker.x * inverseScale) - markerInset, y: (bottomRightMarker.y * inverseScale) - markerInset }
+    };
+
+    const alignedCanvas = warpQuadCanvas(sourceCropCanvas, corners);
+    return alignedCanvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
+  }
+
+  async function buildAlignedRightOcrArtifacts(sourceDataUrl) {
+    const alignedTableDataUrl = await buildAlignedTableImageDataUrl(sourceDataUrl);
+    if (!alignedTableDataUrl) {
+      return null;
+    }
+
+    return {
+      rightCropDataUrl: await buildCroppedImageDataUrl(alignedTableDataUrl, OCR_ALIGNED_RIGHT_FOCUS_CROP),
+      rightCellCropDataUrls: await buildRightCellCropDataUrls(
+        alignedTableDataUrl,
+        OCR_ALIGNED_RIGHT_FOCUS_CROP,
+        OCR_ALIGNED_RIGHT_CELL_REGION
+      )
+    };
+  }
+
   async function buildFocusedOcrImageDataUrl(sourceDataUrl) {
     if (typeof sourceDataUrl !== "string" || !sourceDataUrl.startsWith("data:image/")) {
       throw new Error("Нужен файл изображения.");
@@ -582,12 +859,9 @@
       throw new Error("Не удалось определить размер изображения для OCR.");
     }
 
-    const cropLeft = Math.max(0, Math.floor(sourceWidth * OCR_FOCUS_CROP.leftRatio));
-    const cropTop = Math.max(0, Math.floor(sourceHeight * OCR_FOCUS_CROP.topRatio));
-    const cropRight = Math.min(sourceWidth, Math.ceil(sourceWidth * (1 - OCR_FOCUS_CROP.rightRatio)));
-    const cropBottom = Math.min(sourceHeight, Math.ceil(sourceHeight * OCR_FOCUS_CROP.bottomRatio));
-    const cropWidth = Math.max(1, cropRight - cropLeft);
-    const cropHeight = Math.max(1, cropBottom - cropTop);
+    const bounds = buildCropBounds(sourceWidth, sourceHeight, OCR_FOCUS_CROP);
+    const cropWidth = bounds.width;
+    const cropHeight = bounds.height;
 
     const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(cropWidth, cropHeight));
     const width = Math.max(1, Math.round(cropWidth * scale));
@@ -605,8 +879,8 @@
     context.fillRect(0, 0, width, height);
     context.drawImage(
       image,
-      cropLeft,
-      cropTop,
+      bounds.left,
+      bounds.top,
       cropWidth,
       cropHeight,
       0,
@@ -630,12 +904,9 @@
       throw new Error("Не удалось определить размер изображения для OCR.");
     }
 
-    const cropLeft = Math.max(0, Math.floor(sourceWidth * cropConfig.leftRatio));
-    const cropTop = Math.max(0, Math.floor(sourceHeight * cropConfig.topRatio));
-    const cropRight = Math.min(sourceWidth, Math.ceil(sourceWidth * (1 - cropConfig.rightRatio)));
-    const cropBottom = Math.min(sourceHeight, Math.ceil(sourceHeight * cropConfig.bottomRatio));
-    const cropWidth = Math.max(1, cropRight - cropLeft);
-    const cropHeight = Math.max(1, cropBottom - cropTop);
+    const bounds = buildCropBounds(sourceWidth, sourceHeight, cropConfig);
+    const cropWidth = bounds.width;
+    const cropHeight = bounds.height;
 
     const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(cropWidth, cropHeight));
     const width = Math.max(1, Math.round(cropWidth * scale));
@@ -653,8 +924,8 @@
     context.fillRect(0, 0, width, height);
     context.drawImage(
       image,
-      cropLeft,
-      cropTop,
+      bounds.left,
+      bounds.top,
       cropWidth,
       cropHeight,
       0,
@@ -666,8 +937,8 @@
     return canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
   }
 
-  async function buildRightCellCropDataUrls(sourceDataUrl) {
-    const rightCropDataUrl = await buildCroppedImageDataUrl(sourceDataUrl, OCR_RIGHT_FOCUS_CROP);
+  async function buildRightCellCropDataUrls(sourceDataUrl, cropConfig = OCR_RIGHT_FOCUS_CROP, regionConfig = OCR_RIGHT_CELL_REGION) {
+    const rightCropDataUrl = await buildCroppedImageDataUrl(sourceDataUrl, cropConfig);
     const image = await loadImageFromDataUrl(rightCropDataUrl);
     const sourceWidth = image.naturalWidth || image.width;
     const sourceHeight = image.naturalHeight || image.height;
@@ -684,7 +955,7 @@
       topRatio,
       bottomRatio,
       innerXPaddingRatio
-    } = OCR_RIGHT_CELL_REGION;
+    } = regionConfig;
 
     const regionLeft = Math.max(0, Math.floor(sourceWidth * startRatio));
     const regionRight = Math.min(sourceWidth, Math.ceil(sourceWidth * endRatio));
@@ -3263,8 +3534,13 @@
 
     try {
       const ocrImageDataUrl = await buildFocusedOcrImageDataUrl(state.photoImport.imageDataUrl);
-      const rightOcrImageDataUrl = await buildCroppedImageDataUrl(state.photoImport.imageDataUrl, OCR_RIGHT_FOCUS_CROP);
-      const rightCellCropDataUrls = await buildRightCellCropDataUrls(state.photoImport.imageDataUrl);
+      const alignedArtifacts = await buildAlignedRightOcrArtifacts(state.photoImport.imageDataUrl);
+      const rightOcrImageDataUrl = alignedArtifacts
+        ? alignedArtifacts.rightCropDataUrl
+        : await buildCroppedImageDataUrl(state.photoImport.imageDataUrl, OCR_RIGHT_FOCUS_CROP);
+      const rightCellCropDataUrls = alignedArtifacts
+        ? alignedArtifacts.rightCellCropDataUrls
+        : await buildRightCellCropDataUrls(state.photoImport.imageDataUrl);
       const result = await sync.recognizeDepartmentPhoto(
         departmentId,
         ocrImageDataUrl,

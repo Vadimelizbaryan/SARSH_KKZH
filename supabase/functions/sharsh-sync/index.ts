@@ -674,6 +674,7 @@ async function recognizeDepartmentPhoto(
     "You will receive images in this order: first a blank template reference of the same form, second the filled top-table crop, optionally one extra zoomed crop of the right-hand part of the same table, and optionally ten single-cell crops for cells 13 through 22.",
     "Use the blank template image only to align the printed grid and cell borders. Extract handwritten values only from the filled form image.",
     "If an extra zoomed right-side crop is present, use it to resolve cells 13 through 22 more accurately than the wider crop.",
+    "The extra zoomed crop and the single-cell crops may be geometrically aligned versions of the same table. Prefer them over the wider crop for exact cell borders.",
     "If ten single-cell crops are present after the right-side zoom crop, they correspond exactly in this order: cell 13, cell 14, cell 15, cell 16, cell 17, cell 18, cell 19, cell 20, cell 21, cell 22.",
     "When the single-cell crops are present, use them as the primary source for cells 13-22 and use the larger crops only as context.",
     "Do not determine or change the department from SR markers, headers, or any other text in the image.",
