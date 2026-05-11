@@ -471,7 +471,8 @@ async function requestOpenAiStructuredVision(
   imageDataUrl: string,
   schemaName: string,
   schema: Record<string, unknown>,
-  referenceImageUrls: string[] = []
+  referenceImageUrls: string[] = [],
+  extraImageDataUrls: string[] = []
 ) {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) {
@@ -498,7 +499,14 @@ async function requestOpenAiStructuredVision(
       type: "input_image",
       image_url: imageDataUrl,
       detail: "high"
-    }
+    },
+    ...extraImageDataUrls
+      .filter((dataUrl) => typeof dataUrl === "string" && dataUrl.startsWith("data:image/"))
+      .map((dataUrl) => ({
+        type: "input_image",
+        image_url: dataUrl,
+        detail: "high"
+      }))
   ];
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -645,7 +653,8 @@ function extractOpenAiOutputText(payload: Record<string, unknown>) {
 
 async function recognizeDepartmentPhoto(
   departmentId: string,
-  imageDataUrl: string
+  imageDataUrl: string,
+  extraImageDataUrls: string[] = []
 ) {
   const departmentMeta = DEPARTMENTS[departmentId as keyof typeof DEPARTMENTS];
   if (!departmentMeta) {
@@ -662,8 +671,9 @@ async function recognizeDepartmentPhoto(
     "You extract handwritten numeric values from a standardized Armenian hospital department form.",
     `Department id: ${departmentId}. Department name: ${departmentMeta.department}.`,
     "The department is already fixed by the current page.",
-    "You will receive two images in order: first a blank template reference of the same form, then the filled form to extract.",
+    "You will receive images in this order: first a blank template reference of the same form, second the filled top-table crop, and optionally one extra zoomed crop of the right-hand part of the same table.",
     "Use the blank template image only to align the printed grid and cell borders. Extract handwritten values only from the filled form image.",
+    "If an extra zoomed right-side crop is present, use it to resolve cells 13 through 22 more accurately than the wider crop.",
     "Do not determine or change the department from SR markers, headers, or any other text in the image.",
     "If the photo is missing SR markers or the printed title is unclear, continue extracting values for the given department anyway.",
     "Read only the top numeric table and the handwritten report date near the header.",
@@ -699,7 +709,8 @@ async function recognizeDepartmentPhoto(
     imageDataUrl,
     "department_photo_recognition",
     buildPhotoRecognitionSchema(),
-    [getOcrTemplateBlankImageUrl()]
+    [getOcrTemplateBlankImageUrl()],
+    extraImageDataUrls
   );
 
   const sanitizedValues = sanitizeValues(parsed.values as Record<string, unknown> | undefined);
@@ -1026,7 +1037,13 @@ Deno.serve(async (request) => {
         return jsonResponse({ error: "A valid image is required." }, 400);
       }
 
-      const recognition = await recognizeDepartmentPhoto(departmentId, imageDataUrl);
+      const extraImageDataUrls = Array.isArray(payload.extraImageDataUrls)
+        ? payload.extraImageDataUrls
+          .filter((item): item is string => typeof item === "string" && item.trim().startsWith("data:image/"))
+          .map((item) => item.trim())
+        : [];
+
+      const recognition = await recognizeDepartmentPhoto(departmentId, imageDataUrl, extraImageDataUrls);
       return jsonResponse(recognition);
     }
 

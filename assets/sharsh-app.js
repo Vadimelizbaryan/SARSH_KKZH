@@ -520,6 +520,13 @@
     bottomRatio: 0.60
   };
 
+  const OCR_RIGHT_FOCUS_CROP = {
+    leftRatio: 0.48,
+    topRatio: 0.18,
+    rightRatio: 0.03,
+    bottomRatio: 0.58
+  };
+
   async function compressImageFile(file) {
     const sourceDataUrl = await readFileAsDataUrl(file);
     if (!sourceDataUrl.startsWith("data:image/")) {
@@ -568,6 +575,54 @@
     const cropTop = Math.max(0, Math.floor(sourceHeight * OCR_FOCUS_CROP.topRatio));
     const cropRight = Math.min(sourceWidth, Math.ceil(sourceWidth * (1 - OCR_FOCUS_CROP.rightRatio)));
     const cropBottom = Math.min(sourceHeight, Math.ceil(sourceHeight * OCR_FOCUS_CROP.bottomRatio));
+    const cropWidth = Math.max(1, cropRight - cropLeft);
+    const cropHeight = Math.max(1, cropBottom - cropTop);
+
+    const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(cropWidth, cropHeight));
+    const width = Math.max(1, Math.round(cropWidth * scale));
+    const height = Math.max(1, Math.round(cropHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(
+      image,
+      cropLeft,
+      cropTop,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      width,
+      height
+    );
+
+    return canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
+  }
+
+  async function buildCroppedImageDataUrl(sourceDataUrl, cropConfig) {
+    if (typeof sourceDataUrl !== "string" || !sourceDataUrl.startsWith("data:image/")) {
+      throw new Error("Нужен файл изображения.");
+    }
+
+    const image = await loadImageFromDataUrl(sourceDataUrl);
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    if (!sourceWidth || !sourceHeight) {
+      throw new Error("Не удалось определить размер изображения для OCR.");
+    }
+
+    const cropLeft = Math.max(0, Math.floor(sourceWidth * cropConfig.leftRatio));
+    const cropTop = Math.max(0, Math.floor(sourceHeight * cropConfig.topRatio));
+    const cropRight = Math.min(sourceWidth, Math.ceil(sourceWidth * (1 - cropConfig.rightRatio)));
+    const cropBottom = Math.min(sourceHeight, Math.ceil(sourceHeight * cropConfig.bottomRatio));
     const cropWidth = Math.max(1, cropRight - cropLeft);
     const cropHeight = Math.max(1, cropBottom - cropTop);
 
@@ -3130,7 +3185,8 @@
 
     try {
       const ocrImageDataUrl = await buildFocusedOcrImageDataUrl(state.photoImport.imageDataUrl);
-      const result = await sync.recognizeDepartmentPhoto(departmentId, ocrImageDataUrl);
+      const rightOcrImageDataUrl = await buildCroppedImageDataUrl(state.photoImport.imageDataUrl, OCR_RIGHT_FOCUS_CROP);
+      const result = await sync.recognizeDepartmentPhoto(departmentId, ocrImageDataUrl, [rightOcrImageDataUrl]);
       const appliedCount = applyRecognizedDepartmentValues(result);
       state.photoImport.isProcessing = false;
 

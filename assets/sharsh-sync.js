@@ -254,7 +254,7 @@
     return payload;
   }
 
-  async function recognizeDepartmentPhoto(departmentId, imageDataUrl) {
+  async function recognizeDepartmentPhoto(departmentId, imageDataUrl, extraImageDataUrls = []) {
     ensureOwnerAuth();
     if (!hasRemoteSync()) {
       throw new Error("Распознавание фото доступно только в онлайн-режиме владельца.");
@@ -264,13 +264,18 @@
       throw new Error("Нужен файл изображения для распознавания.");
     }
 
+    const normalizedExtraImageDataUrls = Array.isArray(extraImageDataUrls)
+      ? extraImageDataUrls.filter((item) => typeof item === "string" && item.startsWith("data:image/"))
+      : [];
+
     const response = await fetch(getSyncEndpoint(), {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
         type: "recognize_department_photo",
         departmentId,
-        imageDataUrl
+        imageDataUrl,
+        extraImageDataUrls: normalizedExtraImageDataUrls
       })
     });
 
