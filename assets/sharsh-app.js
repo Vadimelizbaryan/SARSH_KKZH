@@ -12,7 +12,9 @@
     ? "department"
     : (document.body.dataset.view === "archive"
       ? "archive"
-      : (document.body.dataset.view === "feedback" ? "feedback" : "main"));
+      : (document.body.dataset.view === "feedback"
+        ? "feedback"
+        : (document.body.dataset.view === "hospital-report" ? "hospital-report" : "main")));
   const departmentId = document.body.dataset.departmentId || "";
   const basePath = document.body.dataset.basePath || ".";
   const queryParams = new URLSearchParams(window.location.search);
@@ -34,6 +36,7 @@
   const MAIN_SAVE_NOTICE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-save-notice:v1`;
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
+  const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
   const PHOTO_FIELD_DEFINITIONS = [
     { cell: 1, key: "beenTotal", label: "1" },
     { cell: 2, key: "beenSoldier", label: "2" },
@@ -106,6 +109,56 @@
     "qhBaseOfficer",
     "qhBaseContract"
   ]);
+  const HOSPITAL_REPORT_PRIMARY_ITEMS = [
+    { key: "beenTotal", cell: 1, label: "Հոսպիտալում եղել է" },
+    { key: "admittedTotal", cell: 4, label: "Ընդունվել է" },
+    { key: "dgTotal", cell: 7, label: "Դուրս է գրվել" },
+    { key: "presentTotal", cell: 12, label: "Առկա է" },
+    { divider: true, label: "Որից" },
+    { key: "currentShar", cell: 13, label: "Ժամկետային զ/ծ" },
+    { key: "currentSpa", cell: 14, label: "Սպա" },
+    { key: "currentPaym", cell: 15, label: "Պայմանագր" },
+    { key: "currentZh", cell: 16, label: "Զինհաշմանդամ" },
+    { key: "family", cell: 17, label: "Զինծառայ․ընտ․անդ․" },
+    { key: "officer", cell: 18, label: "Զինապարտ" },
+    { key: "civil", cell: 19, label: "Քաղաքացի" },
+    { divider: true, label: "Արձակուրդում առկա է", totalKey: "leaveTotal", totalCell: 23 },
+    { key: "leaveSharq", cell: 20, label: "Ժամկետային զ/ծ" },
+    { key: "leaveSpa", cell: 21, label: "Սպա" },
+    { key: "leavePaym", cell: 22, label: "Պայմանագրային" }
+  ];
+  const HOSPITAL_REPORT_SPECIAL_GROUPS = [
+    {
+      rowId: "r19",
+      title: "ԻՆֆ-ում առկա է",
+      items: [
+        { key: "presentTotal", cell: 12, label: "ԻՆֆ-ում առկա է" },
+        { key: "currentShar", cell: 13, label: "Ժամկետային" },
+        { key: "currentSpa", cell: 14, label: "Սպա" },
+        { key: "currentPaym", cell: 15, label: "Պայմ" }
+      ]
+    },
+    {
+      rowId: "r21",
+      title: "Քաղաքացիական  հիվանդան․ առկա է",
+      items: [
+        { key: "presentTotal", cell: 12, label: "Քաղաքացիական  հիվանդան․ առկա է" },
+        { key: "currentShar", cell: 13, label: "Ժամկետային զ/ծ" },
+        { key: "currentSpa", cell: 14, label: "Սպա" },
+        { key: "currentPaym", cell: 15, label: "Պայմանագրային" }
+      ]
+    },
+    {
+      rowId: "r20",
+      title: "ԱՏԴ-ում առկա է",
+      items: [
+        { key: "presentTotal", cell: 12, label: "ԱՏԴ-ում առկա է" },
+        { key: "currentShar", cell: 13, label: "Ժամկետային" },
+        { key: "currentSpa", cell: 14, label: "Սպա" },
+        { key: "currentPaym", cell: 15, label: "Պայմանագրային" }
+      ]
+    }
+  ];
   function resetQhCalcInputs(snapshot) {
     if (!snapshot || !Array.isArray(snapshot.rows)) {
       return snapshot;
@@ -2570,6 +2623,161 @@
     return appendShareQuery(config.getFeedbackPagePath(basePath));
   }
 
+  function getHospitalReportPath() {
+    if (basePath === "@site") {
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent(HOSPITAL_REPORT_FILENAME)}`);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return appendShareQuery(`${prefix}${HOSPITAL_REPORT_FILENAME}`);
+  }
+
+  function buildHospitalReportData(snapshot) {
+    const primaryRows = snapshot.rows.filter((row) => row.group === "primary");
+    const subtotal = (key) => getSummaryValue(snapshot, primaryRows, key);
+    const currentDateTime = getHeaderDateTimeParts(snapshot.reportDate) || getCurrentDateTimeParts();
+
+    return {
+      reportDate: currentDateTime.full,
+      updatedAt: snapshot.updatedAt,
+      primaryItems: HOSPITAL_REPORT_PRIMARY_ITEMS.map((item) => {
+        if (item.divider) {
+          return {
+            divider: true,
+            label: item.label,
+            totalCell: item.totalCell || "",
+            totalValue: item.totalKey ? subtotal(item.totalKey) : null
+          };
+        }
+        return {
+          cell: item.cell,
+          label: item.label,
+          value: subtotal(item.key)
+        };
+      }),
+      specialGroups: HOSPITAL_REPORT_SPECIAL_GROUPS.map((group) => {
+        const row = getDepartmentRow(snapshot, group.rowId);
+        return {
+          title: group.title,
+          department: row ? row.department : group.title,
+          items: group.items.map((item) => ({
+            cell: item.cell,
+            label: item.label,
+            value: row ? getRowDisplayValue(snapshot, row, item.key) : 0
+          }))
+        };
+      })
+    };
+  }
+
+  function renderHospitalReportPrimaryItems(items) {
+    return items.map((item) => {
+      if (item.divider) {
+        return `
+          <div class="hospital-report-divider">
+            <div class="hospital-report-divider-title">${escapeHtml(item.label)}</div>
+            ${item.totalCell ? `
+              <div class="hospital-report-divider-total">
+                <span>Ячейка ${escapeHtml(String(item.totalCell))}</span>
+                <strong>${escapeHtml(String(item.totalValue || 0))}</strong>
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
+      return `
+        <div class="hospital-report-row">
+          <div class="hospital-report-row-label">
+            <span class="hospital-report-cellno">${escapeHtml(String(item.cell))}</span>
+            <span>${escapeHtml(item.label)}</span>
+          </div>
+          <strong class="hospital-report-row-value">${escapeHtml(String(item.value || 0))}</strong>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function renderHospitalReportGroup(group) {
+    return `
+      <section class="hospital-report-card hospital-report-card--accent">
+        <div class="hospital-report-card-head">
+          <h2>${escapeHtml(group.title)}</h2>
+          <span class="hospital-report-mini-pill">${escapeHtml(group.department)}</span>
+        </div>
+        <div class="hospital-report-rows">
+          ${group.items.map((item) => `
+            <div class="hospital-report-row hospital-report-row--compact">
+              <div class="hospital-report-row-label">
+                <span class="hospital-report-cellno">${escapeHtml(String(item.cell))}</span>
+                <span>${escapeHtml(item.label)}</span>
+              </div>
+              <strong class="hospital-report-row-value">${escapeHtml(String(item.value || 0))}</strong>
+            </div>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderHospitalReportPage() {
+    const report = buildHospitalReportData(state.snapshot);
+    const mainPath = appendShareQuery(config.getMainPagePath(basePath));
+    const summaryFreshness = getFreshnessMeta(report.updatedAt);
+
+    app.innerHTML = `
+      <div class="page hospital-report-page">
+        <div class="toolbar no-print">
+          <div>
+            <h1>Հոսպիտալում եղել է</h1>
+            <p>Отдельный отчётный лист по строке «Ընդամենը» и по строкам ԻՆՖ, Ք/Հ, ԱՏԴ.</p>
+          </div>
+          <div class="toolbar-actions">
+            <span class="pill ${getSourceClass()}">${escapeHtml(sync.getSourceLabel(state.source))}</span>
+            <button type="button" id="printBtn">Печать / PDF</button>
+            <a class="button-link" href="${escapeHtml(mainPath)}">К главному</a>
+          </div>
+        </div>
+
+        <article class="hospital-report-sheet">
+          <header class="hospital-report-header">
+            <div>
+              <p class="hospital-report-kicker">ԿԿԶՀ-Շարժ․</p>
+              <h1>Հոսպիտալում եղել է</h1>
+              <p class="hospital-report-subtitle">Сводный отчёт по главной таблице</p>
+            </div>
+            <div class="hospital-report-meta">
+              <div class="hospital-report-meta-card">
+                <span>Дата документа</span>
+                <strong>${escapeHtml(report.reportDate)}</strong>
+              </div>
+              <div class="hospital-report-meta-card">
+                <span>Последнее обновление</span>
+                <strong>${escapeHtml(formatTimestamp(report.updatedAt))}</strong>
+                <em class="status-chip status-chip--${summaryFreshness.level}">${escapeHtml(summaryFreshness.label)}</em>
+              </div>
+            </div>
+          </header>
+
+          <section class="hospital-report-grid">
+            <section class="hospital-report-card">
+              <div class="hospital-report-card-head">
+                <h2>Ընդամենը</h2>
+                <span class="hospital-report-mini-pill">строка 15</span>
+              </div>
+              <div class="hospital-report-rows">
+                ${renderHospitalReportPrimaryItems(report.primaryItems)}
+              </div>
+            </section>
+
+            <section class="hospital-report-side">
+              ${report.specialGroups.map(renderHospitalReportGroup).join("")}
+            </section>
+          </section>
+        </article>
+      </div>
+    `;
+  }
+
   function getFeedbackStatusLabel(status) {
     return status === "corrected_by_operator" ? "Исправлено оператором" : "Принято без правок";
   }
@@ -2739,6 +2947,9 @@
     if (mode === "feedback") {
       return "OCR feedback | SARSH_KKZH";
     }
+    if (mode === "hospital-report") {
+      return "Հոսպիտալում եղել է | SARSH_KKZH";
+    }
     if (mode === "archive") {
       const record = getArchiveRecordByKey(archiveKeyFromQuery);
       return record ? `Архив ${record.archiveLabel} | SARSH_KKZH` : "Архив | SARSH_KKZH";
@@ -2781,6 +2992,7 @@
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
             <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR feedback</a>
+            <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Отчётный лист</a>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="refreshBtn">Обновить</button>
             <button type="button" id="printBtn">Печать</button>
@@ -3323,6 +3535,8 @@
   function renderPage() {
     if (mode === "department") {
       renderDepartmentPage();
+    } else if (mode === "hospital-report") {
+      renderHospitalReportPage();
     } else if (mode === "feedback") {
       renderFeedbackPage();
     } else if (mode === "archive") {

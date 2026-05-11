@@ -1578,12 +1578,218 @@ a {
   font-family: "Sylfaen", "Noto Serif Armenian", serif;
 }
 
+.hospital-report-page {
+  max-width: 1280px;
+}
+
+.hospital-report-sheet {
+  background:
+    linear-gradient(135deg, rgba(255, 244, 214, 0.9), rgba(255, 255, 255, 0.98) 36%, rgba(242, 248, 255, 0.92) 100%);
+  border-radius: 28px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  box-shadow: 0 28px 70px rgba(34, 24, 7, 0.14);
+  padding: 28px;
+}
+
+.hospital-report-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 24px;
+}
+
+.hospital-report-kicker {
+  margin: 0 0 8px;
+  color: #946200;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.hospital-report-header h1 {
+  margin: 0;
+  font-size: 38px;
+  line-height: 1.02;
+}
+
+.hospital-report-subtitle {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.hospital-report-meta {
+  display: grid;
+  gap: 12px;
+}
+
+.hospital-report-meta-card,
+.hospital-report-card {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 22px;
+  box-shadow: 0 14px 32px rgba(17, 17, 17, 0.08);
+}
+
+.hospital-report-meta-card {
+  padding: 16px 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.hospital-report-meta-card span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hospital-report-meta-card strong {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.hospital-report-meta-card em {
+  width: fit-content;
+  font-style: normal;
+}
+
+.hospital-report-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+  gap: 18px;
+}
+
+.hospital-report-card {
+  padding: 20px;
+}
+
+.hospital-report-card--accent {
+  background: linear-gradient(180deg, rgba(255, 248, 229, 0.96), rgba(255, 255, 255, 0.9));
+}
+
+.hospital-report-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.hospital-report-card-head h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.hospital-report-mini-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(155, 106, 20, 0.12);
+  color: #8a5b0d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.hospital-report-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.hospital-report-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(248, 242, 226, 0.72);
+  border: 1px solid rgba(17, 17, 17, 0.06);
+}
+
+.hospital-report-row--compact {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.hospital-report-row-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.hospital-report-cellno {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.hospital-report-row-value {
+  font-size: 30px;
+  line-height: 1;
+  color: #8b4d00;
+  font-variant-numeric: tabular-nums;
+}
+
+.hospital-report-divider {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(17, 17, 17, 0.04);
+  border: 1px dashed rgba(17, 17, 17, 0.18);
+}
+
+.hospital-report-divider-title {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.hospital-report-divider-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+}
+
+.hospital-report-divider-total strong {
+  color: #8b4d00;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.hospital-report-side {
+  display: grid;
+  gap: 18px;
+}
+
 @media (max-width: 1200px) {
   .layout-grid.split {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .setup-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hospital-report-header,
+  .hospital-report-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -1601,6 +1807,15 @@ a {
   .panel {
     padding: 12px;
     border-radius: 18px;
+  }
+
+  .hospital-report-sheet {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .hospital-report-header h1 {
+    font-size: 30px;
   }
 }
 
@@ -1647,5 +1862,19 @@ a {
 
   .sheet {
     min-width: 0;
+  }
+
+  .hospital-report-sheet {
+    box-shadow: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .hospital-report-meta-card,
+  .hospital-report-card {
+    box-shadow: none;
+    background: #ffffff;
   }
 }
