@@ -30,6 +30,7 @@
   const PHOTO_JPEG_QUALITY = 0.88;
   const MAIN_PHOTO_ROUTE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-photo-route:v1`;
   const MAIN_PHOTO_ROUTE_MAX_AGE_MS = 15 * 60 * 1000;
+  const MAIN_PHOTO_ROUTE_TRANSFER_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:main-photo-route-transfer:`;
   const MAIN_SAVE_NOTICE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-save-notice:v1`;
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
@@ -1279,6 +1280,69 @@
     writePendingMainPhotoRouteQueue(items);
   }
 
+  function buildMainPhotoRouteTransferStorageKey(transferId) {
+    return `${MAIN_PHOTO_ROUTE_TRANSFER_STORAGE_PREFIX}${transferId}`;
+  }
+
+  function storePendingMainPhotoRouteTransfer(payload) {
+    const normalized = normalizePendingMainPhotoRouteItem(payload);
+    if (!normalized) {
+      return "";
+    }
+
+    const transferId = `route-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    try {
+      localStorage.setItem(
+        buildMainPhotoRouteTransferStorageKey(transferId),
+        JSON.stringify({
+          createdAt: Date.now(),
+          item: normalized
+        })
+      );
+      return transferId;
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function takePendingMainPhotoRouteTransfer(transferId, departmentIdToMatch) {
+    if (!transferId) {
+      return null;
+    }
+
+    const storageKey = buildMainPhotoRouteTransferStorageKey(transferId);
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        return null;
+      }
+
+      localStorage.removeItem(storageKey);
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        return null;
+      }
+
+      const createdAt = Number(parsed.createdAt || 0);
+      if (!Number.isFinite(createdAt) || (Date.now() - createdAt) > MAIN_PHOTO_ROUTE_MAX_AGE_MS) {
+        return null;
+      }
+
+      const normalized = normalizePendingMainPhotoRouteItem(parsed.item);
+      if (!normalized || normalized.departmentId !== departmentIdToMatch) {
+        return null;
+      }
+
+      return normalized;
+    } catch (_error) {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (_removeError) {
+      }
+      return null;
+    }
+  }
+
   function peekPendingMainPhotoRoute() {
     const queue = readPendingMainPhotoRouteQueue();
     return queue && queue.items.length ? queue.items[0] : null;
@@ -2477,6 +2541,17 @@
       return path;
     }
     return path.includes("?") ? `${path}${shareQuery.replace("?", "&")}` : `${path}${shareQuery}`;
+  }
+
+  function appendQueryParams(path, params) {
+    const url = new URL(appendShareQuery(path), window.location.href);
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === "") {
+        return;
+      }
+      url.searchParams.set(key, String(value));
+    });
+    return url.toString();
   }
 
   function getArchivePrintPath(archiveKey) {
@@ -3784,6 +3859,37 @@
     return true;
   }
 
+  function openDepartmentTabWithPendingPhoto(item, targetWindow) {
+    if (!item || !item.departmentId) {
+      return false;
+    }
+
+    const department = config.getDepartmentById(item.departmentId);
+    if (!department) {
+      return false;
+    }
+
+    const transferId = storePendingMainPhotoRouteTransfer(item);
+    if (!transferId) {
+      return false;
+    }
+
+    const targetUrl = appendQueryParams(config.getDepartmentPagePath(basePath, item.departmentId), {
+      photoTransfer: transferId
+    });
+
+    try {
+      if (targetWindow && !targetWindow.closed) {
+        targetWindow.location.href = targetUrl;
+        return true;
+      }
+    } catch (_error) {
+    }
+
+    const openedWindow = window.open(targetUrl, "_blank");
+    return Boolean(openedWindow);
+  }
+
   function isSupportedMainPhotoFile(file) {
     if (!file || typeof file !== "object") {
       return false;
@@ -4051,6 +4157,17 @@
         notes: [],
         stage: "ready"
       }));
+      const batchTabTargets = preparedItems.map((_item, index) => {
+        const openedTab = window.open("about:blank", "_blank");
+        if (openedTab && !openedTab.closed) {
+          try {
+            openedTab.document.title = `\u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435 ${index + 1}/${preparedItems.length}`;
+            openedTab.document.body.innerHTML = `<p style="font:16px/1.5 Segoe UI, Arial, sans-serif; padding:24px;">\u041f\u043e\u0434\u0433\u043e\u0442\u0430\u0432\u043b\u0438\u0432\u0430\u044e \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u044f \u0434\u043b\u044f \u0444\u043e\u0442\u043e ${index + 1} \u0438\u0437 ${preparedItems.length}...</p>`;
+          } catch (_error) {
+          }
+        }
+        return openedTab;
+      });
       setMainPhotoRouteStatus(`Определяю отделения по ${preparedItems.length} фото...`, false);
       renderPage();
 
@@ -4092,10 +4209,18 @@
               imageName: preparedItem.imageName,
               imageDataUrl: preparedItem.imageDataUrl,
               detectedBy: "vision",
-              notes
+              notes,
+              targetWindow: batchTabTargets[index] || null
             });
             state.mainPhotoRoute.batchDetectedCount += 1;
           } else {
+            const failedWindow = batchTabTargets[index];
+            if (failedWindow && !failedWindow.closed) {
+              try {
+                failedWindow.close();
+              } catch (_error) {
+              }
+            }
             state.mainPhotoRoute.batchFailedCount += 1;
             batchNotes.push(`${preparedItem.imageName || `Фото ${index + 1}`}: отделение не определилось уверенно.`);
           }
@@ -4115,21 +4240,24 @@
           return;
         }
 
-        storePendingMainPhotoRoutes(recognizedQueue);
-        const firstItem = peekPendingMainPhotoRoute();
-        const firstDepartment = firstItem ? config.getDepartmentById(firstItem.departmentId) : null;
-        if (!firstItem || !firstDepartment) {
-          setMainPhotoRouteStatus("Очередь фото подготовилась, но открыть отделение не удалось.", true);
+        let openedCount = 0;
+        recognizedQueue.forEach((item) => {
+          if (openDepartmentTabWithPendingPhoto(item, item.targetWindow || null)) {
+            openedCount += 1;
+          }
+        });
+
+        if (!openedCount) {
+          setMainPhotoRouteStatus("\u041f\u0430\u043a\u0435\u0442 \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u043d, \u043d\u043e \u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u043d\u0435 \u043e\u0442\u043a\u0440\u044b\u043b \u0432\u043a\u043b\u0430\u0434\u043a\u0438 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0439. \u0420\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u0435 \u0432\u0441\u043f\u043b\u044b\u0432\u0430\u044e\u0449\u0438\u0435 \u043e\u043a\u043d\u0430 \u0438 \u043f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437.", true);
           renderPage();
           return;
         }
 
         setMainPhotoRouteStatus(
-          `Пакет готов: распознано ${recognizedQueue.length} из ${preparedItems.length}. Открываю первое отделение: ${firstDepartment.department}.`,
+          `\u041f\u0430\u043a\u0435\u0442 \u0433\u043e\u0442\u043e\u0432: \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u043d\u043e ${recognizedQueue.length} \u0438\u0437 ${preparedItems.length}. \u041e\u0442\u043a\u0440\u044b\u043b ${openedCount} \u0432\u043a\u043b\u0430\u0434\u043e\u043a \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0439, \u0433\u043b\u0430\u0432\u043d\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430 \u043e\u0441\u0442\u0430\u0451\u0442\u0441\u044f \u043e\u0442\u043a\u0440\u044b\u0442\u043e\u0439.`,
           false
         );
         renderPage();
-        navigateToQueuedDepartment(firstItem);
         return;
       } catch (error) {
         state.mainPhotoRoute.isProcessing = false;
@@ -4210,7 +4338,10 @@
       return;
     }
 
-    const pending = takePendingMainPhotoRoute(departmentId);
+    const transferId = queryParams.get("photoTransfer") || "";
+    const pending = transferId
+      ? takePendingMainPhotoRouteTransfer(transferId, departmentId)
+      : takePendingMainPhotoRoute(departmentId);
     if (!pending) {
       return;
     }
@@ -4218,9 +4349,9 @@
     state.photoImport = buildInitialPhotoImportState();
     state.photoImport.imageName = pending.imageName || "";
     state.photoImport.imageDataUrl = pending.imageDataUrl || "";
-    state.photoImport.queueMode = true;
-    state.photoImport.queueRemainingCount = getPendingMainPhotoRouteCount();
-    const nextPendingRoute = peekPendingMainPhotoRoute();
+    state.photoImport.queueMode = !transferId;
+    state.photoImport.queueRemainingCount = transferId ? 0 : getPendingMainPhotoRouteCount();
+    const nextPendingRoute = !transferId ? peekPendingMainPhotoRoute() : null;
     const nextDepartment = nextPendingRoute ? config.getDepartmentById(nextPendingRoute.departmentId) : null;
     state.photoImport.queueNextDepartmentName = nextDepartment ? nextDepartment.department : "";
     setPhotoImportStatus("Фото перенесено с главного файла. Начинаю распознавание для этого отделения...", false);
@@ -5147,5 +5278,6 @@
     `;
   });
 })();
+
 
 
