@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const DEFAULT_DATE = "05,05,26";
+const DEFAULT_SITE_BASE_URL = "https://vadimelizbaryan.github.io/SARSH_KKZH";
 const VALUE_KEYS = [
   "beenTotal",
   "beenSoldier",
@@ -107,6 +108,8 @@ const PHOTO_TEMPLATE_GUIDE = [
   "- cells 20, 21, 22: final three-cell leave block on the far right",
   "Use the printed vertical borders of the table as the main source of separation between neighboring cells."
 ].join("\n");
+
+const OCR_TEMPLATE_BLANK_IMAGE_PATH = "/assets/ocr-template-blank.jpg";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -289,6 +292,15 @@ function getOpenAiApiKey() {
   return secret && secret.trim() ? secret.trim() : "";
 }
 
+function getPublicSiteBaseUrl() {
+  const raw = Deno.env.get("PUBLIC_SITE_BASE_URL") || DEFAULT_SITE_BASE_URL;
+  return raw.trim().replace(/\/+$/, "");
+}
+
+function getOcrTemplateBlankImageUrl() {
+  return `${getPublicSiteBaseUrl()}${OCR_TEMPLATE_BLANK_IMAGE_PATH}`;
+}
+
 function getTelegramBotToken() {
   const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
   return token && token.trim() ? token.trim() : "";
@@ -372,12 +384,32 @@ async function requestOpenAiStructuredVision(
   prompt: string,
   imageDataUrl: string,
   schemaName: string,
-  schema: Record<string, unknown>
+  schema: Record<string, unknown>,
+  referenceImageUrls: string[] = []
 ) {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured on the server.");
   }
+
+  const content = [
+    {
+      type: "input_text",
+      text: prompt
+    },
+    ...referenceImageUrls
+      .filter((url) => typeof url === "string" && url.trim())
+      .map((url) => ({
+        type: "input_image",
+        image_url: url.trim(),
+        detail: "high"
+      })),
+    {
+      type: "input_image",
+      image_url: imageDataUrl,
+      detail: "high"
+    }
+  ];
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -390,17 +422,7 @@ async function requestOpenAiStructuredVision(
       input: [
         {
           role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: prompt
-            },
-            {
-              type: "input_image",
-              image_url: imageDataUrl,
-              detail: "high"
-            }
-          ]
+          content
         }
       ],
       text: {
@@ -550,6 +572,8 @@ async function recognizeDepartmentPhoto(
     "You extract handwritten numeric values from a standardized Armenian hospital department form.",
     `Department id: ${departmentId}. Department name: ${departmentMeta.department}.`,
     "The department is already fixed by the current page.",
+    "You will receive two images in order: first a blank template reference of the same form, then the filled form to extract.",
+    "Use the blank template image only to align the printed grid and cell borders. Extract handwritten values only from the filled form image.",
     "Do not determine or change the department from SR markers, headers, or any other text in the image.",
     "If the photo is missing SR markers or the printed title is unclear, continue extracting values for the given department anyway.",
     "Read only the top numeric table and the handwritten report date near the header.",
@@ -584,7 +608,8 @@ async function recognizeDepartmentPhoto(
     prompt,
     imageDataUrl,
     "department_photo_recognition",
-    buildPhotoRecognitionSchema()
+    buildPhotoRecognitionSchema(),
+    [getOcrTemplateBlankImageUrl()]
   );
 
   const sanitizedValues = sanitizeValues(parsed.values as Record<string, unknown> | undefined);

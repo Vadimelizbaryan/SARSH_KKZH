@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const DEFAULT_DATE = "05,05,26";
 const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-mini").trim();
 const DEFAULT_SITE_BASE_URL = "https://vadimelizbaryan.github.io/SARSH_KKZH";
+const OCR_TEMPLATE_BLANK_IMAGE_PATH = "/assets/ocr-template-blank.jpg";
 
 const VALUE_KEYS = [
   "beenTotal",
@@ -174,16 +175,40 @@ function getPublicSiteBaseUrl() {
   return raw.trim().replace(/\/+$/, "");
 }
 
+function getOcrTemplateBlankImageUrl() {
+  return `${getPublicSiteBaseUrl()}${OCR_TEMPLATE_BLANK_IMAGE_PATH}`;
+}
+
 async function requestOpenAiStructuredVision(
   prompt: string,
   imageDataUrl: string,
   schemaName: string,
-  schema: Record<string, unknown>
+  schema: Record<string, unknown>,
+  referenceImageUrls: string[] = []
 ) {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured on the server.");
   }
+
+  const content = [
+    {
+      type: "input_text",
+      text: prompt
+    },
+    ...referenceImageUrls
+      .filter((url) => typeof url === "string" && url.trim())
+      .map((url) => ({
+        type: "input_image",
+        image_url: url.trim(),
+        detail: "high"
+      })),
+    {
+      type: "input_image",
+      image_url: imageDataUrl,
+      detail: "high"
+    }
+  ];
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -196,17 +221,7 @@ async function requestOpenAiStructuredVision(
       input: [
         {
           role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: prompt
-            },
-            {
-              type: "input_image",
-              image_url: imageDataUrl,
-              detail: "high"
-            }
-          ]
+          content
         }
       ],
       text: {
@@ -324,6 +339,8 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
     "You extract handwritten numeric values from a standardized Armenian hospital department form.",
     `Department id: ${departmentId}. Department name: ${departmentMeta.department}.`,
     "The department is already fixed by the current request.",
+    "You will receive two images in order: first a blank template reference of the same form, then the filled form to extract.",
+    "Use the blank template image only to align the printed grid and cell borders. Extract handwritten values only from the filled form image.",
     "Do not determine or change the department from SR markers, headers, or any other text in the image.",
     "Read only the top numeric table and the handwritten report date near the header.",
     "Ignore the handwritten descriptive text in the lower part of the page.",
@@ -349,7 +366,8 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
     prompt,
     imageDataUrl,
     "telegram_department_photo_recognition",
-    buildPhotoRecognitionSchema()
+    buildPhotoRecognitionSchema(),
+    [getOcrTemplateBlankImageUrl()]
   );
 
   const sanitizedValues = sanitizeValues(parsed.values as Record<string, unknown> | undefined);
