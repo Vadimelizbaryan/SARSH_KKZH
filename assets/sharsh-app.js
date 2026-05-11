@@ -36,7 +36,7 @@
   const MAIN_SAVE_NOTICE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-save-notice:v1`;
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
-  const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
+  const HOSPITAL_REPORT_FILENAME = "Օրվա շարժ․.html";
   const PHOTO_FIELD_DEFINITIONS = [
     { cell: 1, key: "beenTotal", label: "1" },
     { cell: 2, key: "beenSoldier", label: "2" },
@@ -1932,6 +1932,17 @@
     return value === null || value === "" || typeof value === "undefined" ? "" : String(value);
   }
 
+  function getRowDisplayValue(snapshot, row, key) {
+    if (key === "presentTotal") {
+      return getDisplayValue(calcPresentTotal(snapshot, row));
+    }
+    if (key === "leaveTotal") {
+      const value = calcLeaveTotal(snapshot, row);
+      return value === null ? "" : getDisplayValue(value);
+    }
+    return getDisplayValue(getEffectiveValue(snapshot, row, key));
+  }
+
   function isQhCalcDepartment(row) {
     return Boolean(row && QH_CALC_DEPARTMENT_IDS.has(row.id));
   }
@@ -2728,7 +2739,7 @@
       <div class="page hospital-report-page">
         <div class="toolbar no-print">
           <div>
-            <h1>Հոսպիտալում եղել է</h1>
+            <h1>Օրվա շարժ․</h1>
             <p>Отдельный отчётный лист по строке «Ընդամենը» и по строкам ԻՆՖ, Ք/Հ, ԱՏԴ.</p>
           </div>
           <div class="toolbar-actions">
@@ -2742,7 +2753,7 @@
           <header class="hospital-report-header">
             <div>
               <p class="hospital-report-kicker">ԿԿԶՀ-Շարժ․</p>
-              <h1>Հոսպիտալում եղել է</h1>
+              <h1>Օրվա շարժ․</h1>
               <p class="hospital-report-subtitle">Сводный отчёт по главной таблице</p>
             </div>
             <div class="hospital-report-meta">
@@ -2948,7 +2959,7 @@
       return "OCR feedback | SARSH_KKZH";
     }
     if (mode === "hospital-report") {
-      return "Հոսպիտալում եղել է | SARSH_KKZH";
+      return "Օրվա շարժ․ | SARSH_KKZH";
     }
     if (mode === "archive") {
       const record = getArchiveRecordByKey(archiveKeyFromQuery);
