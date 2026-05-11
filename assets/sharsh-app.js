@@ -707,6 +707,114 @@
     return Math.sqrt((dx * dx) + (dy * dy));
   }
 
+  function shouldRotateImageToLandscape(width, height) {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return false;
+    }
+
+    return height > width;
+  }
+
+  function buildRotatedCanvasFromImage(image, rotation) {
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    const normalizedRotation = ((rotation % 360) + 360) % 360;
+    const swapSides = normalizedRotation === 90 || normalizedRotation === 270;
+    const canvas = document.createElement("canvas");
+    canvas.width = swapSides ? sourceHeight : sourceWidth;
+    canvas.height = swapSides ? sourceWidth : sourceHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Браузер не поддерживает подготовку фото.");
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (normalizedRotation === 90) {
+      context.translate(canvas.width, 0);
+      context.rotate(Math.PI / 2);
+      context.drawImage(image, 0, 0, sourceWidth, sourceHeight);
+    } else if (normalizedRotation === 180) {
+      context.translate(canvas.width, canvas.height);
+      context.rotate(Math.PI);
+      context.drawImage(image, 0, 0, sourceWidth, sourceHeight);
+    } else if (normalizedRotation === 270) {
+      context.translate(0, canvas.height);
+      context.rotate(-Math.PI / 2);
+      context.drawImage(image, 0, 0, sourceWidth, sourceHeight);
+    } else {
+      context.drawImage(image, 0, 0, sourceWidth, sourceHeight);
+    }
+
+    return canvas;
+  }
+
+  function measureCanvasRegionDarkness(imageData, left, top, width, height) {
+    const { data } = imageData;
+    const xStart = Math.max(0, Math.min(imageData.width - 1, Math.floor(left)));
+    const yStart = Math.max(0, Math.min(imageData.height - 1, Math.floor(top)));
+    const xEnd = Math.max(xStart + 1, Math.min(imageData.width, Math.ceil(left + width)));
+    const yEnd = Math.max(yStart + 1, Math.min(imageData.height, Math.ceil(top + height)));
+    let darkness = 0;
+
+    for (let y = yStart; y < yEnd; y += 1) {
+      for (let x = xStart; x < xEnd; x += 1) {
+        const offset = ((y * imageData.width) + x) * 4;
+        const alpha = data[offset + 3] / 255;
+        if (alpha <= 0) {
+          continue;
+        }
+
+        const luminance = ((data[offset] * 0.299) + (data[offset + 1] * 0.587) + (data[offset + 2] * 0.114)) / 255;
+        darkness += (1 - luminance) * alpha;
+      }
+    }
+
+    return darkness;
+  }
+
+  function scoreCanvasForSrTopRight(canvas) {
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) {
+      return Number.NEGATIVE_INFINITY;
+    }
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const imageData = context.getImageData(0, 0, width, height);
+    const srWindowWidth = width * 0.16;
+    const srWindowHeight = height * 0.18;
+    const topInset = height * 0.02;
+    const sideInset = width * 0.02;
+
+    const topRightDarkness = measureCanvasRegionDarkness(
+      imageData,
+      width - srWindowWidth - sideInset,
+      topInset,
+      srWindowWidth,
+      srWindowHeight
+    );
+    const topLeftDarkness = measureCanvasRegionDarkness(imageData, sideInset, topInset, srWindowWidth, srWindowHeight);
+    const bottomLeftDarkness = measureCanvasRegionDarkness(
+      imageData,
+      sideInset,
+      height - srWindowHeight - topInset,
+      srWindowWidth,
+      srWindowHeight
+    );
+    const bottomRightDarkness = measureCanvasRegionDarkness(
+      imageData,
+      width - srWindowWidth - sideInset,
+      height - srWindowHeight - topInset,
+      srWindowWidth,
+      srWindowHeight
+    );
+    const landscapeBonus = width >= height ? 5000 : -5000;
+
+    return (topRightDarkness * 4) - (topLeftDarkness * 1.5) - (bottomLeftDarkness * 3) - (bottomRightDarkness * 1.5) + landscapeBonus;
+  }
+
   async function compressImageFile(file) {
     const sourceDataUrl = await readFileAsDataUrl(file);
     if (!sourceDataUrl.startsWith("data:image/")) {
@@ -720,9 +828,30 @@
       throw new Error("Не удалось определить размер изображения.");
     }
 
-    const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(originalWidth, originalHeight));
-    const width = Math.max(1, Math.round(originalWidth * scale));
-    const height = Math.max(1, Math.round(originalHeight * scale));
+    const candidateRotations = shouldRotateImageToLandscape(originalWidth, originalHeight)
+      ? [90, 270, 0, 180]
+      : [0, 180, 90, 270];
+    let bestRotation = 0;
+    let bestCanvas = null;
+    let bestScore = Number.NEGATIVE_INFINITY;
+
+    candidateRotations.forEach((rotation) => {
+      const candidateCanvas = buildRotatedCanvasFromImage(image, rotation);
+      const score = scoreCanvasForSrTopRight(candidateCanvas);
+      if (score > bestScore) {
+        bestScore = score;
+        bestRotation = rotation;
+        bestCanvas = candidateCanvas;
+      }
+    });
+
+    if (!bestCanvas) {
+      throw new Error("Не удалось подготовить фото.");
+    }
+
+    const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(bestCanvas.width, bestCanvas.height));
+    const width = Math.max(1, Math.round(bestCanvas.width * scale));
+    const height = Math.max(1, Math.round(bestCanvas.height * scale));
 
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -734,9 +863,13 @@
 
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, width, height);
-    context.drawImage(image, 0, 0, width, height);
+    context.drawImage(bestCanvas, 0, 0, width, height);
 
-    return canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY);
+    return {
+      dataUrl: canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY),
+      rotatedToLandscape: bestRotation !== 0,
+      normalizedRotation: bestRotation
+    };
   }
 
   function buildCropBounds(sourceWidth, sourceHeight, cropConfig) {
@@ -3991,16 +4124,20 @@
     renderPage();
 
     try {
-      state.photoImport.imageDataUrl = await compressImageFile(file);
+      const preparedPhoto = await compressImageFile(file);
+      state.photoImport.imageDataUrl = preparedPhoto.dataUrl;
       state.photoImport.isProcessing = false;
       const canAutoRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
+      const orientationNote = preparedPhoto.rotatedToLandscape
+        ? " Фото автоматически выровнено: маркер SR перемещён в верхний правый угол."
+        : "";
       if (canAutoRecognize) {
-        setPhotoImportStatus(`Фото готово: ${file.name || "image"}. Автоматически распознаю цифры...`, false);
+        setPhotoImportStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Автоматически распознаю цифры...`, false);
         renderPage();
         await handlePhotoRecognition();
         return;
       }
-      setPhotoImportStatus(`Фото готово: ${file.name || "image"}. Нажмите "Распознать".`, false);
+      setPhotoImportStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Нажмите "Распознать".`, false);
       renderPage();
     } catch (error) {
       state.photoImport = buildInitialPhotoImportState();
@@ -4290,10 +4427,12 @@
           );
           renderPage();
 
-          const imageDataUrl = await compressImageFile(currentFile);
+          const preparedPhoto = await compressImageFile(currentFile);
+          const imageDataUrl = preparedPhoto.dataUrl;
           if (batchItem) {
             batchItem.imageDataUrl = imageDataUrl;
             batchItem.stage = "ready";
+            batchItem.rotatedToLandscape = Boolean(preparedPhoto.rotatedToLandscape);
           }
           if (index === 0) {
             state.mainPhotoRoute.imageDataUrl = imageDataUrl;
@@ -4343,17 +4482,21 @@
     renderPage();
 
     try {
-      state.mainPhotoRoute.imageDataUrl = await compressImageFile(file);
+      const preparedPhoto = await compressImageFile(file);
+      state.mainPhotoRoute.imageDataUrl = preparedPhoto.dataUrl;
       state.mainPhotoRoute.isProcessing = false;
       const canAutoDetect = sync.hasRemoteSync() && typeof sync.detectDepartmentPhoto === "function";
+      const orientationNote = preparedPhoto.rotatedToLandscape
+        ? " Фото автоматически выровнено: маркер SR перемещён в верхний правый угол."
+        : "";
       if (canAutoDetect) {
-        setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}. Автоматически определяю отделение...`, false);
+        setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Автоматически определяю отделение...`, false);
         renderPage();
         await handleMainPhotoRouteDetection();
         return;
       }
 
-      setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}. Нажмите "Определить и открыть".`, false);
+      setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Нажмите "Определить и открыть".`, false);
       renderPage();
     } catch (error) {
       state.mainPhotoRoute = buildInitialMainPhotoRouteState();
