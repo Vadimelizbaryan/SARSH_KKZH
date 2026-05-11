@@ -527,15 +527,17 @@
     bottomRatio: 0.58
   };
 
-  const OCR_RIGHT_CELL_REGION = {
-    startRatio: 0.08,
-    endRatio: 0.98,
-    totalCellSlots: 11,
-    firstTargetSlotIndex: 1,
-    targetCellCount: 10,
-    innerXPaddingRatio: 0.08,
-    topRatio: 0.12,
-    bottomRatio: 0.90
+  const OCR_TEMPLATE_CELL_BOUNDARY_RATIOS = [
+    0.0608, 0.1022, 0.1441, 0.1858, 0.2274, 0.2686, 0.3098, 0.3517,
+    0.3929, 0.4343, 0.4752, 0.5161, 0.5563, 0.5975, 0.6384, 0.6796,
+    0.7212, 0.7624, 0.8036, 0.8452, 0.8864, 0.9286, 0.9712
+  ];
+
+  const OCR_TEMPLATE_CELL_Y_REGION = {
+    topRatio: 0.395,
+    bottomRatio: 0.528,
+    innerXPaddingRatio: 0.06,
+    innerYPaddingRatio: 0.08
   };
 
   async function compressImageFile(file) {
@@ -667,42 +669,39 @@
   }
 
   async function buildRightCellCropDataUrls(sourceDataUrl) {
-    const rightCropDataUrl = await buildCroppedImageDataUrl(sourceDataUrl, OCR_RIGHT_FOCUS_CROP);
-    const image = await loadImageFromDataUrl(rightCropDataUrl);
+    const image = await loadImageFromDataUrl(sourceDataUrl);
     const sourceWidth = image.naturalWidth || image.width;
     const sourceHeight = image.naturalHeight || image.height;
     if (!sourceWidth || !sourceHeight) {
-      throw new Error("Не удалось определить размер правого OCR-фрагмента.");
+      throw new Error("Не удалось определить размер изображения для OCR-ячеек.");
     }
 
     const {
-      startRatio,
-      endRatio,
-      totalCellSlots,
-      firstTargetSlotIndex,
-      targetCellCount,
-      innerXPaddingRatio,
       topRatio,
-      bottomRatio
-    } = OCR_RIGHT_CELL_REGION;
+      bottomRatio,
+      innerXPaddingRatio,
+      innerYPaddingRatio
+    } = OCR_TEMPLATE_CELL_Y_REGION;
 
-    const regionLeft = Math.max(0, Math.floor(sourceWidth * startRatio));
-    const regionRight = Math.min(sourceWidth, Math.ceil(sourceWidth * endRatio));
-    const regionWidth = Math.max(1, regionRight - regionLeft);
-    const slotWidth = regionWidth / totalCellSlots;
-    const padX = slotWidth * innerXPaddingRatio;
-    const cropTop = Math.max(0, Math.floor(sourceHeight * topRatio));
-    const cropBottom = Math.min(sourceHeight, Math.ceil(sourceHeight * bottomRatio));
+    const cropTopBase = Math.max(0, Math.floor(sourceHeight * topRatio));
+    const cropBottomBase = Math.min(sourceHeight, Math.ceil(sourceHeight * bottomRatio));
+    const baseHeight = Math.max(1, cropBottomBase - cropTopBase);
+    const padY = Math.max(0, Math.floor(baseHeight * innerYPaddingRatio));
+    const cropTop = Math.max(0, cropTopBase + padY);
+    const cropBottom = Math.min(sourceHeight, cropBottomBase - padY);
     const cropHeight = Math.max(1, cropBottom - cropTop);
 
     const items = [];
 
-    for (let offset = 0; offset < targetCellCount; offset += 1) {
-      const slotIndex = firstTargetSlotIndex + offset;
-      const slotLeft = regionLeft + (slotIndex * slotWidth);
-      const slotRight = regionLeft + ((slotIndex + 1) * slotWidth);
-      const cropLeft = Math.max(0, Math.floor(slotLeft + padX));
-      const cropRight = Math.min(sourceWidth, Math.ceil(slotRight - padX));
+    for (let cell = 13; cell <= 22; cell += 1) {
+      const leftRatio = OCR_TEMPLATE_CELL_BOUNDARY_RATIOS[cell - 1];
+      const rightRatio = OCR_TEMPLATE_CELL_BOUNDARY_RATIOS[cell];
+      const baseLeft = Math.max(0, Math.floor(sourceWidth * leftRatio));
+      const baseRight = Math.min(sourceWidth, Math.ceil(sourceWidth * rightRatio));
+      const baseWidth = Math.max(1, baseRight - baseLeft);
+      const padX = Math.max(0, Math.floor(baseWidth * innerXPaddingRatio));
+      const cropLeft = Math.max(0, baseLeft + padX);
+      const cropRight = Math.min(sourceWidth, baseRight - padX);
       const cropWidth = Math.max(1, cropRight - cropLeft);
 
       const canvas = document.createElement("canvas");
