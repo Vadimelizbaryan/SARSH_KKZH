@@ -1558,6 +1558,10 @@ a {
   display: none;
 }
 
+.hospital-report-print-sheet {
+  display: none;
+}
+
 .print-title {
   text-align: center;
   margin: 0 0 10px;
@@ -1882,6 +1886,14 @@ a {
     display: block !important;
   }
 
+  .hospital-report-sheet > :not(.hospital-report-print-sheet) {
+    display: none !important;
+  }
+
+  .hospital-report-print-sheet {
+    display: block !important;
+  }
+
   .sheet-shell,
   .panel {
     box-shadow: none;
@@ -1920,155 +1932,66 @@ a {
     background: #ffffff;
   }
 
-  .hospital-report-page {
-    max-width: none;
-  }
-
-  .hospital-report-sheet {
-    padding: 0;
-  }
-
-  .hospital-report-header {
-    gap: 10px;
+  .hospital-report-print-head {
+    display: grid;
+    gap: 4px;
     margin-bottom: 10px;
   }
 
-  .hospital-report-kicker {
-    margin-bottom: 4px;
-    font-size: 10px;
+  .hospital-report-print-title {
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.1;
   }
 
-  .hospital-report-header h1 {
-    font-size: 24px;
-  }
-
-  .hospital-report-subtitle {
-    margin-top: 4px;
-    font-size: 12px;
-  }
-
-  .hospital-report-meta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .hospital-report-meta-card {
-    padding: 8px 10px;
-  }
-
-  .hospital-report-meta-card span {
+  .hospital-report-print-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
     font-size: 11px;
   }
 
-  .hospital-report-meta-card strong {
-    font-size: 14px;
+  .hospital-report-print-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 10px;
   }
 
-  .hospital-report-grid {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-    gap: 8px;
-  }
-
-  .hospital-report-card {
-    padding: 8px;
-    border-radius: 12px;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  .hospital-report-card-head {
-    margin-bottom: 8px;
-  }
-
-  .hospital-report-card-head h2 {
-    font-size: 16px;
-  }
-
-  .hospital-report-mini-pill {
-    min-height: 22px;
-    padding: 3px 7px;
+  .hospital-report-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
     font-size: 10px;
   }
 
-  .hospital-report-rows {
-    gap: 5px;
+  .hospital-report-print-table th,
+  .hospital-report-print-table td {
+    border: 1px solid rgba(17, 17, 17, 0.18);
+    padding: 4px 6px;
+    vertical-align: top;
   }
 
-  .hospital-report-grid > .hospital-report-card .hospital-report-rows {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .hospital-report-print-table th {
+    background: #f4ead5;
+    font-weight: 800;
+    text-align: left;
   }
 
-  .hospital-report-side {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
+  .hospital-report-print-table td:nth-child(1) {
+    width: 34px;
+    text-align: center;
+    font-weight: 800;
   }
 
-  .hospital-report-side .hospital-report-card-head h2 {
-    font-size: 12px;
-  }
-
-  .hospital-report-side .hospital-report-row {
-    grid-template-columns: minmax(0, 1fr) 34px;
-    gap: 5px;
-    padding: 5px 6px;
-  }
-
-  .hospital-report-side .hospital-report-row-label {
-    font-size: 9px;
-    line-height: 1;
-  }
-
-  .hospital-report-side .hospital-report-row-value {
-    min-width: 34px;
+  .hospital-report-print-table td:nth-child(4) {
+    width: 58px;
     text-align: right;
-    justify-self: end;
-    font-size: 12px;
+    font-weight: 800;
   }
 
-  .hospital-report-row {
-    gap: 6px;
-    padding: 6px 7px;
-    border-radius: 9px;
-  }
-
-  .hospital-report-row-label {
-    gap: 6px;
-    font-size: 10px;
-    line-height: 1.05;
-  }
-
-  .hospital-report-cellno {
-    min-width: 22px;
-    min-height: 22px;
-    padding: 2px 5px;
-    border-radius: 7px;
-    font-size: 9px;
-  }
-
-  .hospital-report-row-value {
-    font-size: 14px;
-  }
-
-  .hospital-report-divider {
-    gap: 4px;
-    padding: 6px 8px;
-    border-radius: 10px;
-  }
-
-  .hospital-report-divider-title {
-    font-size: 11px;
-  }
-
-  .hospital-report-divider-total {
-    font-size: 10px;
-  }
-
-  .hospital-report-divider-total strong {
-    font-size: 14px;
-  }
-
-  .hospital-report-sheet {
-    zoom: 0.86;
-    width: 116%;
+  .hospital-report-print-section td,
+  .hospital-report-print-group td {
+    background: #faf6ec;
+    font-weight: 800;
   }
 }

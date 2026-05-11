@@ -2730,6 +2730,83 @@
     `;
   }
 
+  function renderHospitalReportPrintTable(report) {
+    const leftRows = report.primaryItems.map((item) => {
+      if (item.divider) {
+        return `
+          <tr class="hospital-report-print-section">
+            <td colspan="2">${escapeHtml(item.label)}</td>
+            <td>${item.totalCell ? escapeHtml(String(item.totalCell)) : ""}</td>
+            <td>${item.totalValue === null || typeof item.totalValue === "undefined" ? "" : escapeHtml(String(item.totalValue || 0))}</td>
+          </tr>
+        `;
+      }
+
+      return `
+        <tr>
+          <td>${escapeHtml(String(item.cell))}</td>
+          <td>${escapeHtml(item.label)}</td>
+          <td></td>
+          <td>${escapeHtml(String(item.value || 0))}</td>
+        </tr>
+      `;
+    }).join("");
+
+    const rightRows = report.specialGroups.map((group) => `
+      <tr class="hospital-report-print-group">
+        <td colspan="4">${escapeHtml(group.title)}</td>
+      </tr>
+      ${group.items.map((item) => `
+        <tr>
+          <td>${escapeHtml(String(item.cell))}</td>
+          <td>${escapeHtml(item.label)}</td>
+          <td></td>
+          <td>${escapeHtml(String(item.value || 0))}</td>
+        </tr>
+      `).join("")}
+    `).join("");
+
+    return `
+      <section class="hospital-report-print-sheet print-only">
+        <div class="hospital-report-print-head">
+          <div class="hospital-report-print-title">Օրվա շարժ․</div>
+          <div class="hospital-report-print-meta">
+            <span>Ամսաթիվ: ${escapeHtml(report.reportDate)}</span>
+            <span>Թարմացվել է: ${escapeHtml(formatTimestamp(report.updatedAt))}</span>
+          </div>
+        </div>
+        <div class="hospital-report-print-grid">
+          <table class="hospital-report-print-table">
+            <thead>
+              <tr>
+                <th>Բջ.</th>
+                <th>Ցուցիչ</th>
+                <th></th>
+                <th>Թիվ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${leftRows}
+            </tbody>
+          </table>
+          <table class="hospital-report-print-table">
+            <thead>
+              <tr>
+                <th>Բջ.</th>
+                <th>Բաժին / Ցուցիչ</th>
+                <th></th>
+                <th>Թիվ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rightRows}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }
+
   function renderHospitalReportPage() {
     const report = buildHospitalReportData(state.snapshot);
     const mainPath = appendShareQuery(config.getMainPagePath(basePath));
@@ -2750,6 +2827,7 @@
         </div>
 
         <article class="hospital-report-sheet">
+          ${renderHospitalReportPrintTable(report)}
           <header class="hospital-report-header">
             <div>
               <p class="hospital-report-kicker">ԿԿԶՀ-Շարժ․</p>
