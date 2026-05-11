@@ -208,6 +208,69 @@
       .replaceAll('"', "&quot;");
   }
 
+  function translateOcrNote(note) {
+    let text = String(note || "").trim();
+    if (!text) {
+      return "";
+    }
+
+    text = text
+      .replace(
+        /^Cell (\d+) is cut off at the far left in the filled crop and unreadable; cell 12 not returned\.?$/i,
+        (_match, cell) => `Ячейка ${cell} обрезана слева на заполненном фрагменте и не читается; ячейка 12 не возвращается.`
+      )
+      .replace(
+        /^Cell (\d+) is cut off at the far left and unreadable\.?$/i,
+        (_match, cell) => `Ячейка ${cell} обрезана слева и не читается.`
+      )
+      .replace(
+        /^Cell (\d+) appears blank in the provided crop; the visible (.+?) is read as cell (\d+), and cell 12 is ignored\.?$/i,
+        (_match, cell, valueText, targetCell) => `Ячейка ${cell} выглядит пустой на вырезанном фрагменте; видимое значение ${String(valueText).trim()} читается как ячейка ${targetCell}, а ячейка 12 игнорируется.`
+      )
+      .replace(
+        /^Cell (\d+) appears blank in the provided crop and unreadable\.?$/i,
+        (_match, cell) => `Ячейка ${cell} выглядит пустой на вырезанном фрагменте и не читается.`
+      )
+      .replace(
+        /^Cell (\d+) appears blank in the provided crop\.?$/i,
+        (_match, cell) => `Ячейка ${cell} выглядит пустой на вырезанном фрагменте.`
+      )
+      .replace(
+        /^Cell (\d+) is unreadable\.?$/i,
+        (_match, cell) => `Ячейка ${cell} не читается.`
+      )
+      .replace(
+        /^Cell (\d+) was not returned\.?$/i,
+        (_match, cell) => `Ячейка ${cell} не возвращается.`
+      )
+      .replace(
+        /^Cell (\d+) not returned\.?$/i,
+        (_match, cell) => `Ячейка ${cell} не возвращается.`
+      );
+
+    text = text
+      .replace(/cell 12 not returned/gi, "ячейка 12 не возвращается")
+      .replace(/cell 12 is ignored/gi, "ячейка 12 игнорируется")
+      .replace(/appears blank in the provided crop/gi, "выглядит пустой на вырезанном фрагменте")
+      .replace(/is cut off at the far left/gi, "обрезана слева")
+      .replace(/and unreadable/gi, "и не читается")
+      .replace(/is unreadable/gi, "не читается")
+      .replace(/not returned/gi, "не возвращается");
+
+    return text;
+  }
+
+  function normalizeOcrNotes(notes) {
+    if (!Array.isArray(notes)) {
+      return [];
+    }
+
+    return notes
+      .filter((item) => typeof item === "string" && item.trim())
+      .map((item) => translateOcrNote(item))
+      .filter(Boolean);
+  }
+
   function getSnapshotUpdateSignature(snapshot) {
     if (!snapshot || !Array.isArray(snapshot.rows)) {
       return "";
@@ -467,7 +530,7 @@
           label: meta.label || String(meta.cell),
           status,
           valueText: typeof item.valueText === "string" ? item.valueText.trim() : "",
-          reason: typeof item.reason === "string" ? item.reason.trim() : "",
+          reason: typeof item.reason === "string" ? translateOcrNote(item.reason) : "",
           left: Math.max(0, Math.min(1000, left)),
           top: Math.max(0, Math.min(1000, top)),
           width: Math.max(1, Math.min(1000, width)),
@@ -1101,7 +1164,19 @@
     }
 
     try {
-      state.feedback.records = await sync.listOcrFeedback(120);
+      const loadedRecords = await sync.listOcrFeedback(120);
+      state.feedback.records = Array.isArray(loadedRecords)
+        ? loadedRecords.map((record) => {
+          if (!record || typeof record !== "object") {
+            return record;
+          }
+
+          return {
+            ...record,
+            notes: normalizeOcrNotes(record.notes)
+          };
+        })
+        : [];
       state.feedback.loaded = true;
       state.feedback.error = "";
     } catch (error) {
@@ -1122,9 +1197,7 @@
     const imageName = typeof payload.imageName === "string" ? payload.imageName.trim() : "";
     const imageDataUrl = typeof payload.imageDataUrl === "string" ? payload.imageDataUrl : "";
     const detectedBy = typeof payload.detectedBy === "string" ? payload.detectedBy.trim() : "";
-    const notes = Array.isArray(payload.notes)
-      ? payload.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
-      : [];
+    const notes = normalizeOcrNotes(payload.notes);
 
     if (!departmentId || !imageDataUrl.startsWith("data:image/")) {
       return null;
@@ -3512,9 +3585,7 @@
     state.photoImport.recognizedValues = config.normalizeRowValues(values);
     state.photoImport.lastAppliedKeys = previewKeys;
     state.photoImport.lastReportDate = typeof payload.reportDate === "string" ? payload.reportDate : "";
-    state.photoImport.notes = Array.isArray(payload.notes)
-      ? payload.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
-      : [];
+    state.photoImport.notes = normalizeOcrNotes(payload.notes);
     state.photoImport.cellReviews = normalizePhotoCellReviews(payload);
     state.photoImport.suspectKeys = suspectDetails.suspectKeys;
     state.photoImport.suspectReason = suspectDetails.suspectReason;
@@ -4003,9 +4074,7 @@
           const detectedDepartmentId = detection && typeof detection.departmentId === "string"
             ? detection.departmentId
             : "";
-          const notes = Array.isArray(detection?.notes)
-            ? detection.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
-            : [];
+          const notes = normalizeOcrNotes(detection?.notes);
           const department = detectedDepartmentId
             ? config.getDepartmentById(detectedDepartmentId)
             : null;
@@ -4097,9 +4166,7 @@
         ? detection.departmentId
         : "";
       const detectedBy = detectedDepartmentId ? "vision" : "";
-      const notes = Array.isArray(detection?.notes)
-        ? detection.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
-        : [];
+      const notes = normalizeOcrNotes(detection?.notes);
 
       state.mainPhotoRoute.isProcessing = false;
       state.mainPhotoRoute.detectedDepartmentId = detectedDepartmentId;
