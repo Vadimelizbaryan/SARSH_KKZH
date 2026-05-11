@@ -1395,11 +1395,11 @@
     const dischargedContract = getQhCalcSourceValue(row, "qhDischargedContract") || 0;
 
     const cell4 = incomingSoldier + incomingOfficer + incomingContract;
-    const cell5 = incomingOfficer;
-    const cell6 = incomingContract;
+    const cell5 = incomingSoldier + incomingOfficer + incomingContract;
+    const cell6 = incomingSoldier;
     const cell7 = dischargedSoldier + dischargedOfficer + dischargedContract;
-    const cell8 = dischargedOfficer;
-    const cell9 = dischargedContract;
+    const cell8 = dischargedSoldier + dischargedOfficer + dischargedContract;
+    const cell9 = dischargedSoldier;
     const cell13 = calcQhRemainingValue(row, "soldier") || 0;
     const cell14 = calcQhRemainingValue(row, "officer") || 0;
     const cell15 = calcQhRemainingValue(row, "contract") || 0;
