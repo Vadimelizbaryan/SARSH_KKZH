@@ -825,8 +825,7 @@
     return (topRightDarkness * 4) - (topLeftDarkness * 1.5) - (bottomLeftDarkness * 3) - (bottomRightDarkness * 1.5) + landscapeBonus;
   }
 
-  async function compressImageFile(file) {
-    const sourceDataUrl = await readFileAsDataUrl(file);
+  async function normalizeImageDataUrl(sourceDataUrl) {
     if (!sourceDataUrl.startsWith("data:image/")) {
       throw new Error("Нужен файл изображения.");
     }
@@ -880,6 +879,11 @@
       rotatedToLandscape: bestRotation !== 0,
       normalizedRotation: bestRotation
     };
+  }
+
+  async function compressImageFile(file) {
+    const sourceDataUrl = await readFileAsDataUrl(file);
+    return normalizeImageDataUrl(sourceDataUrl);
   }
 
   function buildCropBounds(sourceWidth, sourceHeight, cropConfig) {
@@ -4910,6 +4914,49 @@
     }
   }
 
+  async function maybeLoadTelegramFeedbackPhotoAdjusted() {
+    if (mode !== "department") {
+      return;
+    }
+
+    const feedbackId = queryParams.get("tgFeedback") || "";
+    if (!feedbackId || !sync.hasRemoteSync() || typeof sync.loadTelegramPhotoFeedback !== "function") {
+      return;
+    }
+
+    try {
+      const record = await sync.loadTelegramPhotoFeedback(feedbackId, departmentId);
+      if (!record) {
+        return;
+      }
+
+      const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
+      if (!imageDataUrl.startsWith("data:image/")) {
+        return;
+      }
+
+      const preparedPhoto = await normalizeImageDataUrl(imageDataUrl);
+
+      state.photoImport = buildInitialPhotoImportState();
+      state.photoImport.imageName = typeof record.imageName === "string" ? record.imageName : "";
+      state.photoImport.imageDataUrl = preparedPhoto.dataUrl;
+      state.photoImport.lastReportDate = typeof record.photoReportDate === "string" && record.photoReportDate.trim()
+        ? record.photoReportDate
+        : (typeof record.reportDate === "string" ? record.reportDate : "");
+      state.photoImport.lastAppliedKeys = Array.isArray(record.recognizedKeys)
+        ? record.recognizedKeys.map((item) => String(item))
+        : [];
+      state.photoImport.notes = normalizeOcrNotes(record.notes);
+      state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
+      state.photoImport.status = preparedPhoto.rotatedToLandscape
+        ? "Фото бланка загружено из Telegram и автоматически выровнено по SR-маркеру. Проверьте значения и при необходимости сохраните."
+        : "Фото бланка загружено из Telegram. Проверьте значения и при необходимости сохраните.";
+      state.photoImport.isError = false;
+      renderPage();
+    } catch (_error) {
+    }
+  }
+
   function getStylesheetUrl() {
     if (basePath === "@site") {
       return `${window.location.origin}/functions/v1/site?path=${encodeURIComponent("assets/sharsh.css")}`;
@@ -5849,7 +5896,7 @@
     startFreshnessTicker();
     startClockTicker();
     await maybeResumeTransferredPhotoImport();
-    await maybeLoadTelegramFeedbackPhoto();
+    await maybeLoadTelegramFeedbackPhotoAdjusted();
   }
 
   init().catch((error) => {
