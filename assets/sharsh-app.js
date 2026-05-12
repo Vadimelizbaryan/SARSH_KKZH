@@ -3503,11 +3503,18 @@
     const reviewByKey = new Map(
       (Array.isArray(photoState.cellReviews) ? photoState.cellReviews : []).map((item) => [item.key, item])
     );
+    const recognizedRawValues = photoState.recognizedValues && typeof photoState.recognizedValues === "object"
+      ? photoState.recognizedValues
+      : {};
     const previewFieldKeys = new Set(getRecognizablePhotoFields(row).map((item) => item.key));
     previewFieldKeys.add("presentTotal");
     const previewItems = PHOTO_FIELD_DEFINITIONS
       .filter((item) => previewFieldKeys.has(item.key))
-      .filter((item) => reviewByKey.has(item.key) || recognizedFields.has(item.key) || suspectFields.has(item.key))
+      .filter((item) => {
+        const hasRawValue = Object.prototype.hasOwnProperty.call(recognizedRawValues, item.key)
+          && recognizedRawValues[item.key] !== null;
+        return reviewByKey.has(item.key) || recognizedFields.has(item.key) || suspectFields.has(item.key) || hasRawValue;
+      })
       .map((item) => {
         const review = reviewByKey.get(item.key) || null;
         const status = suspectFields.has(item.key)
