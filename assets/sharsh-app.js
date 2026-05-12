@@ -122,7 +122,7 @@
     { key: "family", cell: 17, label: "Զինծառայ․ընտ․անդ․" },
     { key: "officer", cell: 18, label: "Զինապարտ" },
     { key: "civil", cell: 19, label: "Քաղաքացի" },
-    { divider: true, label: "Արձակուրդում առկա է", totalKey: "leaveTotal", totalCell: 23 },
+    { divider: true, label: "Արձակուրդում առկա է", totalKey: "leaveTotal" },
     { key: "leaveSharq", cell: 20, label: "Ժամկետային զ/ծ" },
     { key: "leaveSpa", cell: 21, label: "Սպա" },
     { key: "leavePaym", cell: 22, label: "Պայմանագրային" }
@@ -2798,7 +2798,6 @@
           return {
             divider: true,
             label: item.label,
-            totalCell: item.totalCell || "",
             totalValue: item.totalKey ? subtotal(item.totalKey) : null
           };
         }
