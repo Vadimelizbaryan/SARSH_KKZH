@@ -31,9 +31,15 @@ jobs:
           cp archive-print.html _site/
           cp ocr-feedback.html _site/
           cp eti77ylq.html _site/
+          cp hospital-report.html _site/
+          cp "Օրվա շարժ․.html" _site/
+          cp department-instructions.html _site/
+          cp department-instructions.pdf _site/
+          cp qr-sheet.html _site/
+          cp qr-sheet.pdf _site/
           cp -R assets _site/
           cp -R bgej6lyx _site/
-          cp -R "Отделения" _site/
+          cp -R "ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ" _site/
           touch _site/.nojekyll
 
       - name: Upload artifact
