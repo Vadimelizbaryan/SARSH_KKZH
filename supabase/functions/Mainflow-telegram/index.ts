@@ -687,10 +687,8 @@ async function getTelegramWebhookInfo() {
 
 async function repairTelegramWebhook(request: Request) {
   const currentUrl = new URL(request.url);
-  const secretToken = getTelegramSecretToken() || undefined;
   return await callTelegramApi("setWebhook", {
     url: `${currentUrl.origin}${currentUrl.pathname}`,
-    secret_token: secretToken,
     allowed_updates: ["message", "edited_message"]
   });
 }
