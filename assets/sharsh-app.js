@@ -662,7 +662,7 @@
   const OCR_RIGHT_FOCUS_CROP = {
     leftRatio: 0.48,
     topRatio: 0.18,
-    rightRatio: 0.03,
+    rightRatio: 0.01,
     bottomRatio: 0.58
   };
 
@@ -690,7 +690,7 @@
   const OCR_ALIGNED_RIGHT_FOCUS_CROP = {
     leftRatio: 0.50,
     topRatio: 0.40,
-    rightRatio: 0.02,
+    rightRatio: 0.005,
     bottomRatio: 0.98
   };
 
@@ -3541,7 +3541,7 @@
       <section class="panel no-print photo-import-panel">
         <h2>Загрузка фото бланка</h2>
         <p>Загрузите фото верхней части бланка. На странице отделения фото всегда относится к текущему отделению: маркер SR здесь не проверяется и не нужен. Значения подставятся в ячейки локально, потом вы их проверите и сохраните обычной кнопкой.</p>
-        <p class="hint">Нумерация ячеек для OCR: <strong>1-22</strong>, счёт идёт от <strong>1</strong>, не от 0.</p>
+        <p class="hint">Нумерация ячеек для OCR: <strong>1-22</strong>, счёт идёт от <strong>1</strong>, не от 0. Внутренние технические слоты OCR не показываются пользователю.</p>
         <div class="photo-import-actions">
           <label class="button-link photo-file-label${photoState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="photoImportFile" accept="image/*" capture="environment" ${photoState.isProcessing ? "disabled" : ""}>
