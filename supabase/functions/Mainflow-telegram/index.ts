@@ -394,9 +394,53 @@ function buildPhotoRecognitionSchema() {
       notes: {
         type: "array",
         items: { type: "string" }
+      },
+      structure: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          all22CellsVisible: { type: "boolean" },
+          gridCellCount: { type: "integer" },
+          missingCells: {
+            type: "array",
+            items: { type: "integer" }
+          },
+          reason: { type: ["string", "null"] }
+        },
+        required: ["all22CellsVisible", "gridCellCount", "missingCells", "reason"]
       }
     },
-    required: ["reportDate", "values", "notes"]
+    required: ["reportDate", "values", "notes", "structure"]
+  };
+}
+
+function sanitizePhotoStructure(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  const all22CellsVisible = payload.all22CellsVisible === true;
+  const rawCount = Number(payload.gridCellCount);
+  const gridCellCount = Number.isFinite(rawCount)
+    ? Math.max(0, Math.min(22, Math.trunc(rawCount)))
+    : 0;
+  const missingCells = Array.isArray(payload.missingCells)
+    ? payload.missingCells
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item))
+      .map((item) => Math.trunc(item))
+      .filter((item) => item >= 1 && item <= 22)
+    : [];
+  const reason = typeof payload.reason === "string" && payload.reason.trim()
+    ? payload.reason.trim()
+    : null;
+
+  return {
+    all22CellsVisible,
+    gridCellCount,
+    missingCells,
+    reason
   };
 }
 
@@ -435,6 +479,10 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
     "Read only the top numeric table and the handwritten report date near the header.",
     "Ignore the handwritten descriptive text in the lower part of the page.",
     "The standard top numeric row always contains exactly 22 handwritten cells from left to right.",
+    "You must explicitly verify the printed top-row grid structure before trusting any values.",
+    "Return structure.all22CellsVisible=true only if you can confidently follow all 22 printed cell positions from cell 1 through cell 22 in the top numeric row.",
+    "Return structure.gridCellCount as the number of distinct top-row cell positions you can confidently identify by printed borders, including blank cells and including the position of cell 12.",
+    "If you cannot confidently identify all 22 positions, set structure.all22CellsVisible=false, set structure.gridCellCount to the count you can see, list the missing or ambiguous cell numbers in structure.missingCells, and explain briefly in structure.reason.",
     PHOTO_TEMPLATE_GUIDE,
     "Return null for any cell that is blank, crossed out, unreadable, or uncertain.",
     "Do not infer values from formulas. Do not copy printed column numbers.",
@@ -463,20 +511,32 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
   const sanitizedValues = sanitizeValues(parsed.values as Record<string, unknown> | undefined);
   const normalizedShift = normalizeShiftedPostCell12Values(sanitizedValues);
   const finalValues = normalizedShift.values;
+  const structure = sanitizePhotoStructure(parsed.structure);
   const baseNotes = Array.isArray(parsed.notes)
     ? parsed.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
     : [];
+  const structureInvalid = !!structure && (!structure.all22CellsVisible || structure.gridCellCount !== 22);
   const notes = normalizedShift.autoShifted
     ? [...baseNotes, "Автокоррекция OCR: блок ячеек 13-22 был сдвинут влево после ложного чтения ячейки 12."]
-    : baseNotes;
+    : [...baseNotes];
+  if (structureInvalid) {
+    notes.push(
+      structure?.reason
+        ? `Структура верхней строки не подтверждена: найдено ${structure.gridCellCount}/22 ячеек. ${structure.reason}`
+        : `Структура верхней строки не подтверждена: найдено ${structure?.gridCellCount ?? 0}/22 ячеек.`
+    );
+  }
 
   return {
     reportDate: sanitizeReportDate(parsed.reportDate),
     values: finalValues,
-    recognizedKeys: Object.entries(finalValues)
+    recognizedKeys: structureInvalid
+      ? []
+      : Object.entries(finalValues)
       .filter(([, value]) => value !== null)
       .map(([key]) => key),
-    notes
+    notes,
+    structure
   };
 }
 
@@ -937,7 +997,9 @@ function buildPhotoSaveSummary(
     `Дата отчёта: ${reportDate}`,
     recognized.reportDate ? `Дата на фото: ${recognized.reportDate}` : "Дата на фото: не распознана",
     `Страница отделения: ${getDepartmentPageUrl(departmentId, feedbackId)}`,
-    cellSummaries ? `Распознано: ${cellSummaries}` : "Распознанных ячеек не найдено.",
+    recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22)
+      ? `Структура строки не подтверждена: ${recognized.structure.gridCellCount}/22 ячеек.`
+      : (cellSummaries ? `Распознано: ${cellSummaries}` : "Распознанных ячеек не найдено."),
     recognized.notes.length ? `Заметки OCR: ${recognized.notes.join("; ")}` : ""
   ].filter(Boolean).join("\n");
 }
@@ -1079,7 +1141,10 @@ async function handleTelegramPhoto(
   const snapshot = await loadSnapshot(supabase);
   const reportDate = hintedReportDate || recognized.reportDate || snapshot.reportDate || DEFAULT_DATE;
 
-  await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values);
+  const structureInvalid = !!recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22);
+  if (!structureInvalid) {
+    await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values);
+  }
   const feedbackId = await insertAcceptedFeedback(
     supabase,
     departmentId,

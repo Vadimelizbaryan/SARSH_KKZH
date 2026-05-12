@@ -185,6 +185,10 @@
       recognizedValues: {},
       notes: [],
       cellReviews: [],
+      structureOk: null,
+      structureCellCount: null,
+      structureMissingCells: [],
+      structureReason: "",
       suspectKeys: [],
       suspectReason: "",
       queueMode: false,
@@ -4150,6 +4154,23 @@
       return 0;
     }
 
+    const structure = payload.structure && typeof payload.structure === "object"
+      ? payload.structure
+      : null;
+    const structureOk = !structure
+      || (structure.all22CellsVisible === true && Number(structure.gridCellCount) === 22);
+    const structureCellCount = structure && Number.isFinite(Number(structure.gridCellCount))
+      ? Number(structure.gridCellCount)
+      : null;
+    const structureMissingCells = structure && Array.isArray(structure.missingCells)
+      ? structure.missingCells
+        .map((item) => Number(item))
+        .filter((item) => Number.isFinite(item))
+        .map((item) => Math.trunc(item))
+        .filter((item) => item >= 1 && item <= 22)
+      : [];
+    const structureReason = structure && typeof structure.reason === "string" ? structure.reason.trim() : "";
+
     const values = payload.values && typeof payload.values === "object" ? payload.values : {};
     const recognizedKeys = new Set(
       Array.isArray(payload.recognizedKeys)
@@ -4160,18 +4181,20 @@
     const appliedKeys = [];
     const previewKeys = [];
 
-    applicableFields.forEach((field) => {
-      if (!Object.prototype.hasOwnProperty.call(values, field.key) || !recognizedKeys.has(field.key)) {
-        return;
-      }
+    if (structureOk) {
+      applicableFields.forEach((field) => {
+        if (!Object.prototype.hasOwnProperty.call(values, field.key) || !recognizedKeys.has(field.key)) {
+          return;
+        }
 
-      const normalized = config.normalizeCellValue(values[field.key]);
-      row.values[field.key] = normalized;
-      if (normalized !== null) {
-        appliedKeys.push(field.key);
-        previewKeys.push(field.key);
-      }
-    });
+        const normalized = config.normalizeCellValue(values[field.key]);
+        row.values[field.key] = normalized;
+        if (normalized !== null) {
+          appliedKeys.push(field.key);
+          previewKeys.push(field.key);
+        }
+      });
+    }
 
     if (appliedKeys.length > 0 && applicableFields.some((field) => field.key === "presentTotal")) {
       previewKeys.push("presentTotal");
@@ -4184,11 +4207,31 @@
     state.photoImport.lastReportDate = typeof payload.reportDate === "string" ? payload.reportDate : "";
     state.photoImport.notes = normalizeOcrNotes(payload.notes);
     state.photoImport.cellReviews = normalizePhotoCellReviews(payload);
+    state.photoImport.structureOk = structureOk;
+    state.photoImport.structureCellCount = structureCellCount;
+    state.photoImport.structureMissingCells = structureMissingCells;
+    state.photoImport.structureReason = structureReason;
     state.photoImport.suspectKeys = suspectDetails.suspectKeys;
     state.photoImport.suspectReason = suspectDetails.suspectReason;
-    state.photoImport.draftMode = appliedKeys.length > 0;
+    state.photoImport.draftMode = structureOk && appliedKeys.length > 0;
 
     return appliedKeys.length;
+  }
+
+  function getPhotoStructureValidationMessage() {
+    const photoState = state.photoImport || buildInitialPhotoImportState();
+    if (photoState.structureOk !== false) {
+      return "";
+    }
+
+    const countText = Number.isFinite(photoState.structureCellCount)
+      ? `${photoState.structureCellCount}/22`
+      : "меньше 22/22";
+    const missingText = Array.isArray(photoState.structureMissingCells) && photoState.structureMissingCells.length
+      ? ` Не найдены или не подтверждены позиции: ${photoState.structureMissingCells.join(", ")}.`
+      : "";
+    const reasonText = photoState.structureReason ? ` ${photoState.structureReason}` : "";
+    return `Структура бланка не подтверждена: система увидела только ${countText} ячеек верхней строки. Проверьте фото и повторите распознавание.${missingText}${reasonText}`;
   }
 
   async function handlePhotoImportSelection(file) {
@@ -4316,6 +4359,13 @@
       );
       const appliedCount = applyRecognizedDepartmentValues(result);
       state.photoImport.isProcessing = false;
+      const structureMessage = getPhotoStructureValidationMessage();
+
+      if (structureMessage) {
+        setPhotoImportStatus(structureMessage, true);
+        renderPage();
+        return;
+      }
 
       if (!appliedCount) {
         setPhotoImportStatus("Не удалось уверенно распознать цифры. Попробуйте другое фото или введите значения вручную.", true);
