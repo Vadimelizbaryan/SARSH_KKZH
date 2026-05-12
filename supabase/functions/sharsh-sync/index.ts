@@ -718,7 +718,6 @@ async function recognizeDepartmentPhoto(
     "Do not shift handwritten values left or right between cells 16, 17, 18, and 19.",
     "Map the handwritten values into these fields:",
     fieldInstructions,
-    "Cell 12 is a derived total between cell 11 and cell 13. Do not return it in values and never assign it to currentShar or any later field.",
     "If the photo clearly shows a handwritten value under the single column between the three soldier columns and the family column, that value belongs to currentZh.",
     "The top table also contains derived totals. Do not return those derived totals unless they correspond to one of the listed fields above.",
     "Return reportDate in dd.mm.yy or dd.mm.yyyy when visible, otherwise null.",
