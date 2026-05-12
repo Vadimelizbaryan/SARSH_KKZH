@@ -3541,6 +3541,7 @@
       <section class="panel no-print photo-import-panel">
         <h2>Загрузка фото бланка</h2>
         <p>Загрузите фото верхней части бланка. На странице отделения фото всегда относится к текущему отделению: маркер SR здесь не проверяется и не нужен. Значения подставятся в ячейки локально, потом вы их проверите и сохраните обычной кнопкой.</p>
+        <p class="hint">Нумерация ячеек для OCR: <strong>1-22</strong>, счёт идёт от <strong>1</strong>, не от 0.</p>
         <div class="photo-import-actions">
           <label class="button-link photo-file-label${photoState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="photoImportFile" accept="image/*" capture="environment" ${photoState.isProcessing ? "disabled" : ""}>
