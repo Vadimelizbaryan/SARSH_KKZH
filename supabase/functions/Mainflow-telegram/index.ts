@@ -607,13 +607,14 @@ async function insertAcceptedFeedback(
   reportDate: string,
   photoReportDate: string | null,
   imageName: string | null,
+  imageDataUrl: string | null,
   recognizedValues: Record<string, number | null>,
   recognizedKeys: string[],
   notes: string[]
 ) {
   const departmentMeta = DEPARTMENTS[departmentId];
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("sharsh_ocr_feedback")
     .insert({
       department_id: departmentId,
@@ -622,7 +623,7 @@ async function insertAcceptedFeedback(
       photo_report_date: photoReportDate,
       save_status: "accepted_as_is",
       image_name: imageName,
-      image_data_url: null,
+      image_data_url: imageDataUrl,
       recognized_keys: recognizedKeys,
       changed_keys: [],
       ocr_raw: recognizedValues,
@@ -630,11 +631,65 @@ async function insertAcceptedFeedback(
       notes,
       cell_reviews: [],
       created_at: new Date().toISOString()
-    });
+    })
+    .select("id")
+    .single();
 
   if (error) {
     throw error;
   }
+
+  return data?.id ? String(data.id) : "";
+}
+
+async function loadAcceptedFeedbackPreview(
+  supabase: ReturnType<typeof createClient>,
+  feedbackId: string,
+  departmentId: DepartmentId | ""
+) {
+  const normalizedId = String(feedbackId || "").trim();
+  if (!normalizedId) {
+    return null;
+  }
+
+  let query = supabase
+    .from("sharsh_ocr_feedback")
+    .select("id, department_id, report_date, photo_report_date, image_name, image_data_url, recognized_keys, final_values, notes, cell_reviews, save_status, created_at")
+    .eq("id", normalizedId)
+    .limit(1)
+    .maybeSingle();
+
+  if (departmentId) {
+    query = query.eq("department_id", departmentId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    return null;
+  }
+
+  const imageDataUrl = typeof data.image_data_url === "string" ? data.image_data_url : "";
+  if (!imageDataUrl.startsWith("data:image/")) {
+    return null;
+  }
+
+  return {
+    id: String(data.id),
+    departmentId: String(data.department_id || ""),
+    reportDate: typeof data.report_date === "string" ? data.report_date : DEFAULT_DATE,
+    photoReportDate: typeof data.photo_report_date === "string" ? data.photo_report_date : "",
+    imageName: typeof data.image_name === "string" ? data.image_name : "",
+    imageDataUrl,
+    recognizedKeys: Array.isArray(data.recognized_keys) ? data.recognized_keys.map((item) => String(item)) : [],
+    finalValues: data.final_values && typeof data.final_values === "object" ? data.final_values : {},
+    notes: Array.isArray(data.notes) ? data.notes.map((item) => String(item)) : [],
+    cellReviews: Array.isArray(data.cell_reviews) ? data.cell_reviews : [],
+    saveStatus: typeof data.save_status === "string" ? data.save_status : "accepted_as_is",
+    createdAt: typeof data.created_at === "string" ? data.created_at : ""
+  };
 }
 
 function getTelegramApiBaseUrl() {
@@ -774,9 +829,14 @@ function detectReportDateFromHint(text: string) {
   return match ? sanitizeReportDate(match[0]) : null;
 }
 
-function getDepartmentPageUrl(departmentId: DepartmentId) {
+function getDepartmentPageUrl(departmentId: DepartmentId, feedbackId?: string | null) {
   const meta = DEPARTMENTS[departmentId];
-  return `${getPublicSiteBaseUrl()}/bgej6lyx/${meta.slug}.html`;
+  const baseUrl = `${getPublicSiteBaseUrl()}/bgej6lyx/${meta.slug}.html`;
+  const normalizedFeedbackId = String(feedbackId || "").trim();
+  if (!normalizedFeedbackId) {
+    return baseUrl;
+  }
+  return `${baseUrl}?tgFeedback=${encodeURIComponent(normalizedFeedbackId)}`;
 }
 
 function getMainPageUrl() {
@@ -832,7 +892,8 @@ function buildPhotoSaveSummary(
   departmentId: DepartmentId,
   reportDate: string,
   recognized: Awaited<ReturnType<typeof recognizeDepartmentPhoto>>,
-  departmentSource: string
+  departmentSource: string,
+  feedbackId: string
 ) {
   const meta = DEPARTMENTS[departmentId];
   const cellSummaries = PHOTO_FIELD_MAPPINGS
@@ -850,7 +911,7 @@ function buildPhotoSaveSummary(
     `Источник отделения: ${departmentSource}`,
     `Дата отчёта: ${reportDate}`,
     recognized.reportDate ? `Дата на фото: ${recognized.reportDate}` : "Дата на фото: не распознана",
-    `Страница отделения: ${getDepartmentPageUrl(departmentId)}`,
+    `Страница отделения: ${getDepartmentPageUrl(departmentId, feedbackId)}`,
     cellSummaries ? `Распознано: ${cellSummaries}` : "Распознанных ячеек не найдено.",
     recognized.notes.length ? `Заметки OCR: ${recognized.notes.join("; ")}` : ""
   ].filter(Boolean).join("\n");
@@ -994,12 +1055,13 @@ async function handleTelegramPhoto(
   const reportDate = hintedReportDate || recognized.reportDate || snapshot.reportDate || DEFAULT_DATE;
 
   await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values);
-  await insertAcceptedFeedback(
+  const feedbackId = await insertAcceptedFeedback(
     supabase,
     departmentId,
     reportDate,
     recognized.reportDate,
     fileName,
+    dataUrl,
     recognized.values,
     recognized.recognizedKeys,
     recognized.notes
@@ -1007,7 +1069,7 @@ async function handleTelegramPhoto(
 
   await sendTelegramMessage(
     chatId,
-    buildPhotoSaveSummary(departmentId, reportDate, recognized, departmentSource)
+    buildPhotoSaveSummary(departmentId, reportDate, recognized, departmentSource, feedbackId)
   );
 }
 
@@ -1075,6 +1137,31 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "repair_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
+    }
+
+    if (action === "feedback-photo") {
+      try {
+        const currentUrl = new URL(request.url);
+        const feedbackId = currentUrl.searchParams.get("id") || "";
+        const departmentId = currentUrl.searchParams.get("departmentId") || "";
+        const supabase = createSupabaseAdmin();
+        const record = await loadAcceptedFeedbackPreview(
+          supabase,
+          feedbackId,
+          Object.prototype.hasOwnProperty.call(DEPARTMENTS, departmentId) ? departmentId as DepartmentId : ""
+        );
+        if (!record) {
+          return jsonResponse({ ok: false, error: "Feedback photo not found." }, 404);
+        }
+        return jsonResponse({ ok: true, record });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "feedback_photo_failed",
           error: error instanceof Error ? error.message : String(error)
         }, 500);
       }

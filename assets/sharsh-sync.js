@@ -28,6 +28,11 @@
     return `${baseUrl}/functions/v1/${functionName}`;
   }
 
+  function getTelegramFunctionEndpoint() {
+    const baseUrl = String(runtime.supabaseUrl || "").replace(/\/+$/, "");
+    return `${baseUrl}/functions/v1/Mainflow-telegram`;
+  }
+
   function getAuthHeaders() {
     const headers = {
       "Content-Type": "application/json"
@@ -461,6 +466,31 @@
     return payload;
   }
 
+  async function loadTelegramPhotoFeedback(feedbackId, departmentId) {
+    const normalizedId = String(feedbackId || "").trim();
+    if (!hasRemoteSync() || !normalizedId) {
+      return null;
+    }
+
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "feedback-photo");
+    url.searchParams.set("id", normalizedId);
+    if (departmentId) {
+      url.searchParams.set("departmentId", String(departmentId));
+    }
+
+    const response = await fetch(url.toString(), {
+      method: "GET"
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw buildResponseError(response, payload, "Не удалось загрузить фото из Telegram");
+    }
+
+    return payload && typeof payload.record === "object" ? payload.record : null;
+  }
+
   function getSourceLabel(source) {
     if (source === "remote") {
       return "Онлайн-синхронизация";
@@ -483,6 +513,7 @@
     saveOcrFeedback,
     saveReportDate,
     notifyOwnerLogin,
+    loadTelegramPhotoFeedback,
     listOcrFeedback,
     verifyDepartmentAccess,
     detectDepartmentPhoto,

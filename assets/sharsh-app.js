@@ -4871,6 +4871,45 @@
     await handlePhotoRecognition();
   }
 
+  async function maybeLoadTelegramFeedbackPhoto() {
+    if (mode !== "department") {
+      return;
+    }
+
+    const feedbackId = queryParams.get("tgFeedback") || "";
+    if (!feedbackId || !sync.hasRemoteSync() || typeof sync.loadTelegramPhotoFeedback !== "function") {
+      return;
+    }
+
+    try {
+      const record = await sync.loadTelegramPhotoFeedback(feedbackId, departmentId);
+      if (!record) {
+        return;
+      }
+
+      const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
+      if (!imageDataUrl.startsWith("data:image/")) {
+        return;
+      }
+
+      state.photoImport = buildInitialPhotoImportState();
+      state.photoImport.imageName = typeof record.imageName === "string" ? record.imageName : "";
+      state.photoImport.imageDataUrl = imageDataUrl;
+      state.photoImport.lastReportDate = typeof record.photoReportDate === "string" && record.photoReportDate.trim()
+        ? record.photoReportDate
+        : (typeof record.reportDate === "string" ? record.reportDate : "");
+      state.photoImport.lastAppliedKeys = Array.isArray(record.recognizedKeys)
+        ? record.recognizedKeys.map((item) => String(item))
+        : [];
+      state.photoImport.notes = normalizeOcrNotes(record.notes);
+      state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
+      state.photoImport.status = "Фото бланка загружено из Telegram. Проверьте значения и при необходимости сохраните.";
+      state.photoImport.isError = false;
+      renderPage();
+    } catch (_error) {
+    }
+  }
+
   function getStylesheetUrl() {
     if (basePath === "@site") {
       return `${window.location.origin}/functions/v1/site?path=${encodeURIComponent("assets/sharsh.css")}`;
@@ -5810,6 +5849,7 @@
     startFreshnessTicker();
     startClockTicker();
     await maybeResumeTransferredPhotoImport();
+    await maybeLoadTelegramFeedbackPhoto();
   }
 
   init().catch((error) => {
