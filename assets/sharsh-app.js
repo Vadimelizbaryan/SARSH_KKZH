@@ -3511,6 +3511,9 @@
     const previewItems = PHOTO_FIELD_DEFINITIONS
       .filter((item) => previewFieldKeys.has(item.key))
       .filter((item) => {
+        if (item.key === "presentTotal") {
+          return true;
+        }
         const hasRawValue = Object.prototype.hasOwnProperty.call(recognizedRawValues, item.key)
           && recognizedRawValues[item.key] !== null;
         return reviewByKey.has(item.key) || recognizedFields.has(item.key) || suspectFields.has(item.key) || hasRawValue;
