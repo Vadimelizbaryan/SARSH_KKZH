@@ -681,6 +681,20 @@ async function sendTelegramMessage(chatId: number | string, text: string) {
   });
 }
 
+async function getTelegramWebhookInfo() {
+  return await callTelegramApi("getWebhookInfo", {});
+}
+
+async function repairTelegramWebhook(request: Request) {
+  const currentUrl = new URL(request.url);
+  const secretToken = getTelegramSecretToken() || undefined;
+  return await callTelegramApi("setWebhook", {
+    url: `${currentUrl.origin}${currentUrl.pathname}`,
+    secret_token: secretToken,
+    allowed_updates: ["message", "edited_message"]
+  });
+}
+
 async function getTelegramFilePath(fileId: string) {
   const result = await callTelegramApi("getFile", { file_id: fileId });
   const filePath = result && typeof result.file_path === "string" ? result.file_path : "";
@@ -1030,6 +1044,31 @@ Deno.serve(async (request) => {
   }
 
   if (request.method === "GET") {
+    const currentUrl = new URL(request.url);
+    const action = currentUrl.searchParams.get("action") || "";
+
+    if (action === "webhook-info") {
+      const info = await getTelegramWebhookInfo();
+      return jsonResponse({
+        ok: true,
+        service: "Mainflow-telegram",
+        status: "ready",
+        webhook: info
+      });
+    }
+
+    if (action === "repair-webhook") {
+      const result = await repairTelegramWebhook(request);
+      const info = await getTelegramWebhookInfo();
+      return jsonResponse({
+        ok: true,
+        service: "Mainflow-telegram",
+        status: "ready",
+        repaired: result,
+        webhook: info
+      });
+    }
+
     return jsonResponse({
       ok: true,
       service: "Mainflow-telegram",
