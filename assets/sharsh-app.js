@@ -3156,6 +3156,9 @@
   }
 
   function getPrintDocumentTitle() {
+    if (mode === "hospital-report") {
+      return "Report";
+    }
     if (mode === "department") {
       const row = getCurrentRow();
       return row ? `${PRINT_REPORT_TITLE} ${row.department}` : PRINT_REPORT_TITLE;
