@@ -2353,16 +2353,12 @@
   }
 
   function getPhotoPreviewValue(row, key) {
-    if (!row) {
+    if (!row || !state.photoImport || !state.photoImport.recognizedValues || typeof state.photoImport.recognizedValues !== "object") {
       return "";
     }
-    if (key === "presentTotal") {
-      return calcPresentTotal(state.snapshot, row);
-    }
-    if (key === "leaveTotal") {
-      return calcLeaveTotal(state.snapshot, row);
-    }
-    return getEffectiveValue(state.snapshot, row, key);
+    return Object.prototype.hasOwnProperty.call(state.photoImport.recognizedValues, key)
+      ? state.photoImport.recognizedValues[key]
+      : "";
   }
 
   function calcPresentTotal(snapshot, row) {
@@ -3507,7 +3503,10 @@
     const reviewByKey = new Map(
       (Array.isArray(photoState.cellReviews) ? photoState.cellReviews : []).map((item) => [item.key, item])
     );
-    const previewItems = getRecognizablePhotoFields(row)
+    const previewFieldKeys = new Set(getRecognizablePhotoFields(row).map((item) => item.key));
+    previewFieldKeys.add("presentTotal");
+    const previewItems = PHOTO_FIELD_DEFINITIONS
+      .filter((item) => previewFieldKeys.has(item.key))
       .filter((item) => reviewByKey.has(item.key) || recognizedFields.has(item.key) || suspectFields.has(item.key))
       .map((item) => {
         const review = reviewByKey.get(item.key) || null;
@@ -4198,7 +4197,13 @@
 
     const suspectDetails = getPhotoImportSuspectDetails(row, recognizedKeys);
 
-    state.photoImport.recognizedValues = config.normalizeRowValues(values);
+    state.photoImport.recognizedValues = {};
+    PHOTO_FIELD_DEFINITIONS.forEach((field) => {
+      if (!Object.prototype.hasOwnProperty.call(values, field.key)) {
+        return;
+      }
+      state.photoImport.recognizedValues[field.key] = config.normalizeCellValue(values[field.key]);
+    });
     state.photoImport.lastAppliedKeys = previewKeys;
     state.photoImport.lastReportDate = typeof payload.reportDate === "string" ? payload.reportDate : "";
     state.photoImport.notes = normalizeOcrNotes(payload.notes);
@@ -5433,10 +5438,10 @@
       return null;
     }
 
-    const recognizedKeys = config.valueKeys.filter((key) => {
-      if (key === "presentTotal" || key === "leaveTotal") {
-        return false;
-      }
+    const previewFeedbackKeys = PHOTO_FIELD_DEFINITIONS
+      .map((item) => item.key)
+      .filter((key) => key !== "leaveTotal");
+    const recognizedKeys = previewFeedbackKeys.filter((key) => {
       return recognizedValues[key] !== null;
     });
     if (!recognizedKeys.length) {

@@ -684,9 +684,7 @@ async function recognizeDepartmentPhoto(
   }
 
   const fieldInstructions = PHOTO_FIELD_MAPPINGS
-    .map((item) => item.cell === 12
-      ? `- cell ${item.cell}: ${item.key} (${item.label}). Do not extract or return this cell at all because the app calculates cell 12 automatically.`
-      : `- cell ${item.cell}: ${item.key} (${item.label})`)
+    .map((item) => `- cell ${item.cell}: ${item.key} (${item.label})`)
     .join("\n");
 
   const prompt = [
@@ -712,10 +710,9 @@ async function recognizeDepartmentPhoto(
     "Return null for any cell that is blank, crossed out, unreadable, or uncertain.",
     "Do not infer values from formulas. Do not copy printed column numbers.",
     "Cells 10 and 11 are the two transfer columns. Immediately after cell 11 there is exactly one narrow single column: that is cell 12 only.",
-    "Cell 12 is never entered by the operator and must not be extracted. The app calculates cell 12 automatically.",
     "Immediately after cell 12 there are exactly three adjacent cells under the soldier subgroup: those are cell 13 currentShar, cell 14 currentSpa, and cell 15 currentPaym in that strict left-to-right order.",
     "Do not merge cell 12 with cells 13-15. Do not shift values between cells 12, 13, 14, and 15 even when the handwriting is close to the border lines.",
-    "If you see any writing in the narrow column for cell 12, ignore it completely and still read the next three values as cells 13, 14, and 15.",
+    "Read the raw handwritten value in cell 12 as presentTotal when it is visibly written.",
     "After the three soldier columns in the 'present' block there are four consecutive single-column fields.",
     "Those four single-column fields must be read strictly in this order: cell 16 currentZh, cell 17 family, cell 18 officer, cell 19 civil.",
     "Do not shift handwritten values left or right between cells 16, 17, 18, and 19.",
@@ -729,7 +726,9 @@ async function recognizeDepartmentPhoto(
     "For cellReviews use status recognized when the handwritten value is read confidently, and status review when the cell has handwriting but the read is uncertain or may be wrong.",
     "For each cellReviews item return approximate bounding box coordinates relative to the full image: left, top, width, height in a 0..1000 scale.",
     "Do not add blank cells to cellReviews.",
-    "Do not include cell 12 in values or in cellReviews.",
+    "Return the handwritten value in cell 12 as presentTotal when it is visibly written in the filled form.",
+    "Do not calculate cell 12 from any other cells. Return only the raw handwritten value you see in cell 12.",
+    "Do not include cell 12 in cellReviews.",
     "Use notes for short uncertainty comments only when needed."
   ].join("\n");
 
@@ -743,7 +742,6 @@ async function recognizeDepartmentPhoto(
   );
 
   const sanitizedValues = sanitizeValues(parsed.values as Record<string, unknown> | undefined);
-  sanitizedValues.presentTotal = null;
   sanitizedValues.leaveTotal = null;
   const finalValues = sanitizedValues;
   const structure = sanitizePhotoStructure(parsed.structure);
@@ -766,7 +764,7 @@ async function recognizeDepartmentPhoto(
     recognizedKeys: structureInvalid
       ? []
       : Object.entries(finalValues)
-      .filter(([key, value]) => key !== "presentTotal" && key !== "leaveTotal" && value !== null)
+      .filter(([key, value]) => key !== "leaveTotal" && value !== null)
       .map(([key]) => key),
     notes,
     cellReviews: sanitizePhotoCellReviews(parsed.cellReviews),
