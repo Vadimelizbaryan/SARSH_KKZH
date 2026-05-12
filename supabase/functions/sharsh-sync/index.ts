@@ -440,16 +440,45 @@ async function sendTelegramMessage(chatId: string, text: string) {
   });
 }
 
+function tryRepairUtf8Mojibake(value: string) {
+  try {
+    const bytes = Uint8Array.from(Array.from(value, (char) => char.charCodeAt(0) & 0xff));
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch (_error) {
+    return value;
+  }
+}
+
+function normalizeTelegramText(value: unknown) {
+  let text = typeof value === "string" ? value.trim() : "";
+  if (!text) {
+    return "";
+  }
+
+  for (let index = 0; index < 3; index += 1) {
+    if (!/[ÃÐÑ]/.test(text)) {
+      break;
+    }
+    const repaired = tryRepairUtf8Mojibake(text).trim();
+    if (!repaired || repaired === text) {
+      break;
+    }
+    text = repaired;
+  }
+
+  return text;
+}
+
 async function notifyOwnerLogin(details: Record<string, unknown> | null | undefined) {
   const chatIds = getTelegramNotifyChatIds();
   if (!chatIds.length) {
     return { ok: false, skipped: true, reason: "no-chat-ids" };
   }
 
-  const email = typeof details?.email === "string" ? details.email.trim() : "";
-  const pageTitle = typeof details?.pageTitle === "string" ? details.pageTitle.trim() : "";
-  const pagePath = typeof details?.pagePath === "string" ? details.pagePath.trim() : "";
-  const happenedAt = typeof details?.happenedAt === "string" ? details.happenedAt.trim() : new Date().toISOString();
+  const email = normalizeTelegramText(details?.email);
+  const pageTitle = normalizeTelegramText(details?.pageTitle);
+  const pagePath = normalizeTelegramText(details?.pagePath);
+  const happenedAt = normalizeTelegramText(details?.happenedAt) || new Date().toISOString();
 
   const lines = [
     "Mainflow: site login",
