@@ -686,9 +686,13 @@ async function getTelegramWebhookInfo() {
 }
 
 async function repairTelegramWebhook(request: Request) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const currentUrl = new URL(request.url);
+  const webhookUrl = supabaseUrl
+    ? `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/Mainflow-telegram`
+    : `${currentUrl.origin}${currentUrl.pathname}`;
   return await callTelegramApi("setWebhook", {
-    url: `${currentUrl.origin}${currentUrl.pathname}`,
+    url: webhookUrl,
     allowed_updates: ["message", "edited_message"]
   });
 }
@@ -1056,15 +1060,24 @@ Deno.serve(async (request) => {
     }
 
     if (action === "repair-webhook") {
-      const result = await repairTelegramWebhook(request);
-      const info = await getTelegramWebhookInfo();
-      return jsonResponse({
-        ok: true,
-        service: "Mainflow-telegram",
-        status: "ready",
-        repaired: result,
-        webhook: info
-      });
+      try {
+        const result = await repairTelegramWebhook(request);
+        const info = await getTelegramWebhookInfo();
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          status: "ready",
+          repaired: result,
+          webhook: info
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "repair_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
     }
 
     return jsonResponse({
