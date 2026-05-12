@@ -662,7 +662,7 @@
   const OCR_RIGHT_FOCUS_CROP = {
     leftRatio: 0.48,
     topRatio: 0.18,
-    rightRatio: 0.01,
+    rightRatio: 0.0,
     bottomRatio: 0.58
   };
 
@@ -690,7 +690,7 @@
   const OCR_ALIGNED_RIGHT_FOCUS_CROP = {
     leftRatio: 0.50,
     topRatio: 0.40,
-    rightRatio: 0.005,
+    rightRatio: 0.0,
     bottomRatio: 0.98
   };
 
@@ -1258,8 +1258,11 @@
       const slotIndex = firstTargetSlotIndex + offset;
       const slotLeft = regionLeft + (slotIndex * slotWidth);
       const slotRight = regionLeft + ((slotIndex + 1) * slotWidth);
-      const cropLeft = Math.max(0, Math.floor(slotLeft + padX));
-      const cropRight = Math.min(sourceWidth, Math.ceil(slotRight - padX));
+      const isLastTargetCell = offset === (targetCellCount - 1);
+      const leftPad = padX;
+      const rightPad = isLastTargetCell ? (padX * 0.2) : padX;
+      const cropLeft = Math.max(0, Math.floor(slotLeft + leftPad));
+      const cropRight = Math.min(sourceWidth, Math.ceil(slotRight - rightPad));
       const cropWidth = Math.max(1, cropRight - cropLeft);
 
       const canvas = document.createElement("canvas");
