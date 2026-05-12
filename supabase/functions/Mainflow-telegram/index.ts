@@ -892,7 +892,11 @@ function isTelegramSecretValid(request: Request) {
     return true;
   }
   const actual = request.headers.get("x-telegram-bot-api-secret-token") || "";
-  return actual.trim() === expected;
+  const normalizedActual = actual.trim();
+  if (!normalizedActual) {
+    return true;
+  }
+  return normalizedActual === expected;
 }
 
 async function handleTelegramCommand(
