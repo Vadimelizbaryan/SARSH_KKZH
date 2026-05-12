@@ -532,7 +532,7 @@ function createSupabaseAdmin() {
 async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
   const { data: departmentRows, error: departmentsError } = await supabase
     .from("sharsh_departments")
-    .select("department_id, values, updated_at");
+    .select("department_id, values, updated_at, photo_workflow_status, photo_feedback_id, photo_feedback_updated_at, photo_name");
 
   if (departmentsError) {
     throw departmentsError;
@@ -560,7 +560,11 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
         department: meta.department,
         group: meta.group,
         values: sanitizeValues(saved?.values as Record<string, unknown> | undefined),
-        updatedAt: saved?.updated_at || null
+        updatedAt: saved?.updated_at || null,
+        photoWorkflowStatus: typeof saved?.photo_workflow_status === "string" ? saved.photo_workflow_status : "idle",
+        photoFeedbackId: typeof saved?.photo_feedback_id === "number" ? saved.photo_feedback_id : null,
+        photoFeedbackUpdatedAt: saved?.photo_feedback_updated_at || null,
+        photoName: typeof saved?.photo_name === "string" ? saved.photo_name : ""
       };
     })
   };
@@ -598,6 +602,27 @@ async function saveDepartmentSnapshot(
 
   if (metaError) {
     throw metaError;
+  }
+}
+
+async function markDepartmentPhotoPending(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: DepartmentId,
+  feedbackId: string,
+  imageName: string | null
+) {
+  const { error } = await supabase
+    .from("sharsh_departments")
+    .update({
+      photo_workflow_status: "pending",
+      photo_feedback_id: feedbackId ? Number(feedbackId) : null,
+      photo_feedback_updated_at: new Date().toISOString(),
+      photo_name: imageName || ""
+    })
+    .eq("department_id", departmentId);
+
+  if (error) {
+    throw error;
   }
 }
 
@@ -1066,6 +1091,7 @@ async function handleTelegramPhoto(
     recognized.recognizedKeys,
     recognized.notes
   );
+  await markDepartmentPhotoPending(supabase, departmentId, feedbackId, fileName);
 
   await sendTelegramMessage(
     chatId,

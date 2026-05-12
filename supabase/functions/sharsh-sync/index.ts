@@ -891,7 +891,7 @@ async function authorizeOwner(request: Request, supabase: ReturnType<typeof crea
 async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
   const { data: departmentRows, error: departmentsError } = await supabase
     .from("sharsh_departments")
-    .select("department_id, values, updated_at");
+    .select("department_id, values, updated_at, photo_workflow_status, photo_feedback_id, photo_feedback_updated_at, photo_name");
 
   if (departmentsError) {
     throw departmentsError;
@@ -917,7 +917,11 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
       return {
         id,
         values: sanitizeValues(saved?.values as Record<string, unknown> | undefined),
-        updatedAt: saved?.updated_at || null
+        updatedAt: saved?.updated_at || null,
+        photoWorkflowStatus: typeof saved?.photo_workflow_status === "string" ? saved.photo_workflow_status : "idle",
+        photoFeedbackId: typeof saved?.photo_feedback_id === "number" ? saved.photo_feedback_id : null,
+        photoFeedbackUpdatedAt: saved?.photo_feedback_updated_at || null,
+        photoName: typeof saved?.photo_name === "string" ? saved.photo_name : ""
       };
     })
   };
@@ -1142,6 +1146,19 @@ Deno.serve(async (request) => {
 
     if (rowError) {
       throw rowError;
+    }
+
+    const { error: workflowError } = await supabase
+      .from("sharsh_departments")
+      .update({
+        photo_workflow_status: "processed",
+        photo_feedback_updated_at: new Date().toISOString()
+      })
+      .eq("department_id", departmentId)
+      .not("photo_feedback_id", "is", null);
+
+    if (workflowError) {
+      throw workflowError;
     }
 
     const { error: metaError } = await supabase

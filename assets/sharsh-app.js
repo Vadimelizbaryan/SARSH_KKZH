@@ -178,6 +178,8 @@
 
   function buildInitialPhotoImportState() {
     return {
+      feedbackId: "",
+      workflowStatus: "idle",
       imageName: "",
       imageDataUrl: "",
       recognizedValues: {},
@@ -2011,6 +2013,35 @@
     return getFreshnessMeta(row && row.updatedAt, rowHasSubmittedData(row));
   }
 
+  function getDepartmentPhotoWorkflowMeta(row) {
+    if (!row) {
+      return {
+        tone: "neutral",
+        label: "Без нового бланка"
+      };
+    }
+
+    if (row.photoWorkflowStatus === "pending" && row.photoFeedbackId) {
+      return {
+        tone: "pending",
+        label: "Новый бланк"
+      };
+    }
+
+    const freshness = getRowFreshnessMeta(row);
+    if (row.photoWorkflowStatus === "processed" && row.photoFeedbackId && freshness.level !== "stale" && freshness.level !== "missing") {
+      return {
+        tone: "processed",
+        label: "Проверено"
+      };
+    }
+
+    return {
+      tone: "neutral",
+      label: "Без нового бланка"
+    };
+  }
+
   function buildFreshnessStats(rows) {
     const counts = {
       fresh: 0,
@@ -2738,9 +2769,10 @@
   function buildCopyCard(definition) {
     const row = getDepartmentRow(state.snapshot, definition.id);
     const freshness = getRowFreshnessMeta(row);
+    const photoWorkflow = getDepartmentPhotoWorkflowMeta(row);
     const relativePath = appendShareQuery(config.getDepartmentPagePath(basePath, definition.id));
     return `
-      <div class="link-card">
+      <div class="link-card" data-department-open-card="${definition.id}" data-workflow-tone="${photoWorkflow.tone}" title="${escapeHtml(photoWorkflow.label)}">
         <strong>${escapeHtml(definition.department)}</strong>
         <div class="link-card-meta">
           <span class="status-chip status-chip--${freshness.level}" data-department-status="${definition.id}">${escapeHtml(freshness.label)}</span>
@@ -4037,9 +4069,11 @@
 
       state.snapshot.rows.forEach((row) => {
         const meta = getRowFreshnessMeta(row);
+        const photoWorkflow = getDepartmentPhotoWorkflowMeta(row);
         const statusEl = document.querySelector(`[data-department-status="${row.id}"]`);
         const updatedEl = document.querySelector(`[data-department-updated="${row.id}"]`);
         const ageEl = document.querySelector(`[data-department-age="${row.id}"]`);
+        const openCardEl = document.querySelector(`[data-department-open-card="${row.id}"]`);
         const listStatusEl = document.querySelector(`[data-update-status="${row.id}"]`);
         const listTimeEl = document.querySelector(`[data-update-time="${row.id}"]`);
         const listAgeEl = document.querySelector(`[data-update-age="${row.id}"]`);
@@ -4053,6 +4087,10 @@
         }
         if (ageEl) {
           ageEl.textContent = meta.age;
+        }
+        if (openCardEl) {
+          openCardEl.setAttribute("data-workflow-tone", photoWorkflow.tone);
+          openCardEl.setAttribute("title", photoWorkflow.label);
         }
         if (listStatusEl) {
           listStatusEl.textContent = meta.label;
@@ -4998,6 +5036,8 @@
       const preparedPhoto = await normalizeImageDataUrl(imageDataUrl);
 
       state.photoImport = buildInitialPhotoImportState();
+      state.photoImport.feedbackId = String(record.id || feedbackId);
+      state.photoImport.workflowStatus = "pending";
       state.photoImport.imageName = typeof record.imageName === "string" ? record.imageName : "";
       state.photoImport.imageDataUrl = preparedPhoto.dataUrl;
       state.photoImport.lastReportDate = typeof record.photoReportDate === "string" && record.photoReportDate.trim()
@@ -5011,6 +5051,69 @@
       state.photoImport.status = preparedPhoto.rotatedToLandscape
         ? "Фото бланка загружено из Telegram и автоматически выровнено по SR-маркеру. Проверьте значения и при необходимости сохраните."
         : "Фото бланка загружено из Telegram. Проверьте значения и при необходимости сохраните.";
+      state.photoImport.isError = false;
+      renderPage();
+    } catch (_error) {
+    }
+  }
+
+  async function maybeLoadStoredDepartmentPhotoAdjusted(forceReplace = false) {
+    if (mode !== "department" || !sync.hasRemoteSync() || typeof sync.loadTelegramPhotoFeedback !== "function") {
+      return;
+    }
+
+    const feedbackQueryId = queryParams.get("tgFeedback") || "";
+    if (feedbackQueryId && !forceReplace) {
+      return;
+    }
+
+    const row = getCurrentRow();
+    const feedbackId = row && row.photoFeedbackId ? String(row.photoFeedbackId) : "";
+    if (!feedbackId) {
+      return;
+    }
+
+    if (!forceReplace) {
+      if (state.photoImport.draftMode) {
+        return;
+      }
+      if (state.photoImport.feedbackId === feedbackId && state.photoImport.imageDataUrl) {
+        return;
+      }
+    }
+
+    try {
+      const record = await sync.loadTelegramPhotoFeedback(feedbackId, departmentId);
+      if (!record) {
+        return;
+      }
+
+      const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
+      if (!imageDataUrl.startsWith("data:image/")) {
+        return;
+      }
+
+      const preparedPhoto = await normalizeImageDataUrl(imageDataUrl);
+      const workflowStatus = row && typeof row.photoWorkflowStatus === "string" ? row.photoWorkflowStatus : "idle";
+
+      state.photoImport = buildInitialPhotoImportState();
+      state.photoImport.feedbackId = String(record.id || feedbackId);
+      state.photoImport.workflowStatus = workflowStatus;
+      state.photoImport.imageName = typeof record.imageName === "string" && record.imageName.trim()
+        ? record.imageName
+        : (row && typeof row.photoName === "string" ? row.photoName : "");
+      state.photoImport.imageDataUrl = preparedPhoto.dataUrl;
+      state.photoImport.lastReportDate = typeof record.photoReportDate === "string" && record.photoReportDate.trim()
+        ? record.photoReportDate
+        : (typeof record.reportDate === "string" ? record.reportDate : "");
+      state.photoImport.lastAppliedKeys = Array.isArray(record.recognizedKeys)
+        ? record.recognizedKeys.map((item) => String(item))
+        : [];
+      state.photoImport.notes = normalizeOcrNotes(record.notes);
+      state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
+      state.photoImport.status = workflowStatus === "pending"
+        ? "Новый бланк загружен. Проверьте значения и сохраните данные после корректировок."
+        : "Показан последний сохранённый бланк отделения.";
       state.photoImport.isError = false;
       renderPage();
     } catch (_error) {
@@ -5406,6 +5509,13 @@
             };
 
             state.photoImport.draftMode = false;
+            if (state.photoImport.feedbackId) {
+              state.photoImport.workflowStatus = "processed";
+              if (state.photoImport.imageDataUrl) {
+                state.photoImport.status = "Последний бланк сохранён вместе с данными отделения.";
+                state.photoImport.isError = false;
+              }
+            }
 
             if (ocrFeedback && typeof sync.saveOcrFeedback === "function") {
               try {
@@ -5935,6 +6045,9 @@
         }
         restorePendingMainSaveNotice();
         refreshTableData();
+        if (mode === "department") {
+          void maybeLoadStoredDepartmentPhotoAdjusted();
+        }
       } catch (error) {
         state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
         refreshTableData();
@@ -5995,6 +6108,7 @@
     startClockTicker();
     await maybeResumeTransferredPhotoImport();
     await maybeLoadTelegramFeedbackPhotoAdjusted();
+    await maybeLoadStoredDepartmentPhotoAdjusted();
   }
 
   init().catch((error) => {

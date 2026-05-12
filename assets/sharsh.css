@@ -915,6 +915,26 @@ a {
   background: #fff6e9;
 }
 
+.link-card[data-workflow-tone="pending"] .link-card-actions a:first-child {
+  background: #c53b2d;
+  border-color: #c53b2d;
+  color: #ffffff;
+}
+
+.link-card[data-workflow-tone="pending"] .link-card-actions a:first-child:hover {
+  background: #b13225;
+}
+
+.link-card[data-workflow-tone="processed"] .link-card-actions a:first-child {
+  background: #1f8d49;
+  border-color: #1f8d49;
+  color: #ffffff;
+}
+
+.link-card[data-workflow-tone="processed"] .link-card-actions a:first-child:hover {
+  background: #19763d;
+}
+
 .updates-panel {
   margin-top: 14px;
 }

@@ -397,7 +397,17 @@
       presentKeys: [...definition.presentKeys],
       hasLeaveTotal: definition.hasLeaveTotal,
       values: normalizeRowValues(sourceRow && sourceRow.values),
-      updatedAt: sourceRow && sourceRow.updatedAt ? String(sourceRow.updatedAt) : null
+      updatedAt: sourceRow && sourceRow.updatedAt ? String(sourceRow.updatedAt) : null,
+      photoWorkflowStatus: sourceRow && sourceRow.photoWorkflowStatus
+        ? String(sourceRow.photoWorkflowStatus)
+        : "idle",
+      photoFeedbackId: sourceRow && sourceRow.photoFeedbackId !== null && typeof sourceRow.photoFeedbackId !== "undefined"
+        ? Number(sourceRow.photoFeedbackId)
+        : null,
+      photoFeedbackUpdatedAt: sourceRow && sourceRow.photoFeedbackUpdatedAt
+        ? String(sourceRow.photoFeedbackUpdatedAt)
+        : null,
+      photoName: sourceRow && sourceRow.photoName ? String(sourceRow.photoName) : ""
     };
   }
 
@@ -429,7 +439,11 @@
         ? saved.departments.map((item) => ({
             id: item.id || item.departmentId,
             values: item.values,
-            updatedAt: item.updatedAt
+            updatedAt: item.updatedAt,
+            photoWorkflowStatus: item.photoWorkflowStatus,
+            photoFeedbackId: item.photoFeedbackId,
+            photoFeedbackUpdatedAt: item.photoFeedbackUpdatedAt,
+            photoName: item.photoName
           }))
         : []);
 
