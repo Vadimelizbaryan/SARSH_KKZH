@@ -214,6 +214,14 @@
     };
   }
 
+  function buildInitialPhotoLightboxState() {
+    return {
+      open: false,
+      imageDataUrl: "",
+      alt: "Фото бланка"
+    };
+  }
+
   function buildInitialFeedbackState() {
     return {
       records: [],
@@ -246,6 +254,7 @@
     selectedArchiveKey: "",
     initialized: false,
     photoImport: buildInitialPhotoImportState(),
+    photoLightbox: buildInitialPhotoLightboxState(),
     mainPhotoRoute: buildInitialMainPhotoRouteState(),
     feedback: buildInitialFeedbackState()
   };
@@ -3325,6 +3334,7 @@
             </div>
           </aside>
         </div>
+        ${renderPhotoLightbox()}
       </div>
     `;
   }
@@ -3387,6 +3397,23 @@
               ? `<div class="feedback-list">${records.map((record) => buildFeedbackCard(record)).join("")}</div>`
               : `<div class="archive-empty">${escapeHtml(state.feedback.isLoading ? "Загружаю записи..." : "Пока нет сохранённых OCR feedback записей.")}</div>`}
           </section>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPhotoLightbox() {
+    const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+    if (!lightbox.open || !lightbox.imageDataUrl) {
+      return "";
+    }
+
+    return `
+      <div class="photo-lightbox" id="photoLightbox" aria-modal="true" role="dialog">
+        <div class="photo-lightbox-backdrop" data-photo-lightbox-close="true"></div>
+        <div class="photo-lightbox-dialog">
+          <button type="button" class="photo-lightbox-close" id="photoLightboxClose" aria-label="Закрыть просмотр">×</button>
+          <img src="${escapeHtml(lightbox.imageDataUrl)}" alt="${escapeHtml(lightbox.alt || "Фото бланка")}">
         </div>
       </div>
     `;
@@ -3477,6 +3504,7 @@
             <input type="file" id="photoImportFile" accept="image/*" capture="environment" ${photoState.isProcessing ? "disabled" : ""}>
             Выбрать фото
           </label>
+          <button type="button" id="photoZoomBtn" ${!photoState.imageDataUrl ? "disabled" : ""}>Увеличить</button>
           <button type="button" id="photoRotateBtn" ${!photoState.imageDataUrl || photoState.isProcessing ? "disabled" : ""}>Повернуть 90°</button>
           <button type="button" id="photoRecognizeBtn" ${!photoState.imageDataUrl || photoState.isProcessing || !canRecognize ? "disabled" : ""}>
             ${photoState.isProcessing ? "Распознаю..." : "Распознать"}
@@ -3498,7 +3526,12 @@
         ${photoState.imageDataUrl ? `
           <div class="photo-import-preview">
             <div class="photo-import-preview-frame">
-              <img src="${escapeHtml(photoState.imageDataUrl)}" alt="Загруженный бланк">
+              <img
+                src="${escapeHtml(photoState.imageDataUrl)}"
+                alt="Загруженный бланк"
+                class="photo-import-preview-image"
+                data-photo-zoom-trigger="department"
+              >
               ${renderPhotoReviewOverlay(photoState)}
             </div>
           </div>
@@ -3707,6 +3740,7 @@
             </div>
           </div>
         </div>
+        ${renderPhotoLightbox()}
       </div>
     `;
   }
@@ -4564,6 +4598,26 @@
     renderPage();
   }
 
+  function openPhotoLightbox(imageDataUrl, alt) {
+    if (!imageDataUrl) {
+      return;
+    }
+    state.photoLightbox = {
+      open: true,
+      imageDataUrl,
+      alt: alt || "Фото бланка"
+    };
+    renderPage();
+  }
+
+  function closePhotoLightbox() {
+    if (!state.photoLightbox?.open) {
+      return;
+    }
+    state.photoLightbox = buildInitialPhotoLightboxState();
+    renderPage();
+  }
+
   function renderMainPhotoRoutePanel() {
     const canDetect = sync.hasRemoteSync() && typeof sync.detectDepartmentPhoto === "function";
     const routeState = state.mainPhotoRoute || buildInitialMainPhotoRouteState();
@@ -4585,6 +4639,7 @@
             <input type="file" id="mainPhotoRouteFolder" accept="image/*" webkitdirectory directory multiple ${routeState.isProcessing ? "disabled" : ""}>
             Выбрать папку
           </label>
+          <button type="button" id="mainPhotoRouteZoomBtn" ${!routeState.imageDataUrl ? "disabled" : ""}>Увеличить</button>
           <button type="button" id="mainPhotoRouteRotateBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>Повернуть 90°</button>
           <button type="button" id="mainPhotoRouteDetectBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
             ${routeState.isProcessing ? "Определяю..." : "Определить и открыть"}
@@ -4604,7 +4659,12 @@
         }</p>
         ${routeState.imageDataUrl ? `
           <div class="photo-import-preview">
-            <img src="${escapeHtml(routeState.imageDataUrl)}" alt="Фото для определения отделения">
+            <img
+              src="${escapeHtml(routeState.imageDataUrl)}"
+              alt="Фото для определения отделения"
+              class="photo-import-preview-image"
+              data-photo-zoom-trigger="main"
+            >
           </div>
         ` : ""}
         ${detectedDepartment || batchPreviewItems || (routeState.notes && routeState.notes.length) ? `
@@ -5627,6 +5687,13 @@
       });
     }
 
+    const mainPhotoRouteZoomBtn = document.getElementById("mainPhotoRouteZoomBtn");
+    if (mainPhotoRouteZoomBtn) {
+      mainPhotoRouteZoomBtn.addEventListener("click", () => {
+        openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Фото для определения отделения");
+      });
+    }
+
     const photoImportFile = document.getElementById("photoImportFile");
     if (photoImportFile instanceof HTMLInputElement) {
       photoImportFile.addEventListener("change", () => {
@@ -5662,6 +5729,37 @@
         clearPhotoImportSelection();
       });
     }
+
+    const photoZoomBtn = document.getElementById("photoZoomBtn");
+    if (photoZoomBtn) {
+      photoZoomBtn.addEventListener("click", () => {
+        openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Фото бланка");
+      });
+    }
+
+    document.querySelectorAll("[data-photo-zoom-trigger]").forEach((image) => {
+      image.addEventListener("click", () => {
+        const kind = image.getAttribute("data-photo-zoom-trigger");
+        if (kind === "main") {
+          openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Фото для определения отделения");
+          return;
+        }
+        openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Фото бланка");
+      });
+    });
+
+    const photoLightboxClose = document.getElementById("photoLightboxClose");
+    if (photoLightboxClose) {
+      photoLightboxClose.addEventListener("click", () => {
+        closePhotoLightbox();
+      });
+    }
+
+    document.querySelectorAll("[data-photo-lightbox-close]").forEach((element) => {
+      element.addEventListener("click", () => {
+        closePhotoLightbox();
+      });
+    });
     const signOutButton = document.querySelector("[data-owner-signout]");
     if (signOutButton && auth && typeof auth.signOut === "function") {
       signOutButton.addEventListener("click", () => {

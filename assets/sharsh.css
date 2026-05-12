@@ -320,6 +320,10 @@ a {
   border-radius: 12px;
 }
 
+.photo-import-preview-image {
+  cursor: zoom-in;
+}
+
 .photo-import-preview-frame {
   position: relative;
   display: inline-block;
@@ -406,6 +410,63 @@ a {
 
 .photo-import-overlay-chip--review {
   background: rgba(177, 58, 45, 0.88);
+}
+
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.photo-lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 12, 12, 0.82);
+  backdrop-filter: blur(2px);
+}
+
+.photo-lightbox-dialog {
+  position: relative;
+  z-index: 1;
+  max-width: min(92vw, 1400px);
+  max-height: 88vh;
+  padding: 14px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+
+.photo-lightbox-dialog img {
+  display: block;
+  max-width: min(88vw, 1320px);
+  max-height: calc(88vh - 28px);
+  width: auto;
+  height: auto;
+  border-radius: 14px;
+}
+
+.photo-lightbox-close {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.photo-lightbox-close:hover {
+  background: #000000;
 }
 
 .photo-import-results {
