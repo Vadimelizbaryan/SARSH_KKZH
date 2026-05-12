@@ -670,8 +670,8 @@
     startRatio: 0.08,
     endRatio: 0.98,
     totalCellSlots: 11,
-    firstTargetSlotIndex: 1,
-    targetCellCount: 10,
+    firstTargetSlotIndex: 0,
+    targetCellCount: 11,
     innerXPaddingRatio: 0.08,
     topRatio: 0.12,
     bottomRatio: 0.90
@@ -698,8 +698,8 @@
     startRatio: 0.02,
     endRatio: 0.98,
     totalCellSlots: 11,
-    firstTargetSlotIndex: 1,
-    targetCellCount: 10,
+    firstTargetSlotIndex: 0,
+    targetCellCount: 11,
     innerXPaddingRatio: 0.08,
     topRatio: 0.12,
     bottomRatio: 0.94
