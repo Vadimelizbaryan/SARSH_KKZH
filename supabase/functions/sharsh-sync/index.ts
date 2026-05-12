@@ -144,6 +144,23 @@ function sanitizeValues(values: Record<string, unknown> | null | undefined) {
   return output;
 }
 
+function extractPresentTotalFromNotes(notes: string[]) {
+  for (const note of notes) {
+    if (typeof note !== "string" || !note.trim()) {
+      continue;
+    }
+    const englishMatch = note.match(/\bcell\s*12\b.*?\b(?:as|=|is)\s*(\d+)\b/i);
+    if (englishMatch) {
+      return sanitizeNumber(englishMatch[1]);
+    }
+    const russianMatch = note.match(/\bяч(?:ейк[аи]|\.?)\s*12\b.*?\b(?:как|=|это|значение)\s*(\d+)\b/i);
+    if (russianMatch) {
+      return sanitizeNumber(russianMatch[1]);
+    }
+  }
+  return null;
+}
+
 function sanitizeReportDate(value: unknown) {
   if (typeof value !== "string") {
     return null;
@@ -747,6 +764,9 @@ async function recognizeDepartmentPhoto(
   const baseNotes = Array.isArray(parsed.notes)
     ? parsed.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
     : [];
+  if (sanitizedValues.presentTotal === null) {
+    sanitizedValues.presentTotal = extractPresentTotalFromNotes(baseNotes);
+  }
   const structureInvalid = !!structure && (!structure.all22CellsVisible || structure.gridCellCount !== 22);
   const notes = [...baseNotes];
   if (structureInvalid) {
