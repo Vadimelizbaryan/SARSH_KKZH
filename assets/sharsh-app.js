@@ -4196,10 +4196,6 @@
       });
     }
 
-    if (appliedKeys.length > 0 && applicableFields.some((field) => field.key === "presentTotal")) {
-      previewKeys.push("presentTotal");
-    }
-
     const suspectDetails = getPhotoImportSuspectDetails(row, recognizedKeys);
 
     state.photoImport.recognizedValues = config.normalizeRowValues(values);
