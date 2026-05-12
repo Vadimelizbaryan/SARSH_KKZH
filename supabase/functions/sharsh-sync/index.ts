@@ -743,6 +743,8 @@ async function recognizeDepartmentPhoto(
   );
 
   const sanitizedValues = sanitizeValues(parsed.values as Record<string, unknown> | undefined);
+  sanitizedValues.presentTotal = null;
+  sanitizedValues.leaveTotal = null;
   const finalValues = sanitizedValues;
   const structure = sanitizePhotoStructure(parsed.structure);
   const baseNotes = Array.isArray(parsed.notes)
@@ -764,7 +766,7 @@ async function recognizeDepartmentPhoto(
     recognizedKeys: structureInvalid
       ? []
       : Object.entries(finalValues)
-      .filter(([, value]) => value !== null)
+      .filter(([key, value]) => key !== "presentTotal" && key !== "leaveTotal" && value !== null)
       .map(([key]) => key),
     notes,
     cellReviews: sanitizePhotoCellReviews(parsed.cellReviews),

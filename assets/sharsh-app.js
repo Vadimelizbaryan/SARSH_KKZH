@@ -538,7 +538,7 @@
       ...(Array.isArray(row.editableKeys) ? row.editableKeys : [])
     ]);
 
-    return PHOTO_FIELD_DEFINITIONS.filter((item) => item.key === "presentTotal" || allowedKeys.has(item.key));
+    return PHOTO_FIELD_DEFINITIONS.filter((item) => allowedKeys.has(item.key));
   }
 
   function getPhotoFieldMetaByKey(key) {
@@ -5433,7 +5433,12 @@
       return null;
     }
 
-    const recognizedKeys = config.valueKeys.filter((key) => recognizedValues[key] !== null);
+    const recognizedKeys = config.valueKeys.filter((key) => {
+      if (key === "presentTotal" || key === "leaveTotal") {
+        return false;
+      }
+      return recognizedValues[key] !== null;
+    });
     if (!recognizedKeys.length) {
       return null;
     }
