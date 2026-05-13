@@ -5143,21 +5143,24 @@
       : null;
     const batchPreviewItems = buildMainPhotoRouteBatchSummary(routeState);
     const saveDirectoryLabel = state.mainPhotoSaveDirectoryName
-      ? `Папка: ${state.mainPhotoSaveDirectoryName}`
-      : "Выбрать Pictures/MFPictures";
+      ? `Сохранять: ${state.mainPhotoSaveDirectoryName}`
+      : "Сохранять: MFPictures";
 
     return `
       <section class="panel no-print photo-import-panel">
         <h2>Фото бланка в отделение</h2>
-        <p>Загрузите фото бланка на главном файле. После загрузки система определит отделение по крупному маркеру или по шапке бланка и отметит это отделение красной кнопкой, как после Telegram. Страницы отделений автоматически не открываются.</p>
+        <p>Сначала выберите папку сохранения, если нужны копии на диск. Потом загрузите фото бланка: система определит отделение и отметит его красной кнопкой, как после Telegram.</p>
         <div class="photo-import-actions">
+          <button type="button" id="mainPhotoRouteSaveFolderBtn" ${!canUseMainPhotoSaveDirectory() || routeState.isProcessing ? "disabled" : ""}>
+            ${escapeHtml(saveDirectoryLabel)}
+          </button>
           <label class="button-link photo-file-label${routeState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="mainPhotoRouteFile" accept="image/*" capture="environment" multiple ${routeState.isProcessing ? "disabled" : ""}>
             Выбрать фото
           </label>
           <label class="button-link photo-file-label${routeState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="mainPhotoRouteFolder" accept="image/*" webkitdirectory directory multiple ${routeState.isProcessing ? "disabled" : ""}>
-            Выбрать папку
+            Папка фото
           </label>
           <button type="button" id="mainPhotoRouteZoomBtn" ${!routeState.imageDataUrl ? "disabled" : ""}>Увеличить</button>
           <button type="button" id="mainPhotoRouteRotateBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>Повернуть 90°</button>
@@ -5166,9 +5169,6 @@
           </button>
           <button type="button" id="mainPhotoRouteRecheckBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
             Проверить заново
-          </button>
-          <button type="button" id="mainPhotoRouteSaveFolderBtn" ${!canUseMainPhotoSaveDirectory() || routeState.isProcessing ? "disabled" : ""}>
-            ${escapeHtml(saveDirectoryLabel)}
           </button>
           <button type="button" id="mainPhotoRouteClearBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>Очистить</button>
         </div>
@@ -5337,7 +5337,7 @@
 
         const saveStatusText = state.mainPhotoSaveDirectoryHandle
           ? ` Сохранено копий в ${state.mainPhotoSaveDirectoryName || "выбранную папку"}: ${savedCopyCount}.`
-          : " Папка MFPictures не выбрана, копии на диск не сохранены.";
+          : " Копии на диск не сохранены: сначала нажмите «Сохранять: MFPictures» и выберите Pictures или MFPictures.";
         setMainPhotoRouteStatus(
           `Пакет готов: распознано ${recognizedQueue.length} из ${preparedItems.length}. Кнопки отделений с новыми бланками подсвечены красным, страницы не открывались.${saveStatusText}`,
           false
@@ -5412,7 +5412,7 @@
 
       let saveStatusText = state.mainPhotoSaveDirectoryHandle
         ? " Копия на диск не сохранена: нет разрешения записи."
-        : " Папка MFPictures не выбрана, копия на диск не сохранена.";
+        : " Копия на диск не сохранена: сначала нажмите «Сохранять: MFPictures» и выберите Pictures или MFPictures.";
       try {
         const saveResult = await saveMainPhotoRouteCopy(queuedItem, 1);
         if (saveResult.ok) {

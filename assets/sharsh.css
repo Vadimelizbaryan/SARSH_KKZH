@@ -242,13 +242,15 @@ a {
 .photo-import-panel {
   display: grid;
   gap: 12px;
+  overflow: hidden;
 }
 
 .photo-import-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  max-width: 100%;
 }
 
 .photo-import-actions button,
@@ -258,18 +260,26 @@ a {
   align-items: center;
   justify-content: center;
   min-height: 38px;
-  padding: 9px 15px;
+  max-width: 100%;
+  padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid var(--panel-border);
   background: var(--panel);
   box-shadow: 0 10px 24px rgba(17, 17, 17, 0.08);
   color: var(--ink);
   font: inherit;
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
   text-decoration: none;
   transition: transform 0.15s ease, background 0.15s ease;
   overflow: hidden;
   cursor: pointer;
+}
+
+#mainPhotoRouteSaveFolderBtn {
+  flex: 0 1 320px;
 }
 
 .photo-import-actions button:hover,
