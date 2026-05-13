@@ -5,6 +5,7 @@ const DEFAULT_DATE = "05,05,26";
 const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-mini").trim();
 const DEFAULT_SITE_BASE_URL = "https://vadimelizbaryan.github.io/SARSH_KKZH";
 const OCR_TEMPLATE_BLANK_IMAGE_PATH = "/assets/ocr-template-blank.jpg";
+const DEPARTMENT_SHEET_TEMPLATE_PATH = "/assets/templates/SHARSH_KKZH_template.xlsx";
 
 const VALUE_KEYS = [
   "beenTotal",
@@ -232,6 +233,10 @@ function getPublicSiteBaseUrl() {
 
 function getOcrTemplateBlankImageUrl() {
   return `${getPublicSiteBaseUrl()}${OCR_TEMPLATE_BLANK_IMAGE_PATH}`;
+}
+
+function getDepartmentSheetTemplateUrl() {
+  return `${getPublicSiteBaseUrl()}${DEPARTMENT_SHEET_TEMPLATE_PATH}`;
 }
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -829,6 +834,51 @@ async function sendTelegramMessage(chatId: number | string, text: string) {
   });
 }
 
+async function sendTelegramDocument(
+  chatId: number | string,
+  fileName: string,
+  bytes: Uint8Array,
+  caption: string,
+  mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+) {
+  const formData = new FormData();
+  formData.append("chat_id", String(chatId));
+  if (caption) {
+    formData.append("caption", caption);
+  }
+  const fileBuffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(fileBuffer).set(bytes);
+  formData.append("document", new File([fileBuffer], fileName, { type: mimeType }));
+
+  const response = await fetch(`${getTelegramApiBaseUrl()}/sendDocument`, {
+    method: "POST",
+    body: formData
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload || payload.ok !== true) {
+    const description = payload && typeof payload === "object" && typeof payload.description === "string"
+      ? payload.description
+      : `Telegram API call sendDocument failed (${response.status}).`;
+    throw new Error(description);
+  }
+}
+
+async function fetchDepartmentSheetTemplateBytes() {
+  const url = getDepartmentSheetTemplateUrl();
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Не удалось загрузить рабочую таблицу (${response.status}) из ${url}.`);
+  }
+
+  return new Uint8Array(await response.arrayBuffer());
+}
+
 async function getTelegramWebhookInfo() {
   return await callTelegramApi("getWebhookInfo", {});
 }
@@ -951,6 +1001,7 @@ function buildHelpText() {
     "/pdf — ссылка на главный файл",
     "/done — то же, что /pdf",
     "",
+    "Чтобы получить рабочий XLSX-файл отделения, отправьте код или название отделения отдельным сообщением: `r4`, `SR-4`.",
     "Подсказка: можно добавить в подпись к фото `r4` или `SR-4`, чтобы явно указать отделение."
   ].join("\n");
 }
@@ -958,6 +1009,43 @@ function buildHelpText() {
 function buildDepartmentsText() {
   const lines = Object.entries(DEPARTMENTS).map(([id, meta]) => `${id} — ${meta.department} (${meta.marker})`);
   return ["Доступные отделения:", ...lines].join("\n");
+}
+
+function sanitizeSheetFileNamePart(value: string) {
+  return value
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+}
+
+async function sendWorkingSheetForDepartment(
+  supabase: ReturnType<typeof createClient>,
+  chatId: number,
+  departmentId: DepartmentId,
+  text: string
+) {
+  const snapshot = await loadSnapshot(supabase);
+  const reportDate = detectReportDateFromHint(text) || snapshot.reportDate || DEFAULT_DATE;
+  const meta = DEPARTMENTS[departmentId];
+  const bytes = await fetchDepartmentSheetTemplateBytes();
+  const safeDate = sanitizeSheetFileNamePart(reportDate.replaceAll(".", ",").replaceAll("/", ","));
+  const fileName = `${sanitizeSheetFileNamePart(meta.marker)}_${safeDate || DEFAULT_DATE}_working.xlsx`;
+
+  await sendTelegramDocument(
+    chatId,
+    fileName,
+    bytes,
+    [
+      `Рабочая таблица для отделения: ${meta.department} (${departmentId}, ${meta.marker})`,
+      `Дата отчёта: ${reportDate}`,
+      "Это файл из рабочей таблицы проекта, не новая упрощённая форма.",
+      "Заполните нужные данные отделения и отправьте XLSX-файл обратно боту.",
+      "После возврата файла данные должны попасть на проверку перед общей таблицей."
+    ].join("\n")
+  );
 }
 
 function rowHasAnyData(values: Record<string, number | null>) {
@@ -1090,6 +1178,16 @@ async function handleTelegramCommand(
     return;
   }
 
+  if (command === "/sheet") {
+    const departmentId = detectDepartmentFromHint(text);
+    if (!departmentId) {
+      await sendTelegramMessage(chatId, "Укажите отделение после команды: /sheet r4 или /sheet SR-4.");
+      return;
+    }
+    await sendWorkingSheetForDepartment(supabase, chatId, departmentId, text);
+    return;
+  }
+
   if (command === "/status") {
     const snapshot = await loadSnapshot(supabase);
     await sendTelegramMessage(chatId, buildStatusText(snapshot));
@@ -1195,6 +1293,12 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
 
   if (text.startsWith("/")) {
     await handleTelegramCommand(supabase, safeChatId, text);
+    return;
+  }
+
+  const requestedDepartmentId = detectDepartmentFromHint(text);
+  if (requestedDepartmentId && !extractPhotoFileId(message)) {
+    await sendWorkingSheetForDepartment(supabase, safeChatId, requestedDepartmentId, text);
     return;
   }
 
