@@ -122,6 +122,41 @@ const DEPARTMENT_SHEET_INPUT_COLUMNS = [
   "T", "U", "V",
   "Y", "Z"
 ];
+const DEPARTMENT_SHEET_VALUE_COLUMNS = {
+  beenTotal: "B",
+  beenSoldier: "C",
+  beenSeries: "D",
+  admittedTotal: "E",
+  admittedSoldier: "F",
+  admittedSeries: "G",
+  dgTotal: "H",
+  dgSoldier: "I",
+  dgSeries: "J",
+  currentShar: "M",
+  currentSpa: "N",
+  currentPaym: "O",
+  currentZh: "P",
+  family: "Q",
+  officer: "R",
+  civil: "S",
+  leaveSharq: "T",
+  leaveSpa: "U",
+  leavePaym: "V",
+  transferFromDepartment: "Y",
+  transferToDepartment: "Z"
+} as const;
+const DEPARTMENT_SHEET_PRESENT_SUM_KEYS = [
+  "currentShar",
+  "currentSpa",
+  "currentPaym",
+  "currentZh",
+  "family",
+  "officer",
+  "civil",
+  "leaveSharq",
+  "leaveSpa",
+  "leavePaym"
+] as const;
 const DEPARTMENT_SHEET_FORMULA_COLUMNS = ["K", "L", "W", "X"];
 const DEPARTMENT_SHEET_LAST_COLUMN = "Z";
 const DEPARTMENT_SHEET_FIRST_INPUT_COLUMN = "B";
@@ -998,6 +1033,17 @@ function escapeXmlText(value: string) {
     .replace(/>/g, "&gt;");
 }
 
+function decodeXmlText(value: string) {
+  return value
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_match, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&amp;/g, "&");
+}
+
 function normalizeDepartmentSheetReportDate(reportDate: string) {
   const match = String(reportDate || "").trim().match(/^(\d{2})[.,/](\d{2})[.,/](\d{2,4})$/);
   if (!match) {
@@ -1252,6 +1298,123 @@ function protectDepartmentSheetXml(worksheetXml: string) {
   return worksheetXml.replace("</sheetData>", `</sheetData>${DEPARTMENT_SHEET_PROTECTION_TAG}`);
 }
 
+function parseSharedStringsXml(sharedStringsXml: string) {
+  return Array.from(sharedStringsXml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g))
+    .map((match) => {
+      const texts = Array.from(match[1].matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g))
+        .map((textMatch) => decodeXmlText(textMatch[1]));
+      return texts.join("");
+    });
+}
+
+function getWorksheetCellXml(worksheetXml: string, cellRef: string) {
+  const pattern = new RegExp(`<c\\b[^>]*\\br="${cellRef}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`);
+  const match = worksheetXml.match(pattern);
+  return match ? match[0] : "";
+}
+
+function getWorksheetCellText(worksheetXml: string, cellRef: string, sharedStrings: string[]) {
+  const cellXml = getWorksheetCellXml(worksheetXml, cellRef);
+  if (!cellXml) {
+    return "";
+  }
+
+  if (/\bt="s"/.test(cellXml)) {
+    const indexMatch = cellXml.match(/<v>([\s\S]*?)<\/v>/);
+    const index = indexMatch ? Number(indexMatch[1]) : NaN;
+    return Number.isFinite(index) ? sharedStrings[index] || "" : "";
+  }
+
+  if (/\bt="inlineStr"/.test(cellXml)) {
+    return Array.from(cellXml.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g))
+      .map((match) => decodeXmlText(match[1]))
+      .join("");
+  }
+
+  const valueMatch = cellXml.match(/<v>([\s\S]*?)<\/v>/);
+  return valueMatch ? decodeXmlText(valueMatch[1]) : "";
+}
+
+function detectDepartmentFromSheetTitle(worksheetXml: string, sharedStrings: string[]) {
+  const title = getWorksheetCellText(worksheetXml, "A1", sharedStrings);
+  return detectDepartmentFromHint(title);
+}
+
+function detectDepartmentFromVisibleSheetRow(worksheetXml: string) {
+  const visibleRows = Array.from(worksheetXml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>/g))
+    .map((match) => {
+      const rowNumber = Number(match[1]);
+      return {
+        rowNumber,
+        isHidden: /\bhidden="1"/.test(match[0])
+      };
+    })
+    .filter((row) => row.rowNumber >= 4 && row.rowNumber <= 22 && !row.isHidden);
+
+  if (visibleRows.length !== 1) {
+    return null;
+  }
+
+  const found = Object.entries(DEPARTMENT_SHEET_ROW_BY_ID)
+    .find(([, rowNumber]) => rowNumber === visibleRows[0].rowNumber);
+  return found ? found[0] as DepartmentId : null;
+}
+
+function getSheetNumber(values: Record<string, number | null>, key: string) {
+  return values[key] ?? 0;
+}
+
+function validateDepartmentSheetValues(values: Record<string, number | null>) {
+  const actual = DEPARTMENT_SHEET_PRESENT_SUM_KEYS
+    .reduce((sum, key) => sum + getSheetNumber(values, key), 0);
+  const expected = (
+    getSheetNumber(values, "beenTotal")
+    + getSheetNumber(values, "admittedTotal")
+    + getSheetNumber(values, "transferToDepartment")
+  ) - (
+    getSheetNumber(values, "dgTotal")
+    + getSheetNumber(values, "transferFromDepartment")
+  );
+
+  return {
+    isValid: actual === expected,
+    actual,
+    expected
+  };
+}
+
+async function parseReturnedDepartmentSheet(bytes: Uint8Array, fileName: string) {
+  const zip = await JSZip.loadAsync(bytes);
+  const worksheet = zip.file("xl/worksheets/sheet1.xml");
+  if (!worksheet) {
+    throw new Error("В XLSX не найден лист Sheet1.");
+  }
+
+  const worksheetXml = await worksheet.async("string");
+  const sharedStringsFile = zip.file("xl/sharedStrings.xml");
+  const sharedStrings = sharedStringsFile
+    ? parseSharedStringsXml(await sharedStringsFile.async("string"))
+    : [];
+  const departmentId = detectDepartmentFromHint(fileName)
+    || detectDepartmentFromSheetTitle(worksheetXml, sharedStrings)
+    || detectDepartmentFromVisibleSheetRow(worksheetXml);
+  if (!departmentId) {
+    throw new Error("Не удалось определить отделение из XLSX-файла.");
+  }
+
+  const targetRow = DEPARTMENT_SHEET_ROW_BY_ID[departmentId];
+  const values = sanitizeValues(null);
+  Object.entries(DEPARTMENT_SHEET_VALUE_COLUMNS).forEach(([key, column]) => {
+    values[key] = sanitizeNumber(getWorksheetCellText(worksheetXml, `${column}${targetRow}`, sharedStrings));
+  });
+
+  return {
+    departmentId,
+    values,
+    validation: validateDepartmentSheetValues(values)
+  };
+}
+
 async function buildDepartmentOnlySheetBytes(templateBytes: Uint8Array, departmentId: DepartmentId, reportDate: string) {
   const targetRow = DEPARTMENT_SHEET_ROW_BY_ID[departmentId];
   if (!targetRow) {
@@ -1354,6 +1517,20 @@ async function downloadTelegramImageAsDataUrl(fileId: string) {
   return {
     dataUrl: `data:${mimeType};base64,${bytesToBase64(bytes)}`,
     fileName: filePath.split("/").pop() || "telegram-image.jpg"
+  };
+}
+
+async function downloadTelegramFileBytes(fileId: string) {
+  const filePath = await getTelegramFilePath(fileId);
+  const response = await fetch(`${getTelegramFileBaseUrl()}/${filePath}`);
+  if (!response.ok) {
+    throw new Error(`Telegram file download failed (${response.status}).`);
+  }
+
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    fileName: filePath.split("/").pop() || "telegram-file",
+    contentType: response.headers.get("content-type") || ""
   };
 }
 
@@ -1559,6 +1736,34 @@ function extractPhotoFileId(message: Record<string, unknown>) {
   return null;
 }
 
+function extractSheetDocument(message: Record<string, unknown>) {
+  const document = message.document as {
+    file_id?: unknown;
+    file_name?: unknown;
+    mime_type?: unknown;
+  } | undefined;
+  if (!document || typeof document.file_id !== "string") {
+    return null;
+  }
+
+  const fileName = typeof document.file_name === "string" ? document.file_name : "";
+  const mimeType = typeof document.mime_type === "string" ? document.mime_type : "";
+  const lowerFileName = fileName.toLowerCase();
+  const lowerMimeType = mimeType.toLowerCase();
+  const isXlsx = lowerFileName.endsWith(".xlsx")
+    || lowerMimeType.includes("spreadsheetml.sheet")
+    || lowerMimeType.includes("application/vnd.ms-excel");
+  if (!isXlsx) {
+    return null;
+  }
+
+  return {
+    fileId: document.file_id,
+    fileName: fileName || "department-sheet.xlsx",
+    mimeType
+  };
+}
+
 function isAllowedChat(chatId: number | null) {
   if (chatId === null) {
     return false;
@@ -1698,6 +1903,44 @@ async function handleTelegramPhoto(
   );
 }
 
+async function handleTelegramSheetDocument(
+  chatId: number,
+  sheetDocument: { fileId: string; fileName: string; mimeType: string }
+) {
+  await sendTelegramMessage(chatId, "XLSX-файл получен. Проверяю формулу...");
+
+  const downloaded = await downloadTelegramFileBytes(sheetDocument.fileId);
+  const bytes = downloaded.bytes;
+  const fileName = sheetDocument.fileName || downloaded.fileName || "department-sheet.xlsx";
+  const result = await parseReturnedDepartmentSheet(bytes, fileName);
+  const meta = DEPARTMENTS[result.departmentId];
+
+  if (!result.validation.isValid) {
+    await sendTelegramDocument(
+      chatId,
+      fileName,
+      bytes,
+      [
+        "Данные неправильные, нужно отредактировать файл.",
+        `Отделение: ${meta.department} (${meta.marker})`,
+        `Формула не совпала: сумма 13-22 = ${result.validation.actual}, а должно быть ${result.validation.expected}.`,
+        "Исправьте значения в ячейках ввода и отправьте XLSX обратно боту."
+      ].join("\n")
+    );
+    return;
+  }
+
+  await sendTelegramMessage(
+    chatId,
+    [
+      "Файл проверен: формула совпала.",
+      `Отделение: ${meta.department} (${meta.marker})`,
+      `Сумма 13-22 = ${result.validation.actual}.`,
+      "Данные приняты на проверку. В общую таблицу пока не внесены автоматически."
+    ].join("\n")
+  );
+}
+
 async function processTelegramUpdate(update: Record<string, unknown>) {
   const message = (update.message || update.edited_message) as Record<string, unknown> | undefined;
   if (!message || typeof message !== "object") {
@@ -1715,6 +1958,12 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
 
   if (text.startsWith("/")) {
     await handleTelegramCommand(supabase, safeChatId, text);
+    return;
+  }
+
+  const sheetDocument = extractSheetDocument(message);
+  if (sheetDocument) {
+    await handleTelegramSheetDocument(safeChatId, sheetDocument);
     return;
   }
 
