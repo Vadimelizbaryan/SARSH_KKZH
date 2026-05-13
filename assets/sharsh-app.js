@@ -4748,8 +4748,8 @@
     return typeof window.showDirectoryPicker === "function";
   }
 
-  async function ensureMainPhotoSaveDirectoryPermission() {
-    const handle = state.mainPhotoSaveDirectoryHandle;
+  async function ensureMainPhotoSaveDirectoryPermission(directoryHandle = state.mainPhotoSaveDirectoryHandle) {
+    const handle = directoryHandle;
     if (!handle) {
       return false;
     }
@@ -4770,6 +4770,39 @@
     }
   }
 
+  async function getMainPhotoSaveDirectoryHandle(selectedDirectoryHandle) {
+    if (!selectedDirectoryHandle) {
+      return null;
+    }
+    if (selectedDirectoryHandle.name === "MFPictures") {
+      return {
+        handle: selectedDirectoryHandle,
+        name: "MFPictures"
+      };
+    }
+
+    if (!(await ensureMainPhotoSaveDirectoryPermission(selectedDirectoryHandle))) {
+      return {
+        handle: selectedDirectoryHandle,
+        name: selectedDirectoryHandle.name || "выбранная папка",
+        needsPermission: true
+      };
+    }
+
+    if (typeof selectedDirectoryHandle.getDirectoryHandle !== "function") {
+      return {
+        handle: selectedDirectoryHandle,
+        name: selectedDirectoryHandle.name || "выбранная папка"
+      };
+    }
+
+    const mfPicturesHandle = await selectedDirectoryHandle.getDirectoryHandle("MFPictures", { create: true });
+    return {
+      handle: mfPicturesHandle,
+      name: `${selectedDirectoryHandle.name || "Pictures"}/MFPictures`
+    };
+  }
+
   async function chooseMainPhotoSaveDirectory() {
     if (!canUseMainPhotoSaveDirectory()) {
       setMainPhotoRouteStatus("Браузер не поддерживает сохранение в выбранную папку. Используйте Chrome или Edge.", true);
@@ -4783,11 +4816,17 @@
         mode: "readwrite",
         startIn: "pictures"
       });
-      state.mainPhotoSaveDirectoryHandle = directoryHandle;
-      state.mainPhotoSaveDirectoryName = directoryHandle && directoryHandle.name
+      const saveDirectory = await getMainPhotoSaveDirectoryHandle(directoryHandle);
+      state.mainPhotoSaveDirectoryHandle = saveDirectory?.handle || directoryHandle;
+      state.mainPhotoSaveDirectoryName = saveDirectory?.name || (directoryHandle && directoryHandle.name
         ? directoryHandle.name
+        : "MFPictures");
+      const hasPermission = saveDirectory?.needsPermission
+        ? false
+        : await ensureMainPhotoSaveDirectoryPermission();
+      state.mainPhotoSaveDirectoryName = state.mainPhotoSaveDirectoryName
+        ? state.mainPhotoSaveDirectoryName
         : "MFPictures";
-      const hasPermission = await ensureMainPhotoSaveDirectoryPermission();
       setMainPhotoRouteStatus(
         hasPermission
           ? `Папка для копий выбрана: ${state.mainPhotoSaveDirectoryName}. После определения отделения фото будет сохранено туда.`
@@ -5105,7 +5144,7 @@
     const batchPreviewItems = buildMainPhotoRouteBatchSummary(routeState);
     const saveDirectoryLabel = state.mainPhotoSaveDirectoryName
       ? `Папка: ${state.mainPhotoSaveDirectoryName}`
-      : "Выбрать MFPictures";
+      : "Выбрать Pictures/MFPictures";
 
     return `
       <section class="panel no-print photo-import-panel">
