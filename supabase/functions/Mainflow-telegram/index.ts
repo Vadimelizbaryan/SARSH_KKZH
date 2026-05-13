@@ -295,6 +295,18 @@ function getTelegramAllowedChatIds() {
     .filter(Boolean);
 }
 
+function getTelegramNotifyChatIds(currentChatId?: number | string | null) {
+  const raw = Deno.env.get("TELEGRAM_NOTIFY_CHAT_IDS") || Deno.env.get("TELEGRAM_ALLOWED_CHAT_IDS") || "";
+  const current = currentChatId === null || typeof currentChatId === "undefined" ? "" : String(currentChatId);
+  return Array.from(new Set(
+    raw
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .filter((value) => value !== current)
+  ));
+}
+
 function getPublicSiteBaseUrl() {
   const raw = Deno.env.get("PUBLIC_SITE_BASE_URL") || DEFAULT_SITE_BASE_URL;
   const trimmed = raw.trim().replace(/\/+$/, "");
@@ -963,6 +975,16 @@ async function sendTelegramMessage(chatId: number | string, text: string) {
     text,
     disable_web_page_preview: true
   });
+}
+
+async function sendTelegramMessageToMany(chatIds: Array<number | string>, text: string) {
+  for (const chatId of chatIds) {
+    try {
+      await sendTelegramMessage(chatId, text);
+    } catch (error) {
+      console.error("Failed to send Telegram notification:", sanitizePublicErrorMessage(error));
+    }
+  }
 }
 
 async function sendTelegramDocument(
@@ -1683,7 +1705,8 @@ function buildPhotoSaveSummary(
   recognized: Awaited<ReturnType<typeof recognizeDepartmentPhoto>>,
   departmentSource: string,
   feedbackId: string,
-  didSaveSnapshot: boolean
+  didSaveSnapshot: boolean,
+  validation?: { isValid: boolean; actual: number; expected: number } | null
 ) {
   const meta = DEPARTMENTS[departmentId];
   const cellSummaries = PHOTO_FIELD_MAPPINGS
@@ -1697,7 +1720,7 @@ function buildPhotoSaveSummary(
   return [
     didSaveSnapshot
       ? "Фото обработано и сохранено."
-      : "Фото обработано. Значения не сохранены: распознанных ячеек не найдено.",
+      : "Фото обработано. Значения не сохранены: контроль отделения не пройден.",
     `Отделение: ${meta.department} (${departmentId})`,
     `Источник отделения: ${departmentSource}`,
     `Дата отчёта: ${reportDate}`,
@@ -1706,8 +1729,40 @@ function buildPhotoSaveSummary(
     recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22)
       ? `Структура строки не подтверждена: ${recognized.structure.gridCellCount}/22 ячеек.`
       : (cellSummaries ? `Распознано: ${cellSummaries}` : "Распознанных ячеек не найдено."),
+    validation
+      ? (validation.isValid
+        ? `Контроль формулы: пройден, сумма 13-22 = ${validation.actual}.`
+        : `Контроль формулы: не пройден, сумма 13-22 = ${validation.actual}, должно быть ${validation.expected}.`)
+      : "",
     recognized.notes.length ? `Заметки OCR: ${recognized.notes.join("; ")}` : ""
   ].filter(Boolean).join("\n");
+}
+
+function buildPhotoSenderResponse(
+  isControlPassed: boolean,
+  validation: { isValid: boolean; actual: number; expected: number } | null,
+  structureInvalid: boolean,
+  hasRecognizedValues: boolean
+) {
+  if (isControlPassed) {
+    return "Спасибо, контроль отделения пройден. 🙂";
+  }
+
+  const reason = !hasRecognizedValues
+    ? "не удалось уверенно прочитать значения"
+    : (structureInvalid
+      ? "верхняя строка бланка распознана неуверенно"
+      : (validation && !validation.isValid ? "формула отделения не совпала" : "контроль не пройден"));
+
+  return buildPhotoRetakeResponse(reason);
+}
+
+function buildPhotoRetakeResponse(reason: string) {
+  return [
+    "Контроль отделения не пройден.",
+    `Причина: ${reason}.`,
+    "Пожалуйста, пришлите повторный качественный снимок бланка: ровно, без обрезанных краёв, чтобы SR-маркер и верхняя строка с ячейками были хорошо видны."
+  ].join("\n");
 }
 
 function getMessageText(message: Record<string, unknown>) {
@@ -1872,10 +1927,20 @@ async function handleTelegramPhoto(
     const detection = await detectDepartmentFromPhoto(dataUrl);
     departmentId = detection.departmentId;
     if (!departmentId) {
-      const noteText = detection.notes.length ? `\nЗаметки: ${detection.notes.join("; ")}` : "";
+      const detectionSummary = [
+        "Фото обработано. Отделение не определено.",
+        "Источник отделения: автоопределение по фото",
+        detection.notes.length ? `Заметки OCR: ${detection.notes.join("; ")}` : ""
+      ].filter(Boolean).join("\n");
+      const notifyChatIds = getTelegramNotifyChatIds(chatId);
+      if (notifyChatIds.length) {
+        await sendTelegramMessageToMany(notifyChatIds, detectionSummary);
+      } else {
+        console.warn("Telegram photo detection summary was not sent: TELEGRAM_NOTIFY_CHAT_IDS is not configured.");
+      }
       await sendTelegramMessage(
         chatId,
-        `Не удалось уверенно определить отделение по фото.${noteText}\nПовторите фото или добавьте в подпись код вроде r4 или SR-4.`
+        buildPhotoRetakeResponse("не удалось уверенно определить отделение по фото")
       );
       return;
     }
@@ -1889,7 +1954,9 @@ async function handleTelegramPhoto(
   const hasRecognizedValues = recognized.recognizedKeys.some((key) => {
     return VALUE_KEYS.includes(key as (typeof VALUE_KEYS)[number]);
   });
-  const shouldSaveSnapshot = !structureInvalid && hasRecognizedValues;
+  const photoValidation = hasRecognizedValues ? validateDepartmentSheetValues(recognized.values) : null;
+  const isPhotoControlPassed = !structureInvalid && hasRecognizedValues && !!photoValidation?.isValid;
+  const shouldSaveSnapshot = isPhotoControlPassed;
   if (shouldSaveSnapshot) {
     await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values);
   }
@@ -1906,9 +1973,25 @@ async function handleTelegramPhoto(
   );
   await markDepartmentPhotoPending(supabase, departmentId, feedbackId, fileName);
 
+  const detailedPhotoSummary = buildPhotoSaveSummary(
+    departmentId,
+    reportDate,
+    recognized,
+    departmentSource,
+    feedbackId,
+    shouldSaveSnapshot,
+    photoValidation
+  );
+  const notifyChatIds = getTelegramNotifyChatIds(chatId);
+  if (notifyChatIds.length) {
+    await sendTelegramMessageToMany(notifyChatIds, detailedPhotoSummary);
+  } else {
+    console.warn("Telegram photo OCR summary was not sent: TELEGRAM_NOTIFY_CHAT_IDS is not configured.");
+  }
+
   await sendTelegramMessage(
     chatId,
-    buildPhotoSaveSummary(departmentId, reportDate, recognized, departmentSource, feedbackId, shouldSaveSnapshot)
+    buildPhotoSenderResponse(isPhotoControlPassed, photoValidation, structureInvalid, hasRecognizedValues)
   );
 }
 
