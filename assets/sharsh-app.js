@@ -4707,50 +4707,32 @@
     }).join("");
   }
 
-  function navigateToQueuedDepartment(item) {
-    if (!item || !item.departmentId) {
+  async function queueMainPhotoRouteDepartmentPhoto(item) {
+    if (!item || !item.departmentId || !item.imageDataUrl) {
       return false;
+    }
+    if (typeof sync.queueDepartmentPhoto !== "function") {
+      throw new Error("Очередь фото отделений недоступна в текущем режиме.");
     }
 
     const department = config.getDepartmentById(item.departmentId);
-    if (!department) {
-      return false;
+    const notes = [
+      "Фото загружено с главной страницы после автоопределения отделения.",
+      ...(Array.isArray(item.notes) ? item.notes : [])
+    ];
+    const result = await sync.queueDepartmentPhoto(
+      item.departmentId,
+      item.imageName || "",
+      item.imageDataUrl,
+      notes
+    );
+    applyLoadedSnapshot(result);
+
+    if (department) {
+      setInfo(`Новый бланк добавлен в очередь отделения: ${department.department}.`, false);
     }
 
-    renderPage();
-    window.location.href = appendShareQuery(config.getDepartmentPagePath(basePath, item.departmentId));
     return true;
-  }
-
-  function openDepartmentTabWithPendingPhoto(item, targetWindow) {
-    if (!item || !item.departmentId) {
-      return false;
-    }
-
-    const department = config.getDepartmentById(item.departmentId);
-    if (!department) {
-      return false;
-    }
-
-    const transferId = storePendingMainPhotoRouteTransfer(item);
-    if (!transferId) {
-      return false;
-    }
-
-    const targetUrl = appendQueryParams(config.getDepartmentPagePath(basePath, item.departmentId), {
-      photoTransfer: transferId
-    });
-
-    try {
-      if (targetWindow && !targetWindow.closed) {
-        targetWindow.location.href = targetUrl;
-        return true;
-      }
-    } catch (_error) {
-    }
-
-    const openedWindow = window.open(targetUrl, "_blank");
-    return Boolean(openedWindow);
   }
 
   function isSupportedMainPhotoFile(file) {
@@ -4814,18 +4796,6 @@
     }
 
     if (selectedFiles.length > 1) {
-      const batchTabTargets = selectedFiles.map((_item, index) => {
-        const openedTab = window.open("about:blank", "_blank");
-        if (openedTab && !openedTab.closed) {
-          try {
-            openedTab.document.title = `\u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435 ${index + 1}/${selectedFiles.length}`;
-            openedTab.document.body.innerHTML = `<p style="font:16px/1.5 Segoe UI, Arial, sans-serif; padding:24px;">\u041f\u043e\u0434\u0433\u043e\u0442\u0430\u0432\u043b\u0438\u0432\u0430\u044e \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u044f \u0434\u043b\u044f \u0444\u043e\u0442\u043e ${index + 1} \u0438\u0437 ${selectedFiles.length}...</p>`;
-          } catch (_error) {
-          }
-        }
-        return openedTab;
-      });
-
       state.mainPhotoRoute = buildInitialMainPhotoRouteState();
       state.mainPhotoRoute.isProcessing = true;
       state.mainPhotoRoute.imageName = selectedFiles[0].name || "";
@@ -4865,8 +4835,7 @@
           }
           preparedItems.push({
             imageName: currentFile.name || "",
-            imageDataUrl,
-            targetWindow: batchTabTargets[index] || null
+            imageDataUrl
           });
         }
 
@@ -4922,7 +4891,7 @@
         return;
       }
 
-      setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Нажмите "Определить и открыть".`, false);
+      setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Нажмите "Определить".`, false);
       renderPage();
     } catch (error) {
       state.mainPhotoRoute = buildInitialMainPhotoRouteState();
@@ -4972,7 +4941,7 @@
     return `
       <section class="panel no-print photo-import-panel">
         <h2>Фото бланка в отделение</h2>
-        <p>Загрузите фото бланка на главном файле. После загрузки система сама определит отделение по крупному маркеру отделения или по шапке бланка, откроет нужную страницу и автоматически начнёт подстановку цифр в поля этого отделения.</p>
+        <p>Загрузите фото бланка на главном файле. После загрузки система определит отделение по крупному маркеру или по шапке бланка и отметит это отделение красной кнопкой, как после Telegram. Страницы отделений автоматически не открываются.</p>
         <div class="photo-import-actions">
           <label class="button-link photo-file-label${routeState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="mainPhotoRouteFile" accept="image/*" capture="environment" multiple ${routeState.isProcessing ? "disabled" : ""}>
@@ -4985,7 +4954,7 @@
           <button type="button" id="mainPhotoRouteZoomBtn" ${!routeState.imageDataUrl ? "disabled" : ""}>Увеличить</button>
           <button type="button" id="mainPhotoRouteRotateBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>Повернуть 90°</button>
           <button type="button" id="mainPhotoRouteDetectBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
-            ${routeState.isProcessing ? "Определяю..." : "Определить и открыть"}
+            ${routeState.isProcessing ? "Определяю..." : "Определить"}
           </button>
           <button type="button" id="mainPhotoRouteRecheckBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
             Проверить заново
@@ -5066,20 +5035,6 @@
         notes: [],
         stage: "ready"
       }));
-      const batchTabTargets = preparedItems.map((preparedItem, index) => {
-        const existingWindow = preparedItem && preparedItem.targetWindow && !preparedItem.targetWindow.closed
-          ? preparedItem.targetWindow
-          : null;
-        const openedTab = existingWindow || window.open("about:blank", "_blank");
-        if (openedTab && !openedTab.closed) {
-          try {
-            openedTab.document.title = `\u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435 ${index + 1}/${preparedItems.length}`;
-            openedTab.document.body.innerHTML = `<p style="font:16px/1.5 Segoe UI, Arial, sans-serif; padding:24px;">\u041f\u043e\u0434\u0433\u043e\u0442\u0430\u0432\u043b\u0438\u0432\u0430\u044e \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u044f \u0434\u043b\u044f \u0444\u043e\u0442\u043e ${index + 1} \u0438\u0437 ${preparedItems.length}...</p>`;
-          } catch (_error) {
-          }
-        }
-        return openedTab;
-      });
       setMainPhotoRouteStatus(`Определяю отделения по ${preparedItems.length} фото...`, false);
       renderPage();
 
@@ -5116,23 +5071,25 @@
           }
 
           if (department) {
-            recognizedQueue.push({
+            setMainPhotoRouteStatus(
+              `Отделение найдено: ${department.department}. Сохраняю фото как новый бланк...`,
+              false
+            );
+            renderPage();
+
+            const queuedItem = {
               departmentId: detectedDepartmentId,
               imageName: preparedItem.imageName,
               imageDataUrl: preparedItem.imageDataUrl,
               detectedBy: "vision",
-              notes,
-              targetWindow: batchTabTargets[index] || null
+              notes
+            };
+            await queueMainPhotoRouteDepartmentPhoto(queuedItem);
+            recognizedQueue.push({
+              ...queuedItem
             });
             state.mainPhotoRoute.batchDetectedCount += 1;
           } else {
-            const failedWindow = batchTabTargets[index];
-            if (failedWindow && !failedWindow.closed) {
-              try {
-                failedWindow.close();
-              } catch (_error) {
-              }
-            }
             state.mainPhotoRoute.batchFailedCount += 1;
             batchNotes.push(`${preparedItem.imageName || `Фото ${index + 1}`}: отделение не определилось уверенно.`);
           }
@@ -5152,21 +5109,8 @@
           return;
         }
 
-        let openedCount = 0;
-        recognizedQueue.forEach((item) => {
-          if (openDepartmentTabWithPendingPhoto(item, item.targetWindow || null)) {
-            openedCount += 1;
-          }
-        });
-
-        if (!openedCount) {
-          setMainPhotoRouteStatus("\u041f\u0430\u043a\u0435\u0442 \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u043d, \u043d\u043e \u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u043d\u0435 \u043e\u0442\u043a\u0440\u044b\u043b \u0432\u043a\u043b\u0430\u0434\u043a\u0438 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0439. \u0420\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u0435 \u0432\u0441\u043f\u043b\u044b\u0432\u0430\u044e\u0449\u0438\u0435 \u043e\u043a\u043d\u0430 \u0438 \u043f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437.", true);
-          renderPage();
-          return;
-        }
-
         setMainPhotoRouteStatus(
-          `\u041f\u0430\u043a\u0435\u0442 \u0433\u043e\u0442\u043e\u0432: \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u043d\u043e ${recognizedQueue.length} \u0438\u0437 ${preparedItems.length}. \u041e\u0442\u043a\u0440\u044b\u043b ${openedCount} \u0432\u043a\u043b\u0430\u0434\u043e\u043a \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0439, \u0433\u043b\u0430\u0432\u043d\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430 \u043e\u0441\u0442\u0430\u0451\u0442\u0441\u044f \u043e\u0442\u043a\u0440\u044b\u0442\u043e\u0439.`,
+          `Пакет готов: распознано ${recognizedQueue.length} из ${preparedItems.length}. Кнопки отделений с новыми бланками подсвечены красным, страницы не открывались.`,
           false
         );
         renderPage();
@@ -5226,15 +5170,19 @@
         return;
       }
 
-      storePendingMainPhotoRoute({
+      await queueMainPhotoRouteDepartmentPhoto({
         departmentId: detectedDepartmentId,
         imageName: state.mainPhotoRoute.imageName,
-        imageDataUrl: state.mainPhotoRoute.imageDataUrl
+        imageDataUrl: state.mainPhotoRoute.imageDataUrl,
+        detectedBy,
+        notes
       });
 
-      setMainPhotoRouteStatus(`Открываю страницу отделения: ${department.department}.`, false);
+      setMainPhotoRouteStatus(
+        `Определено отделение: ${department.department}. Фото сохранено как новый бланк, кнопка отделения подсвечена красным.`,
+        false
+      );
       renderPage();
-      window.location.href = appendShareQuery(config.getDepartmentPagePath(basePath, detectedDepartmentId));
     } catch (error) {
       state.mainPhotoRoute.isProcessing = false;
       setMainPhotoRouteStatus(
@@ -5838,22 +5786,7 @@
             const nextRows = result.snapshot.rows || [];
             const nextStats = buildFreshnessStats(nextRows);
             const nextOverall = getOverallUpdateStatus(nextStats, nextRows.length);
-            const nextPendingRoute = manual ? peekPendingMainPhotoRoute() : null;
             let feedbackWarning = "";
-            const openNextPendingRoute = () => {
-              if (!nextPendingRoute || !nextPendingRoute.departmentId) {
-                return false;
-              }
-
-              const nextDepartment = config.getDepartmentById(nextPendingRoute.departmentId);
-              if (!nextDepartment) {
-                return false;
-              }
-
-              setInfo(`Данные сохранены. Открываю следующее отделение: ${nextDepartment.department}.`, false);
-              navigateToQueuedDepartment(nextPendingRoute);
-              return true;
-            };
 
             state.photoImport.draftMode = false;
             if (state.photoImport.feedbackId) {
@@ -5883,11 +5816,8 @@
             setInfo(manual ? "Данные отделения сохранены. Проверка записи пройдена." : "Изменения отправлены и проверка записи пройдена.", false);
             state.warning = feedbackWarning;
             refreshTableData();
-            if (openNextPendingRoute()) {
-              return;
-            }
             if (manual && state.photoImport.queueMode) {
-              setInfo("Данные отделения сохранены, проверка записи пройдена. Очередь фото завершена.", false);
+              setInfo("Данные отделения сохранены, проверка записи пройдена. Автоматическое открытие следующих страниц отключено.", false);
             }
             return;
           }

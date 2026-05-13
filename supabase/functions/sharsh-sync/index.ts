@@ -1063,6 +1063,80 @@ async function insertOcrFeedbackRecord(
   }
 }
 
+async function insertPendingPhotoFeedback(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: keyof typeof DEPARTMENTS,
+  reportDate: string,
+  imageName: string,
+  imageDataUrl: string,
+  notes: string[]
+) {
+  const departmentMeta = DEPARTMENTS[departmentId];
+  const emptyValues = sanitizePhotoValues(null);
+  const { data, error } = await supabase
+    .from("sharsh_ocr_feedback")
+    .insert({
+      department_id: departmentId,
+      department_name: departmentMeta.department,
+      report_date: reportDate,
+      photo_report_date: null,
+      save_status: "accepted_as_is",
+      image_name: imageName,
+      image_data_url: imageDataUrl,
+      recognized_keys: [],
+      changed_keys: [],
+      ocr_raw: emptyValues,
+      final_values: emptyValues,
+      notes,
+      cell_reviews: [],
+      created_at: new Date().toISOString()
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.id ? Number(data.id) : null;
+}
+
+async function markDepartmentPhotoPending(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: keyof typeof DEPARTMENTS,
+  feedbackId: number | null,
+  imageName: string
+) {
+  const departmentMeta = DEPARTMENTS[departmentId];
+  const { data: saved, error: selectError } = await supabase
+    .from("sharsh_departments")
+    .select("values, updated_at")
+    .eq("department_id", departmentId)
+    .maybeSingle();
+
+  if (selectError) {
+    throw selectError;
+  }
+
+  const { error } = await supabase
+    .from("sharsh_departments")
+    .upsert({
+      department_id: departmentId,
+      department_name: departmentMeta.department,
+      department_group: departmentMeta.group,
+      values: sanitizeValues(saved?.values as Record<string, unknown> | undefined),
+      updated_at: saved?.updated_at || null,
+      photo_workflow_status: "pending",
+      photo_feedback_id: feedbackId,
+      photo_feedback_updated_at: new Date().toISOString(),
+      photo_name: imageName
+    });
+
+  if (error) {
+    throw error;
+  }
+}
+
 function createSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -1164,6 +1238,40 @@ Deno.serve(async (request) => {
 
       const detection = await detectDepartmentFromPhoto(imageDataUrl);
       return jsonResponse(detection);
+    }
+
+    if (type === "queue_department_photo") {
+      const departmentId = typeof payload.departmentId === "string" ? payload.departmentId : "";
+      if (!Object.prototype.hasOwnProperty.call(DEPARTMENTS, departmentId)) {
+        return jsonResponse({ error: "Unknown department." }, 400);
+      }
+
+      const imageDataUrl = typeof payload.imageDataUrl === "string" ? payload.imageDataUrl.trim() : "";
+      if (!imageDataUrl.startsWith("data:image/")) {
+        return jsonResponse({ error: "A valid image is required." }, 400);
+      }
+
+      const imageName = typeof payload.imageName === "string" ? payload.imageName.trim() : "";
+      const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()
+        ? payload.reportDate.trim()
+        : DEFAULT_DATE;
+      const notes = sanitizeFeedbackNotes(payload.notes);
+      const feedbackId = await insertPendingPhotoFeedback(
+        supabase,
+        departmentId as keyof typeof DEPARTMENTS,
+        reportDate,
+        imageName,
+        imageDataUrl,
+        notes
+      );
+      await markDepartmentPhotoPending(
+        supabase,
+        departmentId as keyof typeof DEPARTMENTS,
+        feedbackId,
+        imageName
+      );
+
+      return jsonResponse(await loadSnapshot(supabase));
     }
 
     if (type === "list_ocr_feedback") {

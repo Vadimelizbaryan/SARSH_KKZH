@@ -325,6 +325,31 @@
     return payload;
   }
 
+  async function queueDepartmentPhoto(departmentId, imageName, imageDataUrl, notes = []) {
+    ensureOwnerAuth();
+    if (!hasRemoteSync()) {
+      throw new Error("Очередь фото доступна только в онлайн-режиме владельца.");
+    }
+
+    if (typeof imageDataUrl !== "string" || !imageDataUrl.startsWith("data:image/")) {
+      throw new Error("Нужен файл изображения для очереди отделения.");
+    }
+
+    const snapshot = await postRemote({
+      type: "queue_department_photo",
+      departmentId,
+      reportDate: loadLocalSnapshot().reportDate,
+      imageName: imageName || "",
+      imageDataUrl,
+      notes: Array.isArray(notes) ? notes : []
+    });
+
+    return {
+      snapshot,
+      source: "remote"
+    };
+  }
+
   async function saveDepartment(departmentId, reportDate, values, accessCode) {
     const localSnapshot = loadLocalSnapshot();
     const rowMap = new Map(localSnapshot.rows.map((row) => [row.id, row]));
@@ -518,6 +543,7 @@
     verifyDepartmentAccess,
     detectDepartmentPhoto,
     recognizeDepartmentPhoto,
+    queueDepartmentPhoto,
     loadLocalSnapshot,
     writeLocalSnapshot,
     getSourceLabel,
