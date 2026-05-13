@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import JSZip from "npm:jszip@3.10.1";
 
 // deploy-touch: 2026-05-10
 const DEFAULT_DATE = "05,05,26";
@@ -90,6 +91,26 @@ const DEPARTMENTS = {
   r20: { department: "ԱՏԴ", group: "extra", marker: "SR-20", slug: "5s7rrwg9" },
   r21: { department: "Ք/Հ", group: "extra", marker: "SR-21", slug: "3ofsacp6" }
 } as const;
+
+const DEPARTMENT_SHEET_ROW_BY_ID: Record<keyof typeof DEPARTMENTS, number> = {
+  r4: 4,
+  r5: 5,
+  r6: 6,
+  r7: 7,
+  r8: 8,
+  r9: 9,
+  r10: 10,
+  r11: 11,
+  r12: 12,
+  r13: 13,
+  r14: 14,
+  r15: 15,
+  r16: 16,
+  r17: 17,
+  r19: 19,
+  r20: 20,
+  r21: 21
+};
 
 const PHOTO_TEMPLATE_GUIDE = [
   "Template layout of the 22 visible top-row positions from left to right:",
@@ -879,6 +900,46 @@ async function fetchDepartmentSheetTemplateBytes() {
   return new Uint8Array(await response.arrayBuffer());
 }
 
+function setXmlAttribute(tag: string, name: string, value: string) {
+  const attributePattern = new RegExp(`\\s${name}="[^"]*"`);
+  if (attributePattern.test(tag)) {
+    return tag.replace(attributePattern, ` ${name}="${value}"`);
+  }
+  return tag.replace(/>$/, ` ${name}="${value}">`);
+}
+
+async function buildDepartmentOnlySheetBytes(templateBytes: Uint8Array, departmentId: DepartmentId) {
+  const targetRow = DEPARTMENT_SHEET_ROW_BY_ID[departmentId];
+  if (!targetRow) {
+    return templateBytes;
+  }
+
+  const zip = await JSZip.loadAsync(templateBytes);
+  const worksheet = zip.file("xl/worksheets/sheet1.xml");
+  if (!worksheet) {
+    throw new Error("В рабочем XLSX не найден лист Sheet1.");
+  }
+
+  const visibleRows = new Set([1, 2, 3, targetRow]);
+  const xml = await worksheet.async("string");
+  const filteredXml = xml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>/g, (tag, rowNumberText) => {
+    const rowNumber = Number(rowNumberText);
+    if (!Number.isFinite(rowNumber) || visibleRows.has(rowNumber)) {
+      return setXmlAttribute(tag, "hidden", "0");
+    }
+    if (rowNumber >= 4 && rowNumber <= 22) {
+      return setXmlAttribute(tag, "hidden", "1");
+    }
+    return tag;
+  });
+
+  zip.file("xl/worksheets/sheet1.xml", filteredXml);
+  return await zip.generateAsync({
+    type: "uint8array",
+    compression: "DEFLATE"
+  });
+}
+
 async function getTelegramWebhookInfo() {
   return await callTelegramApi("getWebhookInfo", {});
 }
@@ -1030,9 +1091,10 @@ async function sendWorkingSheetForDepartment(
   const snapshot = await loadSnapshot(supabase);
   const reportDate = detectReportDateFromHint(text) || snapshot.reportDate || DEFAULT_DATE;
   const meta = DEPARTMENTS[departmentId];
-  const bytes = await fetchDepartmentSheetTemplateBytes();
+  const templateBytes = await fetchDepartmentSheetTemplateBytes();
+  const bytes = await buildDepartmentOnlySheetBytes(templateBytes, departmentId);
   const safeDate = sanitizeSheetFileNamePart(reportDate.replaceAll(".", ",").replaceAll("/", ","));
-  const fileName = `${sanitizeSheetFileNamePart(meta.marker)}_${safeDate || DEFAULT_DATE}_working.xlsx`;
+  const fileName = `${sanitizeSheetFileNamePart(meta.marker)}_${safeDate || DEFAULT_DATE}_department.xlsx`;
 
   await sendTelegramDocument(
     chatId,
@@ -1041,7 +1103,7 @@ async function sendWorkingSheetForDepartment(
     [
       `Рабочая таблица для отделения: ${meta.department} (${departmentId}, ${meta.marker})`,
       `Дата отчёта: ${reportDate}`,
-      "Это файл из рабочей таблицы проекта, не новая упрощённая форма.",
+      "Это файл из рабочей таблицы проекта: видна только часть выбранного отделения.",
       "Заполните нужные данные отделения и отправьте XLSX-файл обратно боту.",
       "После возврата файла данные должны попасть на проверку перед общей таблицей."
     ].join("\n")
