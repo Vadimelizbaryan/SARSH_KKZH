@@ -261,6 +261,8 @@
     initialized: false,
     photoImport: buildInitialPhotoImportState(),
     photoLightbox: buildInitialPhotoLightboxState(),
+    mainPhotoSaveDirectoryHandle: null,
+    mainPhotoSaveDirectoryName: "",
     mainPhotoRoute: buildInitialMainPhotoRouteState(),
     feedback: buildInitialFeedbackState()
   };
@@ -4736,9 +4738,137 @@
         <div class="photo-import-result-item">
           <span>${escapeHtml(`${index + 1}. ${item.imageName || "image"}`)}</span>
           <strong>${escapeHtml(title)}</strong>
+          ${item.savedFileName ? `<small>${escapeHtml(item.savedFileName)}</small>` : ""}
         </div>
       `;
     }).join("");
+  }
+
+  function canUseMainPhotoSaveDirectory() {
+    return typeof window.showDirectoryPicker === "function";
+  }
+
+  async function ensureMainPhotoSaveDirectoryPermission() {
+    const handle = state.mainPhotoSaveDirectoryHandle;
+    if (!handle) {
+      return false;
+    }
+
+    try {
+      if (typeof handle.queryPermission === "function") {
+        const currentPermission = await handle.queryPermission({ mode: "readwrite" });
+        if (currentPermission === "granted") {
+          return true;
+        }
+      }
+      if (typeof handle.requestPermission === "function") {
+        return (await handle.requestPermission({ mode: "readwrite" })) === "granted";
+      }
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  async function chooseMainPhotoSaveDirectory() {
+    if (!canUseMainPhotoSaveDirectory()) {
+      setMainPhotoRouteStatus("Браузер не поддерживает сохранение в выбранную папку. Используйте Chrome или Edge.", true);
+      renderPage();
+      return false;
+    }
+
+    try {
+      const directoryHandle = await window.showDirectoryPicker({
+        id: "sharsh-mf-pictures",
+        mode: "readwrite",
+        startIn: "pictures"
+      });
+      state.mainPhotoSaveDirectoryHandle = directoryHandle;
+      state.mainPhotoSaveDirectoryName = directoryHandle && directoryHandle.name
+        ? directoryHandle.name
+        : "MFPictures";
+      const hasPermission = await ensureMainPhotoSaveDirectoryPermission();
+      setMainPhotoRouteStatus(
+        hasPermission
+          ? `Папка для копий выбрана: ${state.mainPhotoSaveDirectoryName}. После определения отделения фото будет сохранено туда.`
+          : "Папка выбрана, но браузер не дал право записи. Выберите папку ещё раз и разрешите сохранение.",
+        !hasPermission
+      );
+      renderPage();
+      return hasPermission;
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        setMainPhotoRouteStatus("Папка MFPictures не выбрана. Фото обработаются, но копии не сохранятся на диск.", true);
+      } else {
+        setMainPhotoRouteStatus(
+          error instanceof Error ? error.message : "Не удалось выбрать папку для сохранения фото.",
+          true
+        );
+      }
+      renderPage();
+      return false;
+    }
+  }
+
+  function sanitizePhotoFileNamePart(value) {
+    return String(value || "")
+      .trim()
+      .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 80);
+  }
+
+  function formatPhotoFileTimestamp(date = new Date()) {
+    const pad = (value) => String(value).padStart(2, "0");
+    const shortYear = String(date.getFullYear()).slice(-2);
+    return [
+      pad(date.getDate()),
+      pad(date.getMonth() + 1),
+      shortYear
+    ].join(",") + "_" + [
+      pad(date.getHours()),
+      pad(date.getMinutes()),
+      pad(date.getSeconds())
+    ].join("-");
+  }
+
+  function dataUrlToBlob(dataUrl) {
+    const [header, base64Payload] = String(dataUrl || "").split(",");
+    if (!header || !base64Payload) {
+      throw new Error("Не удалось подготовить фото для сохранения.");
+    }
+
+    const mimeMatch = header.match(/^data:([^;]+);base64$/i);
+    const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const binary = atob(base64Payload);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return new Blob([bytes], { type: mimeType });
+  }
+
+  async function saveMainPhotoRouteCopy(item, index = 0) {
+    const handle = state.mainPhotoSaveDirectoryHandle;
+    if (!handle || !item || !item.imageDataUrl) {
+      return { ok: false, skipped: true, fileName: "" };
+    }
+    if (!(await ensureMainPhotoSaveDirectoryPermission())) {
+      return { ok: false, skipped: true, fileName: "" };
+    }
+
+    const department = config.getDepartmentById(item.departmentId);
+    const marker = sanitizePhotoFileNamePart(department?.marker || item.departmentId || "department");
+    const suffix = Number(index) > 1 ? `_${String(index).padStart(2, "0")}` : "";
+    const fileName = `${marker}_${formatPhotoFileTimestamp()}${suffix}.jpg`;
+    const blob = dataUrlToBlob(item.imageDataUrl);
+    const fileHandle = await handle.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return { ok: true, skipped: false, fileName };
   }
 
   async function queueMainPhotoRouteDepartmentPhoto(item) {
@@ -4973,6 +5103,9 @@
       ? config.getDepartmentById(routeState.detectedDepartmentId)
       : null;
     const batchPreviewItems = buildMainPhotoRouteBatchSummary(routeState);
+    const saveDirectoryLabel = state.mainPhotoSaveDirectoryName
+      ? `Папка: ${state.mainPhotoSaveDirectoryName}`
+      : "Выбрать MFPictures";
 
     return `
       <section class="panel no-print photo-import-panel">
@@ -4994,6 +5127,9 @@
           </button>
           <button type="button" id="mainPhotoRouteRecheckBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
             Проверить заново
+          </button>
+          <button type="button" id="mainPhotoRouteSaveFolderBtn" ${!canUseMainPhotoSaveDirectory() || routeState.isProcessing ? "disabled" : ""}>
+            ${escapeHtml(saveDirectoryLabel)}
           </button>
           <button type="button" id="mainPhotoRouteClearBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>Очистить</button>
         </div>
@@ -5077,6 +5213,7 @@
       try {
         const recognizedQueue = [];
         const batchNotes = [];
+        let savedCopyCount = 0;
 
         for (let index = 0; index < preparedItems.length; index += 1) {
           const preparedItem = preparedItems[index];
@@ -5122,6 +5259,19 @@
               notes
             };
             await queueMainPhotoRouteDepartmentPhoto(queuedItem);
+            try {
+              const saveResult = await saveMainPhotoRouteCopy(queuedItem, index + 1);
+              if (saveResult.ok) {
+                savedCopyCount += 1;
+                if (batchItem) {
+                  batchItem.savedFileName = saveResult.fileName;
+                }
+              }
+            } catch (saveError) {
+              batchNotes.push(
+                `${preparedItem.imageName || `Фото ${index + 1}`}: отделение определено, но копия не сохранилась (${saveError instanceof Error ? saveError.message : "ошибка записи"}).`
+              );
+            }
             recognizedQueue.push({
               ...queuedItem
             });
@@ -5146,8 +5296,11 @@
           return;
         }
 
+        const saveStatusText = state.mainPhotoSaveDirectoryHandle
+          ? ` Сохранено копий в ${state.mainPhotoSaveDirectoryName || "выбранную папку"}: ${savedCopyCount}.`
+          : " Папка MFPictures не выбрана, копии на диск не сохранены.";
         setMainPhotoRouteStatus(
-          `Пакет готов: распознано ${recognizedQueue.length} из ${preparedItems.length}. Кнопки отделений с новыми бланками подсвечены красным, страницы не открывались.`,
+          `Пакет готов: распознано ${recognizedQueue.length} из ${preparedItems.length}. Кнопки отделений с новыми бланками подсвечены красным, страницы не открывались.${saveStatusText}`,
           false
         );
         renderPage();
@@ -5209,16 +5362,29 @@
 
       void playDepartmentDetectedSound();
 
-      await queueMainPhotoRouteDepartmentPhoto({
+      const queuedItem = {
         departmentId: detectedDepartmentId,
         imageName: state.mainPhotoRoute.imageName,
         imageDataUrl: state.mainPhotoRoute.imageDataUrl,
         detectedBy,
         notes
-      });
+      };
+      await queueMainPhotoRouteDepartmentPhoto(queuedItem);
+
+      let saveStatusText = state.mainPhotoSaveDirectoryHandle
+        ? " Копия на диск не сохранена: нет разрешения записи."
+        : " Папка MFPictures не выбрана, копия на диск не сохранена.";
+      try {
+        const saveResult = await saveMainPhotoRouteCopy(queuedItem, 1);
+        if (saveResult.ok) {
+          saveStatusText = ` Копия сохранена: ${saveResult.fileName}.`;
+        }
+      } catch (saveError) {
+        saveStatusText = ` Копия на диск не сохранена: ${saveError instanceof Error ? saveError.message : "ошибка сохранения"}.`;
+      }
 
       setMainPhotoRouteStatus(
-        `Определено отделение: ${department.department}. Фото сохранено как новый бланк, кнопка отделения подсвечена красным.`,
+        `Определено отделение: ${department.department}. Фото сохранено как новый бланк, кнопка отделения подсвечена красным.${saveStatusText}`,
         false
       );
       renderPage();
@@ -6107,6 +6273,13 @@
     if (mainPhotoRouteRecheckBtn) {
       mainPhotoRouteRecheckBtn.addEventListener("click", () => {
         handleMainPhotoRouteDetection();
+      });
+    }
+
+    const mainPhotoRouteSaveFolderBtn = document.getElementById("mainPhotoRouteSaveFolderBtn");
+    if (mainPhotoRouteSaveFolderBtn) {
+      mainPhotoRouteSaveFolderBtn.addEventListener("click", () => {
+        chooseMainPhotoSaveDirectory();
       });
     }
 
