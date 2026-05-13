@@ -1,0 +1,213 @@
+:root {
+  color-scheme: light;
+  --tg-ink: #1f2a24;
+  --tg-muted: #65736c;
+  --tg-line: #d8cbb3;
+  --tg-paper: #fffaf0;
+  --tg-panel: rgba(255, 255, 255, 0.92);
+  --tg-accent: #0f8b4c;
+  --tg-danger: #b92d20;
+  --tg-warning: #a86d00;
+  --tg-shadow: 0 18px 55px rgba(80, 62, 30, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Trebuchet MS", "Noto Sans Armenian", Verdana, sans-serif;
+  color: var(--tg-ink);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 225, 149, 0.55), transparent 30%),
+    linear-gradient(135deg, #f8edda 0%, #fffdf8 42%, #e8f4e9 100%);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.tg-form-root {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  padding: 14px;
+}
+
+.tg-form-card {
+  background: var(--tg-panel);
+  border: 1px solid rgba(127, 99, 47, 0.22);
+  border-radius: 28px;
+  box-shadow: var(--tg-shadow);
+  padding: 18px;
+}
+
+.tg-form-kicker {
+  margin: 0 0 6px;
+  color: var(--tg-accent);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tg-form-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tg-form-title {
+  margin: 0;
+  font-size: clamp(24px, 7vw, 42px);
+  line-height: 1.05;
+}
+
+.tg-form-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tg-form-pill {
+  border: 1px solid rgba(15, 139, 76, 0.22);
+  border-radius: 999px;
+  background: rgba(15, 139, 76, 0.08);
+  padding: 8px 12px;
+  font-weight: 800;
+}
+
+.tg-form-muted {
+  color: var(--tg-muted);
+}
+
+.tg-form-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--tg-line);
+  border-radius: 20px;
+  background: #fffdf8;
+}
+
+.tg-form-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.tg-form-table th,
+.tg-form-table td {
+  border: 1px solid var(--tg-line);
+  padding: 7px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.tg-form-table th {
+  background: #efe0c3;
+  font-weight: 900;
+}
+
+.tg-form-cell-number {
+  display: block;
+  color: var(--tg-muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.tg-form-cell-label {
+  display: block;
+  min-height: 28px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tg-form-input,
+.tg-form-control-value {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(31, 42, 36, 0.18);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  font-size: 20px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.tg-form-input:focus {
+  outline: 3px solid rgba(15, 139, 76, 0.18);
+  border-color: var(--tg-accent);
+}
+
+.tg-form-control-value {
+  display: grid;
+  place-items: center;
+  background: #f3efe7;
+  color: var(--tg-muted);
+}
+
+.tg-form-status {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(15, 139, 76, 0.08);
+  border: 1px solid rgba(15, 139, 76, 0.22);
+  font-weight: 800;
+}
+
+.tg-form-status.bad {
+  background: rgba(185, 45, 32, 0.08);
+  border-color: rgba(185, 45, 32, 0.25);
+  color: var(--tg-danger);
+}
+
+.tg-form-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.tg-form-submit {
+  min-height: 54px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--tg-accent);
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-form-submit:disabled {
+  cursor: not-allowed;
+  background: #aab7af;
+}
+
+.tg-form-message {
+  min-height: 22px;
+  color: var(--tg-muted);
+  font-weight: 800;
+}
+
+.tg-form-message.error {
+  color: var(--tg-danger);
+}
+
+.tg-form-message.success {
+  color: var(--tg-accent);
+}
+
+@media (max-width: 720px) {
+  .tg-form-root {
+    padding: 8px;
+  }
+
+  .tg-form-card {
+    border-radius: 20px;
+    padding: 12px;
+  }
+}

@@ -145,6 +145,7 @@ const DEPARTMENT_SHEET_VALUE_COLUMNS = {
   transferFromDepartment: "Y",
   transferToDepartment: "Z"
 } as const;
+const DEPARTMENT_SHEET_VALUE_KEYS = Object.keys(DEPARTMENT_SHEET_VALUE_COLUMNS);
 const DEPARTMENT_SHEET_PRESENT_SUM_KEYS = [
   "currentShar",
   "currentSpa",
@@ -220,6 +221,18 @@ function sanitizeValues(values: Record<string, unknown> | null | undefined) {
   return output;
 }
 
+function sanitizeDepartmentFormValues(values: unknown) {
+  if (!values || typeof values !== "object" || Array.isArray(values)) {
+    return sanitizeValues(null);
+  }
+  const rawValues = values as Record<string, unknown>;
+  const allowedValues: Record<string, unknown> = {};
+  DEPARTMENT_SHEET_VALUE_KEYS.forEach((key) => {
+    allowedValues[key] = rawValues[key];
+  });
+  return sanitizeValues(allowedValues);
+}
+
 function sanitizeRightCellValues(value: unknown) {
   if (!Array.isArray(value)) {
     return null;
@@ -290,6 +303,72 @@ function getTelegramSecretToken() {
   return token && token.trim() ? token.trim() : "";
 }
 
+function bytesToHex(bytes: ArrayBuffer) {
+  return Array.from(new Uint8Array(bytes))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function timingSafeEqual(left: string, right: string) {
+  if (left.length !== right.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return diff === 0;
+}
+
+function textToArrayBuffer(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+}
+
+async function hmacSha256(keyBytes: ArrayBuffer, data: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+}
+
+async function verifyTelegramWebAppInitData(initData: string) {
+  const token = getTelegramBotToken();
+  if (!token) {
+    throw new Error("TELEGRAM_BOT_TOKEN is not configured on the server.");
+  }
+
+  const params = new URLSearchParams(initData || "");
+  const receivedHash = String(params.get("hash") || "").trim().toLowerCase();
+  if (!receivedHash) {
+    return null;
+  }
+
+  params.delete("hash");
+  const dataCheckString = Array.from(params.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+  const secretKey = await hmacSha256(textToArrayBuffer("WebAppData"), token);
+  const calculatedHash = bytesToHex(await hmacSha256(secretKey, dataCheckString));
+  if (!timingSafeEqual(receivedHash, calculatedHash)) {
+    return null;
+  }
+
+  const userJson = params.get("user") || "";
+  const user = userJson ? JSON.parse(userJson) as Record<string, unknown> : null;
+  return {
+    userId: typeof user?.id === "number" ? user.id : null,
+    firstName: typeof user?.first_name === "string" ? user.first_name : "",
+    lastName: typeof user?.last_name === "string" ? user.last_name : "",
+    username: typeof user?.username === "string" ? user.username : ""
+  };
+}
+
 function getTelegramAllowedChatIds() {
   const raw = Deno.env.get("TELEGRAM_ALLOWED_CHAT_IDS") || "";
   return raw
@@ -323,6 +402,13 @@ function getPublicSiteBaseUrl() {
     // Fall back to the known-good public site URL below.
   }
   return DEFAULT_SITE_BASE_URL;
+}
+
+function getTelegramWebFormUrl(departmentId: DepartmentId, reportDate: string) {
+  const params = new URLSearchParams();
+  params.set("department", departmentId);
+  params.set("date", reportDate);
+  return `${getPublicSiteBaseUrl()}/tg-form.html?${params.toString()}`;
 }
 
 function getOcrTemplateBlankImageUrl() {
@@ -834,6 +920,33 @@ async function insertAcceptedFeedback(
   return data?.id ? String(data.id) : "";
 }
 
+async function insertTelegramWebFormFeedback(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: DepartmentId,
+  reportDate: string,
+  values: Record<string, number | null>,
+  userId: number | null,
+  userName: string
+) {
+  const notes = [
+    "Telegram Web App form submission.",
+    userId ? `Telegram user id: ${userId}` : "",
+    userName ? `Telegram user: ${userName}` : ""
+  ].filter(Boolean);
+
+  return await insertAcceptedFeedback(
+    supabase,
+    departmentId,
+    reportDate,
+    null,
+    "telegram-web-app-form",
+    null,
+    values,
+    DEPARTMENT_SHEET_VALUE_KEYS,
+    notes
+  );
+}
+
 async function loadAcceptedFeedbackPreview(
   supabase: ReturnType<typeof createClient>,
   feedbackId: string,
@@ -978,6 +1091,19 @@ async function sendTelegramMessage(chatId: number | string, text: string) {
     chat_id: chatId,
     text,
     disable_web_page_preview: true
+  });
+}
+
+async function sendTelegramMessageWithReplyMarkup(
+  chatId: number | string,
+  text: string,
+  replyMarkup: Record<string, unknown>
+) {
+  await callTelegramApi("sendMessage", {
+    chat_id: chatId,
+    text,
+    disable_web_page_preview: true,
+    reply_markup: replyMarkup
   });
 }
 
@@ -1764,8 +1890,10 @@ function buildHelpText() {
     "/departments — список кодов отделений",
     "/pdf — ссылка на главный файл",
     "/done — то же, что /pdf",
+    "/form SR-4 — открыть Telegram Web App форму отделения",
+    "/sheet SR-4 — получить старый XLSX-файл",
     "",
-    "Чтобы получить рабочий XLSX-файл отделения, отправьте код или название отделения отдельным сообщением: `r4`, `SR-4`.",
+    "Чтобы получить форму отделения, отправьте код или название отделения отдельным сообщением: `r4`, `SR-4`.",
     "Подсказка: можно добавить в подпись к фото `r4` или `SR-4`, чтобы явно указать отделение."
   ].join("\n");
 }
@@ -1812,6 +1940,38 @@ async function sendWorkingSheetForDepartment(
   );
 }
 
+async function sendTelegramWebFormForDepartment(
+  supabase: unknown,
+  chatId: number,
+  departmentId: DepartmentId,
+  text: string
+) {
+  const snapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
+  const reportDate = detectReportDateFromHint(text) || snapshot.reportDate || DEFAULT_DATE;
+  const meta = DEPARTMENTS[departmentId];
+  const formUrl = getTelegramWebFormUrl(departmentId, reportDate);
+
+  await sendTelegramMessageWithReplyMarkup(
+    chatId,
+    [
+      `Форма ввода для отделения: ${meta.department} (${meta.marker})`,
+      `Дата отчёта: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
+      "Откройте форму, заполните ячейки таблицы и отправьте данные на проверку.",
+      "Если нужен старый XLSX-файл, отправьте команду /sheet " + meta.marker + "."
+    ].join("\n"),
+    {
+      inline_keyboard: [
+        [
+          {
+            text: "Открыть форму",
+            web_app: { url: formUrl }
+          }
+        ]
+      ]
+    }
+  );
+}
+
 function rowHasAnyData(values: Record<string, number | null>) {
   return Object.values(values).some((value) => typeof value === "number" && value > 0);
 }
@@ -1831,6 +1991,99 @@ function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
     updatedRows.length ? "Последние обновления:" : null,
     ...updatedRows
   ].filter(Boolean).join("\n");
+}
+
+function buildTelegramWebFormValuesText(values: Record<string, number | null>) {
+  return PHOTO_FIELD_MAPPINGS
+    .map((item) => {
+      if (item.key === "presentTotal") {
+        return null;
+      }
+      return `${item.cell}=${values[item.key] ?? 0}`;
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
+async function handleTelegramWebFormSubmit(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const verifiedUser = await verifyTelegramWebAppInitData(String(payload?.initData || ""));
+    if (!verifiedUser) {
+      return jsonResponse({ ok: false, error: "Telegram Web App authorization failed." }, 403);
+    }
+
+    const departmentId = typeof payload?.departmentId === "string" && Object.prototype.hasOwnProperty.call(DEPARTMENTS, payload.departmentId)
+      ? payload.departmentId as DepartmentId
+      : null;
+    if (!departmentId) {
+      return jsonResponse({ ok: false, error: "Не удалось определить отделение формы." }, 400);
+    }
+
+    const reportDate = sanitizeReportDate(payload?.reportDate) || DEFAULT_DATE;
+    const values = sanitizeDepartmentFormValues(payload?.values);
+    const validation = validateDepartmentSheetValues(values);
+    if (!validation.isValid) {
+      return jsonResponse({
+        ok: false,
+        error: "Контроль формулы не пройден.",
+        validation
+      }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const userName = [
+      verifiedUser.firstName,
+      verifiedUser.lastName,
+      verifiedUser.username ? `@${verifiedUser.username}` : ""
+    ].filter(Boolean).join(" ");
+    const feedbackId = await insertTelegramWebFormFeedback(
+      supabase,
+      departmentId,
+      reportDate,
+      values,
+      verifiedUser.userId,
+      userName
+    );
+    const meta = DEPARTMENTS[departmentId];
+    const messageText = [
+      "Спасибо. Отличная работа. 🙂",
+      "Форма проверена: формула совпала.",
+      `Отделение: ${meta.department} (${meta.marker})`,
+      `Сумма 13-22 = ${validation.actual}.`,
+      "Данные приняты на проверку. В общую таблицу пока не внесены автоматически."
+    ].join("\n");
+
+    if (verifiedUser.userId) {
+      await sendTelegramMessage(verifiedUser.userId, messageText).catch((error) => {
+        console.error("Failed to notify Telegram Web App user:", sanitizePublicErrorMessage(error));
+      });
+    }
+
+    const notifyChatIds = getTelegramNotifyChatIds(verifiedUser.userId);
+    if (notifyChatIds.length) {
+      await sendTelegramMessageToMany(notifyChatIds, [
+        "Получена Telegram Web App форма.",
+        `Отделение: ${meta.department} (${meta.marker})`,
+        `Дата отчёта: ${reportDate}`,
+        `Пользователь: ${userName || verifiedUser.userId || "неизвестно"}`,
+        `OCR feedback: ${feedbackId || "без номера"}`,
+        `Значения: ${buildTelegramWebFormValuesText(values)}`
+      ].join("\n"));
+    }
+
+    return jsonResponse({
+      ok: true,
+      feedbackId,
+      validation,
+      message: messageText
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      error: sanitizePublicErrorMessage(error)
+    }, 500);
+  }
 }
 
 function buildPhotoSaveSummary(
@@ -2010,6 +2263,16 @@ async function handleTelegramCommand(
       return;
     }
     await sendWorkingSheetForDepartment(supabase, chatId, departmentId, text);
+    return;
+  }
+
+  if (command === "/form") {
+    const departmentId = detectDepartmentFromHint(text);
+    if (!departmentId) {
+      await sendTelegramMessage(chatId, "Укажите отделение после команды: /form r4 или /form SR-4.");
+      return;
+    }
+    await sendTelegramWebFormForDepartment(supabase, chatId, departmentId, text);
     return;
   }
 
@@ -2221,7 +2484,7 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
 
   const requestedDepartmentId = detectDepartmentFromHint(text);
   if (requestedDepartmentId && !extractPhotoFileId(message)) {
-    await sendWorkingSheetForDepartment(supabase, safeChatId, requestedDepartmentId, text);
+    await sendTelegramWebFormForDepartment(supabase, safeChatId, requestedDepartmentId, text);
     return;
   }
 
@@ -2308,6 +2571,11 @@ Deno.serve(async (request) => {
 
   if (request.method !== "POST") {
     return jsonResponse({ error: "Method not allowed." }, 405);
+  }
+
+  const postUrl = new URL(request.url);
+  if (postUrl.searchParams.get("action") === "web-form-submit") {
+    return await handleTelegramWebFormSubmit(request);
   }
 
   if (!isTelegramSecretValid(request)) {
