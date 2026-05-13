@@ -34,6 +34,7 @@ const VALUE_KEYS = [
 
 const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-mini").trim();
 const OCR_FEEDBACK_STATUSES = ["accepted_as_is", "corrected_by_operator"] as const;
+const PHOTO_FEEDBACK_VALUE_KEYS = new Set<string>([...VALUE_KEYS, "presentTotal"]);
 
 const PHOTO_FIELD_MAPPINGS = [
   { cell: 1, key: "beenTotal", label: "been / total" },
@@ -47,7 +48,7 @@ const PHOTO_FIELD_MAPPINGS = [
   { cell: 9, key: "dgSeries", label: "dg / series" },
   { cell: 10, key: "transferFromDepartment", label: "transfer / from department" },
   { cell: 11, key: "transferToDepartment", label: "transfer / to department" },
-  { cell: 12, key: "photoCell12Derived", label: "derived total / ignored by app" },
+  { cell: 12, key: "presentTotal", label: "present calculated/control total; display only, never currentShar" },
   { cell: 13, key: "currentShar", label: "present / shar / first soldier column" },
   { cell: 14, key: "currentSpa", label: "present / spa / second soldier column" },
   { cell: 15, key: "currentPaym", label: "present / paym / third soldier column" },
@@ -57,22 +58,25 @@ const PHOTO_FIELD_MAPPINGS = [
   { cell: 19, key: "civil", label: "present / q-i / single column immediately after officer" },
   { cell: 20, key: "leaveSharq", label: "leave / sharq" },
   { cell: 21, key: "leaveSpa", label: "leave / spa" },
-  { cell: 22, key: "leavePaym", label: "leave / paym" }
+  { cell: 22, key: "leavePaym", label: "leave / paym; final rightmost normal variable" }
 ] as const;
 
+const PHOTO_RIGHT_CELL_MAPPINGS = PHOTO_FIELD_MAPPINGS
+  .filter((item) => item.cell >= 12 && item.cell <= 22);
+
+const PHOTO_RIGHT_CELL_KEYS = PHOTO_RIGHT_CELL_MAPPINGS
+  .map((item) => item.key);
+
 const PHOTO_SCHEMA_VALUE_KEYS = PHOTO_FIELD_MAPPINGS
-  .filter((item) => item.key !== "photoCell12Derived")
-  .map((item) => item.key)
-  .filter((key): key is string => typeof key === "string");
+  .map((item) => item.key);
 
 const PHOTO_CELL_REVIEW_KEYS = PHOTO_FIELD_MAPPINGS
-  .filter((item) => item.key !== "photoCell12Derived")
-  .map((item) => item.key)
-  .filter((key): key is string => typeof key === "string");
+  .filter((item) => item.key !== "presentTotal")
+  .map((item) => item.key);
 
 const PHOTO_CELL_REVIEW_CELL_MAP = Object.fromEntries(
   PHOTO_FIELD_MAPPINGS
-    .filter((item) => item.key !== "photoCell12Derived")
+    .filter((item) => item.key !== "presentTotal")
     .map((item) => [item.key, item.cell])
 ) as Record<string, number>;
 
@@ -97,15 +101,15 @@ const DEPARTMENTS = {
 } as const;
 
 const PHOTO_TEMPLATE_GUIDE = [
-  "Template layout of the 22 handwritten cells from left to right:",
+  "Template layout of the 22 visible top-row positions from left to right:",
   "- cells 1, 2, 3: first three-cell block on the far left",
   "- cells 4, 5, 6: second three-cell block",
   "- cells 7, 8, 9: third three-cell block",
   "- cells 10, 11: two narrow transfer cells",
-  "- cell 12: one narrow single cell immediately after cell 11",
+  "- cell 12: one narrow calculated/control total cell immediately after cell 11; read it as presentTotal only",
   "- cells 13, 14, 15: one three-cell group immediately after cell 12",
   "- cells 16, 17, 18, 19: four consecutive single cells immediately after cells 13-15",
-  "- cells 20, 21, 22: final three-cell leave block on the far right",
+  "- cells 20, 21, 22: final three-cell leave block on the far right; cell 22 is the last visible handwritten cell and is a normal variable",
   "Use the printed vertical borders of the table as the main source of separation between neighboring cells."
 ].join("\n");
 
@@ -141,6 +145,37 @@ function sanitizeValues(values: Record<string, unknown> | null | undefined) {
   VALUE_KEYS.forEach((key) => {
     output[key] = sanitizeNumber(values ? values[key] : null);
   });
+  return output;
+}
+
+function sanitizeRightCellValues(value: unknown) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  return PHOTO_RIGHT_CELL_KEYS.map((_key, index) => sanitizeNumber(value[index]));
+}
+
+function applyRightCellValues(
+  values: Record<string, number | null>,
+  rightCellValues: Array<number | null> | null
+) {
+  if (!rightCellValues || rightCellValues.length !== PHOTO_RIGHT_CELL_KEYS.length) {
+    return false;
+  }
+  if (!rightCellValues.some((value) => value !== null)) {
+    return false;
+  }
+
+  PHOTO_RIGHT_CELL_KEYS.forEach((key, index) => {
+    values[key] = rightCellValues[index];
+  });
+  return true;
+}
+
+function sanitizePhotoValues(values: Record<string, unknown> | null | undefined) {
+  const output = sanitizeValues(values);
+  output.presentTotal = sanitizeNumber(values ? values.presentTotal : null);
   return output;
 }
 
@@ -199,7 +234,7 @@ function sanitizePhotoCellReviews(value: unknown) {
     const key = typeof (rawItem as { key?: unknown }).key === "string"
       ? String((rawItem as { key: string }).key).trim()
       : "";
-    if (!PHOTO_CELL_REVIEW_KEYS.includes(key)) {
+    if (!PHOTO_CELL_REVIEW_KEYS.includes(key as (typeof PHOTO_CELL_REVIEW_KEYS)[number])) {
       continue;
     }
 
@@ -280,7 +315,7 @@ function sanitizeFeedbackKeys(value: unknown) {
   }
 
   return value
-    .filter((item): item is string => typeof item === "string" && VALUE_KEYS.includes(item))
+    .filter((item): item is string => typeof item === "string" && PHOTO_FEEDBACK_VALUE_KEYS.has(item))
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -291,7 +326,7 @@ function sanitizeFeedbackNotes(value: unknown) {
   }
 
   return value
-    .filter((item): item is string => typeof item === "string" && item.trim())
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
     .map((item) => item.trim());
 }
 
@@ -327,8 +362,8 @@ function sanitizeOcrFeedbackPayload(value: unknown) {
     saveStatus,
     recognizedKeys: sanitizeFeedbackKeys(payload.recognizedKeys),
     changedKeys: sanitizeFeedbackKeys(payload.changedKeys),
-    ocrRaw: sanitizeValues(payload.recognizedValues as Record<string, unknown> | undefined),
-    finalValues: sanitizeValues(payload.finalValues as Record<string, unknown> | undefined),
+    ocrRaw: sanitizePhotoValues(payload.recognizedValues as Record<string, unknown> | undefined),
+    finalValues: sanitizePhotoValues(payload.finalValues as Record<string, unknown> | undefined),
     notes: sanitizeFeedbackNotes(payload.notes),
     cellReviews: sanitizePhotoCellReviews(payload.cellReviews)
   };
@@ -595,6 +630,12 @@ function buildPhotoRecognitionSchema() {
         properties: valueProperties,
         required: PHOTO_SCHEMA_VALUE_KEYS
       },
+      rightCellValues: {
+        type: "array",
+        minItems: PHOTO_RIGHT_CELL_KEYS.length,
+        maxItems: PHOTO_RIGHT_CELL_KEYS.length,
+        items: { type: ["integer", "null"] }
+      },
       notes: {
         type: "array",
         items: { type: "string" }
@@ -639,7 +680,7 @@ function buildPhotoRecognitionSchema() {
         required: ["all22CellsVisible", "gridCellCount", "missingCells", "reason"]
       }
     },
-    required: ["reportDate", "values", "notes", "cellReviews", "structure"]
+    required: ["reportDate", "values", "rightCellValues", "notes", "cellReviews", "structure"]
   };
 }
 
@@ -712,27 +753,29 @@ async function recognizeDepartmentPhoto(
     "Use the blank template image only to align the printed grid and cell borders. Extract handwritten values only from the filled form image.",
     "If an extra zoomed right-side crop is present, use it to resolve cells 12 through 22 more accurately than the wider crop.",
     "The extra zoomed crop and the single-cell crops may be geometrically aligned versions of the same table. Prefer them over the wider crop for exact cell borders.",
-    "If eleven single-cell crops are present after the right-side zoom crop, they correspond exactly in this order: cell 12, cell 13, cell 14, cell 15, cell 16, cell 17, cell 18, cell 19, cell 20, cell 21, cell 22.",
-    "When the single-cell crops are present, use them as the primary source for cells 12-22 and use the larger crops only as context.",
+    "If eleven single-cell crops are present after the right-side zoom crop, they correspond exactly in this visual order: cell 12, cell 13, cell 14, cell 15, cell 16, cell 17, cell 18, cell 19, cell 20, cell 21, cell 22.",
+    "When the single-cell crops are present, use them as the primary source for rightCellValues and use the larger crops only as context.",
     "Do not determine or change the department from SR markers, headers, or any other text in the image.",
     "If the photo is missing SR markers or the printed title is unclear, continue extracting values for the given department anyway.",
     "Read only the top numeric table and the handwritten report date near the header.",
     "Ignore the handwritten descriptive text in the lower part of the page.",
-    "The standard top numeric row always contains exactly 22 handwritten cells from left to right.",
+    "The standard top numeric row contains exactly cells 1 through 22. There is no cell 23 in the photo.",
     "You must explicitly verify the printed top-row grid structure before trusting any values.",
-    "Return structure.all22CellsVisible=true only if you can confidently follow all 22 printed cell positions from cell 1 through cell 22 in the top numeric row.",
+    "Return structure.all22CellsVisible=true only if you can confidently follow cells 1 through 22 in the top numeric row.",
     "Return structure.gridCellCount as the number of distinct top-row cell positions you can confidently identify by printed borders, including blank cells and including the position of cell 12.",
     "If you cannot confidently identify all 22 positions, set structure.all22CellsVisible=false, set structure.gridCellCount to the count you can see, list the missing or ambiguous cell numbers in structure.missingCells, and explain briefly in structure.reason.",
     PHOTO_TEMPLATE_GUIDE,
     "Return null for any cell that is blank, crossed out, unreadable, or uncertain.",
     "Do not infer values from formulas. Do not copy printed column numbers.",
-    "Cells 10 and 11 are the two transfer columns. Immediately after cell 11 there is exactly one narrow single column: that is cell 12 only.",
-    "Immediately after cell 12 there are exactly three adjacent cells under the soldier subgroup: those are cell 13 currentShar, cell 14 currentSpa, and cell 15 currentPaym in that strict left-to-right order.",
-    "Do not merge cell 12 with cells 13-15. Do not shift values between cells 12, 13, 14, and 15 even when the handwriting is close to the border lines.",
-    "Read the raw handwritten value in cell 12 as presentTotal when it is visibly written.",
+    "Cells 10 and 11 are the two transfer columns. Immediately after cell 11 there is exactly one narrow single column: that is visual cell 12.",
+    "Return rightCellValues as exactly 11 items for the visual right side of the printed row, strictly left to right: [cell 12, cell 13, cell 14, cell 15, cell 16, cell 17, cell 18, cell 19, cell 20, cell 21, cell 22].",
+    "The program applies the required left-shift correction from rightCellValues: item 0 goes to presentTotal/cell 12, item 1 to currentShar/cell 13, item 2 to currentSpa/cell 14, item 3 to currentPaym/cell 15, item 4 to currentZh/cell 16, item 5 to family/cell 17, item 6 to officer/cell 18, item 7 to civil/cell 19, item 8 to leaveSharq/cell 20, item 9 to leaveSpa/cell 21, item 10 to leavePaym/cell 22.",
+    "This positional rightCellValues array is more important than semantic labels for cells 12-22. Do not let the visual cell 12 value move to cell 13; put it in rightCellValues[0].",
+    "The last visible rightmost handwritten cell is visual cell 22 and must be preserved in rightCellValues[10].",
     "After the three soldier columns in the 'present' block there are four consecutive single-column fields.",
     "Those four single-column fields must be read strictly in this order: cell 16 currentZh, cell 17 family, cell 18 officer, cell 19 civil.",
-    "Do not shift handwritten values left or right between cells 16, 17, 18, and 19.",
+    "For rightCellValues, keep the visual left-to-right order between cells 16, 17, 18, and 19.",
+    "Cell 22 is the final rightmost handwritten value on the blank and is a normal variable, not a calculated total.",
     "Map the handwritten values into these fields:",
     fieldInstructions,
     "If the photo clearly shows a handwritten value under the single column between the three soldier columns and the family column, that value belongs to currentZh.",
@@ -742,8 +785,8 @@ async function recognizeDepartmentPhoto(
     "For cellReviews use status recognized when the handwritten value is read confidently, and status review when the cell has handwriting but the read is uncertain or may be wrong.",
     "For each cellReviews item return approximate bounding box coordinates relative to the full image: left, top, width, height in a 0..1000 scale.",
     "Do not add blank cells to cellReviews.",
-    "Return the handwritten value in cell 12 as presentTotal when it is visibly written in the filled form.",
-    "Do not calculate cell 12 from any other cells. Return only the raw handwritten value you see in cell 12.",
+    "Return the handwritten value in visual cell 12 as rightCellValues[0] when it is visibly written in the filled form.",
+    "Do not calculate visual cell 12 from any other cells. Return only the raw handwritten value you see in visual cell 12.",
     "Do not include cell 12 in cellReviews.",
     "Use notes for short uncertainty comments only when needed."
   ].join("\n");
@@ -757,8 +800,13 @@ async function recognizeDepartmentPhoto(
     extraImageDataUrls
   );
 
-  const sanitizedValues = sanitizeValues(parsed.values as Record<string, unknown> | undefined);
-  sanitizedValues.leaveTotal = null;
+  const parsedValues = parsed.values && typeof parsed.values === "object"
+    ? parsed.values as Record<string, unknown>
+    : {};
+  const sanitizedValues = sanitizeValues(parsedValues);
+  sanitizedValues.presentTotal = sanitizeNumber(parsedValues.presentTotal);
+  const rightCellValues = sanitizeRightCellValues(parsed.rightCellValues);
+  applyRightCellValues(sanitizedValues, rightCellValues);
   const finalValues = sanitizedValues;
   const structure = sanitizePhotoStructure(parsed.structure);
   const baseNotes = Array.isArray(parsed.notes)
@@ -783,7 +831,7 @@ async function recognizeDepartmentPhoto(
     recognizedKeys: structureInvalid
       ? []
       : Object.entries(finalValues)
-      .filter(([key, value]) => key !== "leaveTotal" && value !== null)
+      .filter(([_key, value]) => value !== null)
       .map(([key]) => key),
     notes,
     cellReviews: sanitizePhotoCellReviews(parsed.cellReviews),
@@ -976,8 +1024,8 @@ async function listOcrFeedbackRecords(supabase: ReturnType<typeof createClient>,
     imageDataUrl: row.image_data_url,
     recognizedKeys: Array.isArray(row.recognized_keys) ? row.recognized_keys : [],
     changedKeys: Array.isArray(row.changed_keys) ? row.changed_keys : [],
-    recognizedValues: sanitizeValues(row.ocr_raw as Record<string, unknown> | undefined),
-    finalValues: sanitizeValues(row.final_values as Record<string, unknown> | undefined),
+    recognizedValues: sanitizePhotoValues(row.ocr_raw as Record<string, unknown> | undefined),
+    finalValues: sanitizePhotoValues(row.final_values as Record<string, unknown> | undefined),
     notes: sanitizeFeedbackNotes(row.notes),
     cellReviews: sanitizePhotoCellReviews(row.cell_reviews)
   }));

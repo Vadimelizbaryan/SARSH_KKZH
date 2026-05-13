@@ -48,7 +48,7 @@ const PHOTO_FIELD_MAPPINGS = [
   { cell: 9, key: "dgSeries", label: "discharged / series" },
   { cell: 10, key: "transferFromDepartment", label: "transfer / from department" },
   { cell: 11, key: "transferToDepartment", label: "transfer / to department" },
-  { cell: 12, key: "photoCell12Derived", label: "derived total / ignored by app" },
+  { cell: 12, key: "presentTotal", label: "present calculated/control total; display only, never currentShar" },
   { cell: 13, key: "currentShar", label: "present / shar / first soldier column" },
   { cell: 14, key: "currentSpa", label: "present / spa / second soldier column" },
   { cell: 15, key: "currentPaym", label: "present / paym / third soldier column" },
@@ -58,13 +58,17 @@ const PHOTO_FIELD_MAPPINGS = [
   { cell: 19, key: "civil", label: "present / civil" },
   { cell: 20, key: "leaveSharq", label: "leave / sharq" },
   { cell: 21, key: "leaveSpa", label: "leave / spa" },
-  { cell: 22, key: "leavePaym", label: "leave / paym" }
+  { cell: 22, key: "leavePaym", label: "leave / paym; final rightmost normal variable" }
 ] as const;
 
+const PHOTO_RIGHT_CELL_MAPPINGS = PHOTO_FIELD_MAPPINGS
+  .filter((item) => item.cell >= 12 && item.cell <= 22);
+
+const PHOTO_RIGHT_CELL_KEYS = PHOTO_RIGHT_CELL_MAPPINGS
+  .map((item) => item.key);
+
 const PHOTO_SCHEMA_VALUE_KEYS = PHOTO_FIELD_MAPPINGS
-  .filter((item) => item.key !== "photoCell12Derived")
-  .map((item) => item.key)
-  .filter((key): key is string => typeof key === "string");
+  .map((item) => item.key);
 
 const DEPARTMENTS = {
   r4: { department: "Վիրաբուժական", group: "primary", marker: "SR-4", slug: "te9625wg" },
@@ -87,15 +91,15 @@ const DEPARTMENTS = {
 } as const;
 
 const PHOTO_TEMPLATE_GUIDE = [
-  "Template layout of the 22 handwritten cells from left to right:",
+  "Template layout of the 22 visible top-row positions from left to right:",
   "- cells 1, 2, 3: first three-cell block on the far left",
   "- cells 4, 5, 6: second three-cell block",
   "- cells 7, 8, 9: third three-cell block",
   "- cells 10, 11: two narrow transfer cells",
-  "- cell 12: one narrow single cell immediately after cell 11",
+  "- cell 12: one narrow calculated/control total cell immediately after cell 11; read it as presentTotal only",
   "- cells 13, 14, 15: one three-cell group immediately after cell 12",
   "- cells 16, 17, 18, 19: four consecutive single cells immediately after cells 13-15",
-  "- cells 20, 21, 22: final three-cell leave block on the far right",
+  "- cells 20, 21, 22: final three-cell leave block on the far right; cell 22 is the last visible handwritten cell and is a normal variable",
   "Use the printed vertical borders of the table as the main source of separation between neighboring cells."
 ].join("\n");
 
@@ -132,6 +136,31 @@ function sanitizeValues(values: Record<string, unknown> | null | undefined) {
     output[key] = sanitizeNumber(values ? values[key] : null);
   }
   return output;
+}
+
+function sanitizeRightCellValues(value: unknown) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  return PHOTO_RIGHT_CELL_KEYS.map((_key, index) => sanitizeNumber(value[index]));
+}
+
+function applyRightCellValues(
+  values: Record<string, number | null>,
+  rightCellValues: Array<number | null> | null
+) {
+  if (!rightCellValues || rightCellValues.length !== PHOTO_RIGHT_CELL_KEYS.length) {
+    return false;
+  }
+  if (!rightCellValues.some((value) => value !== null)) {
+    return false;
+  }
+
+  PHOTO_RIGHT_CELL_KEYS.forEach((key, index) => {
+    values[key] = rightCellValues[index];
+  });
+  return true;
 }
 
 function extractPresentTotalFromNotes(notes: string[]) {
@@ -357,6 +386,12 @@ function buildPhotoRecognitionSchema() {
         properties: valueProperties,
         required: PHOTO_SCHEMA_VALUE_KEYS
       },
+      rightCellValues: {
+        type: "array",
+        minItems: PHOTO_RIGHT_CELL_KEYS.length,
+        maxItems: PHOTO_RIGHT_CELL_KEYS.length,
+        items: { type: ["integer", "null"] }
+      },
       notes: {
         type: "array",
         items: { type: "string" }
@@ -376,7 +411,7 @@ function buildPhotoRecognitionSchema() {
         required: ["all22CellsVisible", "gridCellCount", "missingCells", "reason"]
       }
     },
-    required: ["reportDate", "values", "notes", "structure"]
+    required: ["reportDate", "values", "rightCellValues", "notes", "structure"]
   };
 }
 
@@ -442,26 +477,28 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
     "Do not determine or change the department from SR markers, headers, or any other text in the image.",
     "Read only the top numeric table and the handwritten report date near the header.",
     "Ignore the handwritten descriptive text in the lower part of the page.",
-    "The standard top numeric row always contains exactly 22 handwritten cells from left to right.",
+    "The standard top numeric row contains exactly cells 1 through 22. There is no cell 23 in the photo.",
     "You must explicitly verify the printed top-row grid structure before trusting any values.",
-    "Return structure.all22CellsVisible=true only if you can confidently follow all 22 printed cell positions from cell 1 through cell 22 in the top numeric row.",
+    "Return structure.all22CellsVisible=true only if you can confidently follow cells 1 through 22 in the top numeric row.",
     "Return structure.gridCellCount as the number of distinct top-row cell positions you can confidently identify by printed borders, including blank cells and including the position of cell 12.",
     "If you cannot confidently identify all 22 positions, set structure.all22CellsVisible=false, set structure.gridCellCount to the count you can see, list the missing or ambiguous cell numbers in structure.missingCells, and explain briefly in structure.reason.",
     PHOTO_TEMPLATE_GUIDE,
     "Return null for any cell that is blank, crossed out, unreadable, or uncertain.",
     "Do not infer values from formulas. Do not copy printed column numbers.",
-    "Cells 10 and 11 are the two transfer columns. Immediately after cell 11 there is exactly one narrow single column: that is cell 12 only.",
-    "Immediately after cell 12 there are exactly three adjacent cells under the soldier subgroup: those are cell 13 currentShar, cell 14 currentSpa, and cell 15 currentPaym in that strict left-to-right order.",
-    "Do not merge cell 12 with cells 13-15. Do not shift values between cells 12, 13, 14, and 15 even when the handwriting is close to the border lines.",
-    "Read the raw handwritten value in cell 12 as presentTotal when it is visibly written.",
+    "Cells 10 and 11 are the two transfer columns. Immediately after cell 11 there is exactly one narrow single column: that is visual cell 12.",
+    "Return rightCellValues as exactly 11 items for the visual right side of the printed row, strictly left to right: [cell 12, cell 13, cell 14, cell 15, cell 16, cell 17, cell 18, cell 19, cell 20, cell 21, cell 22].",
+    "The program applies the required left-shift correction from rightCellValues: item 0 goes to presentTotal/cell 12, item 1 to currentShar/cell 13, item 2 to currentSpa/cell 14, item 3 to currentPaym/cell 15, item 4 to currentZh/cell 16, item 5 to family/cell 17, item 6 to officer/cell 18, item 7 to civil/cell 19, item 8 to leaveSharq/cell 20, item 9 to leaveSpa/cell 21, item 10 to leavePaym/cell 22.",
+    "This positional rightCellValues array is more important than semantic labels for cells 12-22. Do not let the visual cell 12 value move to cell 13; put it in rightCellValues[0].",
+    "The last visible rightmost handwritten cell is visual cell 22 and must be preserved in rightCellValues[10].",
     "After the three soldier columns in the 'present' block there are four consecutive single-column fields.",
     "Those four single-column fields must be read strictly in this order: cell 16 currentZh, cell 17 family, cell 18 officer, cell 19 civil.",
-    "Do not shift handwritten values left or right between cells 16, 17, 18, and 19.",
+    "For rightCellValues, keep the visual left-to-right order between cells 16, 17, 18, and 19.",
+    "Cell 22 is the final rightmost handwritten value on the blank and is a normal variable, not a calculated total.",
     "Map the handwritten values into these fields:",
     fieldInstructions,
     "Return reportDate in dd.mm.yy or dd.mm.yyyy when visible, otherwise null.",
-    "Return the handwritten value in cell 12 as presentTotal when it is visibly written in the filled form.",
-    "Do not calculate cell 12 from any other cells. Return only the raw handwritten value you see in cell 12.",
+    "Return the handwritten value in visual cell 12 as rightCellValues[0] when it is visibly written in the filled form.",
+    "Do not calculate visual cell 12 from any other cells. Return only the raw handwritten value you see in visual cell 12.",
     "Use notes for short uncertainty comments only when needed."
   ].join("\n");
 
@@ -473,8 +510,13 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
     [getOcrTemplateBlankImageUrl()]
   );
 
-  const sanitizedValues = sanitizeValues(parsed.values as Record<string, unknown> | undefined);
-  sanitizedValues.leaveTotal = null;
+  const parsedValues = parsed.values && typeof parsed.values === "object"
+    ? parsed.values as Record<string, unknown>
+    : {};
+  const sanitizedValues = sanitizeValues(parsedValues);
+  sanitizedValues.presentTotal = sanitizeNumber(parsedValues.presentTotal);
+  const rightCellValues = sanitizeRightCellValues(parsed.rightCellValues);
+  applyRightCellValues(sanitizedValues, rightCellValues);
   const finalValues = sanitizedValues;
   const structure = sanitizePhotoStructure(parsed.structure);
   const baseNotes = Array.isArray(parsed.notes)
@@ -499,7 +541,7 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
     recognizedKeys: structureInvalid
       ? []
       : Object.entries(finalValues)
-      .filter(([key, value]) => key !== "leaveTotal" && value !== null)
+      .filter(([_key, value]) => value !== null)
       .map(([key]) => key),
     notes,
     structure
@@ -610,7 +652,7 @@ async function saveDepartmentSnapshot(
       department_id: departmentId,
       department_name: departmentMeta.department,
       department_group: departmentMeta.group,
-      values,
+      values: sanitizeValues(values),
       updated_at: new Date().toISOString()
     });
 
@@ -944,11 +986,11 @@ function buildPhotoSaveSummary(
   reportDate: string,
   recognized: Awaited<ReturnType<typeof recognizeDepartmentPhoto>>,
   departmentSource: string,
-  feedbackId: string
+  feedbackId: string,
+  didSaveSnapshot: boolean
 ) {
   const meta = DEPARTMENTS[departmentId];
   const cellSummaries = PHOTO_FIELD_MAPPINGS
-    .filter((item) => item.key !== "photoCell12Derived")
     .map((item) => {
       const value = recognized.values[item.key];
       return value === null ? null : `${item.cell}=${value}`;
@@ -957,7 +999,9 @@ function buildPhotoSaveSummary(
     .join(", ");
 
   return [
-    "Фото обработано и сохранено.",
+    didSaveSnapshot
+      ? "Фото обработано и сохранено."
+      : "Фото обработано. Значения не сохранены: распознанных ячеек не найдено.",
     `Отделение: ${meta.department} (${departmentId})`,
     `Источник отделения: ${departmentSource}`,
     `Дата отчёта: ${reportDate}`,
@@ -1088,7 +1132,7 @@ async function handleTelegramPhoto(
   const { dataUrl, fileName } = await downloadTelegramImageAsDataUrl(fileId);
 
   let departmentId = hintedDepartmentId;
-  let departmentSource = hintedDepartmentId ? "подсказка в сообщении" : "автоопределение по фото";
+  const departmentSource = hintedDepartmentId ? "подсказка в сообщении" : "автоопределение по фото";
 
   if (!departmentId) {
     const detection = await detectDepartmentFromPhoto(dataUrl);
@@ -1108,7 +1152,11 @@ async function handleTelegramPhoto(
   const reportDate = hintedReportDate || recognized.reportDate || snapshot.reportDate || DEFAULT_DATE;
 
   const structureInvalid = !!recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22);
-  if (!structureInvalid) {
+  const hasRecognizedValues = recognized.recognizedKeys.some((key) => {
+    return VALUE_KEYS.includes(key as (typeof VALUE_KEYS)[number]);
+  });
+  const shouldSaveSnapshot = !structureInvalid && hasRecognizedValues;
+  if (shouldSaveSnapshot) {
     await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values);
   }
   const feedbackId = await insertAcceptedFeedback(
@@ -1126,7 +1174,7 @@ async function handleTelegramPhoto(
 
   await sendTelegramMessage(
     chatId,
-    buildPhotoSaveSummary(departmentId, reportDate, recognized, departmentSource, feedbackId)
+    buildPhotoSaveSummary(departmentId, reportDate, recognized, departmentSource, feedbackId, shouldSaveSnapshot)
   );
 }
 
