@@ -122,7 +122,17 @@ const DEPARTMENT_SHEET_INPUT_COLUMNS = [
   "T", "U", "V",
   "Y", "Z"
 ];
-const DEPARTMENT_SHEET_PROTECTION_TAG = '<sheetProtection sheet="1" objects="1" scenarios="1"/>';
+const DEPARTMENT_SHEET_FORMULA_COLUMNS = ["K", "L", "W", "X"];
+const DEPARTMENT_SHEET_LAST_COLUMN = "Z";
+const DEPARTMENT_SHEET_FIRST_INPUT_COLUMN = "B";
+const DEPARTMENT_SHEET_PROTECTION_TAG = [
+  '<sheetProtection sheet="1" objects="1" scenarios="1"',
+  ' selectLockedCells="1"',
+  ' formatCells="1" formatColumns="1" formatRows="1"',
+  ' insertColumns="1" insertRows="1" insertHyperlinks="1"',
+  ' deleteColumns="1" deleteRows="1"',
+  ' sort="1" autoFilter="1" pivotTables="1"/>'
+].join("");
 
 const PHOTO_TEMPLATE_GUIDE = [
   "Template layout of the 22 visible top-row positions from left to right:",
@@ -981,15 +991,54 @@ function setXmlAttribute(tag: string, name: string, value: string) {
   return tag.replace(/>$/, ` ${name}="${value}">`);
 }
 
+function escapeXmlText(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function normalizeDepartmentSheetReportDate(reportDate: string) {
+  const match = String(reportDate || "").trim().match(/^(\d{2})[.,/](\d{2})[.,/](\d{2,4})$/);
+  if (!match) {
+    return DEFAULT_DATE;
+  }
+  return `${match[1]},${match[2]},${match[3].slice(-2)}`;
+}
+
+function getYerevanTimeText(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Asia/Yerevan",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const hour = parts.find((part) => part.type === "hour")?.value || "00";
+  const minute = parts.find((part) => part.type === "minute")?.value || "00";
+  return `${hour}:${minute}`;
+}
+
+function buildDepartmentSheetDateTimeText(reportDate: string) {
+  return `${normalizeDepartmentSheetReportDate(reportDate)} ${getYerevanTimeText()}`;
+}
+
 function isDepartmentSheetInputColumn(column: string) {
   return DEPARTMENT_SHEET_INPUT_COLUMNS.includes(column);
 }
 
-function collectDepartmentSheetInputStyleIds(worksheetXml: string, targetRow: number) {
+function isDepartmentSheetFormulaColumn(column: string) {
+  return DEPARTMENT_SHEET_FORMULA_COLUMNS.includes(column);
+}
+
+function collectDepartmentSheetColumnStyleIds(
+  worksheetXml: string,
+  targetRow: number,
+  isTargetColumn: (column: string) => boolean
+) {
   const styleIds = new Set<number>();
 
   worksheetXml.replace(/<c\b[^>]*\br="([A-Z]+)(\d+)"[^>]*>/g, (cellTag, column, rowText) => {
-    if (Number(rowText) !== targetRow || !isDepartmentSheetInputColumn(column)) {
+    if (Number(rowText) !== targetRow || !isTargetColumn(column)) {
       return cellTag;
     }
 
@@ -1001,25 +1050,51 @@ function collectDepartmentSheetInputStyleIds(worksheetXml: string, targetRow: nu
   return styleIds;
 }
 
-function createUnlockedCellXfTag(xfTag: string) {
+function collectDepartmentSheetInputStyleIds(worksheetXml: string, targetRow: number) {
+  return collectDepartmentSheetColumnStyleIds(worksheetXml, targetRow, isDepartmentSheetInputColumn);
+}
+
+function collectDepartmentSheetFormulaStyleIds(worksheetXml: string, targetRow: number) {
+  return collectDepartmentSheetColumnStyleIds(worksheetXml, targetRow, isDepartmentSheetFormulaColumn);
+}
+
+function upsertProtectionTag(xfTag: string, attributes: Record<string, string>) {
   let updated = xfTag.replace(/^<xf\b[^>]*?(?:\/>|>)/, (openingTag) => (
     setXmlAttribute(openingTag, "applyProtection", "1")
   ));
 
+  const applyAttributes = (protectionTag: string) => Object.entries(attributes)
+    .reduce((tag, [name, value]) => setXmlAttribute(tag, name, value), protectionTag);
+
   if (/<protection\b/.test(updated)) {
-    return updated.replace(/<protection\b[^>]*(?:\/>|>[\s\S]*?<\/protection>)/, (protectionTag) => (
-      setXmlAttribute(protectionTag, "locked", "0")
-    ));
+    return updated.replace(/<protection\b[^>]*(?:\/>|>[\s\S]*?<\/protection>)/, applyAttributes);
   }
+
+  const protectionAttributes = Object.entries(attributes)
+    .map(([name, value]) => `${name}="${value}"`)
+    .join(" ");
+  const protectionTag = `<protection ${protectionAttributes}/>`;
 
   if (/\/>$/.test(updated)) {
-    return updated.replace(/\s*\/>$/, '><protection locked="0"/></xf>');
+    return updated.replace(/\s*\/>$/, `>${protectionTag}</xf>`);
   }
 
-  return updated.replace(/<\/xf>$/, '<protection locked="0"/></xf>');
+  return updated.replace(/<\/xf>$/, `${protectionTag}</xf>`);
 }
 
-function addUnlockedDepartmentSheetStyles(stylesXml: string, styleIds: Set<number>) {
+function createUnlockedCellXfTag(xfTag: string) {
+  return upsertProtectionTag(xfTag, { locked: "0" });
+}
+
+function createHiddenFormulaCellXfTag(xfTag: string) {
+  return upsertProtectionTag(xfTag, { locked: "1", hidden: "1" });
+}
+
+function addDepartmentSheetStyles(
+  stylesXml: string,
+  styleIds: Set<number>,
+  createStyleTag: (xfTag: string) => string
+) {
   const styleMap = new Map<number, number>();
   if (!styleIds.size) {
     return { stylesXml, styleMap };
@@ -1050,7 +1125,7 @@ function addUnlockedDepartmentSheetStyles(stylesXml: string, styleIds: Set<numbe
       }
 
       styleMap.set(styleId, xfTags.length + appendedTags.length);
-      appendedTags.push(createUnlockedCellXfTag(sourceTag));
+      appendedTags.push(createStyleTag(sourceTag));
     });
 
   if (!appendedTags.length) {
@@ -1064,6 +1139,14 @@ function addUnlockedDepartmentSheetStyles(stylesXml: string, styleIds: Set<numbe
     stylesXml: stylesXml.replace(cellXfsBlock, updatedCellXfsBlock),
     styleMap
   };
+}
+
+function addUnlockedDepartmentSheetStyles(stylesXml: string, styleIds: Set<number>) {
+  return addDepartmentSheetStyles(stylesXml, styleIds, createUnlockedCellXfTag);
+}
+
+function addHiddenFormulaDepartmentSheetStyles(stylesXml: string, styleIds: Set<number>) {
+  return addDepartmentSheetStyles(stylesXml, styleIds, createHiddenFormulaCellXfTag);
 }
 
 function unlockDepartmentSheetInputCells(worksheetXml: string, targetRow: number, styleMap: Map<number, number>) {
@@ -1087,6 +1170,78 @@ function unlockDepartmentSheetInputCells(worksheetXml: string, targetRow: number
   });
 }
 
+function hideDepartmentSheetFormulaCells(worksheetXml: string, targetRow: number, styleMap: Map<number, number>) {
+  if (!styleMap.size) {
+    return worksheetXml;
+  }
+
+  return worksheetXml.replace(/<c\b[^>]*?\br="([A-Z]+)(\d+)"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g, (cellTag, column, rowText) => {
+    if (Number(rowText) !== targetRow || !isDepartmentSheetFormulaColumn(column)) {
+      return cellTag;
+    }
+
+    return cellTag.replace(/^<c\b[^>]*?(?:\/>|>)/, (openingTag) => {
+      const styleMatch = openingTag.match(/\bs="(\d+)"/);
+      const originalStyleId = styleMatch ? Number(styleMatch[1]) : 0;
+      const hiddenStyleId = styleMap.get(originalStyleId);
+      return typeof hiddenStyleId === "number"
+        ? setXmlAttribute(openingTag, "s", String(hiddenStyleId))
+        : openingTag;
+    });
+  });
+}
+
+function setDepartmentSheetInlineStringCell(worksheetXml: string, cellRef: string, value: string) {
+  const rowMatch = cellRef.match(/\d+/);
+  const rowNumber = rowMatch ? rowMatch[0] : "";
+  const escapedValue = escapeXmlText(value);
+  const cellPattern = new RegExp(`<c\\b[^>]*\\br="${cellRef}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`);
+  const rowPattern = new RegExp(`(<row\\b[^>]*\\br="${rowNumber}"[^>]*>)`);
+  const replacementForCell = (cellTag: string) => {
+    const styleMatch = cellTag.match(/\bs="(\d+)"/);
+    const styleAttribute = styleMatch ? ` s="${styleMatch[1]}"` : "";
+    return `<c r="${cellRef}"${styleAttribute} t="inlineStr"><is><t>${escapedValue}</t></is></c>`;
+  };
+
+  if (cellPattern.test(worksheetXml)) {
+    return worksheetXml.replace(cellPattern, replacementForCell);
+  }
+
+  return rowNumber
+    ? worksheetXml.replace(rowPattern, `$1<c r="${cellRef}" t="inlineStr"><is><t>${escapedValue}</t></is></c>`)
+    : worksheetXml;
+}
+
+function setDepartmentSheetTitle(worksheetXml: string, departmentId: DepartmentId) {
+  const meta = DEPARTMENTS[departmentId];
+  return setDepartmentSheetInlineStringCell(worksheetXml, "A1", `${meta.marker} / ${meta.department}`);
+}
+
+function setDepartmentSheetA3DateTime(worksheetXml: string, dateTimeText: string) {
+  return setDepartmentSheetInlineStringCell(worksheetXml, "A3", dateTimeText);
+}
+
+function setDepartmentSheetUsedRange(worksheetXml: string, targetRow: number) {
+  const usedRange = `A1:${DEPARTMENT_SHEET_LAST_COLUMN}${targetRow}`;
+  const activeCell = `${DEPARTMENT_SHEET_FIRST_INPUT_COLUMN}${targetRow}`;
+
+  let updatedXml = worksheetXml.replace(/<dimension\b[^>]*(?:\/>|>[\s\S]*?<\/dimension>)/, `<dimension ref="${usedRange}"/>`);
+
+  updatedXml = updatedXml.replace(/<sheetView\b[^>]*>/g, (tag) => {
+    let updatedTag = setXmlAttribute(tag, "showGridLines", "0");
+    updatedTag = setXmlAttribute(updatedTag, "topLeftCell", "A1");
+    return updatedTag;
+  });
+
+  updatedXml = updatedXml.replace(/<selection\b[^>]*\/>/g, `<selection activeCell="${activeCell}" sqref="${activeCell}"/>`);
+
+  updatedXml = updatedXml.replace(/<col\b[^>]*\bmin="27"[^>]*\bmax="16384"[^>]*\/>/g, (tag) => (
+    setXmlAttribute(tag, "hidden", "1")
+  ));
+
+  return updatedXml;
+}
+
 function protectDepartmentSheetXml(worksheetXml: string) {
   if (/<sheetProtection\b[\s\S]*?\/>/.test(worksheetXml)) {
     return worksheetXml.replace(/<sheetProtection\b[\s\S]*?\/>/, DEPARTMENT_SHEET_PROTECTION_TAG);
@@ -1097,7 +1252,7 @@ function protectDepartmentSheetXml(worksheetXml: string) {
   return worksheetXml.replace("</sheetData>", `</sheetData>${DEPARTMENT_SHEET_PROTECTION_TAG}`);
 }
 
-async function buildDepartmentOnlySheetBytes(templateBytes: Uint8Array, departmentId: DepartmentId) {
+async function buildDepartmentOnlySheetBytes(templateBytes: Uint8Array, departmentId: DepartmentId, reportDate: string) {
   const targetRow = DEPARTMENT_SHEET_ROW_BY_ID[departmentId];
   if (!targetRow) {
     return templateBytes;
@@ -1116,22 +1271,28 @@ async function buildDepartmentOnlySheetBytes(templateBytes: Uint8Array, departme
   const visibleRows = new Set([1, 2, 3, targetRow]);
   const xml = await worksheet.async("string");
   const inputStyleIds = collectDepartmentSheetInputStyleIds(xml, targetRow);
+  const formulaStyleIds = collectDepartmentSheetFormulaStyleIds(xml, targetRow);
   const stylesXml = await styles.async("string");
   const protectedStyles = addUnlockedDepartmentSheetStyles(stylesXml, inputStyleIds);
+  const formulaProtectedStyles = addHiddenFormulaDepartmentSheetStyles(protectedStyles.stylesXml, formulaStyleIds);
   const filteredXml = xml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>/g, (tag, rowNumberText) => {
     const rowNumber = Number(rowNumberText);
     if (!Number.isFinite(rowNumber) || visibleRows.has(rowNumber)) {
       return setXmlAttribute(tag, "hidden", "0");
     }
-    if (rowNumber >= 4 && rowNumber <= 22) {
+    if (rowNumber >= 4) {
       return setXmlAttribute(tag, "hidden", "1");
     }
     return tag;
   });
   const unlockedXml = unlockDepartmentSheetInputCells(filteredXml, targetRow, protectedStyles.styleMap);
-  const protectedXml = protectDepartmentSheetXml(unlockedXml);
+  const formulaHiddenXml = hideDepartmentSheetFormulaCells(unlockedXml, targetRow, formulaProtectedStyles.styleMap);
+  const titledXml = setDepartmentSheetTitle(formulaHiddenXml, departmentId);
+  const datedXml = setDepartmentSheetA3DateTime(titledXml, buildDepartmentSheetDateTimeText(reportDate));
+  const usedRangeXml = setDepartmentSheetUsedRange(datedXml, targetRow);
+  const protectedXml = protectDepartmentSheetXml(usedRangeXml);
 
-  zip.file("xl/styles.xml", protectedStyles.stylesXml);
+  zip.file("xl/styles.xml", formulaProtectedStyles.stylesXml);
   zip.file("xl/worksheets/sheet1.xml", protectedXml);
   return await zip.generateAsync({
     type: "uint8array",
@@ -1291,7 +1452,7 @@ async function sendWorkingSheetForDepartment(
   const reportDate = detectReportDateFromHint(text) || snapshot.reportDate || DEFAULT_DATE;
   const meta = DEPARTMENTS[departmentId];
   const templateBytes = await fetchDepartmentSheetTemplateBytes();
-  const bytes = await buildDepartmentOnlySheetBytes(templateBytes, departmentId);
+  const bytes = await buildDepartmentOnlySheetBytes(templateBytes, departmentId, reportDate);
   const safeDate = sanitizeSheetFileNamePart(reportDate.replaceAll(".", ",").replaceAll("/", ","));
   const fileName = `${sanitizeSheetFileNamePart(meta.marker)}_${safeDate || DEFAULT_DATE}_department.xlsx`;
 
