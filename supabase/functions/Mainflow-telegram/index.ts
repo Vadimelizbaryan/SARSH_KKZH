@@ -1068,6 +1068,16 @@ function buildDepartmentSheetDateTimeText(reportDate: string) {
   return `${normalizeDepartmentSheetReportDate(reportDate)} ${getYerevanTimeText()}`;
 }
 
+function buildDepartmentSheetMessageDateTimeText(reportDate: string) {
+  const match = String(reportDate || "").trim().match(/^(\d{2})[.,/](\d{2})[.,/](\d{2,4})$/);
+  if (!match) {
+    return `${reportDate || DEFAULT_DATE} ${getYerevanTimeText()}`;
+  }
+
+  const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+  return `${match[1]}.${match[2]}.${year} ${getYerevanTimeText()}`;
+}
+
 function isDepartmentSheetInputColumn(column: string) {
   return DEPARTMENT_SHEET_INPUT_COLUMNS.includes(column);
 }
@@ -1638,11 +1648,10 @@ async function sendWorkingSheetForDepartment(
     fileName,
     bytes,
     [
-      `Рабочая таблица для отделения: ${meta.department} (${departmentId}, ${meta.marker})`,
-      `Дата отчёта: ${reportDate}`,
-      "Это файл из рабочей таблицы проекта: видна только часть выбранного отделения.",
-      "Заполните нужные данные отделения и отправьте XLSX-файл обратно боту.",
-      "После возврата файла данные должны попасть на проверку перед общей таблицей."
+      `Рабочая таблица для отделения: ${meta.department}`,
+      `Дата отчёта: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
+      "Заполните нужные данные отделения и отправьте XLSX-файл обратно мне. Пожалуйста, не забудьте прислать и фото бланка документа.",
+      "После возврата файла данные попадут на проверку перед общей таблицей. Спасибо."
     ].join("\n")
   );
 }
