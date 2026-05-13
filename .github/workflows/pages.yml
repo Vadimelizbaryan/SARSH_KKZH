@@ -39,7 +39,7 @@ jobs:
           cp qr-sheet.pdf _site/
           cp -R assets _site/
           cp -R bgej6lyx _site/
-          cp -R "ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ" _site/
+          cp -R "Отделения" _site/
           touch _site/.nojekyll
 
       - name: Upload artifact
