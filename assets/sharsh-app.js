@@ -264,6 +264,7 @@
     mainPhotoRoute: buildInitialMainPhotoRouteState(),
     feedback: buildInitialFeedbackState()
   };
+  const autoRecognizedTelegramFeedbackIds = new Set();
 
   function deepCopy(value) {
     return config.deepCopy(value);
@@ -338,6 +339,20 @@
       .filter((item) => typeof item === "string" && item.trim())
       .map((item) => translateOcrNote(item))
       .filter(Boolean);
+  }
+
+  function hasRotatedTelegramPhotoHint(notes) {
+    if (!Array.isArray(notes)) {
+      return false;
+    }
+
+    return notes.some((item) => {
+      const text = String(item || "").toLowerCase();
+      return /\brotated\b/.test(text)
+        || text.includes("перевер")
+        || text.includes("повернут")
+        || text.includes("повёрнут");
+    });
   }
 
   function getSnapshotUpdateSignature(snapshot) {
@@ -680,6 +695,36 @@
   const OCR_ALIGNMENT_ANALYSIS_MAX_WIDTH = 1200;
   const OCR_ALIGNMENT_MARKER_WINDOW_RATIO = 0.018;
   const OCR_ALIGNMENT_MARKER_INSET_RATIO = 0.35;
+  const SR_BADGE_CORNER_WINDOWS = {
+    topLeft: { leftRatio: 0.02, rightRatio: 0.20, topRatio: 0.01, bottomRatio: 0.14 },
+    topRight: { leftRatio: 0.80, rightRatio: 0.98, topRatio: 0.01, bottomRatio: 0.14 },
+    bottomLeft: { leftRatio: 0.02, rightRatio: 0.20, topRatio: 0.86, bottomRatio: 0.99 },
+    bottomRight: { leftRatio: 0.80, rightRatio: 0.98, topRatio: 0.86, bottomRatio: 0.99 }
+  };
+  const OCR_TABLE_MARKER_WINDOWS = {
+    upright: [
+      { leftRatio: 0.04, rightRatio: 0.12, topRatio: 0.13, bottomRatio: 0.23 },
+      { leftRatio: 0.035, rightRatio: 0.115, topRatio: 0.31, bottomRatio: 0.42 },
+      { leftRatio: 0.92, rightRatio: 0.995, topRatio: 0.31, bottomRatio: 0.42 }
+    ],
+    inverted: [
+      { leftRatio: 0.88, rightRatio: 0.96, topRatio: 0.77, bottomRatio: 0.87 },
+      { leftRatio: 0.885, rightRatio: 0.965, topRatio: 0.58, bottomRatio: 0.69 },
+      { leftRatio: 0.005, rightRatio: 0.08, topRatio: 0.58, bottomRatio: 0.69 }
+    ]
+  };
+  const OCR_TOP_TABLE_BAND_CROP = {
+    leftRatio: 0.06,
+    rightRatio: 0.06,
+    topRatio: 0.06,
+    bottomRatio: 0.38
+  };
+  const OCR_BOTTOM_TABLE_BAND_CROP = {
+    leftRatio: 0.06,
+    rightRatio: 0.06,
+    topRatio: 0.62,
+    bottomRatio: 0.94
+  };
   const OCR_ALIGNMENT_CORNER_WINDOWS = {
     topLeft: { leftRatio: 0.0, rightRatio: 0.18, topRatio: 0.18, bottomRatio: 0.52 },
     topRight: { leftRatio: 0.82, rightRatio: 1.0, topRatio: 0.18, bottomRatio: 0.52 },
@@ -799,6 +844,137 @@
     return darkness;
   }
 
+  function measureCanvasRegionDarknessDensity(imageData, left, top, width, height) {
+    const safeWidth = Math.max(1, Math.round(width));
+    const safeHeight = Math.max(1, Math.round(height));
+    return measureCanvasRegionDarkness(imageData, left, top, safeWidth, safeHeight) / (safeWidth * safeHeight);
+  }
+
+  function measureCanvasRegionEdgeDensity(imageData, left, top, width, height) {
+    const xStart = Math.max(0, Math.min(imageData.width - 2, Math.floor(left)));
+    const yStart = Math.max(0, Math.min(imageData.height - 2, Math.floor(top)));
+    const xEnd = Math.max(xStart + 1, Math.min(imageData.width - 1, Math.ceil(left + width)));
+    const yEnd = Math.max(yStart + 1, Math.min(imageData.height - 1, Math.ceil(top + height)));
+    const data = imageData.data;
+    let total = 0;
+    let samples = 0;
+
+    for (let y = yStart; y < yEnd; y += 1) {
+      for (let x = xStart; x < xEnd; x += 1) {
+        const offset = ((y * imageData.width) + x) * 4;
+        const rightOffset = ((y * imageData.width) + Math.min(imageData.width - 1, x + 1)) * 4;
+        const downOffset = (((Math.min(imageData.height - 1, y + 1)) * imageData.width) + x) * 4;
+        const current = ((data[offset] * 0.299) + (data[offset + 1] * 0.587) + (data[offset + 2] * 0.114)) / 255;
+        const right = ((data[rightOffset] * 0.299) + (data[rightOffset + 1] * 0.587) + (data[rightOffset + 2] * 0.114)) / 255;
+        const down = ((data[downOffset] * 0.299) + (data[downOffset + 1] * 0.587) + (data[downOffset + 2] * 0.114)) / 255;
+        total += Math.abs(current - right) + Math.abs(current - down);
+        samples += 2;
+      }
+    }
+
+    return samples > 0 ? total / samples : 0;
+  }
+
+  function scoreCanvasForTopTablePosition(imageData) {
+    const topBounds = buildCropBounds(imageData.width, imageData.height, OCR_TOP_TABLE_BAND_CROP);
+    const bottomBounds = buildCropBounds(imageData.width, imageData.height, OCR_BOTTOM_TABLE_BAND_CROP);
+    const topDensity = measureCanvasRegionDarknessDensity(
+      imageData,
+      topBounds.left,
+      topBounds.top,
+      topBounds.width,
+      topBounds.height
+    );
+    const bottomDensity = measureCanvasRegionDarknessDensity(
+      imageData,
+      bottomBounds.left,
+      bottomBounds.top,
+      bottomBounds.width,
+      bottomBounds.height
+    );
+    const topEdgeDensity = measureCanvasRegionEdgeDensity(
+      imageData,
+      topBounds.left,
+      topBounds.top,
+      topBounds.width,
+      topBounds.height
+    );
+    const bottomEdgeDensity = measureCanvasRegionEdgeDensity(
+      imageData,
+      bottomBounds.left,
+      bottomBounds.top,
+      bottomBounds.width,
+      bottomBounds.height
+    );
+
+    return ((topDensity - bottomDensity) * 85000) + ((topEdgeDensity - bottomEdgeDensity) * 180000);
+  }
+
+  function buildActualRatioBounds(imageData, searchWindow) {
+    return buildCropBounds(imageData.width, imageData.height, {
+      leftRatio: searchWindow.leftRatio,
+      rightRatio: 1 - searchWindow.rightRatio,
+      topRatio: searchWindow.topRatio,
+      bottomRatio: searchWindow.bottomRatio
+    });
+  }
+
+  function scoreCanvasWindowFeature(imageData, searchWindow) {
+    const bounds = buildActualRatioBounds(imageData, searchWindow);
+    const darkness = measureCanvasRegionDarknessDensity(
+      imageData,
+      bounds.left,
+      bounds.top,
+      bounds.width,
+      bounds.height
+    );
+    const edgeDensity = measureCanvasRegionEdgeDensity(
+      imageData,
+      bounds.left,
+      bounds.top,
+      bounds.width,
+      bounds.height
+    );
+
+    return (edgeDensity * 1000) + (darkness * 180);
+  }
+
+  function scoreCanvasForExpectedTableMarkers(imageData) {
+    const scoreMarkerSet = (windows) => windows.reduce(
+      (sum, searchWindow) => sum + scoreCanvasWindowFeature(imageData, searchWindow),
+      0
+    ) / Math.max(1, windows.length);
+    const uprightScore = scoreMarkerSet(OCR_TABLE_MARKER_WINDOWS.upright);
+    const invertedScore = scoreMarkerSet(OCR_TABLE_MARKER_WINDOWS.inverted);
+
+    return (uprightScore - invertedScore) * 900;
+  }
+
+  function detectSrBadgeCorner(imageData) {
+    const candidates = Object.entries(SR_BADGE_CORNER_WINDOWS)
+      .map(([corner, searchWindow]) => {
+        return {
+          corner,
+          score: scoreCanvasWindowFeature(imageData, searchWindow)
+        };
+      })
+      .filter(Boolean);
+
+    if (!candidates.length) {
+      return null;
+    }
+
+    candidates.sort((first, second) => second.score - first.score);
+    const best = candidates[0];
+    const second = candidates[1] || null;
+
+    return {
+      corner: best.corner,
+      score: best.score,
+      confidence: second ? (best.score / Math.max(0.001, second.score)) : 2
+    };
+  }
+
   function scoreCanvasForSrTopRight(canvas) {
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) {
@@ -836,8 +1012,64 @@
       srWindowHeight
     );
     const landscapeBonus = width >= height ? 5000 : -5000;
+    const topTablePositionScore = scoreCanvasForTopTablePosition(imageData);
+    const tableMarkerScore = scoreCanvasForExpectedTableMarkers(imageData);
+    const srBadge = detectSrBadgeCorner(imageData);
+    const srBadgeCornerScore = srBadge
+      ? ({
+          topRight: 32000,
+          topLeft: -12000,
+          bottomRight: -22000,
+          bottomLeft: -32000
+        }[srBadge.corner] || 0) + Math.min(12000, Math.max(0, (srBadge.confidence - 1) * 14000))
+      : 0;
 
-    return (topRightDarkness * 4) - (topLeftDarkness * 1.5) - (bottomLeftDarkness * 3) - (bottomRightDarkness * 1.5) + landscapeBonus;
+    return (topRightDarkness * 4) - (topLeftDarkness * 1.5) - (bottomLeftDarkness * 3) - (bottomRightDarkness * 1.5) + landscapeBonus + topTablePositionScore + tableMarkerScore + srBadgeCornerScore;
+  }
+
+  function detectCanvasSrBadgeCorner(canvas) {
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) {
+      return null;
+    }
+
+    return detectSrBadgeCorner(context.getImageData(0, 0, canvas.width, canvas.height));
+  }
+
+  function flipCanvasIfSrIsBottomLeft(canvas, rotation) {
+    const srBadge = detectCanvasSrBadgeCorner(canvas);
+    if (!srBadge || srBadge.corner !== "bottomLeft") {
+      return { canvas, rotation };
+    }
+
+    return {
+      canvas: buildRotatedCanvasFromImage(canvas, 180),
+      rotation: (rotation + 180) % 360
+    };
+  }
+
+  function buildPreparedPhotoResultFromCanvas(sourceCanvas, normalizedRotation) {
+    const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(sourceCanvas.width, sourceCanvas.height));
+    const width = Math.max(1, Math.round(sourceCanvas.width * scale));
+    const height = Math.max(1, Math.round(sourceCanvas.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Браузер не поддерживает подготовку фото.");
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(sourceCanvas, 0, 0, width, height);
+
+    return {
+      dataUrl: canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY),
+      rotatedToLandscape: normalizedRotation !== 0,
+      normalizedRotation
+    };
   }
 
   async function normalizeImageDataUrl(sourceDataUrl) {
@@ -852,9 +1084,7 @@
       throw new Error("Не удалось определить размер изображения.");
     }
 
-    const candidateRotations = shouldRotateImageToLandscape(originalWidth, originalHeight)
-      ? [90, 270, 0, 180]
-      : [0, 180, 90, 270];
+    const candidateRotations = [0];
     let bestRotation = 0;
     let bestCanvas = null;
     let bestScore = Number.NEGATIVE_INFINITY;
@@ -873,27 +1103,13 @@
       throw new Error("Не удалось подготовить фото.");
     }
 
-    const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(bestCanvas.width, bestCanvas.height));
-    const width = Math.max(1, Math.round(bestCanvas.width * scale));
-    const height = Math.max(1, Math.round(bestCanvas.height * scale));
+    return buildPreparedPhotoResultFromCanvas(bestCanvas, bestRotation);
 
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d");
-    if (!context) {
-      throw new Error("Браузер не поддерживает подготовку фото.");
-    }
+  }
 
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, width, height);
-    context.drawImage(bestCanvas, 0, 0, width, height);
-
-    return {
-      dataUrl: canvas.toDataURL("image/jpeg", PHOTO_JPEG_QUALITY),
-      rotatedToLandscape: bestRotation !== 0,
-      normalizedRotation: bestRotation
-    };
+  async function normalizeTelegramFeedbackImageDataUrl(sourceDataUrl, notes) {
+    void notes;
+    return normalizeImageDataUrl(sourceDataUrl);
   }
 
   async function compressImageFile(file) {
@@ -2364,6 +2580,30 @@
       : "";
   }
 
+  function buildPhotoPreviewValuesFromRecord(record) {
+    const recognizedSource = record && record.recognizedValues && typeof record.recognizedValues === "object"
+      ? record.recognizedValues
+      : null;
+    const finalSource = record && record.finalValues && typeof record.finalValues === "object"
+      ? record.finalValues
+      : null;
+    const output = {};
+    if (!recognizedSource && !finalSource) {
+      return output;
+    }
+
+    PHOTO_FIELD_DEFINITIONS.forEach((field) => {
+      if (recognizedSource && Object.prototype.hasOwnProperty.call(recognizedSource, field.key)) {
+        output[field.key] = config.normalizeCellValue(recognizedSource[field.key]);
+      }
+      if (finalSource && Object.prototype.hasOwnProperty.call(finalSource, field.key)) {
+        output[field.key] = config.normalizeCellValue(finalSource[field.key]);
+      }
+    });
+
+    return output;
+  }
+
   function calcPresentTotal(snapshot, row) {
     return row.presentKeys.reduce((sum, key) => sum + getNumber(snapshot, row, key), 0);
   }
@@ -3547,7 +3787,7 @@
       <section class="panel no-print photo-import-panel">
         <h2>Загрузка фото бланка</h2>
         <p>Загрузите фото верхней части бланка. На странице отделения фото всегда относится к текущему отделению: маркер SR здесь не проверяется и не нужен. Значения подставятся в ячейки локально, потом вы их проверите и сохраните обычной кнопкой.</p>
-        <p class="hint">Нумерация ячеек для OCR: <strong>1-22</strong>, счёт идёт от <strong>1</strong>, не от 0. Внутренние технические слоты OCR не показываются пользователю.</p>
+        <p class="hint">Нумерация ячеек для OCR: <strong>1-22</strong>, счёт идёт от <strong>1</strong>, не от 0. Ячейка 12 читается как расчётная карточка, а 13-22 это обычные переменные.</p>
         <div class="photo-import-actions">
           <label class="button-link photo-file-label${photoState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="photoImportFile" accept="image/*" capture="environment" ${photoState.isProcessing ? "disabled" : ""}>
@@ -3572,19 +3812,6 @@
           )
         }</p>
         ${queueInfoText ? `<p class="hint"><strong>${escapeHtml(queueInfoText)}</strong></p>` : ""}
-        ${photoState.imageDataUrl ? `
-          <div class="photo-import-preview">
-            <div class="photo-import-preview-frame">
-              <img
-                src="${escapeHtml(photoState.imageDataUrl)}"
-                alt="Загруженный бланк"
-                class="photo-import-preview-image"
-                data-photo-zoom-trigger="department"
-              >
-              ${renderPhotoReviewOverlay(photoState)}
-            </div>
-          </div>
-        ` : ""}
         ${previewItems || photoState.lastReportDate || (photoState.notes && photoState.notes.length) ? `
           <div class="photo-import-results">
             ${photoState.lastReportDate ? `<p class="hint">Дата на фото: <strong>${escapeHtml(photoState.lastReportDate)}</strong></p>` : ""}
@@ -3596,6 +3823,19 @@
             ` : ""}
             ${photoState.suspectReason ? `<p class="hint warning-note"><strong>${escapeHtml(photoState.suspectReason)}</strong></p>` : ""}
             ${photoState.draftMode ? `<p class="hint"><strong>Автоотправка временно приостановлена.</strong> Проверьте ячейки и нажмите Сохранить.</p>` : ""}
+          </div>
+        ` : ""}
+        ${photoState.imageDataUrl ? `
+          <div class="photo-import-preview">
+            <div class="photo-import-preview-frame">
+              <img
+                src="${escapeHtml(photoState.imageDataUrl)}"
+                alt="Загруженный бланк"
+                class="photo-import-preview-image"
+                data-photo-zoom-trigger="department"
+              >
+              ${renderPhotoReviewOverlay(photoState)}
+            </div>
           </div>
         ` : ""}
       </section>
@@ -4276,7 +4516,7 @@
       state.photoImport.isProcessing = false;
       const canAutoRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
       const orientationNote = preparedPhoto.rotatedToLandscape
-        ? " Фото автоматически выровнено: маркер SR перемещён в верхний правый угол."
+        ? " Фото автоматически выровнено: надпись SR перемещена вправо вверх."
         : "";
       if (canAutoRecognize) {
         setPhotoImportStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Автоматически распознаю цифры...`, false);
@@ -4673,7 +4913,7 @@
       state.mainPhotoRoute.isProcessing = false;
       const canAutoDetect = sync.hasRemoteSync() && typeof sync.detectDepartmentPhoto === "function";
       const orientationNote = preparedPhoto.rotatedToLandscape
-        ? " Фото автоматически выровнено: маркер SR перемещён в верхний правый угол."
+        ? " Фото автоматически выровнено: надпись SR перемещена вправо вверх."
         : "";
       if (canAutoDetect) {
         setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Автоматически определяю отделение...`, false);
@@ -4760,16 +5000,6 @@
               : "Определение отделения доступно только в онлайн-режиме владельца.")
           )
         }</p>
-        ${routeState.imageDataUrl ? `
-          <div class="photo-import-preview">
-            <img
-              src="${escapeHtml(routeState.imageDataUrl)}"
-              alt="Фото для определения отделения"
-              class="photo-import-preview-image"
-              data-photo-zoom-trigger="main"
-            >
-          </div>
-        ` : ""}
         ${detectedDepartment || batchPreviewItems || (routeState.notes && routeState.notes.length) ? `
           <div class="photo-import-results">
             ${detectedDepartment ? `
@@ -4792,6 +5022,16 @@
                 ${routeState.notes.map((note) => `<p class="hint warning-note">${escapeHtml(note)}</p>`).join("")}
               </div>
             ` : ""}
+          </div>
+        ` : ""}
+        ${routeState.imageDataUrl ? `
+          <div class="photo-import-preview">
+            <img
+              src="${escapeHtml(routeState.imageDataUrl)}"
+              alt="Фото для определения отделения"
+              class="photo-import-preview-image"
+              data-photo-zoom-trigger="main"
+            >
           </div>
         ` : ""}
       </section>
@@ -5068,6 +5308,7 @@
       state.photoImport.lastAppliedKeys = Array.isArray(record.recognizedKeys)
         ? record.recognizedKeys.map((item) => String(item))
         : [];
+      state.photoImport.recognizedValues = buildPhotoPreviewValuesFromRecord(record);
       state.photoImport.notes = normalizeOcrNotes(record.notes);
       state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
       state.photoImport.status = "Фото бланка загружено из Telegram. Проверьте значения и при необходимости сохраните.";
@@ -5098,7 +5339,8 @@
         return;
       }
 
-      const preparedPhoto = await normalizeImageDataUrl(imageDataUrl);
+      const recordNotes = Array.isArray(record.notes) ? record.notes : [];
+      const preparedPhoto = await normalizeTelegramFeedbackImageDataUrl(imageDataUrl, recordNotes);
 
       state.photoImport = buildInitialPhotoImportState();
       state.photoImport.feedbackId = String(record.id || feedbackId);
@@ -5111,10 +5353,11 @@
       state.photoImport.lastAppliedKeys = Array.isArray(record.recognizedKeys)
         ? record.recognizedKeys.map((item) => String(item))
         : [];
-      state.photoImport.notes = normalizeOcrNotes(record.notes);
+      state.photoImport.recognizedValues = buildPhotoPreviewValuesFromRecord(record);
+      state.photoImport.notes = normalizeOcrNotes(recordNotes);
       state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
       state.photoImport.status = preparedPhoto.rotatedToLandscape
-        ? "Фото бланка загружено из Telegram и автоматически выровнено по SR-маркеру. Проверьте значения и при необходимости сохраните."
+        ? "Фото бланка загружено из Telegram и автоматически выровнено: SR сверху справа. Проверьте значения и при необходимости сохраните."
         : "Фото бланка загружено из Telegram. Проверьте значения и при необходимости сохраните.";
       state.photoImport.isError = false;
       renderPage();
@@ -5158,7 +5401,8 @@
         return;
       }
 
-      const preparedPhoto = await normalizeImageDataUrl(imageDataUrl);
+      const recordNotes = Array.isArray(record.notes) ? record.notes : [];
+      const preparedPhoto = await normalizeTelegramFeedbackImageDataUrl(imageDataUrl, recordNotes);
       const workflowStatus = row && typeof row.photoWorkflowStatus === "string" ? row.photoWorkflowStatus : "idle";
 
       state.photoImport = buildInitialPhotoImportState();
@@ -5174,15 +5418,39 @@
       state.photoImport.lastAppliedKeys = Array.isArray(record.recognizedKeys)
         ? record.recognizedKeys.map((item) => String(item))
         : [];
-      state.photoImport.notes = normalizeOcrNotes(record.notes);
+      state.photoImport.recognizedValues = buildPhotoPreviewValuesFromRecord(record);
+      state.photoImport.notes = normalizeOcrNotes(recordNotes);
       state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
       state.photoImport.status = workflowStatus === "pending"
         ? "Новый бланк загружен. Проверьте значения и сохраните данные после корректировок."
         : "Показан последний сохранённый бланк отделения.";
+      if (preparedPhoto.rotatedToLandscape) {
+        state.photoImport.status = `Фото автоматически выровнено: SR сверху справа. ${state.photoImport.status}`;
+      }
       state.photoImport.isError = false;
       renderPage();
     } catch (_error) {
     }
+  }
+
+  async function maybeAutoRecognizeLoadedTelegramPhoto() {
+    if (mode !== "department" || !sync.hasRemoteSync() || typeof sync.recognizeDepartmentPhoto !== "function") {
+      return;
+    }
+
+    const photoState = state.photoImport;
+    if (!photoState || photoState.isProcessing || photoState.draftMode || !photoState.imageDataUrl) {
+      return;
+    }
+
+    const feedbackId = String(photoState.feedbackId || "").trim();
+    const shouldAutoRecognize = photoState.workflowStatus === "pending" || Boolean(queryParams.get("tgFeedback"));
+    if (!feedbackId || !shouldAutoRecognize || autoRecognizedTelegramFeedbackIds.has(feedbackId)) {
+      return;
+    }
+
+    autoRecognizedTelegramFeedbackIds.add(feedbackId);
+    await handlePhotoRecognition();
   }
 
   function getStylesheetUrl() {
@@ -5445,24 +5713,33 @@
       return null;
     }
 
-    const recognizedValues = state.photoImport.recognizedValues && typeof state.photoImport.recognizedValues === "object"
-      ? config.normalizeRowValues(state.photoImport.recognizedValues)
+    const rawRecognizedValues = state.photoImport.recognizedValues && typeof state.photoImport.recognizedValues === "object"
+      ? state.photoImport.recognizedValues
+      : null;
+    const recognizedValues = rawRecognizedValues
+      ? config.normalizeRowValues(rawRecognizedValues)
       : null;
     if (!recognizedValues) {
       return null;
+    }
+    if (Object.prototype.hasOwnProperty.call(rawRecognizedValues, "presentTotal")) {
+      recognizedValues.presentTotal = config.normalizeCellValue(rawRecognizedValues.presentTotal);
     }
 
     const previewFeedbackKeys = PHOTO_FIELD_DEFINITIONS
       .map((item) => item.key)
       .filter((key) => key !== "leaveTotal");
     const recognizedKeys = previewFeedbackKeys.filter((key) => {
-      return recognizedValues[key] !== null;
+      return Object.prototype.hasOwnProperty.call(recognizedValues, key) && recognizedValues[key] !== null;
     });
     if (!recognizedKeys.length) {
       return null;
     }
 
     const normalizedFinalValues = config.normalizeRowValues(finalValues);
+    if (Object.prototype.hasOwnProperty.call(recognizedValues, "presentTotal")) {
+      normalizedFinalValues.presentTotal = recognizedValues.presentTotal;
+    }
     const changedKeys = recognizedKeys.filter((key) => recognizedValues[key] !== normalizedFinalValues[key]);
     const status = changedKeys.length > 0 ? "corrected_by_operator" : "accepted_as_is";
 
@@ -6116,7 +6393,8 @@
         restorePendingMainSaveNotice();
         refreshTableData();
         if (mode === "department") {
-          void maybeLoadStoredDepartmentPhotoAdjusted();
+          await maybeLoadStoredDepartmentPhotoAdjusted();
+          await maybeAutoRecognizeLoadedTelegramPhoto();
         }
       } catch (error) {
         state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
@@ -6179,6 +6457,7 @@
     await maybeResumeTransferredPhotoImport();
     await maybeLoadTelegramFeedbackPhotoAdjusted();
     await maybeLoadStoredDepartmentPhotoAdjusted();
+    await maybeAutoRecognizeLoadedTelegramPhoto();
   }
 
   init().catch((error) => {
