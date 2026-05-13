@@ -1049,6 +1049,20 @@ function setXmlAttribute(tag: string, name: string, value: string) {
   return tag.replace(/>$/, ` ${name}="${value}">`);
 }
 
+function removeXmlAttribute(tag: string, name: string) {
+  return tag.replace(new RegExp(`\\s${name}="[^"]*"`, "g"), "");
+}
+
+function columnToIndex(column: string) {
+  return column
+    .split("")
+    .reduce((index, letter) => (index * 26) + (letter.charCodeAt(0) - 64), 0);
+}
+
+function isDepartmentSheetUsedColumn(column: string) {
+  return columnToIndex(column) <= columnToIndex(DEPARTMENT_SHEET_LAST_COLUMN);
+}
+
 function escapeXmlText(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -1165,6 +1179,10 @@ function createUnlockedCellXfTag(xfTag: string) {
   return upsertProtectionTag(xfTag, { locked: "0" });
 }
 
+function createLockedCellXfTag(xfTag: string) {
+  return upsertProtectionTag(xfTag, { locked: "1" });
+}
+
 function createHiddenFormulaCellXfTag(xfTag: string) {
   return upsertProtectionTag(xfTag, { locked: "1", hidden: "1" });
 }
@@ -1224,8 +1242,49 @@ function addUnlockedDepartmentSheetStyles(stylesXml: string, styleIds: Set<numbe
   return addDepartmentSheetStyles(stylesXml, styleIds, createUnlockedCellXfTag);
 }
 
+function addLockedDepartmentSheetStyles(stylesXml: string, styleIds: Set<number>) {
+  return addDepartmentSheetStyles(stylesXml, styleIds, createLockedCellXfTag);
+}
+
 function addHiddenFormulaDepartmentSheetStyles(stylesXml: string, styleIds: Set<number>) {
   return addDepartmentSheetStyles(stylesXml, styleIds, createHiddenFormulaCellXfTag);
+}
+
+function collectDepartmentSheetVisibleStyleIds(worksheetXml: string, visibleRows: Set<number>) {
+  const styleIds = new Set<number>();
+
+  worksheetXml.replace(/<c\b[^>]*\br="([A-Z]+)(\d+)"[^>]*>/g, (cellTag, column, rowText) => {
+    if (!visibleRows.has(Number(rowText)) || !isDepartmentSheetUsedColumn(column)) {
+      return cellTag;
+    }
+
+    const styleMatch = cellTag.match(/\bs="(\d+)"/);
+    styleIds.add(styleMatch ? Number(styleMatch[1]) : 0);
+    return cellTag;
+  });
+
+  return styleIds;
+}
+
+function lockDepartmentSheetVisibleCells(worksheetXml: string, visibleRows: Set<number>, styleMap: Map<number, number>) {
+  if (!styleMap.size) {
+    return worksheetXml;
+  }
+
+  return worksheetXml.replace(/<c\b[^>]*?\br="([A-Z]+)(\d+)"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g, (cellTag, column, rowText) => {
+    if (!visibleRows.has(Number(rowText)) || !isDepartmentSheetUsedColumn(column)) {
+      return cellTag;
+    }
+
+    return cellTag.replace(/^<c\b[^>]*?(?:\/>|>)/, (openingTag) => {
+      const styleMatch = openingTag.match(/\bs="(\d+)"/);
+      const originalStyleId = styleMatch ? Number(styleMatch[1]) : 0;
+      const lockedStyleId = styleMap.get(originalStyleId);
+      return typeof lockedStyleId === "number"
+        ? setXmlAttribute(openingTag, "s", String(lockedStyleId))
+        : openingTag;
+    });
+  });
 }
 
 function unlockDepartmentSheetInputCells(worksheetXml: string, targetRow: number, styleMap: Map<number, number>) {
@@ -1268,6 +1327,41 @@ function hideDepartmentSheetFormulaCells(worksheetXml: string, targetRow: number
         : openingTag;
     });
   });
+}
+
+function setDepartmentSheetInputDefaults(worksheetXml: string, targetRow: number) {
+  return DEPARTMENT_SHEET_INPUT_COLUMNS.reduce((updatedXml, column) => {
+    const cellRef = `${column}${targetRow}`;
+    const cellPattern = new RegExp(`<c\\b[^>]*\\br="${cellRef}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`);
+    return updatedXml.replace(cellPattern, (cellTag) => {
+      const openingMatch = cellTag.match(/^<c\b[^>]*?(?:\/>|>)/);
+      if (!openingMatch) {
+        return cellTag;
+      }
+
+      const openingTag = removeXmlAttribute(
+        openingMatch[0].replace(/\s*\/>$/, ">"),
+        "t"
+      );
+      return `${openingTag}<v>0</v></c>`;
+    });
+  }, worksheetXml);
+}
+
+function resetDepartmentSheetFormulaCachedValues(worksheetXml: string, targetRow: number) {
+  return DEPARTMENT_SHEET_FORMULA_COLUMNS.reduce((updatedXml, column) => {
+    const cellRef = `${column}${targetRow}`;
+    const cellPattern = new RegExp(`<c\\b[^>]*\\br="${cellRef}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`);
+    return updatedXml.replace(cellPattern, (cellTag) => {
+      if (!/<f\b/.test(cellTag)) {
+        return cellTag;
+      }
+      if (/<v>[\s\S]*?<\/v>/.test(cellTag)) {
+        return cellTag.replace(/<v>[\s\S]*?<\/v>/, "<v>0</v>");
+      }
+      return cellTag.replace("</c>", "<v>0</v></c>");
+    });
+  }, worksheetXml);
 }
 
 function setDepartmentSheetInlineStringCell(worksheetXml: string, cellRef: string, value: string) {
@@ -1466,11 +1560,9 @@ async function buildDepartmentOnlySheetBytes(templateBytes: Uint8Array, departme
 
   const visibleRows = new Set([1, 2, 3, targetRow]);
   const xml = await worksheet.async("string");
-  const inputStyleIds = collectDepartmentSheetInputStyleIds(xml, targetRow);
-  const formulaStyleIds = collectDepartmentSheetFormulaStyleIds(xml, targetRow);
   const stylesXml = await styles.async("string");
-  const protectedStyles = addUnlockedDepartmentSheetStyles(stylesXml, inputStyleIds);
-  const formulaProtectedStyles = addHiddenFormulaDepartmentSheetStyles(protectedStyles.stylesXml, formulaStyleIds);
+  const visibleStyleIds = collectDepartmentSheetVisibleStyleIds(xml, visibleRows);
+  const lockedStyles = addLockedDepartmentSheetStyles(stylesXml, visibleStyleIds);
   const filteredXml = xml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>/g, (tag, rowNumberText) => {
     const rowNumber = Number(rowNumberText);
     if (!Number.isFinite(rowNumber) || visibleRows.has(rowNumber)) {
@@ -1481,7 +1573,14 @@ async function buildDepartmentOnlySheetBytes(templateBytes: Uint8Array, departme
     }
     return tag;
   });
-  const unlockedXml = unlockDepartmentSheetInputCells(filteredXml, targetRow, protectedStyles.styleMap);
+  const zeroedXml = setDepartmentSheetInputDefaults(filteredXml, targetRow);
+  const formulaZeroedXml = resetDepartmentSheetFormulaCachedValues(zeroedXml, targetRow);
+  const lockedXml = lockDepartmentSheetVisibleCells(formulaZeroedXml, visibleRows, lockedStyles.styleMap);
+  const inputStyleIds = collectDepartmentSheetInputStyleIds(lockedXml, targetRow);
+  const formulaStyleIds = collectDepartmentSheetFormulaStyleIds(lockedXml, targetRow);
+  const unlockedStyles = addUnlockedDepartmentSheetStyles(lockedStyles.stylesXml, inputStyleIds);
+  const formulaProtectedStyles = addHiddenFormulaDepartmentSheetStyles(unlockedStyles.stylesXml, formulaStyleIds);
+  const unlockedXml = unlockDepartmentSheetInputCells(lockedXml, targetRow, unlockedStyles.styleMap);
   const formulaHiddenXml = hideDepartmentSheetFormulaCells(unlockedXml, targetRow, formulaProtectedStyles.styleMap);
   const titledXml = setDepartmentSheetTitle(formulaHiddenXml, departmentId);
   const datedXml = setDepartmentSheetA3DateTime(titledXml, buildDepartmentSheetDateTimeText(reportDate));
