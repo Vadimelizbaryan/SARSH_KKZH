@@ -161,7 +161,10 @@ const DEPARTMENT_SHEET_FORMULA_COLUMNS = ["K", "L", "W", "X"];
 const DEPARTMENT_SHEET_LAST_COLUMN = "Z";
 const DEPARTMENT_SHEET_FIRST_INPUT_COLUMN = "B";
 const DEPARTMENT_SHEET_PROTECTION_TAG = [
-  '<sheetProtection sheet="1" objects="1" scenarios="1"',
+  '<sheetProtection algorithmName="SHA-512"',
+  ' hashValue="Cp0WkSPoNf7F8vuLdTav6oyw9QDLU/fmbtQm4BnGFi4aUlCX8ks4uP/bMtM0OhudRVMphOU4WXv374N67WNvEw=="',
+  ' saltValue="isomLFp1CwyyV8C3DxAtUg==" spinCount="100000"',
+  ' sheet="1" objects="1" scenarios="1"',
   ' selectLockedCells="1"',
   ' formatCells="1" formatColumns="1" formatRows="1"',
   ' insertColumns="1" insertRows="1" insertHyperlinks="1"',
