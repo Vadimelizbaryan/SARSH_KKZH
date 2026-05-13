@@ -1916,15 +1916,22 @@ async function handleTelegramSheetDocument(
   const meta = DEPARTMENTS[result.departmentId];
 
   if (!result.validation.isValid) {
+    const difference = result.validation.actual - result.validation.expected;
+    const differenceText = difference > 0 ? `+${difference}` : String(difference);
     await sendTelegramDocument(
       chatId,
       fileName,
       bytes,
       [
-        "Данные неправильные, нужно отредактировать файл.",
+        "⚠️ Контроль формулы не пройден.",
+        "Файл возвращаю обратно: нужно чуть поправить данные и отправить его снова.",
+        "",
         `Отделение: ${meta.department} (${meta.marker})`,
-        `Формула не совпала: сумма 13-22 = ${result.validation.actual}, а должно быть ${result.validation.expected}.`,
-        "Исправьте значения в ячейках ввода и отправьте XLSX обратно боту."
+        `Сейчас сумма 13-22: ${result.validation.actual}`,
+        `По формуле должно быть: ${result.validation.expected}`,
+        `Разница: ${differenceText}`,
+        "",
+        "Проверьте ячейки ввода, особенно блок 13-22, а также 1, 4, 7, 10, 11."
       ].join("\n")
     );
     return;
