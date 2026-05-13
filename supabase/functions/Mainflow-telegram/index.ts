@@ -1490,6 +1490,36 @@ function detectDepartmentFromVisibleSheetRow(worksheetXml: string) {
   return found ? found[0] as DepartmentId : null;
 }
 
+function validateReturnedDepartmentSheetIntegrity(
+  worksheetXml: string,
+  sharedStrings: string[],
+  departmentId: DepartmentId
+) {
+  const issues: string[] = [];
+  const targetRow = DEPARTMENT_SHEET_ROW_BY_ID[departmentId];
+  const titleDepartmentId = detectDepartmentFromSheetTitle(worksheetXml, sharedStrings);
+  const visibleDepartmentId = detectDepartmentFromVisibleSheetRow(worksheetXml);
+
+  if (titleDepartmentId !== departmentId) {
+    issues.push("название отделения в заголовке было изменено или удалено");
+  }
+  if (visibleDepartmentId !== departmentId) {
+    issues.push("видимая строка отделения была изменена");
+  }
+
+  const brokenFormulaCells = DEPARTMENT_SHEET_FORMULA_COLUMNS
+    .map((column) => `${column}${targetRow}`)
+    .filter((cellRef) => !/<f\b/.test(getWorksheetCellXml(worksheetXml, cellRef)));
+  if (brokenFormulaCells.length) {
+    issues.push(`формульные ячейки изменены: ${brokenFormulaCells.join(", ")}`);
+  }
+
+  return {
+    isValid: issues.length === 0,
+    issues
+  };
+}
+
 function getSheetNumber(values: Record<string, number | null>, key: string) {
   return values[key] ?? 0;
 }
@@ -1541,6 +1571,7 @@ async function parseReturnedDepartmentSheet(bytes: Uint8Array, fileName: string)
   return {
     departmentId,
     values,
+    integrity: validateReturnedDepartmentSheetIntegrity(worksheetXml, sharedStrings, departmentId),
     validation: validateDepartmentSheetValues(values)
   };
 }
@@ -2109,6 +2140,24 @@ async function handleTelegramSheetDocument(
   const fileName = sheetDocument.fileName || downloaded.fileName || "department-sheet.xlsx";
   const result = await parseReturnedDepartmentSheet(bytes, fileName);
   const meta = DEPARTMENTS[result.departmentId];
+
+  if (!result.integrity.isValid) {
+    await sendTelegramDocument(
+      chatId,
+      fileName,
+      bytes,
+      [
+        "⚠️ Структура рабочей таблицы изменена.",
+        "Файл возвращаю обратно: нужно взять свежий файл у бота и заполнить только ячейки ввода.",
+        "",
+        `Отделение: ${meta.department} (${meta.marker})`,
+        `Что найдено: ${result.integrity.issues.join("; ")}.`,
+        "",
+        "На телефоне приложение может позволять нажимать на все ячейки, но менять нужно только ячейки ввода с нулями."
+      ].join("\n")
+    );
+    return;
+  }
 
   if (!result.validation.isValid) {
     const difference = result.validation.actual - result.validation.expected;
