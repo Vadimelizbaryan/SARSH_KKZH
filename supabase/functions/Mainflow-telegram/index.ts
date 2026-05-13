@@ -113,6 +113,16 @@ const DEPARTMENT_SHEET_ROW_BY_ID: Record<keyof typeof DEPARTMENTS, number> = {
   r20: 20,
   r21: 21
 };
+const DEPARTMENT_SHEET_INPUT_COLUMNS = [
+  "B", "C", "D",
+  "E", "F", "G",
+  "H", "I", "J",
+  "M", "N", "O",
+  "P", "Q", "R", "S",
+  "T", "U", "V",
+  "Y", "Z"
+];
+const DEPARTMENT_SHEET_PROTECTION_TAG = '<sheetProtection sheet="1" objects="1" scenarios="1"/>';
 
 const PHOTO_TEMPLATE_GUIDE = [
   "Template layout of the 22 visible top-row positions from left to right:",
@@ -965,7 +975,126 @@ function setXmlAttribute(tag: string, name: string, value: string) {
   if (attributePattern.test(tag)) {
     return tag.replace(attributePattern, ` ${name}="${value}"`);
   }
+  if (/\/>$/.test(tag)) {
+    return tag.replace(/\s*\/>$/, ` ${name}="${value}"/>`);
+  }
   return tag.replace(/>$/, ` ${name}="${value}">`);
+}
+
+function isDepartmentSheetInputColumn(column: string) {
+  return DEPARTMENT_SHEET_INPUT_COLUMNS.includes(column);
+}
+
+function collectDepartmentSheetInputStyleIds(worksheetXml: string, targetRow: number) {
+  const styleIds = new Set<number>();
+
+  worksheetXml.replace(/<c\b[^>]*\br="([A-Z]+)(\d+)"[^>]*>/g, (cellTag, column, rowText) => {
+    if (Number(rowText) !== targetRow || !isDepartmentSheetInputColumn(column)) {
+      return cellTag;
+    }
+
+    const styleMatch = cellTag.match(/\bs="(\d+)"/);
+    styleIds.add(styleMatch ? Number(styleMatch[1]) : 0);
+    return cellTag;
+  });
+
+  return styleIds;
+}
+
+function createUnlockedCellXfTag(xfTag: string) {
+  let updated = xfTag.replace(/^<xf\b[^>]*?(?:\/>|>)/, (openingTag) => (
+    setXmlAttribute(openingTag, "applyProtection", "1")
+  ));
+
+  if (/<protection\b/.test(updated)) {
+    return updated.replace(/<protection\b[^>]*(?:\/>|>[\s\S]*?<\/protection>)/, (protectionTag) => (
+      setXmlAttribute(protectionTag, "locked", "0")
+    ));
+  }
+
+  if (/\/>$/.test(updated)) {
+    return updated.replace(/\s*\/>$/, '><protection locked="0"/></xf>');
+  }
+
+  return updated.replace(/<\/xf>$/, '<protection locked="0"/></xf>');
+}
+
+function addUnlockedDepartmentSheetStyles(stylesXml: string, styleIds: Set<number>) {
+  const styleMap = new Map<number, number>();
+  if (!styleIds.size) {
+    return { stylesXml, styleMap };
+  }
+
+  const cellXfsMatch = stylesXml.match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/);
+  if (!cellXfsMatch) {
+    throw new Error("В рабочем XLSX не найден блок стилей cellXfs.");
+  }
+
+  const cellXfsBlock = cellXfsMatch[0];
+  const openingTagMatch = cellXfsBlock.match(/^<cellXfs\b[^>]*>/);
+  if (!openingTagMatch) {
+    throw new Error("В рабочем XLSX повреждён блок стилей cellXfs.");
+  }
+
+  const openingTag = openingTagMatch[0];
+  const innerXml = cellXfsMatch[1];
+  const xfTags = Array.from(innerXml.matchAll(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)).map((match) => match[0]);
+  const appendedTags: string[] = [];
+
+  Array.from(styleIds)
+    .sort((left, right) => left - right)
+    .forEach((styleId) => {
+      const sourceTag = xfTags[styleId];
+      if (!sourceTag) {
+        return;
+      }
+
+      styleMap.set(styleId, xfTags.length + appendedTags.length);
+      appendedTags.push(createUnlockedCellXfTag(sourceTag));
+    });
+
+  if (!appendedTags.length) {
+    return { stylesXml, styleMap };
+  }
+
+  const updatedOpeningTag = setXmlAttribute(openingTag, "count", String(xfTags.length + appendedTags.length));
+  const updatedCellXfsBlock = `${updatedOpeningTag}${innerXml}${appendedTags.join("")}</cellXfs>`;
+
+  return {
+    stylesXml: stylesXml.replace(cellXfsBlock, updatedCellXfsBlock),
+    styleMap
+  };
+}
+
+function unlockDepartmentSheetInputCells(worksheetXml: string, targetRow: number, styleMap: Map<number, number>) {
+  if (!styleMap.size) {
+    return worksheetXml;
+  }
+
+  return worksheetXml.replace(/<c\b[^>]*?\br="([A-Z]+)(\d+)"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g, (cellTag, column, rowText) => {
+    if (Number(rowText) !== targetRow || !isDepartmentSheetInputColumn(column)) {
+      return cellTag;
+    }
+
+    return cellTag.replace(/^<c\b[^>]*?(?:\/>|>)/, (openingTag) => {
+      const styleMatch = openingTag.match(/\bs="(\d+)"/);
+      const originalStyleId = styleMatch ? Number(styleMatch[1]) : 0;
+      const unlockedStyleId = styleMap.get(originalStyleId);
+      return typeof unlockedStyleId === "number"
+        ? setXmlAttribute(openingTag, "s", String(unlockedStyleId))
+        : openingTag;
+    });
+  });
+}
+
+function protectDepartmentSheetXml(worksheetXml: string) {
+  if (/<sheetProtection\b[\s\S]*?\/>/.test(worksheetXml)) {
+    return worksheetXml.replace(/<sheetProtection\b[\s\S]*?\/>/, DEPARTMENT_SHEET_PROTECTION_TAG);
+  }
+  if (/<sheetProtection\b[\s\S]*?<\/sheetProtection>/.test(worksheetXml)) {
+    return worksheetXml.replace(/<sheetProtection\b[\s\S]*?<\/sheetProtection>/, DEPARTMENT_SHEET_PROTECTION_TAG);
+  }
+  return worksheetXml.replace("</sheetData>", `</sheetData>${DEPARTMENT_SHEET_PROTECTION_TAG}`);
 }
 
 async function buildDepartmentOnlySheetBytes(templateBytes: Uint8Array, departmentId: DepartmentId) {
@@ -979,9 +1108,16 @@ async function buildDepartmentOnlySheetBytes(templateBytes: Uint8Array, departme
   if (!worksheet) {
     throw new Error("В рабочем XLSX не найден лист Sheet1.");
   }
+  const styles = zip.file("xl/styles.xml");
+  if (!styles) {
+    throw new Error("В рабочем XLSX не найден файл стилей.");
+  }
 
   const visibleRows = new Set([1, 2, 3, targetRow]);
   const xml = await worksheet.async("string");
+  const inputStyleIds = collectDepartmentSheetInputStyleIds(xml, targetRow);
+  const stylesXml = await styles.async("string");
+  const protectedStyles = addUnlockedDepartmentSheetStyles(stylesXml, inputStyleIds);
   const filteredXml = xml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>/g, (tag, rowNumberText) => {
     const rowNumber = Number(rowNumberText);
     if (!Number.isFinite(rowNumber) || visibleRows.has(rowNumber)) {
@@ -992,8 +1128,11 @@ async function buildDepartmentOnlySheetBytes(templateBytes: Uint8Array, departme
     }
     return tag;
   });
+  const unlockedXml = unlockDepartmentSheetInputCells(filteredXml, targetRow, protectedStyles.styleMap);
+  const protectedXml = protectDepartmentSheetXml(unlockedXml);
 
-  zip.file("xl/worksheets/sheet1.xml", filteredXml);
+  zip.file("xl/styles.xml", protectedStyles.stylesXml);
+  zip.file("xl/worksheets/sheet1.xml", protectedXml);
   return await zip.generateAsync({
     type: "uint8array",
     compression: "DEFLATE"
