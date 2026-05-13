@@ -1214,7 +1214,7 @@ function setDepartmentSheetInlineStringCell(worksheetXml: string, cellRef: strin
 
 function setDepartmentSheetTitle(worksheetXml: string, departmentId: DepartmentId) {
   const meta = DEPARTMENTS[departmentId];
-  return setDepartmentSheetInlineStringCell(worksheetXml, "A1", `${meta.marker} / ${meta.department}`);
+  return setDepartmentSheetInlineStringCell(worksheetXml, "A1", meta.department);
 }
 
 function setDepartmentSheetA3DateTime(worksheetXml: string, dateTimeText: string) {
