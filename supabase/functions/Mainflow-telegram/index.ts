@@ -1933,6 +1933,7 @@ async function handleTelegramSheetDocument(
   await sendTelegramMessage(
     chatId,
     [
+      "Спасибо. Отличная работа. 🙂",
       "Файл проверен: формула совпала.",
       `Отделение: ${meta.department} (${meta.marker})`,
       `Сумма 13-22 = ${result.validation.actual}.`,
