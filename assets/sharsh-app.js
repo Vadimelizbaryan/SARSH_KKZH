@@ -535,6 +535,40 @@
     return true;
   }
 
+  async function playPhotoReceivedSound() {
+    const audioContext = await prepareUpdateAudioContext();
+    if (!audioContext) {
+      return false;
+    }
+
+    scheduleBellStrike(audioContext, audioContext.currentTime, 880, 0.095);
+    return true;
+  }
+
+  async function playDepartmentDetectedSound() {
+    const audioContext = await prepareUpdateAudioContext();
+    if (!audioContext) {
+      return false;
+    }
+
+    const now = audioContext.currentTime;
+    scheduleBellStrike(audioContext, now, 987.77, 0.1);
+    scheduleBellStrike(audioContext, now + 0.28, 1174.66, 0.095);
+    return true;
+  }
+
+  function getPendingPhotoWorkflowSignature(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.rows)) {
+      return "";
+    }
+
+    return snapshot.rows
+      .filter((row) => row && row.photoWorkflowStatus === "pending" && row.photoFeedbackId)
+      .map((row) => `${row.id}:${row.photoFeedbackId}:${row.photoFeedbackUpdatedAt || ""}`)
+      .sort()
+      .join("|");
+  }
+
   function applyLoadedSnapshot(result) {
     state.snapshot = syncQhCalculatedTargets(primeQhBaseInputs(resetQhCalcInputs(deepCopy(result.snapshot))));
     state.loadedSnapshot = syncQhCalculatedTargets(primeQhBaseInputs(resetQhCalcInputs(deepCopy(result.snapshot))));
@@ -4795,6 +4829,8 @@
       return;
     }
 
+    void playPhotoReceivedSound();
+
     if (selectedFiles.length > 1) {
       state.mainPhotoRoute = buildInitialMainPhotoRouteState();
       state.mainPhotoRoute.isProcessing = true;
@@ -5071,6 +5107,7 @@
           }
 
           if (department) {
+            void playDepartmentDetectedSound();
             setMainPhotoRouteStatus(
               `Отделение найдено: ${department.department}. Сохраняю фото как новый бланк...`,
               false
@@ -5169,6 +5206,8 @@
         renderPage();
         return;
       }
+
+      void playDepartmentDetectedSound();
 
       await queueMainPhotoRouteDepartmentPhoto({
         departmentId: detectedDepartmentId,
@@ -5308,6 +5347,7 @@
         ? "Фото бланка загружено из Telegram и автоматически выровнено: SR сверху справа. Проверьте значения и при необходимости сохраните."
         : "Фото бланка загружено из Telegram. Проверьте значения и при необходимости сохраните.";
       state.photoImport.isError = false;
+      void playPhotoReceivedSound();
       renderPage();
     } catch (_error) {
     }
@@ -5376,6 +5416,9 @@
         state.photoImport.status = `Фото автоматически выровнено: SR сверху справа. ${state.photoImport.status}`;
       }
       state.photoImport.isError = false;
+      if (workflowStatus === "pending") {
+        void playPhotoReceivedSound();
+      }
       renderPage();
     } catch (_error) {
     }
@@ -6313,12 +6356,26 @@
       }
 
       try {
+        const previousPendingPhotoSignature = mode === "main"
+          ? getPendingPhotoWorkflowSignature(state.snapshot)
+          : "";
         const result = await sync.loadSnapshot();
         applyLoadedSnapshot(result);
+        const nextPendingPhotoSignature = mode === "main"
+          ? getPendingPhotoWorkflowSignature(state.snapshot)
+          : "";
         if (mode === "feedback") {
           await loadFeedbackRecords(false);
           renderPage();
           return;
+        }
+        if (
+          mode === "main"
+          && nextPendingPhotoSignature
+          && nextPendingPhotoSignature !== previousPendingPhotoSignature
+        ) {
+          void playPhotoReceivedSound();
+          triggerBackgroundUpdateAttention("photo");
         }
         restorePendingMainSaveNotice();
         refreshTableData();
