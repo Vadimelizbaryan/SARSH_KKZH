@@ -296,14 +296,15 @@ function getTelegramAllowedChatIds() {
 }
 
 function getTelegramNotifyChatIds(currentChatId?: number | string | null) {
-  const raw = Deno.env.get("TELEGRAM_NOTIFY_CHAT_IDS") || Deno.env.get("TELEGRAM_ALLOWED_CHAT_IDS") || "";
+  const explicitRaw = Deno.env.get("TELEGRAM_NOTIFY_CHAT_IDS");
+  const raw = explicitRaw || Deno.env.get("TELEGRAM_ALLOWED_CHAT_IDS") || "";
   const current = currentChatId === null || typeof currentChatId === "undefined" ? "" : String(currentChatId);
   return Array.from(new Set(
     raw
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean)
-      .filter((value) => value !== current)
+      .filter((value) => explicitRaw || value !== current)
   ));
 }
 
