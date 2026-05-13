@@ -7,6 +7,8 @@ const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-
 const DEFAULT_SITE_BASE_URL = "https://vadimelizbaryan.github.io/SARSH_KKZH";
 const OCR_TEMPLATE_BLANK_IMAGE_PATH = "/assets/ocr-template-blank.jpg";
 const DEPARTMENT_SHEET_TEMPLATE_PATH = "/assets/templates/SHARSH_KKZH_template.xlsx";
+const TELEGRAM_RETRY_ATTEMPTS = 3;
+const TELEGRAM_RETRY_BASE_DELAY_MS = 700;
 
 const VALUE_KEYS = [
   "beenTotal",
@@ -827,24 +829,77 @@ function getTelegramFileBaseUrl() {
   return `https://api.telegram.org/file/bot${token}`;
 }
 
-async function callTelegramApi(method: string, body: Record<string, unknown>) {
-  const response = await fetch(`${getTelegramApiBaseUrl()}/${method}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
 
-  const payload = await response.json().catch(() => null);
-  if (!response.ok || !payload || payload.ok !== true) {
-    const description = payload && typeof payload === "object" && typeof payload.description === "string"
-      ? payload.description
-      : `Telegram API call ${method} failed (${response.status}).`;
-    throw new Error(description);
+function sanitizePublicErrorMessage(error: unknown) {
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === "string"
+      ? error
+      : "неизвестная ошибка";
+
+  return message
+    .replace(/https:\/\/api\.telegram\.org\/(?:file\/)?bot[^\s)]+/g, "https://api.telegram.org/bot***/...")
+    .replace(/bot[0-9]+:[A-Za-z0-9_-]+/g, "bot***");
+}
+
+function isRetryableTelegramError(error: unknown) {
+  const message = sanitizePublicErrorMessage(error).toLowerCase();
+  return message.includes("connection") ||
+    message.includes("reset") ||
+    message.includes("timeout") ||
+    message.includes("temporarily") ||
+    message.includes("network") ||
+    message.includes("fetch") ||
+    message.includes("(429)") ||
+    /\(5\d\d\)/.test(message);
+}
+
+async function withTelegramRetry<T>(operation: () => Promise<T>, actionLabel: string) {
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= TELEGRAM_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt >= TELEGRAM_RETRY_ATTEMPTS || !isRetryableTelegramError(error)) {
+        break;
+      }
+
+      console.warn(
+        `${actionLabel} failed, retry ${attempt + 1}/${TELEGRAM_RETRY_ATTEMPTS}:`,
+        sanitizePublicErrorMessage(error)
+      );
+      await sleep(TELEGRAM_RETRY_BASE_DELAY_MS * attempt);
+    }
   }
 
-  return payload.result;
+  throw new Error(sanitizePublicErrorMessage(lastError));
+}
+
+async function callTelegramApi(method: string, body: Record<string, unknown>) {
+  return await withTelegramRetry(async () => {
+    const response = await fetch(`${getTelegramApiBaseUrl()}/${method}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.ok !== true) {
+      const description = payload && typeof payload === "object" && typeof payload.description === "string"
+        ? payload.description
+        : `Telegram API call ${method} failed (${response.status}).`;
+      throw new Error(description);
+    }
+
+    return payload.result;
+  }, `Telegram API ${method}`);
 }
 
 async function sendTelegramMessage(chatId: number | string, text: string) {
@@ -862,27 +917,32 @@ async function sendTelegramDocument(
   caption: string,
   mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 ) {
-  const formData = new FormData();
-  formData.append("chat_id", String(chatId));
-  if (caption) {
-    formData.append("caption", caption);
-  }
   const fileBuffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(fileBuffer).set(bytes);
-  formData.append("document", new File([fileBuffer], fileName, { type: mimeType }));
 
-  const response = await fetch(`${getTelegramApiBaseUrl()}/sendDocument`, {
-    method: "POST",
-    body: formData
-  });
+  await withTelegramRetry(async () => {
+    const formData = new FormData();
+    formData.append("chat_id", String(chatId));
+    if (caption) {
+      formData.append("caption", caption);
+    }
+    formData.append("document", new File([fileBuffer.slice(0)], fileName, { type: mimeType }));
 
-  const payload = await response.json().catch(() => null);
-  if (!response.ok || !payload || payload.ok !== true) {
-    const description = payload && typeof payload === "object" && typeof payload.description === "string"
-      ? payload.description
-      : `Telegram API call sendDocument failed (${response.status}).`;
-    throw new Error(description);
-  }
+    const response = await fetch(`${getTelegramApiBaseUrl()}/sendDocument`, {
+      method: "POST",
+      body: formData
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.ok !== true) {
+      const description = payload && typeof payload === "object" && typeof payload.description === "string"
+        ? payload.description
+        : `Telegram API call sendDocument failed (${response.status}).`;
+      throw new Error(description);
+    }
+
+    return true;
+  }, "Telegram API sendDocument");
 }
 
 async function fetchDepartmentSheetTemplateBytes() {
@@ -1459,12 +1519,13 @@ Deno.serve(async (request) => {
   }
 
   const task = processTelegramUpdate(update as Record<string, unknown>).catch(async (error) => {
-    console.error("Telegram update processing failed:", error);
+    const publicMessage = sanitizePublicErrorMessage(error);
+    console.error("Telegram update processing failed:", publicMessage);
     const message = (update as Record<string, unknown>).message as Record<string, unknown> | undefined;
     const chatId = message ? getMessageChatId(message) : null;
     if (chatId !== null && isAllowedChat(chatId)) {
       try {
-        await sendTelegramMessage(chatId, `Ошибка обработки фото: ${error instanceof Error ? error.message : "неизвестная ошибка"}`);
+        await sendTelegramMessage(chatId, `Ошибка обработки запроса: ${publicMessage}`);
       } catch (_sendError) {
         console.error("Failed to notify Telegram chat about processing error.");
       }
