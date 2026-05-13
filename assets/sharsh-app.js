@@ -5150,10 +5150,13 @@
       <section class="panel no-print photo-import-panel">
         <h2>Фото бланка в отделение</h2>
         <p>Сначала выберите папку сохранения, если нужны копии на диск. Потом загрузите фото бланка: система определит отделение и отметит его красной кнопкой, как после Telegram.</p>
-        <div class="photo-import-actions">
+        <div class="photo-import-save-actions">
           <button type="button" id="mainPhotoRouteSaveFolderBtn" ${!canUseMainPhotoSaveDirectory() || routeState.isProcessing ? "disabled" : ""}>
             ${escapeHtml(saveDirectoryLabel)}
           </button>
+          <span>Выберите Pictures или MFPictures один раз перед загрузкой.</span>
+        </div>
+        <div class="photo-import-actions">
           <label class="button-link photo-file-label${routeState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="mainPhotoRouteFile" accept="image/*" capture="environment" multiple ${routeState.isProcessing ? "disabled" : ""}>
             Выбрать фото

@@ -253,7 +253,22 @@ a {
   max-width: 100%;
 }
 
+.photo-import-save-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  max-width: 100%;
+}
+
+.photo-import-save-actions span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 .photo-import-actions button,
+.photo-import-save-actions button,
 .photo-file-label {
   position: relative;
   display: inline-flex;
@@ -279,21 +294,25 @@ a {
 }
 
 #mainPhotoRouteSaveFolderBtn {
-  flex: 0 1 320px;
+  flex: 0 1 auto;
+  max-width: min(100%, 320px);
 }
 
 .photo-import-actions button:hover,
+.photo-import-save-actions button:hover,
 .photo-file-label:hover {
   transform: translateY(-1px);
   background: #ffffff;
 }
 
 .photo-import-actions button:active,
+.photo-import-save-actions button:active,
 .photo-file-label:active {
   transform: translateY(0);
 }
 
-.photo-import-actions button:disabled {
+.photo-import-actions button:disabled,
+.photo-import-save-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.7;
   transform: none;
