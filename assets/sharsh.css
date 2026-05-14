@@ -944,23 +944,27 @@ a {
   background: #fff6e9;
 }
 
-.link-card[data-workflow-tone="pending"] .link-card-actions a:first-child {
+.link-card-actions [data-department-feedback-link] {
+  font-weight: 800;
+}
+
+.link-card[data-workflow-tone="pending"] .link-card-actions [data-department-feedback-link] {
   background: #c53b2d;
   border-color: #c53b2d;
   color: #ffffff;
 }
 
-.link-card[data-workflow-tone="pending"] .link-card-actions a:first-child:hover {
+.link-card[data-workflow-tone="pending"] .link-card-actions [data-department-feedback-link]:hover {
   background: #b13225;
 }
 
-.link-card[data-workflow-tone="processed"] .link-card-actions a:first-child {
+.link-card[data-workflow-tone="processed"] .link-card-actions [data-department-feedback-link] {
   background: #1f8d49;
   border-color: #1f8d49;
   color: #ffffff;
 }
 
-.link-card[data-workflow-tone="processed"] .link-card-actions a:first-child:hover {
+.link-card[data-workflow-tone="processed"] .link-card-actions [data-department-feedback-link]:hover {
   background: #19763d;
 }
 
