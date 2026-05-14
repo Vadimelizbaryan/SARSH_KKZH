@@ -31,7 +31,7 @@ input {
 }
 
 .tg-form-root {
-  width: min(960px, 100%);
+  width: min(1120px, 100%);
   margin: 0 auto;
   padding: 12px;
 }
@@ -94,7 +94,7 @@ input {
 
 .tg-form-table {
   width: 100%;
-  min-width: 880px;
+  min-width: 1180px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -102,7 +102,7 @@ input {
 .tg-form-table th,
 .tg-form-table td {
   border: 1px solid var(--tg-line);
-  padding: 5px;
+  padding: 4px;
   text-align: center;
   vertical-align: middle;
 }
@@ -131,14 +131,26 @@ input {
 .tg-form-input,
 .tg-form-control-value {
   width: 100%;
+  min-width: 46px;
   min-height: 34px;
   border: 1px solid rgba(31, 42, 36, 0.18);
   border-radius: 10px;
   background: #ffffff;
   color: var(--tg-ink);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 900;
+  padding: 0 2px;
   text-align: center;
+}
+
+.tg-form-input {
+  appearance: textfield;
+}
+
+.tg-form-input::-webkit-outer-spin-button,
+.tg-form-input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 .tg-form-input:focus {
@@ -218,7 +230,7 @@ input {
   }
 
   .tg-form-table {
-    min-width: 820px;
+    min-width: 1120px;
   }
 
   .tg-form-table th,
@@ -228,7 +240,8 @@ input {
 
   .tg-form-input,
   .tg-form-control-value {
+    min-width: 44px;
     min-height: 32px;
-    font-size: 14px;
+    font-size: 13px;
   }
 }
