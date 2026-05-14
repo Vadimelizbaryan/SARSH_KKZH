@@ -35,9 +35,7 @@
   }
 
   function renderResponsiveDepartmentName(value) {
-    const fullName = String(value ?? "");
-    const shortName = shortenText(fullName);
-    return `<span class="dept-name-full">${escapeHtml(fullName)}</span><span class="dept-name-short" aria-hidden="true">${escapeHtml(shortName)}</span>`;
+    return `<span class="dept-name-short">${escapeHtml(shortenText(value))}</span>`;
   }
 
   function getYerevanDateTime() {
