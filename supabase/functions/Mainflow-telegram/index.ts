@@ -404,10 +404,19 @@ function getPublicSiteBaseUrl() {
   return DEFAULT_SITE_BASE_URL;
 }
 
-function getTelegramWebFormUrl(departmentId: DepartmentId, reportDate: string) {
+function getTelegramWebFormUrl(
+  departmentId: DepartmentId,
+  reportDate: string,
+  carryoverValues?: Record<string, number | null>
+) {
   const params = new URLSearchParams();
   params.set("department", departmentId);
   params.set("date", reportDate);
+  if (carryoverValues) {
+    params.set("c1", String(carryoverValues.beenTotal ?? 0));
+    params.set("c2", String(carryoverValues.beenSoldier ?? 0));
+    params.set("c3", String(carryoverValues.beenSeries ?? 0));
+  }
   return `${getPublicSiteBaseUrl()}/tg-form.html?${params.toString()}`;
 }
 
@@ -1650,6 +1659,38 @@ function getSheetNumber(values: Record<string, number | null>, key: string) {
   return values[key] ?? 0;
 }
 
+function getTelegramWebFormCarryoverValues(values: Record<string, number | null>) {
+  const currentShar = getSheetNumber(values, "currentShar");
+  const currentSpa = getSheetNumber(values, "currentSpa");
+  const currentPaym = getSheetNumber(values, "currentPaym");
+  const presentTotal = DEPARTMENT_SHEET_PRESENT_SUM_KEYS
+    .reduce((sum, key) => sum + getSheetNumber(values, key), 0);
+
+  return {
+    beenTotal: presentTotal,
+    beenSoldier: currentShar + currentSpa + currentPaym,
+    beenSeries: currentShar
+  };
+}
+
+function getTelegramWebFormCarryoverFromSnapshot(
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
+  departmentId: DepartmentId
+) {
+  const row = snapshot.rows.find((item) => item.id === departmentId);
+  return getTelegramWebFormCarryoverValues(row ? row.values : sanitizeValues(null));
+}
+
+function applyTelegramWebFormCarryoverValues(
+  values: Record<string, number | null>,
+  carryoverValues: Record<string, number | null>
+) {
+  values.beenTotal = carryoverValues.beenTotal ?? 0;
+  values.beenSoldier = carryoverValues.beenSoldier ?? 0;
+  values.beenSeries = carryoverValues.beenSeries ?? 0;
+  return values;
+}
+
 function validateDepartmentSheetValues(values: Record<string, number | null>) {
   const actual = DEPARTMENT_SHEET_PRESENT_SUM_KEYS
     .reduce((sum, key) => sum + getSheetNumber(values, key), 0);
@@ -1949,13 +1990,15 @@ async function sendTelegramWebFormForDepartment(
   const snapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
   const reportDate = detectReportDateFromHint(text) || snapshot.reportDate || DEFAULT_DATE;
   const meta = DEPARTMENTS[departmentId];
-  const formUrl = getTelegramWebFormUrl(departmentId, reportDate);
+  const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
+  const formUrl = getTelegramWebFormUrl(departmentId, reportDate, carryoverValues);
 
   await sendTelegramMessageWithReplyMarkup(
     chatId,
     [
       `Форма ввода для отделения: ${meta.department} (${meta.marker})`,
       `Дата отчёта: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
+      "Ячейки 1-3 уже заполнены из основной таблицы и закрыты для изменения.",
       "Откройте форму, заполните ячейки таблицы и отправьте данные на проверку.",
       "Если нужен старый XLSX-файл, отправьте команду /sheet " + meta.marker + "."
     ].join("\n"),
@@ -2020,8 +2063,13 @@ async function handleTelegramWebFormSubmit(request: Request) {
       return jsonResponse({ ok: false, error: "Не удалось определить отделение формы." }, 400);
     }
 
-    const reportDate = sanitizeReportDate(payload?.reportDate) || DEFAULT_DATE;
-    const values = sanitizeDepartmentFormValues(payload?.values);
+    const supabase = createSupabaseAdmin();
+    const snapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
+    const reportDate = sanitizeReportDate(payload?.reportDate) || snapshot.reportDate || DEFAULT_DATE;
+    const values = applyTelegramWebFormCarryoverValues(
+      sanitizeDepartmentFormValues(payload?.values),
+      getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId)
+    );
     const validation = validateDepartmentSheetValues(values);
     if (!validation.isValid) {
       return jsonResponse({
@@ -2031,7 +2079,6 @@ async function handleTelegramWebFormSubmit(request: Request) {
       }, 400);
     }
 
-    const supabase = createSupabaseAdmin();
     const userName = [
       verifiedUser.firstName,
       verifiedUser.lastName,

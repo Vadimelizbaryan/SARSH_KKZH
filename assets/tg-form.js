@@ -32,6 +32,7 @@
   const editableKeys = fields
     .filter((field) => field.key !== "presentTotal")
     .map((field) => field.key);
+  const readOnlyKeys = new Set(["beenTotal", "beenSoldier", "beenSeries"]);
 
   const presentKeys = [
     "currentShar",
@@ -76,6 +77,20 @@
 
   function getReportDate() {
     return getQuery().get("date") || (config.DEFAULT_DATE || "05,05,26");
+  }
+
+  function getCarryoverValue(key) {
+    const query = getQuery();
+    const paramByKey = {
+      beenTotal: "c1",
+      beenSoldier: "c2",
+      beenSeries: "c3"
+    };
+    return toNumber(query.get(paramByKey[key] || ""));
+  }
+
+  function getInitialValue(key) {
+    return readOnlyKeys.has(key) ? getCarryoverValue(key) : 0;
   }
 
   function toNumber(value) {
@@ -227,17 +242,19 @@
         if (field.key === "presentTotal") {
           return '<td><span class="tg-form-control-value" data-control-total>0</span></td>';
         }
+        const isReadOnly = readOnlyKeys.has(field.key);
         return `
           <td>
             <input
-              class="tg-form-input"
+              class="tg-form-input${isReadOnly ? " tg-form-input--readonly" : ""}"
               data-field="${escapeHtml(field.key)}"
               inputmode="numeric"
               pattern="[0-9]*"
               type="text"
               autocomplete="off"
               maxlength="3"
-              value="0"
+              value="${getInitialValue(field.key)}"
+              ${isReadOnly ? 'readonly aria-readonly="true" title="Заполнено из основной таблицы"' : ""}
             >
           </td>
         `;
@@ -274,7 +291,7 @@
           <div class="tg-form-actions">
             <button class="tg-form-submit" data-submit type="submit">Отправить на проверку</button>
             <div class="tg-form-message${getInitData() ? "" : " error"}" data-message>
-              ${getInitData() ? "Заполните только нужные ячейки. Пустые значения оставьте 0." : "Откройте форму через кнопку бота в Telegram."}
+              ${getInitData() ? "Ячейки 1-3 заполнены из основной таблицы и закрыты. Остальные пустые значения оставьте 0." : "Откройте форму через кнопку бота в Telegram."}
             </div>
           </div>
         </form>

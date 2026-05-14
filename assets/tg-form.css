@@ -158,6 +158,17 @@ input {
   border-color: var(--tg-accent);
 }
 
+.tg-form-input--readonly {
+  background: #f3efe7;
+  color: var(--tg-muted);
+  cursor: default;
+}
+
+.tg-form-input--readonly:focus {
+  outline-color: rgba(101, 115, 108, 0.18);
+  border-color: rgba(31, 42, 36, 0.18);
+}
+
 .tg-form-control-value {
   display: grid;
   place-items: center;
