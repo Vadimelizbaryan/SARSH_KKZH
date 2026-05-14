@@ -3774,7 +3774,8 @@
   }
 
   function getTelegramFormReviewValue(values, key) {
-    const numberValue = (valueKey) => config.normalizeCellValue(values[valueKey]) || 0;
+    const sourceValues = values && typeof values === "object" ? values : {};
+    const numberValue = (valueKey) => config.normalizeCellValue(sourceValues[valueKey]) || 0;
     if (key === "presentTotal") {
       return (
         numberValue("beenTotal")
@@ -3785,7 +3786,7 @@
         + numberValue("transferFromDepartment")
       );
     }
-    return numberValue(key);
+    return Object.prototype.hasOwnProperty.call(sourceValues, key) ? numberValue(key) : null;
   }
 
   function renderTelegramFormReviewPanel(row) {
@@ -3793,12 +3794,16 @@
     const values = photoState.recognizedValues && typeof photoState.recognizedValues === "object"
       ? photoState.recognizedValues
       : null;
+    const feedbackId = String(photoState.feedbackId || queryParams.get("tgFeedback") || "").trim();
+    const imageName = String(photoState.imageName || "");
+    const statusTextRaw = String(photoState.status || "");
     const isTelegramForm = !photoState.imageDataUrl
-      && photoState.feedbackId
-      && values
+      && feedbackId
       && (
-        photoState.imageName === "telegram-web-app-form"
-        || String(photoState.status || "").includes("Telegram форма")
+        queryParams.has("tgFeedback")
+        || imageName === "telegram-web-app-form"
+        || imageName.toLowerCase().includes("telegram")
+        || statusTextRaw.includes("Telegram")
       );
 
     if (!row || !isTelegramForm) {
@@ -3814,22 +3819,25 @@
       return `
         <td>
           <span>${escapeHtml(field.label)}</span>
-          <strong>${escapeHtml(getDisplayValue(displayValue) || "0")}</strong>
+          <strong>${escapeHtml(displayValue === null ? "-" : (getDisplayValue(displayValue) || "0"))}</strong>
         </td>
       `;
     }).join("");
+    const note = photoState.isError
+      ? (photoState.status || "Не удалось загрузить значения Telegram формы.")
+      : "Проверьте эту таблицу. Если всё правильно, нажмите Сохранить, чтобы внести данные в общую таблицу.";
 
     return `
       <section class="panel no-print telegram-form-review-panel telegram-form-review-panel--${status}">
         <div class="telegram-form-review-head">
           <div>
             <h2>Данные из Telegram формы</h2>
-            <p class="hint">Проверьте эту таблицу. Если всё правильно, нажмите <strong>Сохранить</strong>, чтобы внести данные в общую таблицу.</p>
+            <p class="hint${photoState.isError ? " warning-note" : ""}">${escapeHtml(note)}</p>
           </div>
           <span class="status-chip status-chip--${status === "processed" ? "fresh" : "stale"}">${escapeHtml(statusText)}</span>
         </div>
         <div class="telegram-form-review-meta">
-          <span>Feedback: ${escapeHtml(photoState.feedbackId)}</span>
+          <span>Feedback: ${escapeHtml(feedbackId)}</span>
           <span>Отделение: ${escapeHtml(row.department)}</span>
           ${photoState.lastReportDate ? `<span>Дата: ${escapeHtml(photoState.lastReportDate)}</span>` : ""}
         </div>
@@ -5660,6 +5668,13 @@
     try {
       const record = await sync.loadTelegramPhotoFeedback(feedbackId, departmentId);
       if (!record) {
+        state.photoImport = buildInitialPhotoImportState();
+        state.photoImport.feedbackId = String(feedbackId);
+        state.photoImport.workflowStatus = "pending";
+        state.photoImport.imageName = "telegram-web-app-form";
+        state.photoImport.status = "Не удалось загрузить данные Telegram формы по этому feedback. Возможно, запись уже удалена или номер не найден.";
+        state.photoImport.isError = true;
+        renderPage();
         return;
       }
 
@@ -5674,6 +5689,13 @@
         : Object.keys(previewValues);
       const hasValues = recognizedKeys.some((key) => Object.prototype.hasOwnProperty.call(previewValues, key));
       if (!hasValues) {
+        state.photoImport = buildInitialPhotoImportState();
+        state.photoImport.feedbackId = String(record.id || feedbackId);
+        state.photoImport.workflowStatus = "pending";
+        state.photoImport.imageName = "telegram-web-app-form";
+        state.photoImport.status = "Telegram форма найдена, но в ней нет значений для показа.";
+        state.photoImport.isError = true;
+        renderPage();
         return;
       }
 
@@ -5690,9 +5712,7 @@
           missingCells: []
         }
       });
-      if (!appliedCount) {
-        return;
-      }
+      const hasAppliedValues = appliedCount > 0;
 
       const row = getCurrentRow();
       state.photoImport.feedbackId = String(record.id || feedbackId);
@@ -5703,12 +5723,21 @@
         ? record.imageName
         : "Telegram Web App form";
       state.photoImport.imageDataUrl = "";
-      state.photoImport.draftMode = true;
+      state.photoImport.draftMode = hasAppliedValues;
       state.photoImport.status = "Открыта отправленная Telegram форма. Проверьте значения и нажмите Сохранить, чтобы внести их в общую таблицу.";
       state.photoImport.isError = false;
       setInfo("Отправленная Telegram форма подставлена в таблицу отделения. После проверки нажмите Сохранить.", false);
       renderPage();
-    } catch (_error) {
+    } catch (error) {
+      state.photoImport = buildInitialPhotoImportState();
+      state.photoImport.feedbackId = String(feedbackId);
+      state.photoImport.workflowStatus = "pending";
+      state.photoImport.imageName = "telegram-web-app-form";
+      state.photoImport.status = error instanceof Error
+        ? `Не удалось загрузить данные Telegram формы: ${error.message}`
+        : "Не удалось загрузить данные Telegram формы.";
+      state.photoImport.isError = true;
+      renderPage();
     }
   }
 
