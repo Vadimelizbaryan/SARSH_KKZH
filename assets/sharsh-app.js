@@ -285,6 +285,17 @@
       .replaceAll('"', "&quot;");
   }
 
+  function shortenText(value, maxLength = 8) {
+    const chars = Array.from(String(value ?? "").trim());
+    return chars.length > maxLength ? chars.slice(0, maxLength).join("") : chars.join("");
+  }
+
+  function renderResponsiveDepartmentName(value) {
+    const fullName = String(value ?? "");
+    const shortName = shortenText(fullName);
+    return `<span class="dept-name-full">${escapeHtml(fullName)}</span><span class="dept-name-short" aria-hidden="true">${escapeHtml(shortName)}</span>`;
+  }
+
   function translateOcrNote(note) {
     let text = String(note || "").trim();
     if (!text) {
@@ -2980,7 +2991,7 @@
   function renderDetailRow(snapshot, row, interactive) {
     return `
       <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}" data-row-id="${row.id}">
-        <td class="dept-cell">${escapeHtml(row.department)}</td>
+        <td class="dept-cell" title="${escapeHtml(row.department)}">${renderResponsiveDepartmentName(row.department)}</td>
         ${config.columns.map((key) => renderDetailCell(snapshot, row, key, interactive)).join("")}
       </tr>
     `;

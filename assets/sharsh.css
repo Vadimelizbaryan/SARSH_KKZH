@@ -1647,6 +1647,10 @@ a {
   font-family: "Sylfaen", "Noto Serif Armenian", serif !important;
 }
 
+.dept-name-short {
+  display: none;
+}
+
 .data-cell input,
 .date-input {
   width: 100%;
@@ -2249,6 +2253,15 @@ a {
 
   .sheet .dept-head {
     z-index: 8;
+  }
+
+  .dept-name-full {
+    display: none;
+  }
+
+  .dept-name-short {
+    display: inline;
+    white-space: nowrap;
   }
 
   .night-table thead th:first-child,

@@ -29,6 +29,17 @@
       .replaceAll('"', "&quot;");
   }
 
+  function shortenText(value, maxLength = 8) {
+    const chars = Array.from(String(value ?? "").trim());
+    return chars.length > maxLength ? chars.slice(0, maxLength).join("") : chars.join("");
+  }
+
+  function renderResponsiveDepartmentName(value) {
+    const fullName = String(value ?? "");
+    const shortName = shortenText(fullName);
+    return `<span class="dept-name-full">${escapeHtml(fullName)}</span><span class="dept-name-short" aria-hidden="true">${escapeHtml(shortName)}</span>`;
+  }
+
   function getYerevanDateTime() {
     const parts = new Intl.DateTimeFormat("ru-RU", {
       timeZone: "Asia/Yerevan",
@@ -160,7 +171,7 @@
       <tr>
         <th scope="row">
           <span>${escapeHtml(department.marker)}</span>
-          <strong>${escapeHtml(department.department)}</strong>
+          <strong title="${escapeHtml(department.department)}">${renderResponsiveDepartmentName(department.department)}</strong>
         </th>
         ${NIGHT_COLUMNS.map((column) => `
           <td>
