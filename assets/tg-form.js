@@ -234,9 +234,8 @@
               data-field="${escapeHtml(field.key)}"
               inputmode="numeric"
               pattern="[0-9]*"
-              type="number"
-              min="0"
-              step="1"
+              type="text"
+              autocomplete="off"
               value="0"
             >
           </td>
@@ -282,7 +281,13 @@
     `;
 
     root.querySelectorAll(".tg-form-input").forEach((input) => {
-      input.addEventListener("input", updateControl);
+      input.addEventListener("input", () => {
+        const digitsOnly = input.value.replace(/\D+/g, "");
+        if (input.value !== digitsOnly) {
+          input.value = digitsOnly;
+        }
+        updateControl();
+      });
       input.addEventListener("focus", () => input.select());
     });
     const form = root.querySelector("[data-form]");
