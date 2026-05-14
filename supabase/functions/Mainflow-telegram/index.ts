@@ -2162,7 +2162,7 @@ function buildPhotoSaveSummary(
     `Источник отделения: ${departmentSource}`,
     `Дата отчёта: ${reportDate}`,
     recognized.reportDate ? `Дата на фото: ${recognized.reportDate}` : "Дата на фото: не распознана",
-    `Страница отделения: ${getDepartmentPageUrl(departmentId, feedbackId)}`,
+    `OCR feedback: ${feedbackId || "no id"}`,
     recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22)
       ? `Структура строки не подтверждена: ${recognized.structure.gridCellCount}/22 ячеек.`
       : (cellSummaries ? `Распознано: ${cellSummaries}` : "Распознанных ячеек не найдено."),

@@ -84,6 +84,34 @@
     return `${window.location.origin}${window.location.pathname}${window.location.search}`;
   }
 
+  function getLoginPageTitle() {
+    const view = document.body ? document.body.dataset.view || "" : "";
+    if (view === "department") {
+      const departmentId = document.body ? document.body.dataset.departmentId || "" : "";
+      const config = window.SHARSH_CONFIG || {};
+      const departments = Array.isArray(config.departmentDefinitions) ? config.departmentDefinitions : [];
+      const definition = departments.find((item) => item && item.id === departmentId);
+      if (definition) {
+        return `${definition.marker || departmentId.toUpperCase()} ${definition.department || ""}`.trim();
+      }
+    }
+    if (view === "main") {
+      return "MAINFLOW";
+    }
+    if (view === "feedback") {
+      return "OCR feedback";
+    }
+    if (view === "hospital-report") {
+      return "Hospital report";
+    }
+    if (view === "archive") {
+      return "Archive";
+    }
+
+    const title = document.title || "";
+    return /[ÃƒÒ�]/.test(title) ? "SARSH_KKZH" : title;
+  }
+
   async function notifyLoginToTelegram(email) {
     const sync = window.SHARSH_SYNC || null;
     if (!sync || typeof sync.notifyOwnerLogin !== "function") {
@@ -93,8 +121,7 @@
     try {
       await sync.notifyOwnerLogin({
         email: email || "",
-        pageTitle: document.title || "",
-        pagePath: `${window.location.pathname}${window.location.search}`,
+        pageTitle: getLoginPageTitle(),
         userAgent: navigator.userAgent || "",
         happenedAt: new Date().toISOString()
       });

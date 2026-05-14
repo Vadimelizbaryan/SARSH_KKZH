@@ -508,14 +508,12 @@ async function notifyOwnerLogin(details: Record<string, unknown> | null | undefi
 
   const email = normalizeTelegramText(details?.email);
   const pageTitle = normalizeTelegramText(details?.pageTitle);
-  const pagePath = normalizeTelegramText(details?.pagePath);
   const happenedAt = normalizeTelegramText(details?.happenedAt) || new Date().toISOString();
 
   const lines = [
     "Mainflow: site login",
     email ? `Email: ${email}` : "",
     pageTitle ? `Page: ${pageTitle}` : "",
-    pagePath ? `Path: ${pagePath}` : "",
     `Time: ${happenedAt}`
   ].filter(Boolean);
 
