@@ -838,6 +838,7 @@ a {
 .info-stack {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .meta-row {
@@ -1332,9 +1333,13 @@ a {
   box-shadow: var(--shadow);
   padding: 12px;
   border: 1px solid rgba(17, 17, 17, 0.06);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .zoom-target {
+  min-width: 0;
+  max-width: 100%;
   zoom: var(--sheet-zoom);
 }
 
@@ -1543,6 +1548,7 @@ a {
 .table-wrap {
   overflow: auto;
   border-radius: 16px;
+  max-width: 100%;
 }
 
 .sheet {
