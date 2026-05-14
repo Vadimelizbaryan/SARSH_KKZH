@@ -2111,6 +2111,17 @@ a {
   font-weight: 900;
 }
 
+.night-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  box-shadow: 0 2px 0 rgba(17, 17, 17, 0.12);
+}
+
+.night-table thead th:first-child {
+  z-index: 5;
+}
+
 .night-table thead th:first-child {
   border-top-left-radius: 18px;
 }
