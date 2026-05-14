@@ -758,6 +758,83 @@ a {
   color: #8a5b0f;
 }
 
+.telegram-form-review-panel {
+  border-color: rgba(197, 59, 45, 0.22);
+  background: linear-gradient(135deg, rgba(197, 59, 45, 0.08), rgba(255, 255, 255, 0.92));
+}
+
+.telegram-form-review-panel--processed {
+  border-color: rgba(31, 141, 73, 0.22);
+  background: linear-gradient(135deg, rgba(31, 141, 73, 0.1), rgba(255, 255, 255, 0.92));
+}
+
+.telegram-form-review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.telegram-form-review-head h2 {
+  margin-bottom: 4px;
+}
+
+.telegram-form-review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.telegram-form-review-meta span {
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.telegram-form-review-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.telegram-form-review-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.telegram-form-review-table td {
+  border-right: 1px solid rgba(17, 17, 17, 0.1);
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.telegram-form-review-table td:last-child {
+  border-right: 0;
+}
+
+.telegram-form-review-table span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.telegram-form-review-table strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1;
+}
+
 .info-stack {
   display: grid;
   gap: 12px;

@@ -3773,6 +3773,77 @@
     `;
   }
 
+  function getTelegramFormReviewValue(values, key) {
+    const numberValue = (valueKey) => config.normalizeCellValue(values[valueKey]) || 0;
+    if (key === "presentTotal") {
+      return (
+        numberValue("beenTotal")
+        + numberValue("admittedTotal")
+        + numberValue("transferToDepartment")
+      ) - (
+        numberValue("dgTotal")
+        + numberValue("transferFromDepartment")
+      );
+    }
+    return numberValue(key);
+  }
+
+  function renderTelegramFormReviewPanel(row) {
+    const photoState = state.photoImport || buildInitialPhotoImportState();
+    const values = photoState.recognizedValues && typeof photoState.recognizedValues === "object"
+      ? photoState.recognizedValues
+      : null;
+    const isTelegramForm = !photoState.imageDataUrl
+      && photoState.feedbackId
+      && values
+      && (
+        photoState.imageName === "telegram-web-app-form"
+        || String(photoState.status || "").includes("Telegram форма")
+      );
+
+    if (!row || !isTelegramForm) {
+      return "";
+    }
+
+    const status = photoState.workflowStatus === "processed" ? "processed" : "pending";
+    const statusText = status === "processed"
+      ? "Данные уже сохранены в общую таблицу"
+      : "Ждёт проверки и сохранения";
+    const cells = PHOTO_FIELD_DEFINITIONS.map((field) => {
+      const displayValue = getTelegramFormReviewValue(values, field.key);
+      return `
+        <td>
+          <span>${escapeHtml(field.label)}</span>
+          <strong>${escapeHtml(getDisplayValue(displayValue) || "0")}</strong>
+        </td>
+      `;
+    }).join("");
+
+    return `
+      <section class="panel no-print telegram-form-review-panel telegram-form-review-panel--${status}">
+        <div class="telegram-form-review-head">
+          <div>
+            <h2>Данные из Telegram формы</h2>
+            <p class="hint">Проверьте эту таблицу. Если всё правильно, нажмите <strong>Сохранить</strong>, чтобы внести данные в общую таблицу.</p>
+          </div>
+          <span class="status-chip status-chip--${status === "processed" ? "fresh" : "stale"}">${escapeHtml(statusText)}</span>
+        </div>
+        <div class="telegram-form-review-meta">
+          <span>Feedback: ${escapeHtml(photoState.feedbackId)}</span>
+          <span>Отделение: ${escapeHtml(row.department)}</span>
+          ${photoState.lastReportDate ? `<span>Дата: ${escapeHtml(photoState.lastReportDate)}</span>` : ""}
+        </div>
+        <div class="telegram-form-review-table-wrap">
+          <table class="telegram-form-review-table">
+            <tbody>
+              <tr>${cells}</tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }
+
 
   function renderPhotoImportPanel(row) {
     const canRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
@@ -4056,6 +4127,7 @@
 
           ${renderPhotoImportPanel(row)}
           ${renderQhCalcPanel(row)}
+          ${renderTelegramFormReviewPanel(row)}
 
           <div class="zoom-target">
             <div class="sheet-shell">
