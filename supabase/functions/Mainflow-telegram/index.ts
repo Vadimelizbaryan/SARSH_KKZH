@@ -2061,7 +2061,7 @@ async function buildFilledDepartmentPdfBytes(
   const pdf = await PDFDocument.load(blankBytes);
   const page = pdf.getPage(0);
   const font = await pdf.embedFont(StandardFonts.HelveticaBoldOblique);
-  const fontSize = 17;
+  const fontSize = 15;
   const valueColor = rgb(0.07, 0.08, 0.38);
   const pdfValues = buildDepartmentPdfValues(values);
 
