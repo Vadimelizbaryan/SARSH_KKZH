@@ -986,7 +986,11 @@ async function loadAcceptedFeedbackPreview(
   }
 
   const imageDataUrl = typeof data.image_data_url === "string" ? data.image_data_url : "";
-  if (!imageDataUrl.startsWith("data:image/")) {
+  const imageName = typeof data.image_name === "string" ? data.image_name : "";
+  const recognizedKeys = Array.isArray(data.recognized_keys) ? data.recognized_keys.map((item) => String(item)) : [];
+  const finalValues = data.final_values && typeof data.final_values === "object" ? data.final_values : {};
+  const hasFormValues = recognizedKeys.length > 0 || Object.keys(finalValues).length > 0;
+  if (!imageDataUrl.startsWith("data:image/") && imageName !== "telegram-web-app-form" && !hasFormValues) {
     return null;
   }
 
@@ -995,10 +999,10 @@ async function loadAcceptedFeedbackPreview(
     departmentId: String(data.department_id || ""),
     reportDate: typeof data.report_date === "string" ? data.report_date : DEFAULT_DATE,
     photoReportDate: typeof data.photo_report_date === "string" ? data.photo_report_date : "",
-    imageName: typeof data.image_name === "string" ? data.image_name : "",
+    imageName,
     imageDataUrl,
-    recognizedKeys: Array.isArray(data.recognized_keys) ? data.recognized_keys.map((item) => String(item)) : [],
-    finalValues: data.final_values && typeof data.final_values === "object" ? data.final_values : {},
+    recognizedKeys,
+    finalValues,
     notes: Array.isArray(data.notes) ? data.notes.map((item) => String(item)) : [],
     cellReviews: Array.isArray(data.cell_reviews) ? data.cell_reviews : [],
     saveStatus: typeof data.save_status === "string" ? data.save_status : "accepted_as_is",
