@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import JSZip from "npm:jszip@3.10.1";
+import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
 
 // deploy-touch: 2026-05-10
 const DEFAULT_DATE = "05,05,26";
@@ -96,6 +97,32 @@ const DEPARTMENTS = {
   r20: { department: "ԱՏԴ", group: "extra", marker: "SR-20", slug: "5s7rrwg9" },
   r21: { department: "Ք/Հ", group: "extra", marker: "SR-21", slug: "3ofsacp6" }
 } as const;
+
+const DEPARTMENT_PDF_FILES: Record<keyof typeof DEPARTMENTS, { folder: string; file: string }> = {
+  r4: { folder: "Վիրաբուժական", file: "Վիրաբուժական.pdf" },
+  r5: { folder: "Դիմածնոտային վիր", file: "Դիմածնոտային վիր.pdf" },
+  r6: { folder: "Քիթ-կոկորդ բ-ք", file: "Քիթ-կոկորդ բ-ք.pdf" },
+  r7: { folder: "Ակնաբուժական", file: "Ակնաբուժական.pdf" },
+  r8: { folder: "Վնասվածքաբանական", file: "Վնասվածքաբանական.pdf" },
+  r9: { folder: "Կրծքային մ-բ", file: "Կրծքային մ-բ.pdf" },
+  r10: { folder: "Ուռոլոգիական", file: "Ուռոլոգիական.pdf" },
+  r11: { folder: "Նեյրովիրաբուժական", file: "Նեյրովիրաբուժական.pdf" },
+  r12: { folder: "Թռիչքային", file: "Թռիչքային.pdf" },
+  r13: { folder: "Թերապիա", file: "Թերապիա.pdf" },
+  r14: { folder: "Վերակենդանացման", file: "Վերակենդանացման.pdf" },
+  r15: { folder: "Նյարդաբանական", file: "Նյարդաբանական.pdf" },
+  r16: { folder: "Գինեկոլոգիական", file: "Գինեկոլոգիական.pdf" },
+  r17: { folder: "ԱՆՈԹԱՅԻՆ", file: "ԱՆՈԹԱՅԻՆ.pdf" },
+  r19: { folder: "ԻՆՖ", file: "ԻՆՖ.pdf" },
+  r20: { folder: "ԱՏԴ", file: "ԱՏԴ.pdf" },
+  r21: { folder: "Ք-Հ", file: "Ք-Հ.pdf" }
+};
+
+const DEPARTMENT_PDF_VALUE_X = [
+  69, 104, 139, 175, 210, 245, 279, 314, 348, 383, 417,
+  452, 486, 521, 555, 591, 625, 660, 695, 730, 765, 800
+];
+const DEPARTMENT_PDF_VALUE_Y = 386;
 
 const DEPARTMENT_SHEET_ROW_BY_ID: Record<keyof typeof DEPARTMENTS, number> = {
   r4: 4,
@@ -1147,7 +1174,8 @@ async function sendTelegramDocument(
   fileName: string,
   bytes: Uint8Array,
   caption: string,
-  mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  replyMarkup?: Record<string, unknown>
 ) {
   const fileBuffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(fileBuffer).set(bytes);
@@ -1157,6 +1185,9 @@ async function sendTelegramDocument(
     formData.append("chat_id", String(chatId));
     if (caption) {
       formData.append("caption", caption);
+    }
+    if (replyMarkup) {
+      formData.append("reply_markup", JSON.stringify(replyMarkup));
     }
     formData.append("document", new File([fileBuffer.slice(0)], fileName, { type: mimeType }));
 
@@ -1964,7 +1995,7 @@ function buildHelpText() {
     "/departments — список кодов отделений",
     "/pdf — ссылка на главный файл",
     "/done — то же, что /pdf",
-    "/form SR-4 — открыть Telegram Web App форму отделения",
+    "/form SR-4 — получить PDF текущих данных и открыть Telegram Web App форму",
     "/sheet SR-4 — получить старый XLSX-файл",
     "",
     "Чтобы получить форму отделения, отправьте код или название отделения отдельным сообщением: `r4`, `SR-4`.",
@@ -1985,6 +2016,88 @@ function sanitizeSheetFileNamePart(value: string) {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 80);
+}
+
+function getDepartmentBlankPdfUrl(departmentId: DepartmentId) {
+  const pdfFile = DEPARTMENT_PDF_FILES[departmentId];
+  const parts = ["Отделения", pdfFile.folder, pdfFile.file]
+    .map((part) => encodeURIComponent(part));
+  return `${getPublicSiteBaseUrl()}/${parts.join("/")}`;
+}
+
+async function fetchDepartmentBlankPdfBytes(departmentId: DepartmentId) {
+  const url = getDepartmentBlankPdfUrl(departmentId);
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/pdf,application/octet-stream,*/*"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Не удалось загрузить PDF-бланк отделения (${response.status}) из ${url}.`);
+  }
+
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+function buildDepartmentPdfValues(values: Record<string, number | null>) {
+  const sanitized = sanitizeValues(values as Record<string, unknown>);
+  const validation = validateDepartmentSheetValues(sanitized);
+  const presentTotal = validation.actual;
+
+  return PHOTO_FIELD_MAPPINGS.map((field) => {
+    if (field.key === "presentTotal") {
+      return presentTotal;
+    }
+    return getSheetNumber(sanitized, field.key);
+  });
+}
+
+async function buildFilledDepartmentPdfBytes(
+  departmentId: DepartmentId,
+  values: Record<string, number | null>
+) {
+  const blankBytes = await fetchDepartmentBlankPdfBytes(departmentId);
+  const pdf = await PDFDocument.load(blankBytes);
+  const page = pdf.getPage(0);
+  const font = await pdf.embedFont(StandardFonts.HelveticaBoldOblique);
+  const fontSize = 17;
+  const valueColor = rgb(0.07, 0.08, 0.38);
+  const pdfValues = buildDepartmentPdfValues(values);
+
+  pdfValues.forEach((value, index) => {
+    const text = String(value ?? 0);
+    const textWidth = font.widthOfTextAtSize(text, fontSize);
+    page.drawText(text, {
+      x: DEPARTMENT_PDF_VALUE_X[index] - (textWidth / 2),
+      y: DEPARTMENT_PDF_VALUE_Y,
+      size: fontSize,
+      font,
+      color: valueColor
+    });
+  });
+
+  return await pdf.save();
+}
+
+function buildDepartmentPdfFileName(departmentId: DepartmentId, reportDate: string, suffix: string) {
+  const meta = DEPARTMENTS[departmentId];
+  const safeMarker = sanitizeSheetFileNamePart(meta.marker);
+  const safeDate = sanitizeSheetFileNamePart(reportDate.replaceAll(".", ",").replaceAll("/", ","));
+  return `${safeMarker}_${safeDate || DEFAULT_DATE}_${suffix}.pdf`;
+}
+
+function buildTelegramFormReplyMarkup(formUrl: string) {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "Открыть форму",
+          web_app: { url: formUrl }
+        }
+      ]
+    ]
+  };
 }
 
 async function sendWorkingSheetForDepartment(
@@ -2025,28 +2138,40 @@ async function sendTelegramWebFormForDepartment(
   const meta = DEPARTMENTS[departmentId];
   const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
   const formUrl = getTelegramWebFormUrl(departmentId, reportDate, carryoverValues);
+  const row = snapshot.rows.find((item) => item.id === departmentId);
+  const currentValues = row ? row.values : sanitizeValues(null);
+  const caption = [
+    `Текущие данные отделения: ${meta.department} (${meta.marker})`,
+    `Дата отчёта: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
+    "PDF сформирован из главной таблицы. Сохраните его у себя.",
+    "Кнопка ниже откроет Telegram форму для новых данных.",
+    "После отправки формы пришлите сюда фото бланка этого отделения."
+  ].join("\n");
+  const replyMarkup = buildTelegramFormReplyMarkup(formUrl);
 
-  await sendTelegramMessageWithReplyMarkup(
-    chatId,
-    [
-      `Форма ввода для отделения: ${meta.department} (${meta.marker})`,
-      `Дата отчёта: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
-      "Ячейки 1-3 уже заполнены из основной таблицы и закрыты для изменения.",
-      "Откройте форму, заполните ячейки таблицы и отправьте данные на проверку.",
-      "После отправки формы пришлите сюда фото бланка этого отделения.",
-      "Если нужен старый XLSX-файл, отправьте команду /sheet " + meta.marker + "."
-    ].join("\n"),
-    {
-      inline_keyboard: [
-        [
-          {
-            text: "Открыть форму",
-            web_app: { url: formUrl }
-          }
-        ]
-      ]
-    }
-  );
+  try {
+    const pdfBytes = await buildFilledDepartmentPdfBytes(departmentId, currentValues);
+    await sendTelegramDocument(
+      chatId,
+      buildDepartmentPdfFileName(departmentId, reportDate, "current"),
+      pdfBytes,
+      caption,
+      "application/pdf",
+      replyMarkup
+    );
+  } catch (error) {
+    console.error("Failed to send current department PDF:", sanitizePublicErrorMessage(error));
+    await sendTelegramMessageWithReplyMarkup(
+      chatId,
+      [
+        `Форма ввода для отделения: ${meta.department} (${meta.marker})`,
+        `Дата отчёта: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
+        "PDF с текущими данными сейчас не удалось создать, но форму можно открыть.",
+        "После отправки формы пришлите сюда фото бланка этого отделения."
+      ].join("\n"),
+      replyMarkup
+    );
+  }
 }
 
 async function sendTelegramWebFormPromptAfterPhoto(
@@ -2071,16 +2196,7 @@ async function sendTelegramWebFormPromptAfterPhoto(
       `Отделение: ${meta.department} (${meta.marker})`,
       "Если форму уже отправляли, повторно заполнять не нужно."
     ].join("\n"),
-    {
-      inline_keyboard: [
-        [
-          {
-            text: "Открыть форму",
-            web_app: { url: formUrl }
-          }
-        ]
-      ]
-    }
+    buildTelegramFormReplyMarkup(formUrl)
   );
 }
 
@@ -2169,13 +2285,26 @@ async function handleTelegramWebFormSubmit(request: Request) {
       `Отделение: ${meta.department} (${meta.marker})`,
       `Сумма 13-22 = ${validation.actual}.`,
       "Данные приняты на проверку. В общую таблицу пока не внесены автоматически.",
-      "Пожалуйста, отправьте сюда фото бланка этого отделения, чтобы можно было сверить форму с документом."
+      "Пожалуйста, отправьте сюда фото бланка этого отделения, чтобы можно было сверить форму с документом.",
+      "Прикрепляю PDF-бланк уже с новыми значениями из Telegram формы."
     ].join("\n");
 
     if (verifiedUser.userId) {
-      await sendTelegramMessage(verifiedUser.userId, messageText).catch((error) => {
+      try {
+        const pdfBytes = await buildFilledDepartmentPdfBytes(departmentId, values);
+        await sendTelegramDocument(
+          verifiedUser.userId,
+          buildDepartmentPdfFileName(departmentId, reportDate, "telegram-form"),
+          pdfBytes,
+          messageText,
+          "application/pdf"
+        );
+      } catch (error) {
         console.error("Failed to notify Telegram Web App user:", sanitizePublicErrorMessage(error));
-      });
+        await sendTelegramMessage(verifiedUser.userId, messageText).catch((fallbackError) => {
+          console.error("Failed to send fallback Telegram Web App message:", sanitizePublicErrorMessage(fallbackError));
+        });
+      }
     }
 
     const submitterChatId = verifiedUser.userId ? String(verifiedUser.userId) : "";
