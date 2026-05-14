@@ -2281,9 +2281,10 @@
     }
 
     if (row.photoWorkflowStatus === "pending" && row.photoFeedbackId) {
+      const isTelegramForm = row.photoName === "telegram-web-app-form";
       return {
         tone: "pending",
-        label: "Новый бланк"
+        label: isTelegramForm ? "Новая Telegram форма" : "Новый бланк"
       };
     }
 
@@ -3050,6 +3051,9 @@
     const freshness = getRowFreshnessMeta(row);
     const photoWorkflow = getDepartmentPhotoWorkflowMeta(row);
     const relativePath = appendShareQuery(config.getDepartmentPagePath(basePath, definition.id));
+    const feedbackPath = row && row.photoFeedbackId
+      ? appendQueryParams(config.getDepartmentPagePath(basePath, definition.id), { tgFeedback: row.photoFeedbackId })
+      : "";
     return `
       <div class="link-card" data-department-open-card="${definition.id}" data-workflow-tone="${photoWorkflow.tone}" title="${escapeHtml(photoWorkflow.label)}">
         <strong>${escapeHtml(definition.department)}</strong>
@@ -3060,6 +3064,7 @@
         <p class="link-card-subtext" data-department-age="${definition.id}">${escapeHtml(freshness.age)}</p>
         <div class="link-card-actions">
           <a href="${escapeHtml(relativePath)}" target="_blank" rel="noopener">Открыть</a>
+          <a href="${escapeHtml(feedbackPath || relativePath)}" target="_blank" rel="noopener" data-department-feedback-link="${definition.id}"${feedbackPath ? "" : " hidden"}>Открыть отправленное</a>
           <button type="button" data-copy-link="${escapeHtml(relativePath)}">Копировать ссылку</button>
         </div>
       </div>
@@ -4367,6 +4372,7 @@
         const updatedEl = document.querySelector(`[data-department-updated="${row.id}"]`);
         const ageEl = document.querySelector(`[data-department-age="${row.id}"]`);
         const openCardEl = document.querySelector(`[data-department-open-card="${row.id}"]`);
+        const feedbackLinkEl = document.querySelector(`[data-department-feedback-link="${row.id}"]`);
         const listStatusEl = document.querySelector(`[data-update-status="${row.id}"]`);
         const listTimeEl = document.querySelector(`[data-update-time="${row.id}"]`);
         const listAgeEl = document.querySelector(`[data-update-age="${row.id}"]`);
@@ -4384,6 +4390,14 @@
         if (openCardEl) {
           openCardEl.setAttribute("data-workflow-tone", photoWorkflow.tone);
           openCardEl.setAttribute("title", photoWorkflow.label);
+        }
+        if (feedbackLinkEl) {
+          if (row.photoFeedbackId) {
+            feedbackLinkEl.removeAttribute("hidden");
+            feedbackLinkEl.setAttribute("href", appendQueryParams(config.getDepartmentPagePath(basePath, row.id), { tgFeedback: row.photoFeedbackId }));
+          } else {
+            feedbackLinkEl.setAttribute("hidden", "");
+          }
         }
         if (listStatusEl) {
           listStatusEl.textContent = meta.label;
@@ -5561,6 +5575,71 @@
     }
   }
 
+  async function maybeLoadTelegramFeedbackValues() {
+    if (mode !== "department") {
+      return;
+    }
+
+    const feedbackId = queryParams.get("tgFeedback") || "";
+    if (!feedbackId || !sync.hasRemoteSync() || typeof sync.loadTelegramPhotoFeedback !== "function") {
+      return;
+    }
+
+    try {
+      const record = await sync.loadTelegramPhotoFeedback(feedbackId, departmentId);
+      if (!record) {
+        return;
+      }
+
+      const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
+      if (imageDataUrl.startsWith("data:image/")) {
+        return;
+      }
+
+      const previewValues = buildPhotoPreviewValuesFromRecord(record);
+      const recognizedKeys = Array.isArray(record.recognizedKeys) && record.recognizedKeys.length
+        ? record.recognizedKeys.map((item) => String(item))
+        : Object.keys(previewValues);
+      const hasValues = recognizedKeys.some((key) => Object.prototype.hasOwnProperty.call(previewValues, key));
+      if (!hasValues) {
+        return;
+      }
+
+      state.photoImport = buildInitialPhotoImportState();
+      const appliedCount = applyRecognizedDepartmentValues({
+        values: previewValues,
+        recognizedKeys,
+        reportDate: typeof record.reportDate === "string" ? record.reportDate : "",
+        notes: Array.isArray(record.notes) ? record.notes : [],
+        cellReviews: Array.isArray(record.cellReviews) ? record.cellReviews : [],
+        structure: {
+          all22CellsVisible: true,
+          gridCellCount: 22,
+          missingCells: []
+        }
+      });
+      if (!appliedCount) {
+        return;
+      }
+
+      const row = getCurrentRow();
+      state.photoImport.feedbackId = String(record.id || feedbackId);
+      state.photoImport.workflowStatus = row && typeof row.photoWorkflowStatus === "string"
+        ? row.photoWorkflowStatus
+        : "pending";
+      state.photoImport.imageName = typeof record.imageName === "string" && record.imageName.trim()
+        ? record.imageName
+        : "Telegram Web App form";
+      state.photoImport.imageDataUrl = "";
+      state.photoImport.draftMode = true;
+      state.photoImport.status = "Открыта отправленная Telegram форма. Проверьте значения и нажмите Сохранить, чтобы внести их в общую таблицу.";
+      state.photoImport.isError = false;
+      setInfo("Отправленная Telegram форма подставлена в таблицу отделения. После проверки нажмите Сохранить.", false);
+      renderPage();
+    } catch (_error) {
+    }
+  }
+
   async function maybeLoadStoredDepartmentPhotoAdjusted(forceReplace = false) {
     if (mode !== "department" || !sync.hasRemoteSync() || typeof sync.loadTelegramPhotoFeedback !== "function") {
       return;
@@ -6658,6 +6737,7 @@
     startClockTicker();
     await maybeResumeTransferredPhotoImport();
     await maybeLoadTelegramFeedbackPhotoAdjusted();
+    await maybeLoadTelegramFeedbackValues();
     await maybeLoadStoredDepartmentPhotoAdjusted();
     await maybeAutoRecognizeLoadedTelegramPhoto();
   }

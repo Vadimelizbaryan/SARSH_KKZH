@@ -2038,13 +2038,14 @@ async function handleTelegramWebFormSubmit(request: Request) {
       verifiedUser.username ? `@${verifiedUser.username}` : ""
     ].filter(Boolean).join(" ");
     const feedbackId = await insertTelegramWebFormFeedback(
-      supabase,
+      supabase as ReturnType<typeof createClient>,
       departmentId,
       reportDate,
       values,
       verifiedUser.userId,
       userName
     );
+    await markDepartmentPhotoPending(supabase as ReturnType<typeof createClient>, departmentId, feedbackId, "telegram-web-app-form");
     const meta = DEPARTMENTS[departmentId];
     const messageText = [
       "Спасибо. Отличная работа. 🙂",
