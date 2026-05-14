@@ -119,10 +119,10 @@ const DEPARTMENT_PDF_FILES: Record<keyof typeof DEPARTMENTS, { folder: string; f
 };
 
 const DEPARTMENT_PDF_VALUE_X = [
-  67, 101, 135, 169, 203, 237, 271, 305, 340, 374, 408,
+  60, 94, 128, 162, 196, 230, 264, 298, 333, 367, 401,
   443, 477, 511, 545, 579, 614, 648, 682, 716, 751, 785
 ];
-const DEPARTMENT_PDF_VALUE_Y = 362;
+const DEPARTMENT_PDF_VALUE_Y = 367;
 
 const DEPARTMENT_SHEET_ROW_BY_ID: Record<keyof typeof DEPARTMENTS, number> = {
   r4: 4,
