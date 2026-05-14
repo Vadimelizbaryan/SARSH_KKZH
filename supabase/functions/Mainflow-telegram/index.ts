@@ -32,6 +32,9 @@ const VALUE_KEYS = [
   "leaveSharq",
   "leaveSpa",
   "leavePaym",
+  "qhBaseSoldier",
+  "qhBaseOfficer",
+  "qhBaseContract",
   "qhIncomingSoldier",
   "qhIncomingOfficer",
   "qhIncomingContract",
@@ -194,6 +197,13 @@ const corsHeaders = {
 };
 
 type DepartmentId = keyof typeof DEPARTMENTS;
+
+const QH_CALC_DEPARTMENT_IDS = new Set<DepartmentId>(["r19", "r20", "r21"]);
+const QH_CALC_CARRYOVER_PAIRS = [
+  { base: "qhBaseSoldier", current: "currentShar" },
+  { base: "qhBaseOfficer", current: "currentSpa" },
+  { base: "qhBaseContract", current: "currentPaym" }
+] as const;
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -812,23 +822,25 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
 
   const map = new Map((departmentRows || []).map((row) => [row.department_id, row]));
 
+  const rows = Object.entries(DEPARTMENTS).map(([id, meta]) => {
+    const saved = map.get(id);
+    return {
+      id,
+      department: meta.department,
+      group: meta.group,
+      values: sanitizeValues(saved?.values as Record<string, unknown> | undefined),
+      updatedAt: saved?.updated_at || null,
+      photoWorkflowStatus: typeof saved?.photo_workflow_status === "string" ? saved.photo_workflow_status : "idle",
+      photoFeedbackId: typeof saved?.photo_feedback_id === "number" ? saved.photo_feedback_id : null,
+      photoFeedbackUpdatedAt: saved?.photo_feedback_updated_at || null,
+      photoName: typeof saved?.photo_name === "string" ? saved.photo_name : ""
+    };
+  });
+
   return {
     reportDate: metaRow?.report_date || DEFAULT_DATE,
     updatedAt: metaRow?.updated_at || new Date().toISOString(),
-    rows: Object.entries(DEPARTMENTS).map(([id, meta]) => {
-      const saved = map.get(id);
-      return {
-        id,
-        department: meta.department,
-        group: meta.group,
-        values: sanitizeValues(saved?.values as Record<string, unknown> | undefined),
-        updatedAt: saved?.updated_at || null,
-        photoWorkflowStatus: typeof saved?.photo_workflow_status === "string" ? saved.photo_workflow_status : "idle",
-        photoFeedbackId: typeof saved?.photo_feedback_id === "number" ? saved.photo_feedback_id : null,
-        photoFeedbackUpdatedAt: saved?.photo_feedback_updated_at || null,
-        photoName: typeof saved?.photo_name === "string" ? saved.photo_name : ""
-      };
-    })
+    rows: syncQhCalculatedSnapshotRows(rows)
   };
 }
 
@@ -1661,6 +1673,23 @@ function validateReturnedDepartmentSheetIntegrity(
 
 function getSheetNumber(values: Record<string, number | null>, key: string) {
   return values[key] ?? 0;
+}
+
+function syncQhCalculatedSnapshotRows<T extends { id: string; values: Record<string, number | null> }>(rows: T[]) {
+  rows.forEach((row) => {
+    if (!QH_CALC_DEPARTMENT_IDS.has(row.id as DepartmentId)) {
+      return;
+    }
+
+    QH_CALC_CARRYOVER_PAIRS.forEach(({ base, current }) => {
+      const currentValue = getSheetNumber(row.values, current);
+      if (row.values[base] === null && currentValue > 0) {
+        row.values[base] = currentValue;
+      }
+      row.values[current] = getSheetNumber(row.values, base);
+    });
+  });
+  return rows;
 }
 
 function getTelegramWebFormCarryoverValues(values: Record<string, number | null>) {
