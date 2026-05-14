@@ -2060,7 +2060,9 @@ async function handleTelegramWebFormSubmit(request: Request) {
       });
     }
 
-    const notifyChatIds = getTelegramNotifyChatIds(verifiedUser.userId);
+    const submitterChatId = verifiedUser.userId ? String(verifiedUser.userId) : "";
+    const notifyChatIds = getTelegramNotifyChatIds(null)
+      .filter((chatId) => String(chatId) !== submitterChatId);
     if (notifyChatIds.length) {
       await sendTelegramMessageToMany(notifyChatIds, [
         "Получена Telegram Web App форма.",
