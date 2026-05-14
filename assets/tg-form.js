@@ -236,6 +236,7 @@
               pattern="[0-9]*"
               type="text"
               autocomplete="off"
+              maxlength="3"
               value="0"
             >
           </td>
@@ -282,7 +283,7 @@
 
     root.querySelectorAll(".tg-form-input").forEach((input) => {
       input.addEventListener("input", () => {
-        const digitsOnly = input.value.replace(/\D+/g, "");
+        const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 3);
         if (input.value !== digitsOnly) {
           input.value = digitsOnly;
         }
