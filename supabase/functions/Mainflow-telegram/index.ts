@@ -10,6 +10,7 @@ const OCR_TEMPLATE_BLANK_IMAGE_PATH = "/assets/ocr-template-blank.jpg";
 const DEPARTMENT_SHEET_TEMPLATE_PATH = "/assets/templates/SHARSH_KKZH_template.xlsx";
 const TELEGRAM_RETRY_ATTEMPTS = 3;
 const TELEGRAM_RETRY_BASE_DELAY_MS = 700;
+const TELEGRAM_COLLEAGUES_META_KEY = "telegram_colleagues_access";
 
 const VALUE_KEYS = [
   "beenTotal",
@@ -435,6 +436,29 @@ function getTelegramNotifyChatIds(currentChatId?: number | string | null) {
   ));
 }
 
+function splitTelegramChatIds(raw: string) {
+  return raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function getTelegramAdminChatIds() {
+  const raw = Deno.env.get("TELEGRAM_ADMIN_CHAT_IDS")
+    || Deno.env.get("TELEGRAM_NOTIFY_CHAT_IDS")
+    || Deno.env.get("TELEGRAM_ALLOWED_CHAT_IDS")
+    || "";
+  return splitTelegramChatIds(raw);
+}
+
+function isTelegramAdminChat(chatId: number | string | null) {
+  if (chatId === null) {
+    return false;
+  }
+  const admins = getTelegramAdminChatIds();
+  return admins.includes(String(chatId));
+}
+
 function getPublicSiteBaseUrl() {
   const raw = Deno.env.get("PUBLIC_SITE_BASE_URL") || DEFAULT_SITE_BASE_URL;
   const trimmed = raw.trim().replace(/\/+$/, "");
@@ -834,6 +858,58 @@ function createSupabaseAdmin() {
       persistSession: false
     }
   });
+}
+
+async function areTelegramColleaguesEnabled(supabase: ReturnType<typeof createClient>) {
+  if (isTelegramChatAccessRestricted()) {
+    return false;
+  }
+
+  const { data, error } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date")
+    .eq("report_key", TELEGRAM_COLLEAGUES_META_KEY)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const value = String(data?.report_date || "on").trim().toLowerCase();
+  return value !== "off" && value !== "0" && value !== "false";
+}
+
+async function setTelegramColleaguesEnabled(
+  supabase: ReturnType<typeof createClient>,
+  enabled: boolean
+) {
+  const { error } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: TELEGRAM_COLLEAGUES_META_KEY,
+      report_date: enabled ? "on" : "off",
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function isTelegramUserAllowedByRuntimeState(
+  supabase: ReturnType<typeof createClient>,
+  chatId: number | string | null
+) {
+  if (chatId === null) {
+    return false;
+  }
+  if (isTelegramAdminChat(chatId)) {
+    return true;
+  }
+  if (!await areTelegramColleaguesEnabled(supabase)) {
+    return false;
+  }
+  return isAllowedChat(Number(chatId));
 }
 
 async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
@@ -1989,6 +2065,59 @@ function getMainPageUrl() {
   return `${getPublicSiteBaseUrl()}/index.html`;
 }
 
+function buildSrDepartmentsText() {
+  const lines = Object.values(DEPARTMENTS).map((meta) => `${meta.marker} — ${meta.department}`);
+  return ["Список отделений:", ...lines].join("\n");
+}
+
+function isSrDepartmentsListRequest(text: string) {
+  return /^sr\s*[- ]?\?$/i.test(text.trim());
+}
+
+function buildColleagueStartText() {
+  return [
+    "Здравствуйте. Это бот Mainflow для отправки данных отделений.",
+    "",
+    "Как работать:",
+    "1. Отправьте код отделения, например SR-7.",
+    "2. Бот отправит текущий PDF и кнопку для Telegram формы.",
+    "3. Заполните форму и отправьте фото бланка.",
+    "",
+    "Команда SR-? покажет список отделений.",
+    "",
+    buildSrDepartmentsText()
+  ].join("\n");
+}
+
+function buildAdminHelpText() {
+  return [
+    "Команды Mainflow Telegram бота",
+    "",
+    "Доступ коллег:",
+    "/kollegi_on — подключить коллег: бот принимает сообщения по ссылке.",
+    "/kollegi_off — отключить коллег: бот слушает только администратора.",
+    "/kollegi_status — проверить, подключены ли коллеги.",
+    "",
+    "Работа с отделениями:",
+    "SR-? — показать коллегам список SR-кодов отделений.",
+    "SR-7 или r7 — отправить PDF текущих данных и кнопку Telegram формы.",
+    "/form SR-7 — PDF текущих данных + кнопка Telegram формы.",
+    "/sheet SR-7 — отправить XLSX-файл отделения.",
+    "/departments — список SR-кодов отделений.",
+    "",
+    "Фото и файлы:",
+    "Фото бланка — определить отделение, OCR и попросить заполнить форму.",
+    "XLSX-файл — проверить формулу старого Excel-способа.",
+    "",
+    "Состояние:",
+    "/status — статус заполнения отделений.",
+    "/pdf или /done — ссылка на главный файл сайта.",
+    "/help — показать эту админскую справку.",
+    "",
+    "Важно: /help и команды подключения коллег доступны только администратору."
+  ].join("\n");
+}
+
 function buildHelpText() {
   return [
     "SARSH_KKZH Telegram bot",
@@ -2267,6 +2396,13 @@ async function handleTelegramWebFormSubmit(request: Request) {
     }
 
     const supabase = createSupabaseAdmin();
+    if (!await isTelegramUserAllowedByRuntimeState(supabase, verifiedUser.userId)) {
+      return jsonResponse({
+        ok: false,
+        error: "Бот временно отключён для коллег. Обратитесь к администратору."
+      }, 403);
+    }
+
     const snapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
     const reportDate = sanitizeReportDate(payload?.reportDate) || snapshot.reportDate || DEFAULT_DATE;
     const values = applyTelegramWebFormCarryoverValues(
@@ -2516,13 +2652,57 @@ async function handleTelegramCommand(
 ) {
   const command = text.trim().split(/\s+/)[0].toLowerCase();
 
-  if (command === "/start" || command === "/help") {
-    await sendTelegramMessage(chatId, buildHelpText());
+  if (["/kollegi_on", "/colleagues_on", "/access_on"].includes(command)) {
+    if (!isTelegramAdminChat(chatId)) {
+      await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
+      return;
+    }
+    await setTelegramColleaguesEnabled(supabase, true);
+    await sendTelegramMessage(chatId, "Коллеги подключены. Бот снова принимает сообщения от всех, кто откроет его по ссылке.");
+    return;
+  }
+
+  if (["/kollegi_off", "/colleagues_off", "/access_off"].includes(command)) {
+    if (!isTelegramAdminChat(chatId)) {
+      await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
+      return;
+    }
+    await setTelegramColleaguesEnabled(supabase, false);
+    await sendTelegramMessage(chatId, "Коллеги отключены. Теперь бот принимает сообщения только от администратора.");
+    return;
+  }
+
+  if (["/kollegi_status", "/colleagues_status", "/access_status"].includes(command)) {
+    if (!isTelegramAdminChat(chatId)) {
+      await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
+      return;
+    }
+    const enabled = await areTelegramColleaguesEnabled(supabase);
+    await sendTelegramMessage(
+      chatId,
+      enabled
+        ? "Коллеги сейчас подключены: бот принимает сообщения по ссылке."
+        : "Коллеги сейчас отключены: бот слушает только администратора."
+    );
+    return;
+  }
+
+  if (command === "/start") {
+    await sendTelegramMessage(chatId, buildColleagueStartText());
+    return;
+  }
+
+  if (command === "/help") {
+    if (!isTelegramAdminChat(chatId)) {
+      await sendTelegramMessage(chatId, "Команда /help доступна только администратору. Для списка SR-кодов используйте /start или /departments.");
+      return;
+    }
+    await sendTelegramMessage(chatId, buildAdminHelpText());
     return;
   }
 
   if (command === "/departments") {
-    await sendTelegramMessage(chatId, buildDepartmentsText());
+    await sendTelegramMessage(chatId, buildSrDepartmentsText());
     return;
   }
 
@@ -2736,12 +2916,17 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
   }
 
   const chatId = getMessageChatId(message);
-  if (!isAllowedChat(chatId)) {
+  if (chatId === null) {
     return;
   }
 
-  const safeChatId = chatId as number;
   const supabase = createSupabaseAdmin();
+  const safeChatId = chatId as number;
+  if (!await isTelegramUserAllowedByRuntimeState(supabase, safeChatId)) {
+    await sendTelegramMessage(safeChatId, "Бот временно отключён для коллег. Обратитесь к администратору.");
+    return;
+  }
+
   const text = getMessageText(message);
 
   if (text.startsWith("/")) {
@@ -2752,6 +2937,11 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
   const sheetDocument = extractSheetDocument(message);
   if (sheetDocument) {
     await handleTelegramSheetDocument(safeChatId, sheetDocument);
+    return;
+  }
+
+  if (isSrDepartmentsListRequest(text)) {
+    await sendTelegramMessage(safeChatId, buildSrDepartmentsText());
     return;
   }
 
