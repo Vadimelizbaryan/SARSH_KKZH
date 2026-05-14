@@ -30,6 +30,7 @@ jobs:
           cp ykow8ru3.html _site/
           cp archive-print.html _site/
           cp ocr-feedback.html _site/
+          cp tg-form.html _site/
           cp eti77ylq.html _site/
           cp hospital-report.html _site/
           cp "Օրվա շարժ․.html" _site/
