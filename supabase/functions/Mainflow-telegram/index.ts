@@ -417,6 +417,11 @@ function getTelegramAllowedChatIds() {
     .filter(Boolean);
 }
 
+function isTelegramChatAccessRestricted() {
+  const raw = (Deno.env.get("TELEGRAM_RESTRICT_CHAT_IDS") || "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
+}
+
 function getTelegramNotifyChatIds(currentChatId?: number | string | null) {
   const explicitRaw = Deno.env.get("TELEGRAM_NOTIFY_CHAT_IDS");
   const raw = explicitRaw || Deno.env.get("TELEGRAM_ALLOWED_CHAT_IDS") || "";
@@ -2480,6 +2485,9 @@ function extractSheetDocument(message: Record<string, unknown>) {
 function isAllowedChat(chatId: number | null) {
   if (chatId === null) {
     return false;
+  }
+  if (!isTelegramChatAccessRestricted()) {
+    return true;
   }
   const allowed = getTelegramAllowedChatIds();
   if (!allowed.length) {
