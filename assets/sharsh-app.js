@@ -37,7 +37,7 @@
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
   const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
-  const NIGHT_SHIFT_FILENAME = "night-shift.html";
+  const NIGHT_SHIFT_FILENAME = "night.html";
   const PHOTO_FIELD_DEFINITIONS = [
     { cell: 1, key: "beenTotal", label: "1" },
     { cell: 2, key: "beenSoldier", label: "2" },
