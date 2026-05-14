@@ -37,6 +37,7 @@
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
   const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
+  const NIGHT_SHIFT_FILENAME = "night-shift.html";
   const PHOTO_FIELD_DEFINITIONS = [
     { cell: 1, key: "beenTotal", label: "1" },
     { cell: 2, key: "beenSoldier", label: "2" },
@@ -3114,6 +3115,14 @@
     return appendShareQuery(`${prefix}${HOSPITAL_REPORT_FILENAME}`);
   }
 
+  function getNightShiftPath() {
+    if (basePath === "@site") {
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent(NIGHT_SHIFT_FILENAME)}`);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return appendShareQuery(`${prefix}${NIGHT_SHIFT_FILENAME}`);
+  }
+
   function buildHospitalReportData(snapshot) {
     const primaryRows = snapshot.rows.filter((row) => row.group === "primary");
     const subtotal = (key) => getSummaryValue(snapshot, primaryRows, key);
@@ -3552,6 +3561,7 @@
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
             <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR feedback</a>
+            <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Ночная смена</a>
             <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Отчётный лист</a>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="refreshBtn">Обновить</button>
