@@ -1,8 +1,10 @@
 (function () {
   const config = window.SHARSH_CONFIG;
   const app = document.getElementById("app");
+  const queryParams = new URLSearchParams(window.location.search);
+  const isNightShiftView = document.body.dataset.view === "night-shift" || queryParams.get("view") === "night";
 
-  if (!config || !app) {
+  if (!config || !app || !isNightShiftView) {
     return;
   }
 

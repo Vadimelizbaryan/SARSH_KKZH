@@ -8,6 +8,11 @@
     return;
   }
 
+  const queryParams = new URLSearchParams(window.location.search);
+  if (queryParams.get("view") === "night") {
+    return;
+  }
+
   const mode = document.body.dataset.view === "department"
     ? "department"
     : (document.body.dataset.view === "archive"
@@ -17,7 +22,6 @@
         : (document.body.dataset.view === "hospital-report" ? "hospital-report" : "main")));
   const departmentId = document.body.dataset.departmentId || "";
   const basePath = document.body.dataset.basePath || ".";
-  const queryParams = new URLSearchParams(window.location.search);
   const archiveKeyFromQuery = queryParams.get("archive") || "";
   const archiveAutoPrint = queryParams.get("autoprint") !== "0";
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
@@ -37,7 +41,7 @@
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
   const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
-  const NIGHT_SHIFT_FILENAME = "night.html";
+  const NIGHT_SHIFT_FILENAME = "index.html";
   const PHOTO_FIELD_DEFINITIONS = [
     { cell: 1, key: "beenTotal", label: "1" },
     { cell: 2, key: "beenSoldier", label: "2" },
@@ -3117,10 +3121,10 @@
 
   function getNightShiftPath() {
     if (basePath === "@site") {
-      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent(NIGHT_SHIFT_FILENAME)}`);
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent(NIGHT_SHIFT_FILENAME)}&view=night`);
     }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
-    return appendShareQuery(`${prefix}${NIGHT_SHIFT_FILENAME}`);
+    return appendShareQuery(`${prefix}${NIGHT_SHIFT_FILENAME}?view=night`);
   }
 
   function buildHospitalReportData(snapshot) {
