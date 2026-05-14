@@ -1253,6 +1253,38 @@ async function sendTelegramMessageToMany(chatIds: Array<number | string>, text: 
   }
 }
 
+async function copyTelegramMessage(
+  chatId: number | string,
+  fromChatId: number | string,
+  messageId: number,
+  caption?: string
+) {
+  const body: Record<string, unknown> = {
+    chat_id: chatId,
+    from_chat_id: fromChatId,
+    message_id: messageId
+  };
+  if (caption) {
+    body.caption = caption;
+  }
+  await callTelegramApi("copyMessage", body);
+}
+
+async function copyTelegramMessageToMany(
+  chatIds: Array<number | string>,
+  fromChatId: number | string,
+  messageId: number,
+  caption?: string
+) {
+  for (const chatId of chatIds) {
+    try {
+      await copyTelegramMessage(chatId, fromChatId, messageId, caption);
+    } catch (error) {
+      console.error("Failed to copy Telegram photo notification:", sanitizePublicErrorMessage(error));
+    }
+  }
+}
+
 async function sendTelegramDocument(
   chatId: number | string,
   fileName: string,
@@ -2515,6 +2547,7 @@ function buildPhotoSaveSummary(
     `Источник отделения: ${departmentSource}`,
     `Дата отчёта: ${reportDate}`,
     recognized.reportDate ? `Дата на фото: ${recognized.reportDate}` : "Дата на фото: не распознана",
+    `Страница отделения: ${getDepartmentPageUrl(departmentId, feedbackId)}`,
     `OCR feedback: ${feedbackId || "no id"}`,
     recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22)
       ? `Структура строки не подтверждена: ${recognized.structure.gridCellCount}/22 ячеек.`
@@ -2568,6 +2601,47 @@ function getMessageText(message: Record<string, unknown>) {
 function getMessageChatId(message: Record<string, unknown>) {
   const chat = message.chat as { id?: number } | undefined;
   return typeof chat?.id === "number" ? chat.id : null;
+}
+
+function getTelegramMessageId(message: Record<string, unknown>) {
+  return typeof message.message_id === "number" ? message.message_id : null;
+}
+
+function getTelegramSenderLabel(message: Record<string, unknown>, fallbackChatId: number | string) {
+  const from = message.from as {
+    id?: unknown;
+    first_name?: unknown;
+    last_name?: unknown;
+    username?: unknown;
+  } | undefined;
+  const name = [from?.first_name, from?.last_name]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim())
+    .join(" ");
+  const username = typeof from?.username === "string" && from.username.trim()
+    ? `@${from.username.trim()}`
+    : "";
+  const senderId = typeof from?.id === "number" || typeof from?.id === "string"
+    ? String(from.id)
+    : String(fallbackChatId);
+  return [
+    name || username || "неизвестный пользователь",
+    name && username ? username : "",
+    senderId ? `id ${senderId}` : ""
+  ].filter(Boolean).join(" ");
+}
+
+function buildIncomingPhotoAdminCaption(
+  message: Record<string, unknown>,
+  chatId: number | string,
+  hintText: string
+) {
+  const shortHint = hintText.length > 300 ? `${hintText.slice(0, 300)}...` : hintText;
+  return [
+    "Фото бланка от коллеги.",
+    `Отправитель: ${getTelegramSenderLabel(message, chatId)}`,
+    shortHint ? `Подпись: ${shortHint}` : ""
+  ].filter(Boolean).join("\n");
 }
 
 function extractPhotoFileId(message: Record<string, unknown>) {
@@ -2764,6 +2838,20 @@ async function handleTelegramPhoto(
   const hintedReportDate = detectReportDateFromHint(hintText);
 
   await sendTelegramMessage(chatId, "Фото получено. Обрабатываю...");
+
+  const sourceMessageId = getTelegramMessageId(message);
+  const photoNotifyChatIds = getTelegramNotifyChatIds(chatId)
+    .filter((targetChatId) => String(targetChatId) !== String(chatId));
+  if (photoNotifyChatIds.length && sourceMessageId !== null) {
+    await copyTelegramMessageToMany(
+      photoNotifyChatIds,
+      chatId,
+      sourceMessageId,
+      buildIncomingPhotoAdminCaption(message, chatId, hintText)
+    );
+  } else if (photoNotifyChatIds.length) {
+    console.warn("Telegram photo copy was not sent: original message_id is missing.");
+  }
 
   const { dataUrl, fileName } = await downloadTelegramImageAsDataUrl(fileId);
 
