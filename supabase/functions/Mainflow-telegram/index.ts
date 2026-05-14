@@ -2004,7 +2004,43 @@ async function sendTelegramWebFormForDepartment(
       `Дата отчёта: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
       "Ячейки 1-3 уже заполнены из основной таблицы и закрыты для изменения.",
       "Откройте форму, заполните ячейки таблицы и отправьте данные на проверку.",
+      "После отправки формы пришлите сюда фото бланка этого отделения.",
       "Если нужен старый XLSX-файл, отправьте команду /sheet " + meta.marker + "."
+    ].join("\n"),
+    {
+      inline_keyboard: [
+        [
+          {
+            text: "Открыть форму",
+            web_app: { url: formUrl }
+          }
+        ]
+      ]
+    }
+  );
+}
+
+async function sendTelegramWebFormPromptAfterPhoto(
+  supabase: unknown,
+  chatId: number,
+  departmentId: DepartmentId,
+  reportDate: string,
+  baseText: string
+) {
+  const snapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
+  const effectiveReportDate = reportDate || snapshot.reportDate || DEFAULT_DATE;
+  const meta = DEPARTMENTS[departmentId];
+  const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
+  const formUrl = getTelegramWebFormUrl(departmentId, effectiveReportDate, carryoverValues);
+
+  await sendTelegramMessageWithReplyMarkup(
+    chatId,
+    [
+      baseText,
+      "",
+      "Теперь заполните Telegram форму по этому же отделению.",
+      `Отделение: ${meta.department} (${meta.marker})`,
+      "Если форму уже отправляли, повторно заполнять не нужно."
     ].join("\n"),
     {
       inline_keyboard: [
@@ -2103,7 +2139,8 @@ async function handleTelegramWebFormSubmit(request: Request) {
       "Форма проверена: формула совпала.",
       `Отделение: ${meta.department} (${meta.marker})`,
       `Сумма 13-22 = ${validation.actual}.`,
-      "Данные приняты на проверку. В общую таблицу пока не внесены автоматически."
+      "Данные приняты на проверку. В общую таблицу пока не внесены автоматически.",
+      "Пожалуйста, отправьте сюда фото бланка этого отделения, чтобы можно было сверить форму с документом."
     ].join("\n");
 
     if (verifiedUser.userId) {
@@ -2440,8 +2477,11 @@ async function handleTelegramPhoto(
     console.warn("Telegram photo OCR summary was not sent: TELEGRAM_NOTIFY_CHAT_IDS is not configured.");
   }
 
-  await sendTelegramMessage(
+  await sendTelegramWebFormPromptAfterPhoto(
+    supabase,
     chatId,
+    departmentId,
+    reportDate,
     buildPhotoSenderResponse(isPhotoControlPassed, photoValidation, structureInvalid, hasRecognizedValues)
   );
 }
