@@ -123,6 +123,9 @@ const DEPARTMENT_PDF_VALUE_X = [
   443, 477, 511, 545, 579, 614, 648, 682, 717, 752, 786
 ];
 const DEPARTMENT_PDF_VALUE_Y = 367;
+const DEPARTMENT_PDF_DATE_X = 82;
+const DEPARTMENT_PDF_DATE_Y = 72;
+const DEPARTMENT_PDF_DATE_FONT_SIZE = 11;
 
 const DEPARTMENT_SHEET_ROW_BY_ID: Record<keyof typeof DEPARTMENTS, number> = {
   r4: 4,
@@ -2055,12 +2058,14 @@ function buildDepartmentPdfValues(values: Record<string, number | null>) {
 
 async function buildFilledDepartmentPdfBytes(
   departmentId: DepartmentId,
-  values: Record<string, number | null>
+  values: Record<string, number | null>,
+  reportDate: string
 ) {
   const blankBytes = await fetchDepartmentBlankPdfBytes(departmentId);
   const pdf = await PDFDocument.load(blankBytes);
   const page = pdf.getPage(0);
   const font = await pdf.embedFont(StandardFonts.HelveticaBoldOblique);
+  const dateFont = await pdf.embedFont(StandardFonts.HelveticaBold);
   const fontSize = 15;
   const valueColor = rgb(0.07, 0.08, 0.38);
   const pdfValues = buildDepartmentPdfValues(values);
@@ -2075,6 +2080,14 @@ async function buildFilledDepartmentPdfBytes(
       font,
       color: valueColor
     });
+  });
+
+  page.drawText(buildDepartmentSheetDateTimeText(reportDate), {
+    x: DEPARTMENT_PDF_DATE_X,
+    y: DEPARTMENT_PDF_DATE_Y,
+    size: DEPARTMENT_PDF_DATE_FONT_SIZE,
+    font: dateFont,
+    color: rgb(0, 0, 0)
   });
 
   return await pdf.save();
@@ -2150,7 +2163,7 @@ async function sendTelegramWebFormForDepartment(
   const replyMarkup = buildTelegramFormReplyMarkup(formUrl);
 
   try {
-    const pdfBytes = await buildFilledDepartmentPdfBytes(departmentId, currentValues);
+    const pdfBytes = await buildFilledDepartmentPdfBytes(departmentId, currentValues, reportDate);
     await sendTelegramDocument(
       chatId,
       buildDepartmentPdfFileName(departmentId, reportDate, "current"),
@@ -2291,7 +2304,7 @@ async function handleTelegramWebFormSubmit(request: Request) {
 
     if (verifiedUser.userId) {
       try {
-        const pdfBytes = await buildFilledDepartmentPdfBytes(departmentId, values);
+        const pdfBytes = await buildFilledDepartmentPdfBytes(departmentId, values, reportDate);
         await sendTelegramDocument(
           verifiedUser.userId,
           buildDepartmentPdfFileName(departmentId, reportDate, "telegram-form"),
