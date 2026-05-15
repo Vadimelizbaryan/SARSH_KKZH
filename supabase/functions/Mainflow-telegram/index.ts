@@ -2265,6 +2265,12 @@ function buildDepartmentSheetDateTimeText(reportDate: string) {
 }
 
 function buildDepartmentSheetMessageDateTimeText(reportDate: string) {
+  const dateTimeMatch = String(reportDate || "").trim().match(/^(\d{2})[.,/](\d{2})[.,/](\d{2,4})\s+(\d{2}):(\d{2})$/);
+  if (dateTimeMatch) {
+    const year = dateTimeMatch[3].length === 2 ? `20${dateTimeMatch[3]}` : dateTimeMatch[3];
+    return `${dateTimeMatch[1]}.${dateTimeMatch[2]}.${year} ${dateTimeMatch[4]}:${dateTimeMatch[5]}`;
+  }
+
   const match = String(reportDate || "").trim().match(/^(\d{2})[.,/](\d{2})[.,/](\d{2,4})$/);
   if (!match) {
     return `${reportDate || DEFAULT_DATE} ${getYerevanTimeText()}`;
