@@ -527,6 +527,54 @@ async function notifyOwnerLogin(details: Record<string, unknown> | null | undefi
   return { ok: true, sent: chatIds.length };
 }
 
+function getMainflowTelegramFunctionUrl() {
+  const explicit = (Deno.env.get("MAINFLOW_TELEGRAM_FUNCTION_URL") || "").trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").trim();
+  if (!supabaseUrl) {
+    throw new Error("SUPABASE_URL is not configured on the server.");
+  }
+
+  const host = new URL(supabaseUrl).hostname;
+  const projectRef = host.split(".")[0];
+  if (!projectRef) {
+    throw new Error("Cannot resolve Supabase project ref for Telegram function.");
+  }
+
+  return `https://${projectRef}.functions.supabase.co/Mainflow-telegram`;
+}
+
+async function sendMainPdfsToTelegramFromSync() {
+  const url = new URL(getMainflowTelegramFunctionUrl());
+  url.searchParams.set("action", "send-main-pdfs");
+  url.searchParams.set("force", "1");
+  url.searchParams.set("source", "manual");
+
+  const secret = (Deno.env.get("TELEGRAM_REMINDER_SECRET") || "").trim();
+  const headers: Record<string, string> = {};
+  if (secret) {
+    headers["x-telegram-reminder-secret"] = secret;
+  }
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = payload && typeof payload.error === "string"
+      ? payload.error
+      : `Telegram PDF send failed (${response.status}).`;
+    throw new Error(message);
+  }
+
+  return payload || { ok: true };
+}
+
 async function requestOpenAiStructuredVision(
   prompt: string,
   imageDataUrl: string,
@@ -1295,6 +1343,10 @@ Deno.serve(async (request) => {
     if (type === "notify_owner_login") {
       const details = payload && typeof payload.details === "object" ? payload.details as Record<string, unknown> : {};
       return jsonResponse(await notifyOwnerLogin(details));
+    }
+
+    if (type === "send_main_pdfs_to_telegram") {
+      return jsonResponse(await sendMainPdfsToTelegramFromSync());
     }
 
     if (type !== "save_department") {

@@ -491,6 +491,31 @@
     return payload;
   }
 
+  async function sendMainPdfsToTelegram() {
+    ensureOwnerAuth();
+    if (!hasRemoteSync()) {
+      throw new Error("Онлайн-синхронизация нужна для отправки PDF в Telegram.");
+    }
+
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "send_main_pdfs_to_telegram"
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось отправить PDF в Telegram");
+    }
+
+    return payload || { ok: true };
+  }
+
   async function loadTelegramPhotoFeedback(feedbackId, departmentId) {
     const normalizedId = String(feedbackId || "").trim();
     if (!hasRemoteSync() || !normalizedId) {
@@ -538,6 +563,7 @@
     saveOcrFeedback,
     saveReportDate,
     notifyOwnerLogin,
+    sendMainPdfsToTelegram,
     loadTelegramPhotoFeedback,
     listOcrFeedback,
     verifyDepartmentAccess,

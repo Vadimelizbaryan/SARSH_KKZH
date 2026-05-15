@@ -3568,6 +3568,7 @@
             <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
             ${buildOwnerAuthActions()}
             ${downloadMainPdfButtonHtml}
+            <button type="button" id="sendTelegramPdfsBtn">Отправить PDF в Telegram</button>
             <div class="zoom-control">
               <label for="zoomRange">Масштаб</label>
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
@@ -6404,6 +6405,7 @@
     const zoomRange = document.getElementById("zoomRange");
     const printBtn = document.getElementById("printBtn");
     const refreshBtn = document.getElementById("refreshBtn");
+    const sendTelegramPdfsBtn = document.getElementById("sendTelegramPdfsBtn");
     const resetBtn = document.getElementById("resetBtn");
     const saveBtn = document.getElementById("saveBtn");
     const accessCodeField = document.getElementById("accessCodeField");
@@ -6423,6 +6425,33 @@
     if (printBtn) {
       printBtn.addEventListener("click", () => {
         window.print();
+      });
+    }
+
+    if (sendTelegramPdfsBtn) {
+      sendTelegramPdfsBtn.addEventListener("click", async () => {
+        const button = sendTelegramPdfsBtn instanceof HTMLButtonElement ? sendTelegramPdfsBtn : null;
+        if (button) {
+          button.disabled = true;
+        }
+
+        setInfo("Отправляю Report.pdf и ԿԿԶՀ-Շարժ․pdf в Telegram...", false);
+        try {
+          if (typeof sync.sendMainPdfsToTelegram !== "function") {
+            throw new Error("Отправка PDF в Telegram пока недоступна.");
+          }
+          const result = await sync.sendMainPdfsToTelegram();
+          const sent = result && result.result && typeof result.result.sent === "number"
+            ? result.result.sent
+            : 0;
+          setInfo(`PDF отправлены в Telegram: Report.pdf и ԿԿԶՀ-Շարժ․pdf. Получателей: ${sent}.`, false);
+        } catch (error) {
+          setInfo(error instanceof Error ? error.message : "Не удалось отправить PDF в Telegram.", true);
+        } finally {
+          if (button) {
+            button.disabled = false;
+          }
+        }
       });
     }
 

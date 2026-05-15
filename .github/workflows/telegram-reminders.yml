@@ -2,6 +2,7 @@ name: Telegram reminders
 
 on:
   schedule:
+    - cron: "0 4 * * *"
     - cron: "0 8 * * *"
     - cron: "0 13 * * *"
   workflow_dispatch:
@@ -11,6 +12,7 @@ on:
         required: true
         type: choice
         options:
+          - morning-pdfs
           - midday
           - evening
       force:
@@ -32,9 +34,14 @@ jobs:
         run: |
           slot="${{ github.event.inputs.slot }}"
           force="${{ github.event.inputs.force }}"
+          action="daily-reminder"
 
           if [ -z "$slot" ]; then
             case "${{ github.event.schedule }}" in
+              "0 4 * * *")
+                slot="morning-pdfs"
+                action="send-main-pdfs"
+                ;;
               "0 8 * * *")
                 slot="midday"
                 ;;
@@ -51,13 +58,23 @@ jobs:
             force="false"
           fi
 
+          if [ "$slot" = "morning-pdfs" ]; then
+            action="send-main-pdfs"
+          fi
+
+          echo "action=$action" >> "$GITHUB_OUTPUT"
           echo "slot=$slot" >> "$GITHUB_OUTPUT"
           echo "force=$force" >> "$GITHUB_OUTPUT"
 
-      - name: Send Telegram reminder
+      - name: Send Telegram job
         shell: bash
         run: |
-          url="$FUNCTION_URL?action=daily-reminder&slot=${{ steps.params.outputs.slot }}"
+          if [ "${{ steps.params.outputs.action }}" = "send-main-pdfs" ]; then
+            url="$FUNCTION_URL?action=send-main-pdfs"
+          else
+            url="$FUNCTION_URL?action=daily-reminder&slot=${{ steps.params.outputs.slot }}"
+          fi
+
           if [ "${{ steps.params.outputs.force }}" = "true" ]; then
             url="$url&force=1"
           fi

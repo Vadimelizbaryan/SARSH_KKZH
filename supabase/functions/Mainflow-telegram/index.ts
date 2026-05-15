@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import JSZip from "npm:jszip@3.10.1";
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
+import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
 
 // deploy-touch: 2026-05-10
 const DEFAULT_DATE = "05,05,26";
@@ -13,6 +14,10 @@ const TELEGRAM_RETRY_BASE_DELAY_MS = 700;
 const TELEGRAM_COLLEAGUES_META_KEY = "telegram_colleagues_access";
 const TELEGRAM_COLLEAGUE_CHATS_META_KEY = "telegram_colleague_chats";
 const TELEGRAM_DAILY_REMINDER_META_PREFIX = "telegram_daily_reminder_sent";
+const TELEGRAM_MAIN_PDFS_META_KEY = "telegram_main_pdfs_sent";
+const MAIN_MOVEMENT_PDF_FILE_NAME = "ԿԿԶՀ-Շարժ․pdf";
+const REPORT_PDF_FILE_NAME = "Report.pdf";
+const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarmenian/NotoSansArmenian%5Bwdth,wght%5D.ttf";
 const TELEGRAM_DAILY_REMINDERS = {
   midday: {
     label: "12:00",
@@ -214,6 +219,86 @@ const DEPARTMENT_SHEET_PRESENT_SUM_KEYS = [
   "leaveSharq",
   "leaveSpa",
   "leavePaym"
+] as const;
+const DEPARTMENT_SHEET_LEAVE_SUM_KEYS = [
+  "leaveSharq",
+  "leaveSpa",
+  "leavePaym"
+] as const;
+const MAIN_PDF_COLUMNS = [
+  { key: "beenTotal", label: "1" },
+  { key: "beenSoldier", label: "2" },
+  { key: "beenSeries", label: "3" },
+  { key: "admittedTotal", label: "4" },
+  { key: "admittedSoldier", label: "5" },
+  { key: "admittedSeries", label: "6" },
+  { key: "dgTotal", label: "7" },
+  { key: "dgSoldier", label: "8" },
+  { key: "dgSeries", label: "9" },
+  { key: "transferFromDepartment", label: "10" },
+  { key: "transferToDepartment", label: "11" },
+  { key: "presentTotal", label: "12" },
+  { key: "currentShar", label: "13" },
+  { key: "currentSpa", label: "14" },
+  { key: "currentPaym", label: "15" },
+  { key: "currentZh", label: "16" },
+  { key: "family", label: "17" },
+  { key: "officer", label: "18" },
+  { key: "civil", label: "19" },
+  { key: "leaveSharq", label: "20" },
+  { key: "leaveSpa", label: "21" },
+  { key: "leavePaym", label: "22" },
+  { key: "leaveTotal", label: "23" }
+] as const;
+const REPORT_PRIMARY_ITEMS = [
+  { key: "beenTotal", cell: 1, label: "Հոսպիտալում եղել է" },
+  { key: "admittedTotal", cell: 4, label: "Ընդունվել է" },
+  { key: "dgTotal", cell: 7, label: "Դուրս է գրվել" },
+  { key: "presentTotal", cell: 12, label: "Առկա է" },
+  { divider: true, label: "Որից" },
+  { key: "currentShar", cell: 13, label: "Ժամկետային զ/ծ" },
+  { key: "currentSpa", cell: 14, label: "Սպա" },
+  { key: "currentPaym", cell: 15, label: "Պայմանագր" },
+  { key: "currentZh", cell: 16, label: "Զինհաշմանդամ" },
+  { key: "family", cell: 17, label: "Զինծառայ․ընտ․անդ․" },
+  { key: "officer", cell: 18, label: "Զինապարտ" },
+  { key: "civil", cell: 19, label: "Քաղաքացի" },
+  { divider: true, label: "Արձակուրդում առկա է", totalKey: "leaveTotal" },
+  { key: "leaveSharq", cell: 20, label: "Ժամկետային զ/ծ" },
+  { key: "leaveSpa", cell: 21, label: "Սպա" },
+  { key: "leavePaym", cell: 22, label: "Պայմանագրային" }
+] as const;
+const REPORT_SPECIAL_GROUPS = [
+  {
+    rowId: "r19",
+    title: "ԻՆՖ-ում առկա է",
+    items: [
+      { key: "presentTotal", cell: 12, label: "ԻՆՖ-ում առկա է" },
+      { key: "currentShar", cell: 13, label: "Ժամկետային" },
+      { key: "currentSpa", cell: 14, label: "Սպա" },
+      { key: "currentPaym", cell: 15, label: "Պայմ" }
+    ]
+  },
+  {
+    rowId: "r21",
+    title: "Քաղաքացիական հիվանդան․ առկա է",
+    items: [
+      { key: "presentTotal", cell: 12, label: "Քաղաքացիական հիվանդան․ առկա է" },
+      { key: "currentShar", cell: 13, label: "Ժամկետային զ/ծ" },
+      { key: "currentSpa", cell: 14, label: "Սպա" },
+      { key: "currentPaym", cell: 15, label: "Պայմանագրային" }
+    ]
+  },
+  {
+    rowId: "r20",
+    title: "ԱՏԴ-ում առկա է",
+    items: [
+      { key: "presentTotal", cell: 12, label: "ԱՏԴ-ում առկա է" },
+      { key: "currentShar", cell: 13, label: "Ժամկետային" },
+      { key: "currentSpa", cell: 14, label: "Սպա" },
+      { key: "currentPaym", cell: 15, label: "Պայմանագրային" }
+    ]
+  }
 ] as const;
 const DEPARTMENT_SHEET_FORMULA_COLUMNS = ["K", "L", "W", "X"];
 const DEPARTMENT_SHEET_LAST_COLUMN = "Z";
@@ -816,8 +901,8 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
   if (structureInvalid) {
     notes.push(
       structure?.reason
-        ? `Структура верхней строки не подтверждена: найдено ${structure.gridCellCount}/22 ячеек. ${structure.reason}`
-        : `Структура верхней строки не подтверждена: найдено ${structure?.gridCellCount ?? 0}/22 ячеек.`
+        ? `Վերին տողի կառուցվածքը հաստատված չէ. գտնվել է ${structure.gridCellCount}/22 բջիջ։ ${structure.reason}`
+        : `Վերին տողի կառուցվածքը հաստատված չէ. գտնվել է ${structure?.gridCellCount ?? 0}/22 բջիջ։`
     );
   }
 
@@ -1151,6 +1236,7 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
     const saved = map.get(id);
     return {
       id,
+      marker: meta.marker,
       department: meta.department,
       group: meta.group,
       values: sanitizeValues(saved?.values as Record<string, unknown> | undefined),
@@ -1166,6 +1252,437 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
     reportDate: metaRow?.report_date || DEFAULT_DATE,
     updatedAt: metaRow?.updated_at || new Date().toISOString(),
     rows: syncQhCalculatedSnapshotRows(rows)
+  };
+}
+
+let armenianPdfFontBytesPromise: Promise<Uint8Array | null> | null = null;
+
+async function getArmenianPdfFontBytes() {
+  if (!armenianPdfFontBytesPromise) {
+    armenianPdfFontBytesPromise = fetch(ARMENIAN_PDF_FONT_URL)
+      .then(async (response) => {
+        if (!response.ok) {
+          console.warn(`Armenian PDF font was not loaded: ${response.status}`);
+          return null;
+        }
+        return new Uint8Array(await response.arrayBuffer());
+      })
+      .catch((error) => {
+        console.warn("Armenian PDF font request failed:", sanitizePublicErrorMessage(error));
+        return null;
+      });
+  }
+  return await armenianPdfFontBytesPromise;
+}
+
+async function buildPdfFonts(pdf: PDFDocument) {
+  const regularFallback = await pdf.embedFont(StandardFonts.Helvetica);
+  const boldFallback = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const armenianFontBytes = await getArmenianPdfFontBytes();
+
+  if (!armenianFontBytes) {
+    return {
+      regular: regularFallback,
+      bold: boldFallback,
+      hasArmenian: false
+    };
+  }
+
+  try {
+    pdf.registerFontkit(fontkit as any);
+    const armenianFont = await pdf.embedFont(armenianFontBytes, { subset: true });
+    return {
+      regular: armenianFont,
+      bold: armenianFont,
+      hasArmenian: true
+    };
+  } catch (error) {
+    console.warn("Armenian PDF font embedding failed:", sanitizePublicErrorMessage(error));
+    return {
+      regular: regularFallback,
+      bold: boldFallback,
+      hasArmenian: false
+    };
+  }
+}
+
+function getPdfText(text: string, fonts: { hasArmenian: boolean }, fallback = "") {
+  if (fonts.hasArmenian) {
+    return text;
+  }
+  const ascii = text.replace(/[^\x20-\x7E]/g, "").trim();
+  return ascii || fallback;
+}
+
+function getRowPdfValue(row: { values: Record<string, number | null> }, key: string) {
+  if (key === "presentTotal") {
+    return DEPARTMENT_SHEET_PRESENT_SUM_KEYS.reduce((sum, itemKey) => sum + getSheetNumber(row.values, itemKey), 0);
+  }
+  if (key === "leaveTotal") {
+    return DEPARTMENT_SHEET_LEAVE_SUM_KEYS.reduce((sum, itemKey) => sum + getSheetNumber(row.values, itemKey), 0);
+  }
+  return getSheetNumber(row.values, key);
+}
+
+function getRowsPdfValue(rows: Array<{ values: Record<string, number | null> }>, key: string) {
+  return rows.reduce((sum, row) => sum + getRowPdfValue(row, key), 0);
+}
+
+function drawPdfCell(
+  page: any,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  options: {
+    font: any;
+    size?: number;
+    align?: "left" | "center" | "right";
+    color?: ReturnType<typeof rgb>;
+    fill?: ReturnType<typeof rgb>;
+    border?: ReturnType<typeof rgb>;
+    padding?: number;
+  }
+) {
+  const borderColor = options.border || rgb(0, 0, 0);
+  if (options.fill) {
+    page.drawRectangle({ x, y, width, height, color: options.fill });
+  }
+  page.drawRectangle({ x, y, width, height, borderColor, borderWidth: 0.7 });
+
+  const size = options.size || 8;
+  const padding = typeof options.padding === "number" ? options.padding : 3;
+  const safeText = String(text ?? "");
+  const textWidth = options.font.widthOfTextAtSize(safeText, size);
+  let textX = x + padding;
+  if (options.align === "center") {
+    textX = x + Math.max(padding, (width - textWidth) / 2);
+  } else if (options.align === "right") {
+    textX = x + Math.max(padding, width - textWidth - padding);
+  }
+  page.drawText(safeText, {
+    x: textX,
+    y: y + Math.max(2, (height - size) / 2),
+    size,
+    font: options.font,
+    color: options.color || rgb(0, 0, 0)
+  });
+}
+
+function drawPdfText(
+  page: any,
+  text: string,
+  x: number,
+  y: number,
+  options: {
+    font: any;
+    size?: number;
+    color?: ReturnType<typeof rgb>;
+  }
+) {
+  page.drawText(String(text ?? ""), {
+    x,
+    y,
+    size: options.size || 10,
+    font: options.font,
+    color: options.color || rgb(0, 0, 0)
+  });
+}
+
+async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
+  const pdf = await PDFDocument.create();
+  const fonts = await buildPdfFonts(pdf);
+  const page = pdf.addPage([841.92, 595.32]);
+  const primaryRows = snapshot.rows.filter((row) => row.group === "primary");
+  const allRows = snapshot.rows;
+  const title = getPdfText("ԿԿԶՀ-Շարժ․", fonts, "KKZH-Sharzh");
+  const subtitle = getPdfText(`Ամսաթիվ՝ ${snapshot.reportDate}`, fonts, `Date: ${snapshot.reportDate}`);
+  const generated = getPdfText(`Ստեղծվել է՝ ${buildDepartmentSheetMessageDateTimeText(snapshot.reportDate)}`, fonts, `Generated: ${snapshot.reportDate}`);
+
+  drawPdfText(page, title, 28, 560, { font: fonts.bold, size: 18, color: rgb(0.03, 0.25, 0.16) });
+  drawPdfText(page, subtitle, 28, 540, { font: fonts.regular, size: 10 });
+  drawPdfText(page, generated, 650, 540, { font: fonts.regular, size: 9, color: rgb(0.32, 0.32, 0.32) });
+
+  const startX = 24;
+  const startY = 513;
+  const markerWidth = 42;
+  const nameWidth = 92;
+  const valueWidth = 28.2;
+  const rowHeight = 22;
+  const headerFill = rgb(0.98, 0.78, 0.57);
+  const totalFill = rgb(1, 0.92, 0.02);
+  const nameFill = rgb(0.99, 0.97, 0.92);
+
+  drawPdfCell(page, "SR", startX, startY, markerWidth, rowHeight, {
+    font: fonts.bold,
+    size: 8,
+    align: "center",
+    fill: headerFill
+  });
+  drawPdfCell(page, getPdfText("Բաժանմունք", fonts, "Department"), startX + markerWidth, startY, nameWidth, rowHeight, {
+    font: fonts.bold,
+    size: 8,
+    align: "center",
+    fill: headerFill
+  });
+
+  MAIN_PDF_COLUMNS.forEach((column, index) => {
+    drawPdfCell(page, column.label, startX + markerWidth + nameWidth + (index * valueWidth), startY, valueWidth, rowHeight, {
+      font: fonts.bold,
+      size: 7,
+      align: "center",
+      fill: headerFill
+    });
+  });
+
+  allRows.forEach((row, rowIndex) => {
+    const y = startY - ((rowIndex + 1) * rowHeight);
+    drawPdfCell(page, row.marker, startX, y, markerWidth, rowHeight, {
+      font: fonts.bold,
+      size: 8,
+      align: "center",
+      fill: nameFill
+    });
+    drawPdfCell(page, getPdfText(row.department, fonts, row.id), startX + markerWidth, y, nameWidth, rowHeight, {
+      font: fonts.regular,
+      size: row.department.length > 16 ? 6.5 : 7,
+      align: "left",
+      fill: nameFill
+    });
+    MAIN_PDF_COLUMNS.forEach((column, columnIndex) => {
+      drawPdfCell(page, String(getRowPdfValue(row, column.key)), startX + markerWidth + nameWidth + (columnIndex * valueWidth), y, valueWidth, rowHeight, {
+        font: fonts.bold,
+        size: 8,
+        align: "center",
+        fill: column.key === "presentTotal" || column.key === "leaveTotal" ? rgb(1, 0.96, 0.35) : undefined
+      });
+    });
+  });
+
+  const totalY = startY - ((allRows.length + 1) * rowHeight);
+  drawPdfCell(page, "", startX, totalY, markerWidth, rowHeight, {
+    font: fonts.bold,
+    size: 8,
+    align: "center",
+    fill: totalFill
+  });
+  drawPdfCell(page, getPdfText("Ընդամենը", fonts, "Total"), startX + markerWidth, totalY, nameWidth, rowHeight, {
+    font: fonts.bold,
+    size: 8,
+    align: "center",
+    fill: totalFill
+  });
+  MAIN_PDF_COLUMNS.forEach((column, columnIndex) => {
+    drawPdfCell(page, String(getRowsPdfValue(primaryRows, column.key)), startX + markerWidth + nameWidth + (columnIndex * valueWidth), totalY, valueWidth, rowHeight, {
+      font: fonts.bold,
+      size: 8,
+      align: "center",
+      fill: totalFill
+    });
+  });
+
+  return await pdf.save();
+}
+
+async function buildReportPdfBytes(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
+  const pdf = await PDFDocument.create();
+  const fonts = await buildPdfFonts(pdf);
+  const page = pdf.addPage([841.92, 595.32]);
+  const primaryRows = snapshot.rows.filter((row) => row.group === "primary");
+  const title = getPdfText("Օրվա շարժ․", fonts, "Report");
+  const subtitle = getPdfText(`Ամսաթիվ՝ ${snapshot.reportDate}`, fonts, `Date: ${snapshot.reportDate}`);
+  const headerFill = rgb(0.95, 0.88, 0.76);
+  const sectionFill = rgb(0.9, 0.96, 0.92);
+  const border = rgb(0.15, 0.15, 0.15);
+
+  drawPdfText(page, title, 34, 555, { font: fonts.bold, size: 20, color: rgb(0.03, 0.25, 0.16) });
+  drawPdfText(page, subtitle, 34, 532, { font: fonts.regular, size: 11 });
+
+  const leftX = 34;
+  const rightX = 446;
+  const topY = 500;
+  const rowHeight = 22;
+  const cellWidth = 44;
+  const labelWidth = 255;
+  const valueWidth = 74;
+
+  drawPdfCell(page, getPdfText("Բջ.", fonts, "Cell"), leftX, topY, cellWidth, rowHeight, {
+    font: fonts.bold,
+    size: 8,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  drawPdfCell(page, getPdfText("Ցուցիչ", fonts, "Indicator"), leftX + cellWidth, topY, labelWidth, rowHeight, {
+    font: fonts.bold,
+    size: 8,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  drawPdfCell(page, getPdfText("Ընդամենը", fonts, "Total"), leftX + cellWidth + labelWidth, topY, valueWidth, rowHeight, {
+    font: fonts.bold,
+    size: 8,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+
+  let y = topY - rowHeight;
+  REPORT_PRIMARY_ITEMS.forEach((item) => {
+    if ("divider" in item && item.divider) {
+      const totalValue = item.totalKey ? getRowsPdfValue(primaryRows, item.totalKey) : "";
+      drawPdfCell(page, getPdfText(item.label, fonts, item.label), leftX, y, cellWidth + labelWidth, rowHeight, {
+        font: fonts.bold,
+        size: 8,
+        align: "left",
+        fill: sectionFill,
+        border
+      });
+      drawPdfCell(page, String(totalValue), leftX + cellWidth + labelWidth, y, valueWidth, rowHeight, {
+        font: fonts.bold,
+        size: 9,
+        align: "center",
+        fill: sectionFill,
+        border
+      });
+    } else {
+      const valueItem = item as { key: string; cell: number; label: string };
+      drawPdfCell(page, String(valueItem.cell), leftX, y, cellWidth, rowHeight, {
+        font: fonts.bold,
+        size: 8,
+        align: "center",
+        border
+      });
+      drawPdfCell(page, getPdfText(valueItem.label, fonts, valueItem.key), leftX + cellWidth, y, labelWidth, rowHeight, {
+        font: fonts.regular,
+        size: 8,
+        align: "left",
+        border
+      });
+      drawPdfCell(page, String(getRowsPdfValue(primaryRows, valueItem.key)), leftX + cellWidth + labelWidth, y, valueWidth, rowHeight, {
+        font: fonts.bold,
+        size: 9,
+        align: "center",
+        border
+      });
+    }
+    y -= rowHeight;
+  });
+
+  drawPdfCell(page, getPdfText("Բաժին / ցուցիչ", fonts, "Department / indicator"), rightX, topY, labelWidth, rowHeight, {
+    font: fonts.bold,
+    size: 8,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  drawPdfCell(page, getPdfText("Արժեք", fonts, "Value"), rightX + labelWidth, topY, valueWidth, rowHeight, {
+    font: fonts.bold,
+    size: 8,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+
+  y = topY - rowHeight;
+  REPORT_SPECIAL_GROUPS.forEach((group) => {
+    const row = snapshot.rows.find((item) => item.id === group.rowId);
+    drawPdfCell(page, getPdfText(group.title, fonts, group.rowId), rightX, y, labelWidth + valueWidth, rowHeight, {
+      font: fonts.bold,
+      size: 8,
+      align: "left",
+      fill: sectionFill,
+      border
+    });
+    y -= rowHeight;
+    group.items.forEach((item) => {
+      drawPdfCell(page, `${item.cell} ${getPdfText(item.label, fonts, item.key)}`, rightX, y, labelWidth, rowHeight, {
+        font: fonts.regular,
+        size: 8,
+        align: "left",
+        border
+      });
+      drawPdfCell(page, String(row ? getRowPdfValue(row, item.key) : 0), rightX + labelWidth, y, valueWidth, rowHeight, {
+        font: fonts.bold,
+        size: 9,
+        align: "center",
+        border
+      });
+      y -= rowHeight;
+    });
+    y -= 5;
+  });
+
+  return await pdf.save();
+}
+
+function getMainPdfTelegramChatIds() {
+  const pdfChannelRaw = Deno.env.get("TELEGRAM_MAIN_PDF_CHAT_IDS") || "";
+  const explicitRaw = Deno.env.get("TELEGRAM_NOTIFY_CHAT_IDS") || "";
+  const adminRaw = Deno.env.get("TELEGRAM_ADMIN_CHAT_IDS") || "";
+  const fallbackRaw = Deno.env.get("TELEGRAM_ALLOWED_CHAT_IDS") || "";
+  const parsePdfTargets = (raw: string) => splitTelegramChatIds(raw)
+    .filter((chatId) => !/^https?:\/\//i.test(chatId));
+  const pdfTargets = parsePdfTargets(pdfChannelRaw);
+  if (pdfTargets.length) {
+    return Array.from(new Set(pdfTargets));
+  }
+  return Array.from(new Set(splitTelegramChatIds(explicitRaw || adminRaw || fallbackRaw)));
+}
+
+async function sendMainPdfsToTelegram(
+  supabase: ReturnType<typeof createClient>,
+  options: { force?: boolean; source?: string } = {}
+) {
+  const dateKey = getYerevanDateKey();
+  if (!options.force) {
+    const lastSentDate = await loadMetaValue(supabase, TELEGRAM_MAIN_PDFS_META_KEY);
+    if (lastSentDate === dateKey) {
+      return { sent: 0, skipped: "already_sent", dateKey };
+    }
+  }
+
+  const chatIds = getMainPdfTelegramChatIds();
+  if (!chatIds.length) {
+    return { sent: 0, skipped: "no_chat_ids", dateKey };
+  }
+
+  const snapshot = await loadSnapshot(supabase);
+  const reportPdfBytes = await buildReportPdfBytes(snapshot);
+  const mainPdfBytes = await buildMainMovementPdfBytes(snapshot);
+  const captionPrefix = options.source === "morning"
+    ? "Առավոտյան ավտոմատ PDF ֆայլեր"
+    : "PDF ֆայլերը պատրաստ են";
+  const captionDate = `Ամսաթիվ՝ ${snapshot.reportDate}`;
+
+  for (const chatId of chatIds) {
+    await sendTelegramDocument(
+      chatId,
+      REPORT_PDF_FILE_NAME,
+      reportPdfBytes,
+      `${captionPrefix}\n${captionDate}`,
+      "application/pdf"
+    );
+    await sendTelegramDocument(
+      chatId,
+      MAIN_MOVEMENT_PDF_FILE_NAME,
+      mainPdfBytes,
+      `${captionPrefix}\n${captionDate}`,
+      "application/pdf"
+    );
+  }
+
+  if (!options.force) {
+    await saveMetaValue(supabase, TELEGRAM_MAIN_PDFS_META_KEY, dateKey);
+  }
+
+  return {
+    sent: chatIds.length,
+    skipped: "",
+    dateKey,
+    files: [REPORT_PDF_FILE_NAME, MAIN_MOVEMENT_PDF_FILE_NAME]
   };
 }
 
@@ -2313,7 +2830,7 @@ function getMainPageUrl() {
 
 function buildSrDepartmentsText() {
   const lines = Object.values(DEPARTMENTS).map((meta) => `${meta.marker} — ${meta.department}`);
-  return ["Список отделений:", ...lines].join("\n");
+  return ["Բաժանմունքների ցանկը.", ...lines].join("\n");
 }
 
 function isSrDepartmentsListRequest(text: string) {
@@ -2322,14 +2839,14 @@ function isSrDepartmentsListRequest(text: string) {
 
 function buildColleagueStartText() {
   return [
-    "Здравствуйте. Это бот Mainflow для отправки данных отделений.",
+    "Բարև Ձեզ։ Սա Mainflow բոտն է բաժանմունքների տվյալները ուղարկելու համար։",
     "",
-    "Как работать:",
-    "1. Отправьте код отделения, например SR-7.",
-    "2. Бот отправит текущий PDF и кнопку для Telegram формы.",
-    "3. Заполните форму и отправьте фото бланка.",
+    "Ինչպես աշխատել.",
+    "1. Ուղարկեք բաժանմունքի կոդը, օրինակ՝ SR-7։",
+    "2. Բոտը կուղարկի ընթացիկ PDF-ը և Telegram ձևը բացելու կոճակը։",
+    "3. Լրացրեք ձևը և ուղարկեք բլանկի լուսանկարը։",
     "",
-    "Команда SR-? покажет список отделений.",
+    "SR-? հրամանը ցույց կտա բաժանմունքների ցանկը։",
     "",
     buildSrDepartmentsText()
   ].join("\n");
@@ -2337,32 +2854,32 @@ function buildColleagueStartText() {
 
 function buildAdminHelpText() {
   return [
-    "Команды Mainflow Telegram бота",
+    "Mainflow Telegram բոտի հրամանները",
     "",
-    "Доступ коллег:",
-    "/kollegi_on — подключить коллег: бот принимает сообщения по ссылке.",
-    "/kollegi_off — отключить коллег: бот слушает только администратора.",
-    "/kollegi_status — проверить, подключены ли коллеги.",
-    "/reminder_12 — вручную отправить коллегам напоминание про 14:00.",
-    "/reminder_17 — вручную отправить коллегам напоминание про 18:00.",
+    "Կոլեգաների հասանելիություն.",
+    "/kollegi_on — միացնել կոլեգաներին. բոտը ընդունում է հաղորդագրություններ հղումով։",
+    "/kollegi_off — անջատել կոլեգաներին. բոտը լսում է միայն ադմինիստրատորին։",
+    "/kollegi_status — ստուգել՝ կոլեգաները միացված են, թե ոչ։",
+    "/reminder_12 — ձեռքով ուղարկել 14։00-ի հիշեցումը կոլեգաներին։",
+    "/reminder_17 — ձեռքով ուղարկել 18։00-ի հիշեցումը կոլեգաներին։",
     "",
-    "Работа с отделениями:",
-    "SR-? — показать коллегам список SR-кодов отделений.",
-    "SR-7 или r7 — отправить PDF текущих данных и кнопку Telegram формы.",
-    "/form SR-7 — PDF текущих данных + кнопка Telegram формы.",
-    "/sheet SR-7 — отправить XLSX-файл отделения.",
-    "/departments — список SR-кодов отделений.",
+    "Աշխատանք բաժանմունքների հետ.",
+    "SR-? — ցույց տալ բաժանմունքների SR կոդերի ցանկը։",
+    "SR-7 կամ r7 — ուղարկել ընթացիկ տվյալների PDF-ը և Telegram ձևի կոճակը։",
+    "/form SR-7 — ընթացիկ տվյալների PDF + Telegram ձևի կոճակ։",
+    "/sheet SR-7 — ուղարկել բաժանմունքի XLSX ֆայլը։",
+    "/departments — բաժանմունքների SR կոդերի ցանկը։",
     "",
-    "Фото и файлы:",
-    "Фото бланка — определить отделение, OCR и попросить заполнить форму.",
-    "XLSX-файл — проверить формулу старого Excel-способа.",
+    "Լուսանկարներ և ֆայլեր.",
+    "Բլանկի լուսանկար — որոշել բաժանմունքը, OCR անել և խնդրել լրացնել ձևը։",
+    "XLSX ֆայլ — ստուգել հին Excel տարբերակի բանաձևը։",
     "",
-    "Состояние:",
-    "/status — статус заполнения отделений.",
-    "/pdf или /done — ссылка на главный файл сайта.",
-    "/help — показать эту админскую справку.",
+    "Վիճակ.",
+    "/status — բաժանմունքների լրացման վիճակը։",
+    "/pdf կամ /done — գլխավոր ֆայլի հղումը։",
+    "/help — ցույց տալ այս ադմինիստրատորական օգնությունը։",
     "",
-    "Важно: /help и команды подключения коллег доступны только администратору."
+    "Կարևոր է. /help և կոլեգաների միացման հրամանները հասանելի են միայն ադմինիստրատորին։"
   ].join("\n");
 }
 
@@ -2370,27 +2887,27 @@ function buildHelpText() {
   return [
     "SARSH_KKZH Telegram bot",
     "",
-    "Отправьте фото бланка, и бот попробует:",
-    "1. определить отделение",
-    "2. распознать цифры",
-    "3. сохранить их в систему",
+    "Ուղարկեք բլանկի լուսանկարը, և բոտը կփորձի.",
+    "1. որոշել բաժանմունքը",
+    "2. ճանաչել թվերը",
+    "3. պահպանել տվյալները համակարգում",
     "",
-    "Команды:",
-    "/status — текущее состояние сводки",
-    "/departments — список кодов отделений",
-    "/pdf — ссылка на главный файл",
-    "/done — то же, что /pdf",
-    "/form SR-4 — получить PDF текущих данных и открыть Telegram Web App форму",
-    "/sheet SR-4 — получить старый XLSX-файл",
+    "Հրամաններ.",
+    "/status — ամփոփագրի ընթացիկ վիճակը",
+    "/departments — բաժանմունքների կոդերի ցանկը",
+    "/pdf — գլխավոր ֆայլի հղումը",
+    "/done — նույնն է, ինչ /pdf",
+    "/form SR-4 — ստանալ ընթացիկ տվյալների PDF-ը և բացել Telegram Web App ձևը",
+    "/sheet SR-4 — ստանալ հին XLSX ֆայլը",
     "",
-    "Чтобы получить форму отделения, отправьте код или название отделения отдельным сообщением: `r4`, `SR-4`.",
-    "Подсказка: можно добавить в подпись к фото `r4` или `SR-4`, чтобы явно указать отделение."
+    "Բաժանմունքի ձևը ստանալու համար առանձին հաղորդագրությամբ ուղարկեք կոդը կամ անունը՝ `r4`, `SR-4`։",
+    "Հուշում. լուսանկարի ստորագրության մեջ կարելի է ավելացնել `r4` կամ `SR-4`, որպեսզի բաժանմունքը հստակ նշվի։"
   ].join("\n");
 }
 
 function buildDepartmentsText() {
   const lines = Object.entries(DEPARTMENTS).map(([id, meta]) => `${id} — ${meta.department} (${meta.marker})`);
-  return ["Доступные отделения:", ...lines].join("\n");
+  return ["Հասանելի բաժանմունքներ.", ...lines].join("\n");
 }
 
 function sanitizeSheetFileNamePart(value: string) {
@@ -3364,6 +3881,32 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "daily_reminder_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
+    }
+
+    if (action === "send-main-pdfs") {
+      if (!isTelegramReminderRequestValid(request)) {
+        return jsonResponse({ ok: false, error: "Invalid reminder secret." }, 403);
+      }
+      try {
+        const forceRaw = (currentUrl.searchParams.get("force") || "").trim().toLowerCase();
+        const force = forceRaw === "1" || forceRaw === "true" || forceRaw === "yes";
+        const source = currentUrl.searchParams.get("source") === "manual" ? "manual" : "morning";
+        const supabase = createSupabaseAdmin();
+        const result = await sendMainPdfsToTelegram(supabase, { force, source });
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          action,
+          result
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "main_pdfs_failed",
           error: error instanceof Error ? error.message : String(error)
         }, 500);
       }
