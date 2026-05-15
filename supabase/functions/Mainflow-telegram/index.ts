@@ -13,6 +13,7 @@ const TELEGRAM_RETRY_ATTEMPTS = 3;
 const TELEGRAM_RETRY_BASE_DELAY_MS = 700;
 const TELEGRAM_COLLEAGUES_META_KEY = "telegram_colleagues_access";
 const TELEGRAM_COLLEAGUE_CHATS_META_KEY = "telegram_colleague_chats";
+const TELEGRAM_PENDING_COLLEAGUE_CHATS_META_KEY = "telegram_pending_colleague_chats";
 const TELEGRAM_DAILY_REMINDER_META_PREFIX = "telegram_daily_reminder_sent";
 const TELEGRAM_MAIN_PDFS_META_KEY = "telegram_main_pdfs_sent";
 const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
@@ -1121,6 +1122,190 @@ async function saveTelegramColleagueChats(
   }
 }
 
+async function loadTelegramPendingColleagueChats(supabase: ReturnType<typeof createClient>) {
+  const { data, error } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date")
+    .eq("report_key", TELEGRAM_PENDING_COLLEAGUE_CHATS_META_KEY)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return parseTelegramColleagueChats(data?.report_date);
+}
+
+async function saveTelegramPendingColleagueChats(
+  supabase: ReturnType<typeof createClient>,
+  chats: TelegramColleagueChat[]
+) {
+  const uniqueChats = Array.from(new Map(chats.map((item) => [item.chatId, item])).values());
+  const { error } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: TELEGRAM_PENDING_COLLEAGUE_CHATS_META_KEY,
+      report_date: JSON.stringify(uniqueChats),
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    throw error;
+  }
+}
+
+function getTelegramPersonFromMessage(
+  message: Record<string, unknown>,
+  fallbackChatId: number | string
+): TelegramColleagueChat {
+  const from = message.from as {
+    id?: unknown;
+    first_name?: unknown;
+    last_name?: unknown;
+    username?: unknown;
+  } | undefined;
+  const chatId = typeof from?.id === "number" || typeof from?.id === "string"
+    ? String(from.id)
+    : String(fallbackChatId);
+  return {
+    chatId,
+    firstName: typeof from?.first_name === "string" ? from.first_name.trim() : "",
+    lastName: typeof from?.last_name === "string" ? from.last_name.trim() : "",
+    username: typeof from?.username === "string" ? from.username.trim() : "",
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function getTelegramColleagueDisplayName(record: TelegramColleagueChat) {
+  const fullName = [record.firstName, record.lastName].filter(Boolean).join(" ").trim();
+  return fullName || (record.username ? `@${record.username}` : `id ${record.chatId}`);
+}
+
+function getTelegramColleagueFirstName(record: TelegramColleagueChat) {
+  return record.firstName || (record.username ? `@${record.username}` : "коллега");
+}
+
+function buildColleagueApprovalReplyMarkup(chatId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Одобрить", callback_data: `approve_colleague:${chatId}` },
+        { text: "Отклонить", callback_data: `reject_colleague:${chatId}` }
+      ]
+    ]
+  };
+}
+
+async function isTelegramColleagueApproved(
+  supabase: ReturnType<typeof createClient>,
+  chatId: number | string
+) {
+  const normalizedChatId = String(chatId);
+  if (getTelegramAllowedChatIds().includes(normalizedChatId)) {
+    return true;
+  }
+  const storedChats = await loadTelegramColleagueChats(supabase);
+  return storedChats.some((item) => item.chatId === normalizedChatId);
+}
+
+async function requestTelegramColleagueApproval(
+  supabase: ReturnType<typeof createClient>,
+  message: Record<string, unknown>,
+  chatId: number | string
+) {
+  const candidate = getTelegramPersonFromMessage(message, chatId);
+  const pendingChats = await loadTelegramPendingColleagueChats(supabase);
+  const alreadyPending = pendingChats.some((item) => item.chatId === candidate.chatId);
+
+  if (!alreadyPending) {
+    await saveTelegramPendingColleagueChats(
+      supabase,
+      [candidate, ...pendingChats.filter((item) => item.chatId !== candidate.chatId)]
+    );
+
+    const adminChatIds = getTelegramAdminChatIds();
+    if (adminChatIds.length) {
+      const adminText = [
+        "Новая заявка на подключение к Mainflow боту.",
+        `Пользователь: ${getTelegramColleagueDisplayName(candidate)}`,
+        candidate.username ? `Username: @${candidate.username}` : "",
+        `Chat ID: ${candidate.chatId}`,
+        `Время: ${getYerevanDateTimeText()}`,
+        "",
+        "Разрешить этому коллеге работать с ботом?"
+      ].filter(Boolean).join("\n");
+      for (const adminChatId of adminChatIds) {
+        await sendTelegramMessageWithReplyMarkup(
+          adminChatId,
+          adminText,
+          buildColleagueApprovalReplyMarkup(candidate.chatId)
+        ).catch((error) => {
+          console.error("Failed to send Telegram access request:", sanitizePublicErrorMessage(error));
+        });
+      }
+    }
+  }
+
+  const firstName = getTelegramColleagueFirstName(candidate);
+  await sendTelegramMessage(
+    chatId,
+    [
+      `${firstName}, заявку на подключение я отправил Вадиму Ашотичу.`,
+      "Пока он не нажмёт «Одобрить», рабочие команды закрыты.",
+      "Немного охраны на входе: данные любят порядок, а я люблю, когда всё спокойно и красиво."
+    ].join("\n")
+  );
+}
+
+async function approveTelegramColleague(
+  supabase: ReturnType<typeof createClient>,
+  targetChatId: string
+) {
+  const pendingChats = await loadTelegramPendingColleagueChats(supabase);
+  const approvedChats = await loadTelegramColleagueChats(supabase);
+  const pending = pendingChats.find((item) => item.chatId === targetChatId);
+  const existing = approvedChats.find((item) => item.chatId === targetChatId);
+  const record = {
+    ...(pending || existing || {
+      chatId: targetChatId,
+      firstName: "",
+      lastName: "",
+      username: "",
+      updatedAt: ""
+    }),
+    updatedAt: new Date().toISOString()
+  };
+
+  await saveTelegramColleagueChats(
+    supabase,
+    [record, ...approvedChats.filter((item) => item.chatId !== targetChatId)]
+  );
+  await saveTelegramPendingColleagueChats(
+    supabase,
+    pendingChats.filter((item) => item.chatId !== targetChatId)
+  );
+  return record;
+}
+
+async function rejectTelegramColleague(
+  supabase: ReturnType<typeof createClient>,
+  targetChatId: string
+) {
+  const pendingChats = await loadTelegramPendingColleagueChats(supabase);
+  const pending = pendingChats.find((item) => item.chatId === targetChatId);
+  await saveTelegramPendingColleagueChats(
+    supabase,
+    pendingChats.filter((item) => item.chatId !== targetChatId)
+  );
+  return pending || {
+    chatId: targetChatId,
+    firstName: "",
+    lastName: "",
+    username: "",
+    updatedAt: new Date().toISOString()
+  };
+}
+
 async function rememberTelegramColleagueChat(
   supabase: ReturnType<typeof createClient>,
   message: Record<string, unknown>,
@@ -1264,7 +1449,7 @@ async function isTelegramUserAllowedByRuntimeState(
   if (!await areTelegramColleaguesEnabled(supabase)) {
     return false;
   }
-  return isAllowedChat(Number(chatId));
+  return await isTelegramColleagueApproved(supabase, chatId);
 }
 
 async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
@@ -2265,6 +2450,24 @@ async function sendTelegramMessageWithReplyMarkup(
   });
 }
 
+async function answerTelegramCallbackQuery(callbackQueryId: string, text: string) {
+  await callTelegramApi("answerCallbackQuery", {
+    callback_query_id: callbackQueryId,
+    text
+  });
+}
+
+async function clearTelegramInlineKeyboard(chatId: number | string, messageId: number | null) {
+  if (messageId === null) {
+    return;
+  }
+  await callTelegramApi("editMessageReplyMarkup", {
+    chat_id: chatId,
+    message_id: messageId,
+    reply_markup: { inline_keyboard: [] }
+  });
+}
+
 async function sendTelegramMessageToMany(chatIds: Array<number | string>, text: string) {
   for (const chatId of chatIds) {
     try {
@@ -3016,7 +3219,7 @@ async function repairTelegramWebhook(request: Request) {
     : `${currentUrl.origin}${currentUrl.pathname}`;
   return await callTelegramApi("setWebhook", {
     url: webhookUrl,
-    allowed_updates: ["message", "edited_message"]
+    allowed_updates: ["message", "edited_message", "callback_query"]
   });
 }
 
@@ -3134,9 +3337,13 @@ function isSrDepartmentsListRequest(text: string) {
   return /^sr\s*[- ]?\?$/i.test(text.trim());
 }
 
-function buildColleagueStartText() {
+function buildColleagueStartText(firstName = "") {
+  const greeting = firstName
+    ? `Բարև, ${firstName}։ Սա Mainflow բոտն է բաժանմունքների տվյալները ուղարկելու համար։`
+    : "Բարև Ձեզ։ Սա Mainflow բոտն է բաժանմունքների տվյալները ուղարկելու համար։";
   return [
-    "Բարև Ձեզ։ Սա Mainflow բոտն է բաժանմունքների տվյալները ուղարկելու համար։",
+    greeting,
+    "Ուրախ եմ օգնել. եթե լուսանկարը մի քիչ կամակոր լինի, միասին կհաղթենք։",
     "",
     "Ինչպես աշխատել.",
     "1. Ուղարկեք բաժանմունքի կոդը, օրինակ՝ SR-7։",
@@ -3155,9 +3362,9 @@ function buildAdminHelpText() {
     "Mainflow Telegram բոտի հրամանները",
     "",
     "Կոլեգաների հասանելիություն.",
-    "/kollegi_on — միացնել կոլեգաներին. բոտը ընդունում է հաղորդագրություններ հղումով։",
-    "/kollegi_off — անջատել կոլեգաներին. բոտը լսում է միայն ադմինիստրատորին։",
-    "/kollegi_status — ստուգել՝ կոլեգաները միացված են, թե ոչ։",
+    "/kollegi_on — միացնել հաստատված կոլեգաներին. նոր օգտվողները նախ գալիս են Ձեր հաստատմանը։",
+    "/kollegi_off — անջատել կոլեգաների աշխատանքը. բոտը լսում է միայն ադմինիստրատորին։",
+    "/kollegi_status — ստուգել միացված/անջատված վիճակը և սպասող հայտերի քանակը։",
     "/reminder_12 — ձեռքով ուղարկել 14։00-ի հիշեցումը կոլեգաներին։",
     "/reminder_17 — ձեռքով ուղարկել 18։00-ի հիշեցումը կոլեգաներին։",
     "",
@@ -3745,10 +3952,12 @@ function buildPhotoSenderResponse(
   isControlPassed: boolean,
   validation: { isValid: boolean; actual: number; expected: number } | null,
   structureInvalid: boolean,
-  hasRecognizedValues: boolean
+  hasRecognizedValues: boolean,
+  firstName = ""
 ) {
   if (isControlPassed) {
-    return "Спасибо, контроль отделения пройден. 🙂";
+    const address = firstName ? `${firstName}, ` : "";
+    return `${address}спасибо, контроль отделения пройден. Отличная работа. 🙂`;
   }
 
   const reason = !hasRecognizedValues
@@ -3757,14 +3966,16 @@ function buildPhotoSenderResponse(
       ? "верхняя строка бланка распознана неуверенно"
       : (validation && !validation.isValid ? "формула отделения не совпала" : "контроль не пройден"));
 
-  return buildPhotoRetakeResponse(reason);
+  return buildPhotoRetakeResponse(reason, firstName);
 }
 
-function buildPhotoRetakeResponse(reason: string) {
+function buildPhotoRetakeResponse(reason: string, firstName = "") {
+  const address = firstName ? `${firstName}, ` : "";
   return [
-    "Контроль отделения не пройден.",
+    `${address}контроль отделения не пройден, но это поправимо.`,
     `Причина: ${reason}.`,
-    "Пожалуйста, пришлите повторный качественный снимок бланка: ровно, без обрезанных краёв, чтобы SR-маркер и верхняя строка с ячейками были хорошо видны."
+    "Пожалуйста, пришлите повторный качественный снимок бланка: ровно, без обрезанных краёв, чтобы SR-маркер и верхняя строка с ячейками были хорошо видны.",
+    "Маленькая хитрость: лучше чуть дальше и ровнее, чем близко и под углом. OCR тогда меньше ворчит и больше помогает."
   ].join("\n");
 }
 
@@ -3912,10 +4123,94 @@ function isTelegramReminderRequestValid(request: Request) {
   return actual.trim() === expected;
 }
 
+async function handleTelegramCallbackQuery(
+  supabase: ReturnType<typeof createClient>,
+  callbackQuery: Record<string, unknown>
+) {
+  const callbackQueryId = typeof callbackQuery.id === "string" ? callbackQuery.id : "";
+  const data = typeof callbackQuery.data === "string" ? callbackQuery.data : "";
+  const from = callbackQuery.from as { id?: unknown } | undefined;
+  const adminChatId = typeof from?.id === "number" || typeof from?.id === "string" ? String(from.id) : "";
+  const callbackMessage = callbackQuery.message as Record<string, unknown> | undefined;
+  const callbackMessageChatId = callbackMessage ? getMessageChatId(callbackMessage) : null;
+  const callbackMessageId = callbackMessage ? getTelegramMessageId(callbackMessage) : null;
+
+  if (!callbackQueryId || !data) {
+    return;
+  }
+
+  if (!isTelegramAdminChat(adminChatId)) {
+    await answerTelegramCallbackQuery(callbackQueryId, "Эта кнопка доступна только администратору.").catch(() => null);
+    return;
+  }
+
+  const match = data.match(/^(approve_colleague|reject_colleague):(.+)$/);
+  if (!match) {
+    await answerTelegramCallbackQuery(callbackQueryId, "Неизвестное действие.").catch(() => null);
+    return;
+  }
+
+  const action = match[1];
+  const targetChatId = match[2].trim();
+  if (!targetChatId) {
+    await answerTelegramCallbackQuery(callbackQueryId, "Не найден chat id пользователя.").catch(() => null);
+    return;
+  }
+
+  if (action === "approve_colleague") {
+    const colleague = await approveTelegramColleague(supabase, targetChatId);
+    const enabled = await areTelegramColleaguesEnabled(supabase);
+    await answerTelegramCallbackQuery(callbackQueryId, "Коллега одобрен.").catch(() => null);
+    if (callbackMessageChatId !== null) {
+      await clearTelegramInlineKeyboard(callbackMessageChatId, callbackMessageId).catch(() => null);
+      await sendTelegramMessage(
+        callbackMessageChatId,
+        [
+          `Одобрено: ${getTelegramColleagueDisplayName(colleague)}.`,
+          enabled
+            ? "Доступ открыт, бот примет его рабочие сообщения."
+            : "Коллега добавлен в список, но общий доступ сейчас выключен. Для работы коллег включите /kollegi_on."
+        ].join("\n")
+      );
+    }
+    await sendTelegramMessage(
+      targetChatId,
+      [
+        `${getTelegramColleagueFirstName(colleague)}, доступ к Mainflow боту открыт.`,
+        "Добро пожаловать. Я уже на посту: принимаю фото бланков, формы и ночную смену.",
+        "Если что-то не получится с первого кадра, не переживайте: я подскажу, как снять лучше. У нас тут не экзамен по фотографии, а командная работа."
+      ].join("\n")
+    ).catch((error) => {
+      console.error("Failed to notify approved Telegram colleague:", sanitizePublicErrorMessage(error));
+    });
+    return;
+  }
+
+  const colleague = await rejectTelegramColleague(supabase, targetChatId);
+  await answerTelegramCallbackQuery(callbackQueryId, "Заявка отклонена.").catch(() => null);
+  if (callbackMessageChatId !== null) {
+    await clearTelegramInlineKeyboard(callbackMessageChatId, callbackMessageId).catch(() => null);
+    await sendTelegramMessage(
+      callbackMessageChatId,
+      `Отклонено: ${getTelegramColleagueDisplayName(colleague)}.`
+    );
+  }
+  await sendTelegramMessage(
+    targetChatId,
+    [
+      `${getTelegramColleagueFirstName(colleague)}, сейчас доступ к Mainflow боту не одобрен.`,
+      "Если доступ действительно нужен, пожалуйста, обратитесь к Вадиму Ашотичу."
+    ].join("\n")
+  ).catch((error) => {
+    console.error("Failed to notify rejected Telegram colleague:", sanitizePublicErrorMessage(error));
+  });
+}
+
 async function handleTelegramCommand(
   supabase: ReturnType<typeof createClient>,
   chatId: number,
-  text: string
+  text: string,
+  message?: Record<string, unknown>
 ) {
   const command = text.trim().split(/\s+/)[0].toLowerCase();
 
@@ -3925,7 +4220,7 @@ async function handleTelegramCommand(
       return;
     }
     await setTelegramColleaguesEnabled(supabase, true);
-    await sendTelegramMessage(chatId, "Коллеги подключены. Бот снова принимает сообщения от всех, кто откроет его по ссылке.");
+    await sendTelegramMessage(chatId, "Коллеги подключены. Бот принимает сообщения только от одобренных коллег; новые люди по ссылке сначала попадут к вам на одобрение.");
     return;
   }
 
@@ -3935,7 +4230,7 @@ async function handleTelegramCommand(
       return;
     }
     await setTelegramColleaguesEnabled(supabase, false);
-    await sendTelegramMessage(chatId, "Коллеги отключены. Теперь бот принимает сообщения только от администратора.");
+    await sendTelegramMessage(chatId, "Коллеги отключены. Теперь бот принимает рабочие сообщения только от администратора. Заявки можно одобрять, но коллеги начнут работать после /kollegi_on.");
     return;
   }
 
@@ -3945,11 +4240,17 @@ async function handleTelegramCommand(
       return;
     }
     const enabled = await areTelegramColleaguesEnabled(supabase);
+    const approvedCount = (await loadTelegramColleagueChats(supabase)).length;
+    const pendingCount = (await loadTelegramPendingColleagueChats(supabase)).length;
     await sendTelegramMessage(
       chatId,
-      enabled
-        ? "Коллеги сейчас подключены: бот принимает сообщения по ссылке."
-        : "Коллеги сейчас отключены: бот слушает только администратора."
+      [
+        enabled
+          ? "Коллеги сейчас подключены: бот принимает сообщения от одобренных коллег."
+          : "Коллеги сейчас отключены: бот слушает только администратора.",
+        `Одобрено коллег: ${approvedCount}.`,
+        `Ожидают вашего решения: ${pendingCount}.`
+      ].join("\n")
     );
     return;
   }
@@ -3975,7 +4276,8 @@ async function handleTelegramCommand(
   }
 
   if (command === "/start") {
-    await sendTelegramMessage(chatId, buildColleagueStartText());
+    const person = message ? getTelegramPersonFromMessage(message, chatId) : null;
+    await sendTelegramMessage(chatId, buildColleagueStartText(person ? getTelegramColleagueFirstName(person) : ""));
     return;
   }
 
@@ -4054,8 +4356,13 @@ async function handleTelegramPhoto(
   const hintText = getMessageText(message);
   const hintedDepartmentId = detectDepartmentFromHint(hintText);
   const hintedReportDate = detectReportDateFromHint(hintText);
+  const senderPerson = getTelegramPersonFromMessage(message, chatId);
+  const senderFirstName = getTelegramColleagueFirstName(senderPerson);
 
-  await sendTelegramMessage(chatId, "Фото получено. Обрабатываю...");
+  await sendTelegramMessage(
+    chatId,
+    `${senderFirstName}, фото получил. Сейчас аккуратно читаю бланк. Если что, я не ругаюсь — просто подскажу, как снять лучше.`
+  );
 
   const sourceMessageId = getTelegramMessageId(message);
   const photoNotifyChatIds = getTelegramNotifyChatIds(chatId)
@@ -4093,7 +4400,7 @@ async function handleTelegramPhoto(
       }
       await sendTelegramMessage(
         chatId,
-        buildPhotoRetakeResponse("не удалось уверенно определить отделение по фото")
+        buildPhotoRetakeResponse("не удалось уверенно определить отделение по фото", senderFirstName)
       );
       return;
     }
@@ -4147,7 +4454,7 @@ async function handleTelegramPhoto(
     chatId,
     departmentId,
     reportDate,
-    buildPhotoSenderResponse(isPhotoControlPassed, photoValidation, structureInvalid, hasRecognizedValues)
+    buildPhotoSenderResponse(isPhotoControlPassed, photoValidation, structureInvalid, hasRecognizedValues, senderFirstName)
   );
 }
 
@@ -4216,6 +4523,13 @@ async function handleTelegramSheetDocument(
 }
 
 async function processTelegramUpdate(update: Record<string, unknown>) {
+  const callbackQuery = update.callback_query as Record<string, unknown> | undefined;
+  if (callbackQuery && typeof callbackQuery === "object") {
+    const supabase = createSupabaseAdmin();
+    await handleTelegramCallbackQuery(supabase, callbackQuery);
+    return;
+  }
+
   const message = (update.message || update.edited_message) as Record<string, unknown> | undefined;
   if (!message || typeof message !== "object") {
     return;
@@ -4229,7 +4543,7 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
   const supabase = createSupabaseAdmin();
   const safeChatId = chatId as number;
   if (!await isTelegramUserAllowedByRuntimeState(supabase, safeChatId)) {
-    await sendTelegramMessage(safeChatId, "Бот временно отключён для коллег. Обратитесь к администратору.");
+    await requestTelegramColleagueApproval(supabase, message, safeChatId);
     return;
   }
 
@@ -4242,7 +4556,7 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
   const text = getMessageText(message);
 
   if (text.startsWith("/")) {
-    await handleTelegramCommand(supabase, safeChatId, text);
+    await handleTelegramCommand(supabase, safeChatId, text, message);
     return;
   }
 
