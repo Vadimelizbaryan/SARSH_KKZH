@@ -9,7 +9,7 @@
   }
 
   const queryParams = new URLSearchParams(window.location.search);
-  if (queryParams.get("view") === "night") {
+  if (["night", "day"].includes(queryParams.get("view") || "")) {
     return;
   }
 
@@ -42,6 +42,7 @@
   const SAVE_VERIFICATION_DELAY_MS = 700;
   const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
   const NIGHT_SHIFT_FILENAME = "index.html";
+  const DAY_SHIFT_FILENAME = "index.html";
   const PHOTO_FIELD_DEFINITIONS = [
     { cell: 1, key: "beenTotal", label: "1" },
     { cell: 2, key: "beenSoldier", label: "2" },
@@ -3137,6 +3138,14 @@
     return appendShareQuery(`${prefix}${NIGHT_SHIFT_FILENAME}?view=night`);
   }
 
+  function getDayShiftPath() {
+    if (basePath === "@site") {
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent(DAY_SHIFT_FILENAME)}&view=day`);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return appendShareQuery(`${prefix}${DAY_SHIFT_FILENAME}?view=day`);
+  }
+
   function buildHospitalReportData(snapshot) {
     const primaryRows = snapshot.rows.filter((row) => row.group === "primary");
     const subtotal = (key) => getSummaryValue(snapshot, primaryRows, key);
@@ -3600,6 +3609,7 @@
             </div>
             <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR feedback</a>
             <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Ночная смена</a>
+            <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Дневная смена</a>
             <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Отчётный лист</a>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="refreshBtn">Обновить</button>

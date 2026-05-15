@@ -41,6 +41,8 @@ const PHOTO_FEEDBACK_VALUE_KEYS = new Set<string>([...VALUE_KEYS, "presentTotal"
 const NIGHT_SHIFT_VALUE_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"] as const;
 const NIGHT_SHIFT_ROW_PREFIX = "night:";
 const NIGHT_SHIFT_META_KEY = "night_shift";
+const DAY_SHIFT_ROW_PREFIX = "day:";
+const DAY_SHIFT_META_KEY = "day_shift";
 
 const PHOTO_FIELD_MAPPINGS = [
   { cell: 1, key: "beenTotal", label: "been / total" },
@@ -177,6 +179,10 @@ function getNightShiftRowId(departmentId: string) {
   return `${NIGHT_SHIFT_ROW_PREFIX}${departmentId}`;
 }
 
+function getDayShiftRowId(departmentId: string) {
+  return `${DAY_SHIFT_ROW_PREFIX}${departmentId}`;
+}
+
 function addValue(values: Record<string, number | null>, key: string, amount: number) {
   values[key] = safeNumber(values[key]) + safeNumber(amount);
 }
@@ -212,6 +218,14 @@ function applyNightShiftValues(
   addValue(output, "admittedTotal", nightTotal);
   addValue(output, "admittedSoldier", n1 + n2 + n3);
   return output;
+}
+
+function applyDayShiftValues(
+  values: Record<string, unknown> | null | undefined,
+  dayRow: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number> | undefined
+) {
+  // Day-shift admissions currently follow the same transfer formula as night shift.
+  return applyNightShiftValues(values, dayRow);
 }
 
 function sanitizeRightCellValues(value: unknown) {
@@ -1191,6 +1205,85 @@ async function clearNightShiftDraft(
   return await saveNightShiftDraft(supabase, {}, reportDateTime);
 }
 
+async function loadDayShiftDraft(supabase: ReturnType<typeof createClient>) {
+  const rowIds = Object.keys(DEPARTMENTS).map(getDayShiftRowId);
+  const { data: dayRows, error: rowsError } = await supabase
+    .from("sharsh_departments")
+    .select("department_id, values, updated_at")
+    .in("department_id", rowIds);
+
+  if (rowsError) {
+    throw rowsError;
+  }
+
+  const { data: metaRow, error: metaError } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date, updated_at")
+    .eq("report_key", DAY_SHIFT_META_KEY)
+    .maybeSingle();
+
+  if (metaError) {
+    throw metaError;
+  }
+
+  const map = new Map((dayRows || []).map((row) => [row.department_id, row]));
+  const rows = Object.fromEntries(Object.keys(DEPARTMENTS).map((departmentId) => {
+    const saved = map.get(getDayShiftRowId(departmentId));
+    return [departmentId, sanitizeNightShiftRows({ [departmentId]: saved?.values })[departmentId]];
+  }));
+
+  return {
+    reportDateTime: metaRow?.report_date || DEFAULT_DATE,
+    savedAt: metaRow?.updated_at || null,
+    rows
+  };
+}
+
+async function saveDayShiftDraft(
+  supabase: ReturnType<typeof createClient>,
+  rows: unknown,
+  reportDateTime: string
+) {
+  const dayRows = sanitizeNightShiftRows(rows);
+  const now = new Date().toISOString();
+  const updates = Object.entries(DEPARTMENTS).map(([departmentId, meta]) => ({
+    department_id: getDayShiftRowId(departmentId),
+    department_name: meta.department,
+    department_group: "day_shift",
+    values: dayRows[departmentId],
+    updated_at: now
+  }));
+
+  const { error: rowsError } = await supabase
+    .from("sharsh_departments")
+    .upsert(updates);
+
+  if (rowsError) {
+    throw rowsError;
+  }
+
+  const { error: metaError } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: DAY_SHIFT_META_KEY,
+      report_date: reportDateTime || DEFAULT_DATE,
+      updated_at: now
+    });
+
+  if (metaError) {
+    throw metaError;
+  }
+
+  return await loadDayShiftDraft(supabase);
+}
+
+async function clearDayShiftDraft(
+  supabase: ReturnType<typeof createClient>,
+  reportDateTime: string
+) {
+  return await saveDayShiftDraft(supabase, {}, reportDateTime);
+}
+
 async function listOcrFeedbackRecords(supabase: ReturnType<typeof createClient>, limit: number) {
   const safeLimit = Math.min(200, Math.max(1, Math.trunc(limit || 100)));
   const { data, error } = await supabase
@@ -1509,6 +1602,24 @@ Deno.serve(async (request) => {
       return jsonResponse(await clearNightShiftDraft(supabase, reportDateTime));
     }
 
+    if (type === "load_day_shift") {
+      return jsonResponse(await loadDayShiftDraft(supabase));
+    }
+
+    if (type === "save_day_shift") {
+      const reportDateTime = typeof payload.reportDateTime === "string" && payload.reportDateTime.trim()
+        ? payload.reportDateTime.trim()
+        : DEFAULT_DATE;
+      return jsonResponse(await saveDayShiftDraft(supabase, payload.rows, reportDateTime));
+    }
+
+    if (type === "clear_day_shift") {
+      const reportDateTime = typeof payload.reportDateTime === "string" && payload.reportDateTime.trim()
+        ? payload.reportDateTime.trim()
+        : DEFAULT_DATE;
+      return jsonResponse(await clearDayShiftDraft(supabase, reportDateTime));
+    }
+
     if (type === "apply_night_shift") {
       const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()
         ? payload.reportDate.trim()
@@ -1554,6 +1665,54 @@ Deno.serve(async (request) => {
       }
 
       await clearNightShiftDraft(supabase, reportDate);
+      return jsonResponse(await loadSnapshot(supabase));
+    }
+
+    if (type === "apply_day_shift") {
+      const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()
+        ? payload.reportDate.trim()
+        : DEFAULT_DATE;
+      const dayRows = sanitizeNightShiftRows(payload.rows);
+      const snapshot = await loadSnapshot(supabase);
+      const now = new Date().toISOString();
+      const updates = snapshot.rows.flatMap((row) => {
+        const values = applyDayShiftValues(row.values, dayRows[row.id]);
+        if (!values) {
+          return [];
+        }
+        const departmentMeta = DEPARTMENTS[row.id as keyof typeof DEPARTMENTS];
+        return [{
+          department_id: row.id,
+          department_name: departmentMeta.department,
+          department_group: departmentMeta.group,
+          values,
+          updated_at: now
+        }];
+      });
+
+      if (updates.length) {
+        const { error } = await supabase
+          .from("sharsh_departments")
+          .upsert(updates);
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      const { error: metaError } = await supabase
+        .from("sharsh_report_meta")
+        .upsert({
+          report_key: "main",
+          report_date: reportDate,
+          updated_at: now
+        });
+
+      if (metaError) {
+        throw metaError;
+      }
+
+      await clearDayShiftDraft(supabase, reportDate);
       return jsonResponse(await loadSnapshot(supabase));
     }
 

@@ -565,6 +565,104 @@
     };
   }
 
+  function applyDayShiftRowsToSnapshot(snapshot, rows, reportDate) {
+    // Day-shift admissions currently follow the same transfer formula as night shift.
+    return applyNightShiftRowsToSnapshot(snapshot, rows, reportDate);
+  }
+
+  async function applyDayShiftToMain(rows, reportDate) {
+    const dayRows = sanitizeNightShiftRows(rows);
+
+    if (hasRemoteSync()) {
+      const snapshot = await postRemote({
+        type: "apply_day_shift",
+        reportDate,
+        rows: dayRows
+      });
+      return {
+        snapshot,
+        source: "remote"
+      };
+    }
+
+    const snapshot = applyDayShiftRowsToSnapshot(loadLocalSnapshot(), dayRows, reportDate);
+    writeLocalSnapshot(snapshot);
+    return {
+      snapshot,
+      source: "local-only"
+    };
+  }
+
+  function normalizeDayShiftDraft(payload) {
+    return {
+      reportDateTime: typeof payload?.reportDateTime === "string" ? payload.reportDateTime : "",
+      savedAt: typeof payload?.savedAt === "string" ? payload.savedAt : "",
+      rows: sanitizeNightShiftRows(payload?.rows)
+    };
+  }
+
+  async function loadDayShiftDraft() {
+    if (!hasRemoteSync()) {
+      return {
+        draft: normalizeDayShiftDraft(null),
+        source: "local-only"
+      };
+    }
+
+    const payload = await postRemotePayload(
+      { type: "load_day_shift" },
+      "Не удалось загрузить дневную смену"
+    );
+    return {
+      draft: normalizeDayShiftDraft(payload),
+      source: "remote"
+    };
+  }
+
+  async function saveDayShiftDraft(rows, reportDateTime) {
+    const dayRows = sanitizeNightShiftRows(rows);
+    if (!hasRemoteSync()) {
+      return {
+        draft: normalizeDayShiftDraft({ rows: dayRows, reportDateTime }),
+        source: "local-only"
+      };
+    }
+
+    const payload = await postRemotePayload(
+      {
+        type: "save_day_shift",
+        reportDateTime,
+        rows: dayRows
+      },
+      "Не удалось сохранить дневную смену"
+    );
+    return {
+      draft: normalizeDayShiftDraft(payload),
+      source: "remote"
+    };
+  }
+
+  async function clearDayShiftDraft(reportDateTime) {
+    if (!hasRemoteSync()) {
+      return {
+        draft: normalizeDayShiftDraft({ reportDateTime }),
+        source: "local-only"
+      };
+    }
+
+    const payload = await postRemotePayload(
+      {
+        type: "clear_day_shift",
+        reportDateTime
+      },
+      "Не удалось очистить дневную смену"
+    );
+    return {
+      draft: normalizeDayShiftDraft(payload),
+      source: "remote"
+    };
+  }
+
   async function listOcrFeedback(limit) {
     if (!hasRemoteSync()) {
       return [];
@@ -742,6 +840,10 @@
     loadNightShiftDraft,
     saveNightShiftDraft,
     clearNightShiftDraft,
+    applyDayShiftToMain,
+    loadDayShiftDraft,
+    saveDayShiftDraft,
+    clearDayShiftDraft,
     saveOcrFeedback,
     saveReportDate,
     notifyOwnerLogin,
