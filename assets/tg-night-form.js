@@ -75,6 +75,16 @@
     return rows;
   }
 
+  function readFilledRows() {
+    const rows = readRows();
+    return getDepartments()
+      .map((department) => ({
+        departmentId: department.id,
+        values: rows[department.id] || {}
+      }))
+      .filter((item) => columns.some((column) => toNumber(item.values[column.key]) > 0));
+  }
+
   function getRowTotal(departmentId) {
     return columns.reduce((sum, column) => {
       const input = root.querySelector(`[data-department="${departmentId}"][data-key="${column.key}"]`);
@@ -133,7 +143,8 @@
         body: JSON.stringify({
           initData: getInitData(),
           reportDateTime: getReportDateTime(),
-          rows: readRows()
+          rows: readRows(),
+          filledRows: readFilledRows()
         })
       });
       const payload = await response.json().catch(() => null);
@@ -141,8 +152,11 @@
         throw new Error(payload && payload.error ? payload.error : "Չհաջողվեց ուղարկել գիշերային ձևը։");
       }
       if (message) {
+        const countText = typeof payload.filledDepartments === "number"
+          ? ` Լրացված բաժանմունքներ՝ ${payload.filledDepartments}։`
+          : "";
         message.className = "tg-form-message success";
-        message.textContent = "Շնորհակալություն։ Տվյալները պահպանվել են և ամփոփումը ուղարկվել է։";
+        message.textContent = `Շնորհակալություն։ Տվյալները պահպանվել են և ամփոփումը ուղարկվել է։${countText}`;
       }
       if (telegram) {
         telegram.HapticFeedback && telegram.HapticFeedback.notificationOccurred("success");

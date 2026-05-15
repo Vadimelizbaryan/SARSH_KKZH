@@ -423,6 +423,35 @@ function sanitizeNightShiftRows(rows: unknown) {
   })) as Record<string, Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>>;
 }
 
+function normalizeNightShiftSubmittedRows(payload: Record<string, unknown> | null) {
+  const output = sanitizeNightShiftRows(payload?.rows);
+  const filledRows = payload?.filledRows;
+
+  if (Array.isArray(filledRows)) {
+    filledRows.forEach((item) => {
+      if (!item || typeof item !== "object") {
+        return;
+      }
+      const row = item as Record<string, unknown>;
+      const departmentId = typeof row.departmentId === "string" ? row.departmentId : "";
+      if (!Object.prototype.hasOwnProperty.call(DEPARTMENTS, departmentId)) {
+        return;
+      }
+      const values = row.values && typeof row.values === "object" ? row.values : {};
+      output[departmentId] = sanitizeNightShiftRows({ [departmentId]: values })[departmentId];
+    });
+  } else if (filledRows && typeof filledRows === "object") {
+    const normalizedFilledRows = sanitizeNightShiftRows(filledRows);
+    Object.entries(normalizedFilledRows).forEach(([departmentId, values]) => {
+      if (getNightShiftRowTotal(values) > 0) {
+        output[departmentId] = values;
+      }
+    });
+  }
+
+  return output;
+}
+
 function getNightShiftRowId(departmentId: string) {
   return `${NIGHT_SHIFT_ROW_PREFIX}${departmentId}`;
 }
@@ -1873,9 +1902,21 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
 async function saveNightShiftDraft(
   supabase: ReturnType<typeof createClient>,
   rows: unknown,
-  reportDateTime: string
+  reportDateTime: string,
+  options: { mergeExisting?: boolean } = {}
 ) {
-  const nightRows = sanitizeNightShiftRows(rows);
+  const submittedRows = sanitizeNightShiftRows(rows);
+  const nightRows = options.mergeExisting
+    ? await loadNightShiftDraftRows(supabase)
+    : submittedRows;
+  const departmentIdsToSave = options.mergeExisting
+    ? Object.keys(DEPARTMENTS).filter((departmentId) => getNightShiftRowTotal(submittedRows[departmentId]) > 0)
+    : Object.keys(DEPARTMENTS);
+
+  departmentIdsToSave.forEach((departmentId) => {
+    nightRows[departmentId] = submittedRows[departmentId];
+  });
+
   const now = new Date().toISOString();
   const updates = Object.entries(DEPARTMENTS).map(([departmentId, meta]) => ({
     department_id: getNightShiftRowId(departmentId),
@@ -1906,6 +1947,24 @@ async function saveNightShiftDraft(
   }
 
   return nightRows;
+}
+
+async function loadNightShiftDraftRows(supabase: ReturnType<typeof createClient>) {
+  const { data, error } = await supabase
+    .from("sharsh_departments")
+    .select("department_id, values")
+    .eq("department_group", "night_shift");
+
+  if (error) {
+    throw error;
+  }
+
+  const savedRows = Array.isArray(data) ? data as Array<Record<string, unknown>> : [];
+  const map = new Map(savedRows.map((row) => [String(row.department_id || ""), row]));
+  return Object.fromEntries(Object.keys(DEPARTMENTS).map((departmentId) => {
+    const saved = map.get(getNightShiftRowId(departmentId));
+    return [departmentId, sanitizeNightShiftRows({ [departmentId]: saved?.values })[departmentId]];
+  })) as Record<string, Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>>;
 }
 
 let armenianPdfFontBytesPromise: Promise<Uint8Array | null> | null = null;
@@ -4117,6 +4176,7 @@ function buildNightShiftSummaryText(
     "Գիշերային հերթափոխի տվյալներ են ստացվել։",
     `Ժամանակ: ${reportDateTime}`,
     userName ? `Ուղարկող: ${userName}` : "",
+    `Լրացված բաժանմունքներ: ${filledDepartments.length}`,
     "",
     "Ըստ բաժանմունքների.",
     ...departmentLines,
@@ -4257,10 +4317,12 @@ async function handleTelegramNightFormSubmit(request: Request) {
     const reportDateTime = typeof payload?.reportDateTime === "string" && payload.reportDateTime.trim()
       ? payload.reportDateTime.trim()
       : getYerevanDateTimeText();
+    const submittedRows = normalizeNightShiftSubmittedRows(payload);
     const rows = await saveNightShiftDraft(
       supabase as ReturnType<typeof createClient>,
-      payload?.rows,
-      reportDateTime
+      submittedRows,
+      reportDateTime,
+      { mergeExisting: true }
     );
     const userName = [
       verifiedUser.firstName,
@@ -4303,6 +4365,7 @@ async function handleTelegramNightFormSubmit(request: Request) {
     return jsonResponse({
       ok: true,
       message: "Գիշերային հերթափոխի տվյալները պահպանվել են։",
+      filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
       summary: summaryText
     });
   } catch (error) {
