@@ -1415,15 +1415,30 @@ function drawPdfCenteredText(
 }
 
 function getMainPdfPrintedAtText(date = new Date()) {
-  return new Intl.DateTimeFormat("en-US", {
+  const weekdays: Record<string, string> = {
+    Sunday: "Կիրակի",
+    Monday: "Երկուշաբթի",
+    Tuesday: "Երեքշաբթի",
+    Wednesday: "Չորեքշաբթի",
+    Thursday: "Հինգշաբթի",
+    Friday: "Ուրբաթ",
+    Saturday: "Շաբաթ"
+  };
+  const weekdayKey = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Yerevan",
+    weekday: "long"
+  }).format(date);
+  const parts = new Intl.DateTimeFormat("ru-RU", {
     timeZone: "Asia/Yerevan",
     year: "2-digit",
-    month: "numeric",
-    day: "numeric",
-    hour: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
     minute: "2-digit",
-    hour12: true
-  }).format(date).replace(/\u202f/g, " ");
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value || "";
+  return `${weekdays[weekdayKey] || weekdayKey} ${part("day")}.${part("month")}.${part("year")},${part("hour")}:${part("minute")}`;
 }
 
 async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
@@ -1576,7 +1591,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     fill: headerFill,
     border
   });
-  drawPdfCell(page, cellLabel("Ընդհանուր", "Total"), valueX(22), headerY3, valueWidth, headerHeight * 2, {
+  drawPdfCell(page, cellLabel("Ընդհ", "Total"), valueX(22), headerY3, valueWidth, headerHeight * 2, {
     font: fonts.bold,
     size: labelSize,
     align: "center",
