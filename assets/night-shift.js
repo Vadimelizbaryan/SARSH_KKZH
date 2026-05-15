@@ -111,6 +111,30 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
+  function applyDraft(draft) {
+    if (!draft || !draft.rows || typeof draft.rows !== "object") {
+      return false;
+    }
+    const rows = buildEmptyRows();
+    let hasRows = false;
+    config.departmentDefinitions.forEach((department) => {
+      NIGHT_COLUMNS.forEach((column) => {
+        const value = sanitizeNumber(draft.rows?.[department.id]?.[column.key]);
+        rows[department.id][column.key] = value;
+        hasRows = hasRows || value > 0;
+      });
+    });
+    state.rows = rows;
+    state.reportDateTime = typeof draft.reportDateTime === "string" && draft.reportDateTime.trim()
+      ? draft.reportDateTime.trim()
+      : state.reportDateTime;
+    state.savedAt = typeof draft.savedAt === "string" && draft.savedAt.trim()
+      ? draft.savedAt.trim()
+      : state.savedAt;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return hasRows;
+  }
+
   function clearNightRowsAfterTransfer() {
     state.reportDateTime = getYerevanDateTime();
     state.rows = buildEmptyRows();
@@ -224,7 +248,7 @@
           <div>
             <p class="night-kicker">Черновик перед утренним переносом</p>
             <h2>Добавляем только поступивших за ночь</h2>
-            <p>Логика переноса в основную таблицу будет добавлена позже. Сейчас страница сохраняет ночные значения локально.</p>
+            <p>Telegram форма сохраняет значения сюда. Перенос в основную таблицу выполняется только кнопкой Сохранить на этой странице.</p>
           </div>
           <div class="night-meta">
             <span>Дата и время</span>
@@ -329,6 +353,17 @@
   async function init() {
     if (window.SHARSH_AUTH_READY) {
       await window.SHARSH_AUTH_READY;
+    }
+    if (sync && typeof sync.hasRemoteSync === "function" && sync.hasRemoteSync() && typeof sync.loadNightShiftDraft === "function") {
+      try {
+        const result = await sync.loadNightShiftDraft();
+        const hasRows = applyDraft(result && result.draft);
+        if (hasRows) {
+          setStatus("Загружены данные ночной смены, отправленные через Telegram форму.", false);
+        }
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Не удалось загрузить ночную смену из Telegram формы.", true);
+      }
     }
     render();
   }

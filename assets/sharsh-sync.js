@@ -232,6 +232,25 @@
     return snapshot;
   }
 
+  async function postRemotePayload(body, fallbackMessage = "Ошибка синхронизации") {
+    ensureOwnerAuth();
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body)
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, fallbackMessage);
+    }
+
+    return payload;
+  }
+
   async function verifyDepartmentAccess(departmentId, accessCode) {
     ensureOwnerAuth();
     if (!hasRemoteSync()) {
@@ -476,6 +495,76 @@
     };
   }
 
+  function normalizeNightShiftDraft(payload) {
+    return {
+      reportDateTime: typeof payload?.reportDateTime === "string" ? payload.reportDateTime : "",
+      savedAt: typeof payload?.savedAt === "string" ? payload.savedAt : "",
+      rows: sanitizeNightShiftRows(payload?.rows)
+    };
+  }
+
+  async function loadNightShiftDraft() {
+    if (!hasRemoteSync()) {
+      return {
+        draft: normalizeNightShiftDraft(null),
+        source: "local-only"
+      };
+    }
+
+    const payload = await postRemotePayload(
+      { type: "load_night_shift" },
+      "Не удалось загрузить ночную смену"
+    );
+    return {
+      draft: normalizeNightShiftDraft(payload),
+      source: "remote"
+    };
+  }
+
+  async function saveNightShiftDraft(rows, reportDateTime) {
+    const nightRows = sanitizeNightShiftRows(rows);
+    if (!hasRemoteSync()) {
+      return {
+        draft: normalizeNightShiftDraft({ rows: nightRows, reportDateTime }),
+        source: "local-only"
+      };
+    }
+
+    const payload = await postRemotePayload(
+      {
+        type: "save_night_shift",
+        reportDateTime,
+        rows: nightRows
+      },
+      "Не удалось сохранить ночную смену"
+    );
+    return {
+      draft: normalizeNightShiftDraft(payload),
+      source: "remote"
+    };
+  }
+
+  async function clearNightShiftDraft(reportDateTime) {
+    if (!hasRemoteSync()) {
+      return {
+        draft: normalizeNightShiftDraft({ reportDateTime }),
+        source: "local-only"
+      };
+    }
+
+    const payload = await postRemotePayload(
+      {
+        type: "clear_night_shift",
+        reportDateTime
+      },
+      "Не удалось очистить ночную смену"
+    );
+    return {
+      draft: normalizeNightShiftDraft(payload),
+      source: "remote"
+    };
+  }
+
   async function listOcrFeedback(limit) {
     if (!hasRemoteSync()) {
       return [];
@@ -650,6 +739,9 @@
     loadSnapshot,
     saveDepartment,
     applyNightShiftToMain,
+    loadNightShiftDraft,
+    saveNightShiftDraft,
+    clearNightShiftDraft,
     saveOcrFeedback,
     saveReportDate,
     notifyOwnerLogin,

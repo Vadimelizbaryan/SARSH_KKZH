@@ -230,6 +230,56 @@ input {
   color: var(--tg-accent);
 }
 
+.tg-night-card {
+  padding: 12px;
+}
+
+.tg-night-table-wrap {
+  max-height: 70vh;
+}
+
+.tg-night-table {
+  min-width: 980px;
+}
+
+.tg-night-table th:first-child,
+.tg-night-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.tg-night-table tbody th {
+  background: #fff8e8;
+  text-align: left;
+}
+
+.tg-night-table thead th:first-child,
+.tg-night-table tfoot th {
+  background: #efe0c3;
+}
+
+.tg-night-table tfoot th,
+.tg-night-table tfoot td {
+  background: #ffed00;
+  font-weight: 900;
+}
+
+.tg-night-table tbody strong {
+  display: block;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tg-night-marker {
+  display: block;
+  color: var(--tg-warning);
+  font-size: 11px;
+  font-weight: 900;
+}
+
 @media (max-width: 720px) {
   .tg-form-root {
     padding: 8px;
@@ -254,5 +304,13 @@ input {
     min-width: 44px;
     min-height: 32px;
     font-size: 13px;
+  }
+
+  .tg-night-table {
+    min-width: 880px;
+  }
+
+  .tg-night-table tbody strong {
+    max-width: 82px;
   }
 }

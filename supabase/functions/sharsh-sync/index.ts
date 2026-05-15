@@ -39,6 +39,8 @@ const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-
 const OCR_FEEDBACK_STATUSES = ["accepted_as_is", "corrected_by_operator"] as const;
 const PHOTO_FEEDBACK_VALUE_KEYS = new Set<string>([...VALUE_KEYS, "presentTotal"]);
 const NIGHT_SHIFT_VALUE_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"] as const;
+const NIGHT_SHIFT_ROW_PREFIX = "night:";
+const NIGHT_SHIFT_META_KEY = "night_shift";
 
 const PHOTO_FIELD_MAPPINGS = [
   { cell: 1, key: "beenTotal", label: "been / total" },
@@ -169,6 +171,10 @@ function sanitizeNightShiftRows(rows: unknown) {
       Object.fromEntries(NIGHT_SHIFT_VALUE_KEYS.map((key) => [key, safeNumber(source[key])]))
     ];
   })) as Record<string, Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>>;
+}
+
+function getNightShiftRowId(departmentId: string) {
+  return `${NIGHT_SHIFT_ROW_PREFIX}${departmentId}`;
 }
 
 function addValue(values: Record<string, number | null>, key: string, amount: number) {
@@ -1106,6 +1112,85 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
   };
 }
 
+async function loadNightShiftDraft(supabase: ReturnType<typeof createClient>) {
+  const rowIds = Object.keys(DEPARTMENTS).map(getNightShiftRowId);
+  const { data: nightRows, error: rowsError } = await supabase
+    .from("sharsh_departments")
+    .select("department_id, values, updated_at")
+    .in("department_id", rowIds);
+
+  if (rowsError) {
+    throw rowsError;
+  }
+
+  const { data: metaRow, error: metaError } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date, updated_at")
+    .eq("report_key", NIGHT_SHIFT_META_KEY)
+    .maybeSingle();
+
+  if (metaError) {
+    throw metaError;
+  }
+
+  const map = new Map((nightRows || []).map((row) => [row.department_id, row]));
+  const rows = Object.fromEntries(Object.keys(DEPARTMENTS).map((departmentId) => {
+    const saved = map.get(getNightShiftRowId(departmentId));
+    return [departmentId, sanitizeNightShiftRows({ [departmentId]: saved?.values })[departmentId]];
+  }));
+
+  return {
+    reportDateTime: metaRow?.report_date || DEFAULT_DATE,
+    savedAt: metaRow?.updated_at || null,
+    rows
+  };
+}
+
+async function saveNightShiftDraft(
+  supabase: ReturnType<typeof createClient>,
+  rows: unknown,
+  reportDateTime: string
+) {
+  const nightRows = sanitizeNightShiftRows(rows);
+  const now = new Date().toISOString();
+  const updates = Object.entries(DEPARTMENTS).map(([departmentId, meta]) => ({
+    department_id: getNightShiftRowId(departmentId),
+    department_name: meta.department,
+    department_group: "night_shift",
+    values: nightRows[departmentId],
+    updated_at: now
+  }));
+
+  const { error: rowsError } = await supabase
+    .from("sharsh_departments")
+    .upsert(updates);
+
+  if (rowsError) {
+    throw rowsError;
+  }
+
+  const { error: metaError } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: NIGHT_SHIFT_META_KEY,
+      report_date: reportDateTime || DEFAULT_DATE,
+      updated_at: now
+    });
+
+  if (metaError) {
+    throw metaError;
+  }
+
+  return await loadNightShiftDraft(supabase);
+}
+
+async function clearNightShiftDraft(
+  supabase: ReturnType<typeof createClient>,
+  reportDateTime: string
+) {
+  return await saveNightShiftDraft(supabase, {}, reportDateTime);
+}
+
 async function listOcrFeedbackRecords(supabase: ReturnType<typeof createClient>, limit: number) {
   const safeLimit = Math.min(200, Math.max(1, Math.trunc(limit || 100)));
   const { data, error } = await supabase
@@ -1406,6 +1491,24 @@ Deno.serve(async (request) => {
       return jsonResponse(await sendMainPdfsToTelegramFromSync());
     }
 
+    if (type === "load_night_shift") {
+      return jsonResponse(await loadNightShiftDraft(supabase));
+    }
+
+    if (type === "save_night_shift") {
+      const reportDateTime = typeof payload.reportDateTime === "string" && payload.reportDateTime.trim()
+        ? payload.reportDateTime.trim()
+        : DEFAULT_DATE;
+      return jsonResponse(await saveNightShiftDraft(supabase, payload.rows, reportDateTime));
+    }
+
+    if (type === "clear_night_shift") {
+      const reportDateTime = typeof payload.reportDateTime === "string" && payload.reportDateTime.trim()
+        ? payload.reportDateTime.trim()
+        : DEFAULT_DATE;
+      return jsonResponse(await clearNightShiftDraft(supabase, reportDateTime));
+    }
+
     if (type === "apply_night_shift") {
       const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()
         ? payload.reportDate.trim()
@@ -1450,6 +1553,7 @@ Deno.serve(async (request) => {
         throw metaError;
       }
 
+      await clearNightShiftDraft(supabase, reportDate);
       return jsonResponse(await loadSnapshot(supabase));
     }
 
