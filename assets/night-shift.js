@@ -1,5 +1,6 @@
 (function () {
   const config = window.SHARSH_CONFIG;
+  const sync = window.SHARSH_SYNC || null;
   const app = document.getElementById("app");
   const queryParams = new URLSearchParams(window.location.search);
   const isNightShiftView = document.body.dataset.view === "night-shift" || queryParams.get("view") === "night";
@@ -20,6 +21,8 @@
   ];
 
   const state = loadState();
+  let statusText = "";
+  let statusIsError = false;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -108,6 +111,12 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
+  function clearNightRowsAfterTransfer() {
+    state.reportDateTime = getYerevanDateTime();
+    state.rows = buildEmptyRows();
+    saveState();
+  }
+
   function resetState() {
     state.reportDateTime = getYerevanDateTime();
     state.savedAt = "";
@@ -136,6 +145,11 @@
 
   function getGrandTotal() {
     return config.departmentDefinitions.reduce((sum, department) => sum + getRowTotal(department.id), 0);
+  }
+
+  function setStatus(message, isError = false) {
+    statusText = message || "";
+    statusIsError = Boolean(isError);
   }
 
   function updateTotals() {
@@ -219,6 +233,8 @@
           </div>
         </section>
 
+        ${statusText ? `<p class="hint${statusIsError ? " warning-note" : ""}">${escapeHtml(statusText)}</p>` : ""}
+
         <div class="night-table-shell">
           <div class="night-table-wrap">
             <table class="night-table">
@@ -256,14 +272,46 @@
     updateTotals();
   });
 
+  async function handleNightSave(button) {
+    saveState();
+
+    if (!getGrandTotal()) {
+      setStatus("Ночная смена сохранена локально. Для переноса в основную таблицу нет значений.", false);
+      render();
+      return;
+    }
+
+    if (!sync || typeof sync.applyNightShiftToMain !== "function") {
+      setStatus("Перенос в основную таблицу пока недоступен: модуль синхронизации не загружен.", true);
+      render();
+      return;
+    }
+
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = true;
+    }
+    setStatus("Переношу ночную смену в основную таблицу...", false);
+    render();
+
+    try {
+      const result = await sync.applyNightShiftToMain(state.rows, state.reportDateTime);
+      clearNightRowsAfterTransfer();
+      const sourceText = result && result.source === "remote" ? "онлайн" : "локально";
+      setStatus(`Ночная смена перенесена в основную таблицу (${sourceText}). Ночная таблица очищена.`, false);
+      render();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Не удалось перенести ночную смену в основную таблицу.", true);
+      render();
+    }
+  }
+
   app.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
       return;
     }
     if (target.id === "nightSaveBtn") {
-      saveState();
-      updateTotals();
+      handleNightSave(target);
       return;
     }
     if (target.id === "nightResetBtn") {

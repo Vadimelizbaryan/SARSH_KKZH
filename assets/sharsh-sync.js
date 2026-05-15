@@ -387,6 +387,95 @@
     };
   }
 
+  const NIGHT_SHIFT_TRANSFER_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"];
+
+  function sanitizeNightShiftRows(rows) {
+    const output = {};
+    config.departmentDefinitions.forEach((department) => {
+      const source = rows && typeof rows === "object" ? rows[department.id] : null;
+      output[department.id] = {};
+      NIGHT_SHIFT_TRANSFER_KEYS.forEach((key) => {
+        output[department.id][key] = config.normalizeCellValue(source && source[key]);
+      });
+    });
+    return output;
+  }
+
+  function getNightValue(rows, departmentId, key) {
+    return config.normalizeCellValue(rows?.[departmentId]?.[key]);
+  }
+
+  function addCell(values, key, amount) {
+    values[key] = config.normalizeCellValue(values[key]) + config.normalizeCellValue(amount);
+  }
+
+  function applyNightShiftRowsToSnapshot(snapshot, rows, reportDate) {
+    const normalized = config.buildSnapshotFromSaved(snapshot);
+    const nightRows = sanitizeNightShiftRows(rows);
+    const now = new Date().toISOString();
+
+    normalized.rows.forEach((row) => {
+      const n1 = getNightValue(nightRows, row.id, "shar");
+      const n2 = getNightValue(nightRows, row.id, "spa");
+      const n3 = getNightValue(nightRows, row.id, "paym");
+      const n4 = getNightValue(nightRows, row.id, "zh");
+      const n5 = getNightValue(nightRows, row.id, "family");
+      const n6 = getNightValue(nightRows, row.id, "zp");
+      const n7 = getNightValue(nightRows, row.id, "qi");
+      // Formula from the night-shift workflow: n5 is counted twice, n6 is not included in admittedTotal.
+      const nightTotal = n1 + n2 + n3 + n4 + n5 + n5 + n7;
+      const hasAnyNightValue = n1 + n2 + n3 + n4 + n5 + n6 + n7;
+
+      if (!hasAnyNightValue) {
+        return;
+      }
+
+      const values = config.normalizeRowValues(row.values);
+      addCell(values, "admittedSeries", n1);
+      addCell(values, "currentShar", n1);
+      values.currentSpa = n2;
+      values.currentPaym = n3;
+      values.currentZh = n4;
+      values.family = n5;
+      values.officer = n6;
+      values.civil = n7;
+      addCell(values, "admittedTotal", nightTotal);
+      addCell(values, "admittedSoldier", n1 + n2 + n3);
+
+      row.values = values;
+      row.updatedAt = now;
+    });
+
+    if (typeof reportDate === "string" && reportDate.trim()) {
+      normalized.reportDate = reportDate.trim();
+    }
+    normalized.updatedAt = now;
+    return normalized;
+  }
+
+  async function applyNightShiftToMain(rows, reportDate) {
+    const nightRows = sanitizeNightShiftRows(rows);
+
+    if (hasRemoteSync()) {
+      const snapshot = await postRemote({
+        type: "apply_night_shift",
+        reportDate,
+        rows: nightRows
+      });
+      return {
+        snapshot,
+        source: "remote"
+      };
+    }
+
+    const snapshot = applyNightShiftRowsToSnapshot(loadLocalSnapshot(), nightRows, reportDate);
+    writeLocalSnapshot(snapshot);
+    return {
+      snapshot,
+      source: "local-only"
+    };
+  }
+
   async function listOcrFeedback(limit) {
     if (!hasRemoteSync()) {
       return [];
@@ -560,6 +649,7 @@
     hasRemoteSync,
     loadSnapshot,
     saveDepartment,
+    applyNightShiftToMain,
     saveOcrFeedback,
     saveReportDate,
     notifyOwnerLogin,

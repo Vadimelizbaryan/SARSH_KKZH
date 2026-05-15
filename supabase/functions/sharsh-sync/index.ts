@@ -38,6 +38,7 @@ const VALUE_KEYS = [
 const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-mini").trim();
 const OCR_FEEDBACK_STATUSES = ["accepted_as_is", "corrected_by_operator"] as const;
 const PHOTO_FEEDBACK_VALUE_KEYS = new Set<string>([...VALUE_KEYS, "presentTotal"]);
+const NIGHT_SHIFT_VALUE_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"] as const;
 
 const PHOTO_FIELD_MAPPINGS = [
   { cell: 1, key: "beenTotal", label: "been / total" },
@@ -148,6 +149,62 @@ function sanitizeValues(values: Record<string, unknown> | null | undefined) {
   VALUE_KEYS.forEach((key) => {
     output[key] = sanitizeNumber(values ? values[key] : null);
   });
+  return output;
+}
+
+function safeNumber(value: unknown) {
+  return sanitizeNumber(value) || 0;
+}
+
+function sanitizeNightShiftRows(rows: unknown) {
+  const sourceRows = rows && typeof rows === "object"
+    ? rows as Record<string, Record<string, unknown>>
+    : {};
+  return Object.fromEntries(Object.keys(DEPARTMENTS).map((departmentId) => {
+    const source = sourceRows[departmentId] && typeof sourceRows[departmentId] === "object"
+      ? sourceRows[departmentId]
+      : {};
+    return [
+      departmentId,
+      Object.fromEntries(NIGHT_SHIFT_VALUE_KEYS.map((key) => [key, safeNumber(source[key])]))
+    ];
+  })) as Record<string, Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>>;
+}
+
+function addValue(values: Record<string, number | null>, key: string, amount: number) {
+  values[key] = safeNumber(values[key]) + safeNumber(amount);
+}
+
+function applyNightShiftValues(
+  values: Record<string, unknown> | null | undefined,
+  nightRow: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number> | undefined
+) {
+  const n1 = safeNumber(nightRow?.shar);
+  const n2 = safeNumber(nightRow?.spa);
+  const n3 = safeNumber(nightRow?.paym);
+  const n4 = safeNumber(nightRow?.zh);
+  const n5 = safeNumber(nightRow?.family);
+  const n6 = safeNumber(nightRow?.zp);
+  const n7 = safeNumber(nightRow?.qi);
+  // Formula from the night-shift workflow: n5 is counted twice, n6 is not included in admittedTotal.
+  const nightTotal = n1 + n2 + n3 + n4 + n5 + n5 + n7;
+  const hasAnyNightValue = n1 + n2 + n3 + n4 + n5 + n6 + n7;
+
+  if (!hasAnyNightValue) {
+    return null;
+  }
+
+  const output = sanitizeValues(values);
+  addValue(output, "admittedSeries", n1);
+  addValue(output, "currentShar", n1);
+  output.currentSpa = n2;
+  output.currentPaym = n3;
+  output.currentZh = n4;
+  output.family = n5;
+  output.officer = n6;
+  output.civil = n7;
+  addValue(output, "admittedTotal", nightTotal);
+  addValue(output, "admittedSoldier", n1 + n2 + n3);
   return output;
 }
 
@@ -1347,6 +1404,53 @@ Deno.serve(async (request) => {
 
     if (type === "send_main_pdfs_to_telegram") {
       return jsonResponse(await sendMainPdfsToTelegramFromSync());
+    }
+
+    if (type === "apply_night_shift") {
+      const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()
+        ? payload.reportDate.trim()
+        : DEFAULT_DATE;
+      const nightRows = sanitizeNightShiftRows(payload.rows);
+      const snapshot = await loadSnapshot(supabase);
+      const now = new Date().toISOString();
+      const updates = snapshot.rows.flatMap((row) => {
+        const values = applyNightShiftValues(row.values, nightRows[row.id]);
+        if (!values) {
+          return [];
+        }
+        const departmentMeta = DEPARTMENTS[row.id as keyof typeof DEPARTMENTS];
+        return [{
+          department_id: row.id,
+          department_name: departmentMeta.department,
+          department_group: departmentMeta.group,
+          values,
+          updated_at: now
+        }];
+      });
+
+      if (updates.length) {
+        const { error } = await supabase
+          .from("sharsh_departments")
+          .upsert(updates);
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      const { error: metaError } = await supabase
+        .from("sharsh_report_meta")
+        .upsert({
+          report_key: "main",
+          report_date: reportDate,
+          updated_at: now
+        });
+
+      if (metaError) {
+        throw metaError;
+      }
+
+      return jsonResponse(await loadSnapshot(supabase));
     }
 
     if (type !== "save_department") {
