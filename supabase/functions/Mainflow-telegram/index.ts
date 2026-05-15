@@ -1397,6 +1397,35 @@ function drawPdfText(
   });
 }
 
+function drawPdfCenteredText(
+  page: any,
+  text: string,
+  centerX: number,
+  y: number,
+  options: {
+    font: any;
+    size?: number;
+    color?: ReturnType<typeof rgb>;
+  }
+) {
+  const safeText = String(text ?? "");
+  const size = options.size || 10;
+  const textWidth = options.font.widthOfTextAtSize(safeText, size);
+  drawPdfText(page, safeText, centerX - (textWidth / 2), y, options);
+}
+
+function getMainPdfPrintedAtText(date = new Date()) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Yerevan",
+    year: "2-digit",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  }).format(date).replace(/\u202f/g, " ");
+}
+
 async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
   const pdf = await PDFDocument.create();
   const fonts = await buildPdfFonts(pdf);
@@ -1416,19 +1445,17 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     values: Record<string, number | null>;
     summaryRows?: Array<{ values: Record<string, number | null> }>;
   }>;
-  const title = getPdfText("ԿԿԶՀ-Շարժ․", fonts, "KKZH-Sharzh");
-  const subtitle = getPdfText(`Ամսաթիվ՝ ${snapshot.reportDate}`, fonts, `Date: ${snapshot.reportDate}`);
-  const generated = getPdfText(`Ստեղծվել է՝ ${buildDepartmentSheetMessageDateTimeText(snapshot.reportDate)}`, fonts, `Generated: ${snapshot.reportDate}`);
+  const title = getPdfText("ԿԿԶՀ-Շարժ․", fonts, "KKZH-Sharzh.");
 
-  drawPdfText(page, title, 28, 552, { font: fonts.bold, size: 18, color: rgb(0.03, 0.25, 0.16) });
-  drawPdfText(page, subtitle, 28, 531, { font: fonts.regular, size: 10 });
-  drawPdfText(page, generated, 650, 531, { font: fonts.regular, size: 9, color: rgb(0.32, 0.32, 0.32) });
+  drawPdfText(page, getMainPdfPrintedAtText(), 24, 572, { font: fonts.regular, size: 8 });
+  drawPdfCenteredText(page, title, 421, 571, { font: fonts.regular, size: 8 });
+  drawPdfCenteredText(page, title, 421, 556, { font: fonts.bold, size: 12 });
 
-  const startX = 22;
-  const tableTopY = 510;
-  const nameWidth = 142;
-  const valueWidth = 28.4;
-  const rowHeight = 18;
+  const startX = 28;
+  const tableTopY = 546;
+  const nameWidth = 94.4;
+  const valueWidth = 29.85;
+  const rowHeight = 18.5;
   const headerHeight = 23;
   const headerFill = rgb(0.99, 0.78, 0.56);
   const headerFillDark = rgb(0.98, 0.72, 0.48);
@@ -1437,7 +1464,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
   const nameFill = rgb(0.99, 0.97, 0.92);
   const border = rgb(0, 0, 0);
   const labelSize = 6.3;
-  const valueSize = 7.2;
+  const valueSize = 6.4;
   const valueX = (index: number) => startX + nameWidth + (index * valueWidth);
   const valueWidthFor = (count: number) => valueWidth * count;
   const headerY1 = tableTopY - headerHeight;
@@ -1445,6 +1472,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
   const headerY3 = headerY2 - headerHeight;
   const firstBodyY = headerY3 - rowHeight;
   const dateText = buildDepartmentSheetMessageDateTimeText(snapshot.reportDate);
+  const headerDateText = dateText.replace(/\s+(\d{1,2}:\d{2})$/, "\n$1");
   const valueKeys = MAIN_PDF_COLUMNS.map((column) => column.key);
   const rowValue = (row: typeof allRows[number], key: string) => row.summaryRows
     ? getRowsPdfValue(row.summaryRows, key)
@@ -1487,7 +1515,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     fill: headerFill,
     border
   });
-  drawPdfCell(page, cellLabel("Առկա է", "Present"), valueX(12), headerY1, valueWidthFor(7), headerHeight, {
+  drawPdfCell(page, cellLabel("Առկա է", "Present"), valueX(11), headerY1, valueWidthFor(8), headerHeight, {
     font: fonts.bold,
     size: 7,
     align: "center",
@@ -1509,7 +1537,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     border
   });
 
-  drawPdfCell(page, cellLabel("Ընդամ", "Total"), valueX(11), headerY1, valueWidth, headerHeight * 3, {
+  drawPdfCell(page, cellLabel("Ընդամ", "Total"), valueX(11), headerY3, valueWidth, headerHeight * 2, {
     font: fonts.bold,
     size: labelSize,
     align: "center",
@@ -1544,7 +1572,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     fill: headerFill,
     border
   });
-  drawPdfCell(page, cellLabel("Ընդհանուր", "Total"), valueX(22), headerY2, valueWidth, headerHeight * 2, {
+  drawPdfCell(page, cellLabel("Ընդհանուր", "Total"), valueX(22), headerY3, valueWidth, headerHeight * 2, {
     font: fonts.bold,
     size: labelSize,
     align: "center",
@@ -1552,7 +1580,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     border
   });
 
-  drawPdfCell(page, dateText, startX, headerY3, nameWidth, headerHeight, {
+  drawPdfCell(page, headerDateText, startX, headerY3, nameWidth, headerHeight, {
     font: fonts.bold,
     size: 6.2,
     align: "center",
@@ -1588,9 +1616,10 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     const y = firstBodyY - (rowIndex * rowHeight);
     const isSummary = Boolean(row.summaryRows);
     const rowFill = isSummary ? totalFill : undefined;
-    drawPdfCell(page, getPdfText(row.department, fonts, row.id), startX, y, nameWidth, rowHeight, {
+    const departmentLabel = row.summaryRows ? row.department : Array.from(row.department).slice(0, 8).join("");
+    drawPdfCell(page, getPdfText(departmentLabel, fonts, row.id), startX, y, nameWidth, rowHeight, {
       font: isSummary ? fonts.bold : fonts.regular,
-      size: isSummary ? 7.2 : (row.department.length > 18 ? 5.1 : 6.2),
+      size: isSummary ? 6.4 : 5.8,
       align: isSummary ? "center" : "left",
       fill: rowFill || nameFill,
       border
