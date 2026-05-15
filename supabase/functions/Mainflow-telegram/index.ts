@@ -22,6 +22,7 @@ const TELEGRAM_DAILY_REMINDER_META_PREFIX = "telegram_daily_reminder_sent";
 const TELEGRAM_MAIN_PDFS_META_KEY = "telegram_main_pdfs_sent";
 const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
 const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է միայն բոտի ադմինիստրատորին։";
+const TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT = "Գիշերային հերթափոխ";
 const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
 const REPORT_PDF_FILE_NAME = "Report.pdf";
 const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarmenian/NotoSansArmenian%5Bwdth,wght%5D.ttf";
@@ -1437,7 +1438,8 @@ function buildColleagueApprovalReplyMarkup(chatId: string) {
 function buildWorkplaceLocationReplyMarkup() {
   return {
     keyboard: [
-      [{ text: "Ես աշխատանքի եմ", request_location: true }]
+      [{ text: "Ես աշխատանքի եմ", request_location: true }],
+      [{ text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }]
     ],
     resize_keyboard: true,
     one_time_keyboard: false,
@@ -3682,6 +3684,10 @@ function isSrDepartmentsListRequest(text: string) {
   return /^sr\s*[- ]?\?$/i.test(text.trim());
 }
 
+function isTelegramNightShiftButtonRequest(text: string) {
+  return text.trim() === TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT;
+}
+
 function buildColleagueStartText(firstName = "") {
   const greeting = firstName
     ? `Բարև, ${firstName}։ Սա Mainflow բոտն է բաժանմունքների տվյալները ուղարկելու համար։`
@@ -5334,6 +5340,11 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
   const sheetDocument = extractSheetDocument(message);
   if (sheetDocument) {
     await handleTelegramSheetDocument(safeChatId, sheetDocument);
+    return;
+  }
+
+  if (isTelegramNightShiftButtonRequest(text)) {
+    await handleTelegramCommand(supabase, safeChatId, "/night", message, accessChatId);
     return;
   }
 
