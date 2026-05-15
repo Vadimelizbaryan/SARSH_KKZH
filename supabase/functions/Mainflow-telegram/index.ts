@@ -1400,12 +1400,12 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
   const subtitle = getPdfText(`Ամսաթիվ՝ ${snapshot.reportDate}`, fonts, `Date: ${snapshot.reportDate}`);
   const generated = getPdfText(`Ստեղծվել է՝ ${buildDepartmentSheetMessageDateTimeText(snapshot.reportDate)}`, fonts, `Generated: ${snapshot.reportDate}`);
 
-  drawPdfText(page, title, 28, 560, { font: fonts.bold, size: 18, color: rgb(0.03, 0.25, 0.16) });
-  drawPdfText(page, subtitle, 28, 540, { font: fonts.regular, size: 10 });
-  drawPdfText(page, generated, 650, 540, { font: fonts.regular, size: 9, color: rgb(0.32, 0.32, 0.32) });
+  drawPdfText(page, title, 28, 538, { font: fonts.bold, size: 17, color: rgb(0.03, 0.25, 0.16) });
+  drawPdfText(page, subtitle, 28, 518, { font: fonts.regular, size: 10 });
+  drawPdfText(page, generated, 650, 518, { font: fonts.regular, size: 9, color: rgb(0.32, 0.32, 0.32) });
 
   const startX = 24;
-  const startY = 513;
+  const startY = 492;
   const markerWidth = 42;
   const nameWidth = 92;
   const valueWidth = 28.2;
