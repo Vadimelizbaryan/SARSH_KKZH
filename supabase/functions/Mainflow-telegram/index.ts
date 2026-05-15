@@ -1552,6 +1552,22 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     border
   });
 
+  // In the printed form the present-total column is not part of the "Առկա է" header.
+  drawPdfCell(page, "", valueX(11), headerY1, valueWidth, headerHeight, {
+    font: fonts.bold,
+    size: labelSize,
+    align: "center",
+    fill: totalFill,
+    border
+  });
+  drawPdfCell(page, cellLabel("Առկա է", "Present"), valueX(12), headerY1, valueWidthFor(7), headerHeight, {
+    font: fonts.bold,
+    size: 7,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+
   drawPdfCell(page, dateText, startX, headerY3, nameWidth, headerHeight, {
     font: fonts.bold,
     size: 6.2,
