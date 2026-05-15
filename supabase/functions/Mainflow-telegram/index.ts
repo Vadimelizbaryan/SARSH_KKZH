@@ -1515,12 +1515,16 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     fill: headerFill,
     border
   });
-  drawPdfCell(page, cellLabel("Առկա է", "Present"), valueX(11), headerY1, valueWidthFor(8), headerHeight, {
+  drawPdfCell(page, "", valueX(11), headerY1, valueWidthFor(8), headerHeight, {
     font: fonts.bold,
-    size: 7,
+    size: 6.3,
     align: "center",
     fill: headerFill,
     border
+  });
+  drawPdfCenteredText(page, cellLabel("Առկա է", "Present"), valueX(11) + (valueWidthFor(8) / 2) - 5, headerY1 + 8.2, {
+    font: fonts.bold,
+    size: 6.3
   });
   drawPdfCell(page, cellLabel("որոնցից բուժական", "Medical leave"), valueX(19), headerY1, valueWidthFor(3), headerHeight, {
     font: fonts.bold,
