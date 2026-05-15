@@ -1116,6 +1116,9 @@ function parseTelegramColleagueChats(raw: unknown): TelegramColleagueChat[] {
 }
 
 function sanitizeCoordinate(value: unknown, min: number, max: number) {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return null;
+  }
   const parsed = typeof value === "number" ? value : Number(String(value ?? "").replace(",", "."));
   if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
     return null;
@@ -4371,6 +4374,9 @@ function getMessageChatId(message: Record<string, unknown>) {
 
 function extractTelegramLocation(message: Record<string, unknown>) {
   const location = message.location as { latitude?: unknown; longitude?: unknown } | undefined;
+  if (!location || typeof location !== "object") {
+    return null;
+  }
   const latitude = sanitizeCoordinate(location?.latitude, -90, 90);
   const longitude = sanitizeCoordinate(location?.longitude, -180, 180);
   if (latitude === null || longitude === null) {
