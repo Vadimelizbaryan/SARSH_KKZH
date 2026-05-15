@@ -1441,6 +1441,25 @@ function getMainPdfPrintedAtText(date = new Date()) {
   return `${weekdays[weekdayKey] || weekdayKey} ${part("day")}.${part("month")}.${part("year")},${part("hour")}:${part("minute")}`;
 }
 
+function getPdfFileTimestampText(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Asia/Yerevan",
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value || "";
+  return `${part("day")}.${part("month")}.${part("year")},${part("hour")}-${part("minute")}`;
+}
+
+function buildTimestampedPdfFileName(fileName: string, date = new Date()) {
+  const name = fileName.replace(/\.pdf$/i, "");
+  return `${name}_${getPdfFileTimestampText(date)}.pdf`;
+}
+
 async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
   const pdf = await PDFDocument.create();
   const fonts = await buildPdfFonts(pdf);
@@ -1827,6 +1846,9 @@ async function sendMainPdfsToTelegram(
   const snapshot = await loadSnapshot(supabase);
   const reportPdfBytes = await buildReportPdfBytes(snapshot);
   const mainPdfBytes = await buildMainMovementPdfBytes(snapshot);
+  const fileNameDate = new Date();
+  const reportPdfFileName = buildTimestampedPdfFileName(REPORT_PDF_FILE_NAME, fileNameDate);
+  const mainPdfFileName = buildTimestampedPdfFileName(MAIN_MOVEMENT_PDF_FILE_NAME, fileNameDate);
   const captionPrefix = options.source === "morning"
     ? "Առավոտյան ավտոմատ PDF ֆայլեր"
     : "PDF ֆայլերը պատրաստ են";
@@ -1835,14 +1857,14 @@ async function sendMainPdfsToTelegram(
   for (const chatId of chatIds) {
     await sendTelegramDocument(
       chatId,
-      REPORT_PDF_FILE_NAME,
+      reportPdfFileName,
       reportPdfBytes,
       `${captionPrefix}\n${captionDate}`,
       "application/pdf"
     );
     await sendTelegramDocument(
       chatId,
-      MAIN_MOVEMENT_PDF_FILE_NAME,
+      mainPdfFileName,
       mainPdfBytes,
       `${captionPrefix}\n${captionDate}`,
       "application/pdf"
@@ -1857,7 +1879,7 @@ async function sendMainPdfsToTelegram(
     sent: chatIds.length,
     skipped: "",
     dateKey,
-    files: [REPORT_PDF_FILE_NAME, MAIN_MOVEMENT_PDF_FILE_NAME]
+    files: [reportPdfFileName, mainPdfFileName]
   };
 }
 
