@@ -1561,7 +1561,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     ["Զ/Պ", 17],
     ["Ք-ի", 18]
   ].forEach(([label, index]) => {
-    drawPdfCell(page, cellLabel(String(label), String(label)), valueX(Number(index)), headerY2, valueWidth, headerHeight * 2, {
+    drawPdfCell(page, cellLabel(String(label), String(label)), valueX(Number(index)), headerY3, valueWidth, headerHeight * 2, {
       font: fonts.bold,
       size: labelSize,
       align: "center",
