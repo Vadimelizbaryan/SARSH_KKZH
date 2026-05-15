@@ -2,6 +2,7 @@ name: Telegram reminders
 
 on:
   schedule:
+    - cron: "30 3 * * *"
     - cron: "0 4 * * *"
     - cron: "0 8 * * *"
     - cron: "0 13 * * *"
@@ -12,6 +13,7 @@ on:
         required: true
         type: choice
         options:
+          - night-duty
           - morning-pdfs
           - midday
           - evening
@@ -38,6 +40,10 @@ jobs:
 
           if [ -z "$slot" ]; then
             case "${{ github.event.schedule }}" in
+              "30 3 * * *")
+                slot="night-duty"
+                action="night-duty-reminder"
+                ;;
               "0 4 * * *")
                 slot="morning-pdfs"
                 action="send-main-pdfs"
@@ -61,6 +67,9 @@ jobs:
           if [ "$slot" = "morning-pdfs" ]; then
             action="send-main-pdfs"
           fi
+          if [ "$slot" = "night-duty" ]; then
+            action="night-duty-reminder"
+          fi
 
           echo "action=$action" >> "$GITHUB_OUTPUT"
           echo "slot=$slot" >> "$GITHUB_OUTPUT"
@@ -71,6 +80,8 @@ jobs:
         run: |
           if [ "${{ steps.params.outputs.action }}" = "send-main-pdfs" ]; then
             url="$FUNCTION_URL?action=send-main-pdfs"
+          elif [ "${{ steps.params.outputs.action }}" = "night-duty-reminder" ]; then
+            url="$FUNCTION_URL?action=night-duty-reminder"
           else
             url="$FUNCTION_URL?action=daily-reminder&slot=${{ steps.params.outputs.slot }}"
           fi

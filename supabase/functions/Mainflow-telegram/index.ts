@@ -14,8 +14,14 @@ const TELEGRAM_RETRY_BASE_DELAY_MS = 700;
 const TELEGRAM_COLLEAGUES_META_KEY = "telegram_colleagues_access";
 const TELEGRAM_COLLEAGUE_CHATS_META_KEY = "telegram_colleague_chats";
 const TELEGRAM_PENDING_COLLEAGUE_CHATS_META_KEY = "telegram_pending_colleague_chats";
+const TELEGRAM_WORKPLACE_LOCATION_META_KEY = "telegram_workplace_location";
+const TELEGRAM_WORKPLACE_SETUP_PENDING_META_KEY = "telegram_workplace_setup_pending";
+const TELEGRAM_COLLEAGUE_PRESENCE_META_KEY = "telegram_colleague_presence";
+const TELEGRAM_NIGHT_DUTY_REMINDER_META_KEY = "telegram_night_duty_reminder_sent";
 const TELEGRAM_DAILY_REMINDER_META_PREFIX = "telegram_daily_reminder_sent";
 const TELEGRAM_MAIN_PDFS_META_KEY = "telegram_main_pdfs_sent";
+const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
+const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է միայն բոտի ադմինիստրատորին։";
 const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
 const REPORT_PDF_FILE_NAME = "Report.pdf";
 const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarmenian/NotoSansArmenian%5Bwdth,wght%5D.ttf";
@@ -1055,6 +1061,24 @@ type TelegramColleagueChat = {
   updatedAt: string;
 };
 
+type TelegramWorkplaceLocation = {
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  label: string;
+  updatedAt: string;
+};
+
+type TelegramColleaguePresence = TelegramColleagueChat & {
+  status: "at_work" | "away";
+  isDuty: boolean;
+  arrivedAt: string;
+  leftAt: string;
+  lastLatitude: number | null;
+  lastLongitude: number | null;
+  distanceMeters: number | null;
+};
+
 function parseTelegramColleagueChats(raw: unknown): TelegramColleagueChat[] {
   if (typeof raw !== "string" || !raw.trim()) {
     return [];
@@ -1085,6 +1109,102 @@ function parseTelegramColleagueChats(raw: unknown): TelegramColleagueChat[] {
         };
       })
       .filter((item): item is TelegramColleagueChat => item !== null);
+  } catch (_error) {
+    return [];
+  }
+}
+
+function sanitizeCoordinate(value: unknown, min: number, max: number) {
+  const parsed = typeof value === "number" ? value : Number(String(value ?? "").replace(",", "."));
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    return null;
+  }
+  return parsed;
+}
+
+function sanitizeRadiusMeters(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(String(value ?? "").replace(",", "."));
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_WORKPLACE_RADIUS_METERS;
+  }
+  return Math.max(50, Math.min(5000, Math.round(parsed)));
+}
+
+function parseTelegramWorkplaceLocation(raw: unknown): TelegramWorkplaceLocation | null {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const latitude = sanitizeCoordinate(parsed.latitude, -90, 90);
+    const longitude = sanitizeCoordinate(parsed.longitude, -180, 180);
+    if (latitude === null || longitude === null) {
+      return null;
+    }
+    return {
+      latitude,
+      longitude,
+      radiusMeters: sanitizeRadiusMeters(parsed.radiusMeters),
+      label: typeof parsed.label === "string" && parsed.label.trim() ? parsed.label.trim() : "հիվանդանոց",
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : ""
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function getEnvTelegramWorkplaceLocation(): TelegramWorkplaceLocation | null {
+  const latitude = sanitizeCoordinate(Deno.env.get("TELEGRAM_WORKPLACE_LAT"), -90, 90);
+  const longitude = sanitizeCoordinate(Deno.env.get("TELEGRAM_WORKPLACE_LON"), -180, 180);
+  if (latitude === null || longitude === null) {
+    return null;
+  }
+  return {
+    latitude,
+    longitude,
+    radiusMeters: sanitizeRadiusMeters(Deno.env.get("TELEGRAM_WORKPLACE_RADIUS_METERS")),
+    label: (Deno.env.get("TELEGRAM_WORKPLACE_LABEL") || "հիվանդանոց").trim() || "հիվանդանոց",
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function parseTelegramPresenceRecords(raw: unknown): TelegramColleaguePresence[] {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") {
+          return null;
+        }
+        const record = item as Record<string, unknown>;
+        const chatId = typeof record.chatId === "string" || typeof record.chatId === "number"
+          ? String(record.chatId).trim()
+          : "";
+        if (!chatId) {
+          return null;
+        }
+        return {
+          chatId,
+          firstName: typeof record.firstName === "string" ? record.firstName : "",
+          lastName: typeof record.lastName === "string" ? record.lastName : "",
+          username: typeof record.username === "string" ? record.username : "",
+          updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
+          status: record.status === "at_work" ? "at_work" : "away",
+          isDuty: record.isDuty === true,
+          arrivedAt: typeof record.arrivedAt === "string" ? record.arrivedAt : "",
+          leftAt: typeof record.leftAt === "string" ? record.leftAt : "",
+          lastLatitude: typeof record.lastLatitude === "number" ? record.lastLatitude : null,
+          lastLongitude: typeof record.lastLongitude === "number" ? record.lastLongitude : null,
+          distanceMeters: typeof record.distanceMeters === "number" ? record.distanceMeters : null
+        };
+      })
+      .filter((item): item is TelegramColleaguePresence => item !== null);
   } catch (_error) {
     return [];
   }
@@ -1154,6 +1274,124 @@ async function saveTelegramPendingColleagueChats(
   }
 }
 
+async function loadTelegramWorkplaceLocation(supabase: ReturnType<typeof createClient>) {
+  const { data, error } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date")
+    .eq("report_key", TELEGRAM_WORKPLACE_LOCATION_META_KEY)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return parseTelegramWorkplaceLocation(data?.report_date) || getEnvTelegramWorkplaceLocation();
+}
+
+async function saveTelegramWorkplaceLocation(
+  supabase: ReturnType<typeof createClient>,
+  location: TelegramWorkplaceLocation
+) {
+  const { error } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: TELEGRAM_WORKPLACE_LOCATION_META_KEY,
+      report_date: JSON.stringify(location),
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function loadTelegramPresenceRecords(supabase: ReturnType<typeof createClient>) {
+  const { data, error } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date")
+    .eq("report_key", TELEGRAM_COLLEAGUE_PRESENCE_META_KEY)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return parseTelegramPresenceRecords(data?.report_date);
+}
+
+async function saveTelegramPresenceRecords(
+  supabase: ReturnType<typeof createClient>,
+  records: TelegramColleaguePresence[]
+) {
+  const uniqueRecords = Array.from(new Map(records.map((item) => [item.chatId, item])).values());
+  const { error } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: TELEGRAM_COLLEAGUE_PRESENCE_META_KEY,
+      report_date: JSON.stringify(uniqueRecords),
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    throw error;
+  }
+}
+
+function buildPresenceRecord(
+  person: TelegramColleagueChat,
+  previous: TelegramColleaguePresence | undefined,
+  patch: Partial<TelegramColleaguePresence>
+): TelegramColleaguePresence {
+  return {
+    chatId: person.chatId,
+    firstName: person.firstName || previous?.firstName || "",
+    lastName: person.lastName || previous?.lastName || "",
+    username: person.username || previous?.username || "",
+    updatedAt: new Date().toISOString(),
+    status: patch.status || previous?.status || "away",
+    isDuty: typeof patch.isDuty === "boolean" ? patch.isDuty : previous?.isDuty === true,
+    arrivedAt: patch.arrivedAt || previous?.arrivedAt || "",
+    leftAt: patch.leftAt || previous?.leftAt || "",
+    lastLatitude: typeof patch.lastLatitude === "number" ? patch.lastLatitude : previous?.lastLatitude ?? null,
+    lastLongitude: typeof patch.lastLongitude === "number" ? patch.lastLongitude : previous?.lastLongitude ?? null,
+    distanceMeters: typeof patch.distanceMeters === "number" ? patch.distanceMeters : previous?.distanceMeters ?? null
+  };
+}
+
+async function updateTelegramPresenceRecord(
+  supabase: ReturnType<typeof createClient>,
+  person: TelegramColleagueChat,
+  patch: Partial<TelegramColleaguePresence>
+) {
+  const records = await loadTelegramPresenceRecords(supabase);
+  const previous = records.find((item) => item.chatId === person.chatId);
+  const next = buildPresenceRecord(person, previous, patch);
+  await saveTelegramPresenceRecords(
+    supabase,
+    [next, ...records.filter((item) => item.chatId !== next.chatId)]
+  );
+  return { previous, current: next };
+}
+
+function toRadians(value: number) {
+  return value * Math.PI / 180;
+}
+
+function getDistanceMeters(
+  fromLatitude: number,
+  fromLongitude: number,
+  toLatitude: number,
+  toLongitude: number
+) {
+  const earthRadiusMeters = 6371000;
+  const deltaLatitude = toRadians(toLatitude - fromLatitude);
+  const deltaLongitude = toRadians(toLongitude - fromLongitude);
+  const a = Math.sin(deltaLatitude / 2) ** 2
+    + Math.cos(toRadians(fromLatitude)) * Math.cos(toRadians(toLatitude))
+    * Math.sin(deltaLongitude / 2) ** 2;
+  return Math.round(earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
 function getTelegramPersonFromMessage(
   message: Record<string, unknown>,
   fallbackChatId: number | string
@@ -1182,17 +1420,39 @@ function getTelegramColleagueDisplayName(record: TelegramColleagueChat) {
 }
 
 function getTelegramColleagueFirstName(record: TelegramColleagueChat) {
-  return record.firstName || (record.username ? `@${record.username}` : "коллега");
+  return record.firstName || (record.username ? `@${record.username}` : "հարգելի կոլեգա");
 }
 
 function buildColleagueApprovalReplyMarkup(chatId: string) {
   return {
     inline_keyboard: [
       [
-        { text: "Одобрить", callback_data: `approve_colleague:${chatId}` },
-        { text: "Отклонить", callback_data: `reject_colleague:${chatId}` }
+        { text: "Հաստատել", callback_data: `approve_colleague:${chatId}` },
+        { text: "Մերժել", callback_data: `reject_colleague:${chatId}` }
       ]
     ]
+  };
+}
+
+function buildWorkplaceLocationReplyMarkup() {
+  return {
+    keyboard: [
+      [{ text: "Ես աշխատանքի եմ", request_location: true }]
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: false,
+    input_field_placeholder: "Ուղարկեք Ձեր գտնվելու վայրը"
+  };
+}
+
+function buildWorkplaceSetupLocationReplyMarkup() {
+  return {
+    keyboard: [
+      [{ text: "Սահմանել հիվանդանոցի կետը", request_location: true }]
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: true,
+    input_field_placeholder: "Կանգնեք հիվանդանոցում եւ ուղարկեք կետը"
   };
 }
 
@@ -1251,9 +1511,9 @@ async function requestTelegramColleagueApproval(
   await sendTelegramMessage(
     responseChatId,
     [
-      `${firstName}, заявку на подключение я отправил Вадиму Ашотичу.`,
-      "Пока он не нажмёт «Одобрить», рабочие команды закрыты.",
-      "Немного охраны на входе: данные любят порядок, а я люблю, когда всё спокойно и красиво."
+      `${firstName}, Ձեր միացման հայտը ուղարկել եմ Վադիմ Աշոտիչին։`,
+      "Մինչեւ նա սեղմի «Հաստատել», աշխատանքային հրամանները փակ են։",
+      "Մի փոքր պահակություն մուտքի մոտ. տվյալները սիրում են կարգուկանոն, իսկ ես՝ հանգիստ ու գեղեցիկ ընթացք։"
     ].join("\n")
   );
 }
@@ -1356,6 +1616,21 @@ function getYerevanDateTimeText(date = new Date()) {
   return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
 }
 
+function getYerevanHour(date = new Date()) {
+  const hour = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Yerevan",
+    hour: "2-digit",
+    hourCycle: "h23"
+  }).format(date);
+  const parsed = Number(hour);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isYerevanNightDutyTime(date = new Date()) {
+  const hour = getYerevanHour(date);
+  return hour >= 20 || hour < 8;
+}
+
 function normalizeDailyReminderSlot(value: string | null | undefined): TelegramDailyReminderSlot {
   const normalized = (value || "").trim().toLowerCase();
   if (normalized === "evening" || normalized === "17" || normalized === "17:00") {
@@ -1403,6 +1678,21 @@ async function saveMetaValue(
   }
 }
 
+async function setTelegramWorkplaceSetupPending(
+  supabase: ReturnType<typeof createClient>,
+  chatId: number | string
+) {
+  await saveMetaValue(supabase, TELEGRAM_WORKPLACE_SETUP_PENDING_META_KEY, String(chatId));
+}
+
+async function getTelegramWorkplaceSetupPending(supabase: ReturnType<typeof createClient>) {
+  return (await loadMetaValue(supabase, TELEGRAM_WORKPLACE_SETUP_PENDING_META_KEY)).trim();
+}
+
+async function clearTelegramWorkplaceSetupPending(supabase: ReturnType<typeof createClient>) {
+  await saveMetaValue(supabase, TELEGRAM_WORKPLACE_SETUP_PENDING_META_KEY, "");
+}
+
 async function sendDailyReminderToColleagues(
   supabase: ReturnType<typeof createClient>,
   slot: TelegramDailyReminderSlot,
@@ -1435,6 +1725,60 @@ async function sendDailyReminderToColleagues(
   await sendTelegramMessageToMany(chatIds, reminder.text);
   await saveMetaValue(supabase, metaKey, dateKey);
   return { sent: chatIds.length, skipped: "", dateKey, slot, label: reminder.label };
+}
+
+async function sendNightDutyReminderToColleagues(
+  supabase: ReturnType<typeof createClient>,
+  options: { force?: boolean } = {}
+) {
+  const dateKey = getYerevanDateKey();
+  if (!options.force) {
+    const lastSentDate = await loadMetaValue(supabase, TELEGRAM_NIGHT_DUTY_REMINDER_META_KEY);
+    if (lastSentDate === dateKey) {
+      return { sent: 0, skipped: "already_sent", dateKey };
+    }
+    if (!await areTelegramColleaguesEnabled(supabase)) {
+      return { sent: 0, skipped: "colleagues_disabled", dateKey };
+    }
+  }
+
+  const records = await loadTelegramPresenceRecords(supabase);
+  const dutyRecords = records.filter((item) => item.status === "at_work" && !isTelegramAdminChat(item.chatId));
+  if (!dutyRecords.length) {
+    if (!options.force) {
+      await saveMetaValue(supabase, TELEGRAM_NIGHT_DUTY_REMINDER_META_KEY, dateKey);
+    }
+    return { sent: 0, skipped: "no_duty_colleagues", dateKey };
+  }
+
+  const reportDateTime = getYerevanDateTimeText();
+  const formUrl = getTelegramNightFormUrl(reportDateTime);
+  const replyMarkup = buildTelegramNightFormReplyMarkup(formUrl);
+  let sent = 0;
+  for (const record of dutyRecords) {
+    const firstName = getTelegramColleagueFirstName(record);
+    try {
+      await sendTelegramMessageWithReplyMarkup(
+        record.chatId,
+        [
+          `Բարի լույս, ${firstName}։`,
+          "Շնորհակալություն գիշերային հերթափոխի համար։ Խնդրում եմ մինչեւ ժամը 08։00 լրացնել գիշերվա ընթացքում ընդունված հիվանդների տվյալները։",
+          "Եթե ընդունումներ չեն եղել, թողեք զրոները եւ ուղարկեք ձեւը։",
+          "",
+          "Ես այստեղ եմ, հանգիստ կպահեմ հերթը եւ կօգնեմ, որ առավոտը սկսվի առանց խառնաշփոթի։"
+        ].join("\n"),
+        replyMarkup
+      );
+      sent += 1;
+    } catch (error) {
+      console.error("Failed to send night duty reminder:", sanitizePublicErrorMessage(error));
+    }
+  }
+
+  if (!options.force) {
+    await saveMetaValue(supabase, TELEGRAM_NIGHT_DUTY_REMINDER_META_KEY, dateKey);
+  }
+  return { sent, skipped: "", dateKey };
 }
 
 async function isTelegramUserAllowedByRuntimeState(
@@ -2366,7 +2710,7 @@ function sanitizePublicErrorMessage(error: unknown) {
     ? error.message
     : typeof error === "string"
       ? error
-      : "неизвестная ошибка";
+      : "անհայտ սխալ";
 
   return message
     .replace(/https:\/\/api\.telegram\.org\/(?:file\/)?bot[^\s)]+/g, "https://api.telegram.org/bot***/...")
@@ -3031,17 +3375,17 @@ function validateReturnedDepartmentSheetIntegrity(
   const visibleDepartmentId = detectDepartmentFromVisibleSheetRow(worksheetXml);
 
   if (titleDepartmentId !== departmentId) {
-    issues.push("название отделения в заголовке было изменено или удалено");
+    issues.push("վերնագրում բաժանմունքի անունը փոխվել կամ ջնջվել է");
   }
   if (visibleDepartmentId !== departmentId) {
-    issues.push("видимая строка отделения была изменена");
+    issues.push("բաժանմունքի տեսանելի տողը փոխվել է");
   }
 
   const brokenFormulaCells = DEPARTMENT_SHEET_FORMULA_COLUMNS
     .map((column) => `${column}${targetRow}`)
     .filter((cellRef) => !/<f\b/.test(getWorksheetCellXml(worksheetXml, cellRef)));
   if (brokenFormulaCells.length) {
-    issues.push(`формульные ячейки изменены: ${brokenFormulaCells.join(", ")}`);
+    issues.push(`բանաձևային բջիջները փոխվել են: ${brokenFormulaCells.join(", ")}`);
   }
 
   return {
@@ -3368,12 +3712,19 @@ function buildAdminHelpText() {
     "/kollegi_status — ստուգել միացված/անջատված վիճակը և սպասող հայտերի քանակը։",
     "/reminder_12 — ձեռքով ուղարկել 14։00-ի հիշեցումը կոլեգաներին։",
     "/reminder_17 — ձեռքով ուղարկել 18։00-ի հիշեցումը կոլեգաներին։",
+    "/night_reminder — ձեռքով ուղարկել առավոտյան հիշեցումը գիշերային հերթապահներին։",
+    "/set_workplace_here — սահմանել հիվանդանոցի GPS կետը Ձեր ընթացիկ տեղից։",
+    "/set_workplace LAT LON 500 — սահմանել GPS կետը ձեռքով։",
+    "/workplace_status — տեսնել GPS կետը եւ ով է նշված աշխատանքի վայրում։",
     "",
     "Աշխատանք բաժանմունքների հետ.",
     "SR-? — ցույց տալ բաժանմունքների SR կոդերի ցանկը։",
     "SR-7 կամ r7 — ուղարկել ընթացիկ տվյալների PDF-ը և Telegram ձևի կոճակը։",
     "/form SR-7 — ընթացիկ տվյալների PDF + Telegram ձևի կոճակ։",
     "/night — բացել գիշերային հերթափոխի Telegram ձևը։",
+    "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը։",
+    "/duty — նշել, որ կոլեգան գիշերային հերթապահ է։",
+    "/not_duty — անջատել գիշերային հերթապահության նշումը։",
     "/sheet SR-7 — ուղարկել բաժանմունքի XLSX ֆայլը։",
     "/departments — բաժանմունքների SR կոդերի ցանկը։",
     "",
@@ -3406,6 +3757,8 @@ function buildHelpText() {
     "/done — նույնն է, ինչ /pdf",
     "/form SR-4 — ստանալ ընթացիկ տվյալների PDF-ը և բացել Telegram Web App ձևը",
     "/night — բացել գիշերային հերթափոխի Telegram Web App ձևը",
+    "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը",
+    "/duty — նշել գիշերային հերթապահությունը",
     "/sheet SR-4 — ստանալ հին XLSX ֆայլը",
     "",
     "Բաժանմունքի ձևը ստանալու համար առանձին հաղորդագրությամբ ուղարկեք կոդը կամ անունը՝ `r4`, `SR-4`։",
@@ -3512,7 +3865,7 @@ function buildTelegramFormReplyMarkup(formUrl: string) {
     inline_keyboard: [
       [
         {
-          text: "Открыть форму",
+          text: "Բացել ձևը",
           web_app: { url: formUrl }
         }
       ]
@@ -3552,10 +3905,10 @@ async function sendWorkingSheetForDepartment(
     fileName,
     bytes,
     [
-      `Рабочая таблица для отделения: ${meta.department}`,
-      `Дата отчёта: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
-      "Заполните нужные данные отделения и отправьте XLSX-файл обратно мне. Пожалуйста, не забудьте прислать и фото бланка документа.",
-      "После возврата файла данные попадут на проверку перед общей таблицей. Спасибо."
+      `Բաժանմունքի աշխատանքային աղյուսակ: ${meta.department}`,
+      `Հաշվետվության ամսաթիվ: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
+      "Լրացրեք բաժանմունքի անհրաժեշտ տվյալները եւ XLSX ֆայլը ուղարկեք ինձ հետ։ Խնդրում եմ չմոռանալ ուղարկել նաեւ բլանկի լուսանկարը։",
+      "Ֆայլը վերադարձնելուց հետո տվյալները կանցնեն ստուգման՝ մինչ ընդհանուր աղյուսակ մտնելը։ Շնորհակալություն։"
     ].join("\n")
   );
 }
@@ -3574,11 +3927,11 @@ async function sendTelegramWebFormForDepartment(
   const row = snapshot.rows.find((item) => item.id === departmentId);
   const currentValues = row ? row.values : sanitizeValues(null);
   const caption = [
-    `Текущие данные отделения: ${meta.department} (${meta.marker})`,
-    `Дата отчёта: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
-    "PDF сформирован из главной таблицы. Сохраните его у себя.",
-    "Кнопка ниже откроет Telegram форму для новых данных.",
-    "После отправки формы пришлите сюда фото бланка этого отделения."
+    `Բաժանմունքի ընթացիկ տվյալներ: ${meta.department} (${meta.marker})`,
+    `Հաշվետվության ամսաթիվ: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
+    "PDF-ը ստեղծված է գլխավոր աղյուսակից։ Պահպանեք այն Ձեզ մոտ։",
+    "Ստորեւ կոճակը կբացի Telegram ձևը նոր տվյալների համար։",
+    "Ձևը ուղարկելուց հետո խնդրում եմ այստեղ ուղարկել նաեւ այս բաժանմունքի բլանկի լուսանկարը։"
   ].join("\n");
   const replyMarkup = buildTelegramFormReplyMarkup(formUrl);
 
@@ -3597,10 +3950,10 @@ async function sendTelegramWebFormForDepartment(
     await sendTelegramMessageWithReplyMarkup(
       chatId,
       [
-        `Форма ввода для отделения: ${meta.department} (${meta.marker})`,
-        `Дата отчёта: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
-        "PDF с текущими данными сейчас не удалось создать, но форму можно открыть.",
-        "После отправки формы пришлите сюда фото бланка этого отделения."
+        `Մուտքագրման ձև բաժանմունքի համար: ${meta.department} (${meta.marker})`,
+        `Հաշվետվության ամսաթիվ: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
+        "Ընթացիկ տվյալների PDF-ը հիմա չստացվեց ստեղծել, բայց ձևը կարելի է բացել։",
+        "Ձևը ուղարկելուց հետո խնդրում եմ այստեղ ուղարկել նաեւ այս բաժանմունքի բլանկի լուսանկարը։"
       ].join("\n"),
       replyMarkup
     );
@@ -3625,9 +3978,9 @@ async function sendTelegramWebFormPromptAfterPhoto(
     [
       baseText,
       "",
-      "Теперь заполните Telegram форму по этому же отделению.",
-      `Отделение: ${meta.department} (${meta.marker})`,
-      "Если форму уже отправляли, повторно заполнять не нужно."
+      "Այժմ լրացրեք նույն բաժանմունքի Telegram ձևը։",
+      `Բաժանմունք: ${meta.department} (${meta.marker})`,
+      "Եթե ձևը արդեն ուղարկել եք, կրկին լրացնել պետք չէ։"
     ].join("\n"),
     buildTelegramFormReplyMarkup(formUrl)
   );
@@ -3658,14 +4011,14 @@ function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
   const updatedRows = rowsWithData
     .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))
     .slice(0, 5)
-    .map((row) => `- ${row.department}: ${row.updatedAt ? new Date(row.updatedAt).toLocaleString("ru-RU") : "нет даты"}`);
+    .map((row) => `- ${row.department}: ${row.updatedAt ? new Date(row.updatedAt).toLocaleString("hy-AM") : "ամսաթիվ չկա"}`);
 
   return [
-    `Дата отчёта: ${snapshot.reportDate}`,
-    `Заполнено отделений: ${rowsWithData.length}/${snapshot.rows.length}`,
-    snapshot.updatedAt ? `Последнее обновление сводки: ${new Date(snapshot.updatedAt).toLocaleString("ru-RU")}` : "",
+    `Հաշվետվության ամսաթիվ: ${snapshot.reportDate}`,
+    `Լրացված բաժանմունքներ: ${rowsWithData.length}/${snapshot.rows.length}`,
+    snapshot.updatedAt ? `Ամփոփագրի վերջին թարմացում: ${new Date(snapshot.updatedAt).toLocaleString("hy-AM")}` : "",
     updatedRows.length ? "" : null,
-    updatedRows.length ? "Последние обновления:" : null,
+    updatedRows.length ? "Վերջին թարմացումներ:" : null,
     ...updatedRows
   ].filter(Boolean).join("\n");
 }
@@ -3752,14 +4105,14 @@ async function handleTelegramWebFormSubmit(request: Request) {
       ? payload.departmentId as DepartmentId
       : null;
     if (!departmentId) {
-      return jsonResponse({ ok: false, error: "Не удалось определить отделение формы." }, 400);
+      return jsonResponse({ ok: false, error: "Ձևի բաժանմունքը որոշել չհաջողվեց։" }, 400);
     }
 
     const supabase = createSupabaseAdmin();
     if (!await isTelegramUserAllowedByRuntimeState(supabase, verifiedUser.userId)) {
       return jsonResponse({
         ok: false,
-        error: "Бот временно отключён для коллег. Обратитесь к администратору."
+        error: "Բոտը ժամանակավորապես անջատված է կոլեգաների համար։ Խնդրում ենք դիմել ադմինիստրատորին։"
       }, 403);
     }
 
@@ -3773,7 +4126,7 @@ async function handleTelegramWebFormSubmit(request: Request) {
     if (!validation.isValid) {
       return jsonResponse({
         ok: false,
-        error: "Контроль формулы не пройден.",
+        error: "Բանաձևի վերահսկումը չի անցել։",
         validation
       }, 400);
     }
@@ -3794,13 +4147,13 @@ async function handleTelegramWebFormSubmit(request: Request) {
     await markDepartmentPhotoPending(supabase as ReturnType<typeof createClient>, departmentId, feedbackId, "telegram-web-app-form");
     const meta = DEPARTMENTS[departmentId];
     const messageText = [
-      "Спасибо. Отличная работа. 🙂",
-      "Форма проверена: формула совпала.",
-      `Отделение: ${meta.department} (${meta.marker})`,
-      `Сумма 13-22 = ${validation.actual}.`,
-      "Данные приняты на проверку. В общую таблицу пока не внесены автоматически.",
-      "Пожалуйста, отправьте сюда фото бланка этого отделения, чтобы можно было сверить форму с документом.",
-      "Прикрепляю PDF-бланк уже с новыми значениями из Telegram формы."
+      "Շնորհակալություն։ Գերազանց աշխատանք է։ 🙂",
+      "Ձևը ստուգված է. բանաձևը համընկավ։",
+      `Բաժանմունք: ${meta.department} (${meta.marker})`,
+      `13-22 գումարը = ${validation.actual}.`,
+      "Տվյալները ընդունված են ստուգման։ Ընդհանուր աղյուսակում դեռ ավտոմատ չեն գրանցվել։",
+      "Խնդրում եմ այստեղ ուղարկել այս բաժանմունքի բլանկի լուսանկարը, որ ձևը կարողանանք համեմատել փաստաթղթի հետ։",
+      "Կցում եմ PDF բլանկը՝ Telegram ձևից ստացված նոր արժեքներով։"
     ].join("\n");
 
     if (verifiedUser.userId) {
@@ -3885,10 +4238,25 @@ async function handleTelegramNightFormSubmit(request: Request) {
       await sendTelegramMessageToMany(notifyChatIds, summaryText);
     }
     if (verifiedUser.userId) {
+      await updateTelegramPresenceRecord(
+        supabase as ReturnType<typeof createClient>,
+        {
+          chatId: String(verifiedUser.userId),
+          firstName: verifiedUser.firstName,
+          lastName: verifiedUser.lastName,
+          username: verifiedUser.username,
+          updatedAt: new Date().toISOString()
+        },
+        { isDuty: false }
+      ).catch((error) => {
+        console.error("Failed to clear Telegram night duty mark:", sanitizePublicErrorMessage(error));
+      });
       await sendTelegramMessage(
         verifiedUser.userId,
         [
-          "Շնորհակալություն։ Գիշերային հերթափոխի տվյալները պահպանվել են։",
+          `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Գիշերային հերթափոխի տվյալները պահպանվել են։`,
+          "Շատ լավ աշխատանք է։ Առավոտյան ամենակարեւոր բաներից մեկը կարգավորված տվյալներն են, եւ Դուք դա արդեն արեցիք։",
+          "Թող հերթափոխի ավարտը լինի հանգիստ, իսկ սուրճը՝ արժանիորեն տաք։",
           "Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
         ].join("\n")
       ).catch((error) => {
@@ -3958,14 +4326,14 @@ function buildPhotoSenderResponse(
 ) {
   if (isControlPassed) {
     const address = firstName ? `${firstName}, ` : "";
-    return `${address}спасибо, контроль отделения пройден. Отличная работа. 🙂`;
+    return `${address}շնորհակալություն, բաժանմունքի վերահսկումը անցավ։ Գերազանց աշխատանք է։ 🙂`;
   }
 
   const reason = !hasRecognizedValues
-    ? "не удалось уверенно прочитать значения"
+    ? "արժեքները վստահ կարդալ չհաջողվեց"
     : (structureInvalid
-      ? "верхняя строка бланка распознана неуверенно"
-      : (validation && !validation.isValid ? "формула отделения не совпала" : "контроль не пройден"));
+      ? "բլանկի վերին տողը վստահ չի ճանաչվել"
+      : (validation && !validation.isValid ? "բաժանմունքի բանաձևը չի համընկել" : "վերահսկումը չի անցել"));
 
   return buildPhotoRetakeResponse(reason, firstName);
 }
@@ -3973,10 +4341,10 @@ function buildPhotoSenderResponse(
 function buildPhotoRetakeResponse(reason: string, firstName = "") {
   const address = firstName ? `${firstName}, ` : "";
   return [
-    `${address}контроль отделения не пройден, но это поправимо.`,
-    `Причина: ${reason}.`,
-    "Пожалуйста, пришлите повторный качественный снимок бланка: ровно, без обрезанных краёв, чтобы SR-маркер и верхняя строка с ячейками были хорошо видны.",
-    "Маленькая хитрость: лучше чуть дальше и ровнее, чем близко и под углом. OCR тогда меньше ворчит и больше помогает."
+    `${address}բաժանմունքի վերահսկումը չի անցել, բայց դա հեշտ ուղղելի է։`,
+    `Պատճառը: ${reason}.`,
+    "Խնդրում եմ ուղարկել բլանկի նոր, որակյալ լուսանկար՝ ուղիղ, առանց կտրված եզրերի, որպեսզի SR նշանը եւ վերին տողի բջիջները լավ երեւան։",
+    "Փոքրիկ հնարք. ավելի լավ է նկարել մի քիչ հեռվից եւ ուղիղ, քան շատ մոտիկից եւ անկյան տակ։ Այդպես OCR-ը քիչ է բողոքում եւ ավելի շատ օգնում։"
   ].join("\n");
 }
 
@@ -3993,6 +4361,16 @@ function getMessageText(message: Record<string, unknown>) {
 function getMessageChatId(message: Record<string, unknown>) {
   const chat = message.chat as { id?: number } | undefined;
   return typeof chat?.id === "number" ? chat.id : null;
+}
+
+function extractTelegramLocation(message: Record<string, unknown>) {
+  const location = message.location as { latitude?: unknown; longitude?: unknown } | undefined;
+  const latitude = sanitizeCoordinate(location?.latitude, -90, 90);
+  const longitude = sanitizeCoordinate(location?.longitude, -180, 180);
+  if (latitude === null || longitude === null) {
+    return null;
+  }
+  return { latitude, longitude };
 }
 
 function getMessageChatType(message: Record<string, unknown>) {
@@ -4057,6 +4435,212 @@ function buildIncomingPhotoAdminCaption(
     `Отправитель: ${getTelegramSenderLabel(message, chatId)}`,
     shortHint ? `Подпись: ${shortHint}` : ""
   ].filter(Boolean).join("\n");
+}
+
+function formatDistanceMeters(distanceMeters: number) {
+  if (distanceMeters >= 1000) {
+    return `${(distanceMeters / 1000).toFixed(1).replace(".", ",")} կմ`;
+  }
+  return `${distanceMeters} մ`;
+}
+
+function buildWorkplaceStatusText(location: TelegramWorkplaceLocation | null) {
+  if (!location) {
+    return "Հիվանդանոցի GPS կետը դեռ սահմանված չէ։";
+  }
+  return [
+    `GPS կետ: ${location.label}`,
+    `Լայնություն: ${location.latitude}`,
+    `Երկայնություն: ${location.longitude}`,
+    `Ռադիուս: ${location.radiusMeters} մ`,
+    location.updatedAt ? `Թարմացվել է: ${location.updatedAt}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function buildWorkplaceArrivalText(
+  firstName: string,
+  location: TelegramWorkplaceLocation,
+  distanceMeters: number,
+  isDuty: boolean,
+  alreadyAtWork: boolean
+) {
+  if (alreadyAtWork) {
+    return [
+      `${firstName}, Դուք արդեն նշված եք աշխատանքի վայրում։`,
+      `Հեռավորությունը ${location.label}-ից՝ ${formatDistanceMeters(distanceMeters)}։`,
+      "Ես պահում եմ փոքրիկ հերթապահությունը այստեղ՝ հանգիստ եւ ուշադիր։"
+    ].join("\n");
+  }
+
+  if (isDuty) {
+    return [
+      `Բարի գիշերային հերթապահություն, ${firstName}։`,
+      `Դուք գտնվում եք ${location.label}-ի տարածքում՝ մոտ ${formatDistanceMeters(distanceMeters)} հեռավորությամբ։`,
+      "Թող հերթափոխը լինի խաղաղ։ Եթե ինչ-որ բան խառնվի, ես այստեղ եմ՝ առանց ավելորդ աղմուկի օգնելու համար։"
+    ].join("\n");
+  }
+
+  return [
+    `Բարի գալուստ աշխատանքի, ${firstName}։`,
+    `Դուք գտնվում եք ${location.label}-ի տարածքում՝ մոտ ${formatDistanceMeters(distanceMeters)} հեռավորությամբ։`,
+    "Թող օրը լինի հանգիստ, արդյունավետ եւ մի քիչ էլ բարի անակնկալներով։"
+  ].join("\n");
+}
+
+function buildWorkplaceAwayText(
+  firstName: string,
+  location: TelegramWorkplaceLocation,
+  distanceMeters: number,
+  wasAtWork: boolean
+) {
+  if (wasAtWork) {
+    return [
+      `${firstName}, կարծես արդեն դուրս եք եկել ${location.label}-ի տարածքից։`,
+      `Հեռավորությունը՝ ${formatDistanceMeters(distanceMeters)}։`,
+      "Շնորհակալություն աշխատանքի համար։ Հանգիստ եւ խաղաղ երեկո Ձեզ։"
+    ].join("\n");
+  }
+  return [
+    `${firstName}, այս պահին Դուք ${location.label}-ի տարածքից դուրս եք։`,
+    `Հեռավորությունը՝ ${formatDistanceMeters(distanceMeters)}։`,
+    "Երբ հասնեք հիվանդանոց, կրկին սեղմեք «Ես աշխատանքի եմ» կոճակը։ Ես չեմ նեղանում, պարզապես քարտեզի հետ եմ խորհրդակցում։"
+  ].join("\n");
+}
+
+function buildWorkplaceSetupHelpText() {
+  return [
+    "Հիվանդանոցի GPS կետը դեռ սահմանված չէ։",
+    "Ադմինը կարող է կանգնել հիվանդանոցում եւ ուղարկել /set_workplace_here հրամանը, հետո սեղմել կետի կոճակը։",
+    "Կարելի է նաեւ գրել՝ /set_workplace LAT LON 500"
+  ].join("\n");
+}
+
+async function notifyTelegramWorkplaceEvent(
+  chatId: number | string,
+  person: TelegramColleagueChat,
+  text: string
+) {
+  const notifyChatIds = getTelegramNotifyChatIds(chatId)
+    .filter((targetChatId) => String(targetChatId) !== person.chatId);
+  if (!notifyChatIds.length) {
+    return;
+  }
+  await sendTelegramMessageToMany(notifyChatIds, text);
+}
+
+async function handleTelegramLocation(
+  supabase: ReturnType<typeof createClient>,
+  responseChatId: number,
+  message: Record<string, unknown>,
+  accessChatId: number | string,
+  locationPoint: { latitude: number; longitude: number }
+) {
+  const person = getTelegramPersonFromMessage(message, accessChatId);
+  const firstName = getTelegramColleagueFirstName(person);
+  const pendingSetupChatId = await getTelegramWorkplaceSetupPending(supabase);
+
+  if (isTelegramAdminChat(accessChatId) && pendingSetupChatId === String(accessChatId)) {
+    const location: TelegramWorkplaceLocation = {
+      latitude: locationPoint.latitude,
+      longitude: locationPoint.longitude,
+      radiusMeters: DEFAULT_WORKPLACE_RADIUS_METERS,
+      label: "հիվանդանոց",
+      updatedAt: new Date().toISOString()
+    };
+    await saveTelegramWorkplaceLocation(supabase, location);
+    await clearTelegramWorkplaceSetupPending(supabase);
+    await sendTelegramMessage(
+      responseChatId,
+      [
+        "Հիվանդանոցի GPS կետը պահպանված է։",
+        buildWorkplaceStatusText(location),
+        "Այժմ գործընկերները կարող են սեղմել «Ես աշխատանքի եմ» կոճակը։"
+      ].join("\n")
+    );
+    return;
+  }
+
+  const workplace = await loadTelegramWorkplaceLocation(supabase);
+  if (!workplace) {
+    await sendTelegramMessageWithReplyMarkup(
+      responseChatId,
+      isTelegramAdminChat(accessChatId)
+        ? buildWorkplaceSetupHelpText()
+        : "GPS կետը դեռ կարգավորված չէ։ Երբ Վադիմ Աշոտիչը սահմանի հիվանդանոցի կետը, կկարողանամ ճանաչել Ձեր ներկայությունը։",
+      isTelegramAdminChat(accessChatId) ? buildWorkplaceSetupLocationReplyMarkup() : buildWorkplaceLocationReplyMarkup()
+    );
+    return;
+  }
+
+  const distanceMeters = getDistanceMeters(
+    workplace.latitude,
+    workplace.longitude,
+    locationPoint.latitude,
+    locationPoint.longitude
+  );
+  const isAtWork = distanceMeters <= workplace.radiusMeters;
+  const records = await loadTelegramPresenceRecords(supabase);
+  const previous = records.find((item) => item.chatId === person.chatId);
+  const nowText = getYerevanDateTimeText();
+
+  if (isAtWork) {
+    const isDuty = previous?.isDuty === true || isYerevanNightDutyTime();
+    const alreadyAtWork = previous?.status === "at_work";
+    const result = await updateTelegramPresenceRecord(supabase, person, {
+      status: "at_work",
+      isDuty,
+      arrivedAt: alreadyAtWork ? previous?.arrivedAt || nowText : nowText,
+      lastLatitude: locationPoint.latitude,
+      lastLongitude: locationPoint.longitude,
+      distanceMeters
+    });
+    await sendTelegramMessageWithReplyMarkup(
+      responseChatId,
+      buildWorkplaceArrivalText(firstName, workplace, distanceMeters, result.previous?.status === "at_work" ? result.current.isDuty : isDuty, alreadyAtWork),
+      buildWorkplaceLocationReplyMarkup()
+    );
+    if (!alreadyAtWork) {
+      await notifyTelegramWorkplaceEvent(
+        responseChatId,
+        person,
+        [
+          "Կոլեգան աշխատանքի վայրում է։",
+          `Ով: ${getTelegramColleagueDisplayName(person)}`,
+          `Կարգավիճակ: ${isDuty ? "գիշերային հերթապահություն" : "աշխատանքի ժամ"}`,
+          `Հեռավորություն: ${formatDistanceMeters(distanceMeters)}`,
+          `Ժամանակ: ${nowText}`
+        ].join("\n")
+      );
+    }
+    return;
+  }
+
+  const wasAtWork = previous?.status === "at_work";
+  await updateTelegramPresenceRecord(supabase, person, {
+    status: "away",
+    isDuty: false,
+    leftAt: nowText,
+    lastLatitude: locationPoint.latitude,
+    lastLongitude: locationPoint.longitude,
+    distanceMeters
+  });
+  await sendTelegramMessageWithReplyMarkup(
+    responseChatId,
+    buildWorkplaceAwayText(firstName, workplace, distanceMeters, wasAtWork),
+    buildWorkplaceLocationReplyMarkup()
+  );
+  if (wasAtWork) {
+    await notifyTelegramWorkplaceEvent(
+      responseChatId,
+      person,
+      [
+        "Կոլեգան դուրս է եկել հիվանդանոցի տարածքից։",
+        `Ով: ${getTelegramColleagueDisplayName(person)}`,
+        `Հեռավորություն: ${formatDistanceMeters(distanceMeters)}`,
+        `Ժամանակ: ${nowText}`
+      ].join("\n")
+    );
+  }
 }
 
 function extractPhotoFileId(message: Record<string, unknown>) {
@@ -4164,27 +4748,27 @@ async function handleTelegramCallbackQuery(
   }
 
   if (!isTelegramAdminChat(adminChatId)) {
-    await answerTelegramCallbackQuery(callbackQueryId, "Эта кнопка доступна только администратору.").catch(() => null);
+    await answerTelegramCallbackQuery(callbackQueryId, "Այս կոճակը հասանելի է միայն ադմինիստրատորին։").catch(() => null);
     return;
   }
 
   const match = data.match(/^(approve_colleague|reject_colleague):(.+)$/);
   if (!match) {
-    await answerTelegramCallbackQuery(callbackQueryId, "Неизвестное действие.").catch(() => null);
+    await answerTelegramCallbackQuery(callbackQueryId, "Գործողությունը չճանաչվեց։").catch(() => null);
     return;
   }
 
   const action = match[1];
   const targetChatId = match[2].trim();
   if (!targetChatId) {
-    await answerTelegramCallbackQuery(callbackQueryId, "Не найден chat id пользователя.").catch(() => null);
+    await answerTelegramCallbackQuery(callbackQueryId, "Օգտվողի chat id-ն չի գտնվել։").catch(() => null);
     return;
   }
 
   if (action === "approve_colleague") {
     const colleague = await approveTelegramColleague(supabase, targetChatId);
     const enabled = await areTelegramColleaguesEnabled(supabase);
-    await answerTelegramCallbackQuery(callbackQueryId, "Коллега одобрен.").catch(() => null);
+    await answerTelegramCallbackQuery(callbackQueryId, "Կոլեգան հաստատված է։").catch(() => null);
     if (callbackMessageChatId !== null) {
       await clearTelegramInlineKeyboard(callbackMessageChatId, callbackMessageId).catch(() => null);
       await sendTelegramMessage(
@@ -4197,13 +4781,16 @@ async function handleTelegramCallbackQuery(
         ].join("\n")
       );
     }
-    await sendTelegramMessage(
+    await sendTelegramMessageWithReplyMarkup(
       targetChatId,
       [
-        `${getTelegramColleagueFirstName(colleague)}, доступ к Mainflow боту открыт.`,
-        "Добро пожаловать. Я уже на посту: принимаю фото бланков, формы и ночную смену.",
-        "Если что-то не получится с первого кадра, не переживайте: я подскажу, как снять лучше. У нас тут не экзамен по фотографии, а командная работа."
-      ].join("\n")
+        `${getTelegramColleagueFirstName(colleague)}, Mainflow բոտի հասանելիությունը բացված է։`,
+        "Բարի գալուստ։ Ես արդեն իմ փոքրիկ պոստում եմ՝ ընդունում եմ բլանկների լուսանկարներ, ձևեր և գիշերային հերթափոխի տվյալներ։",
+        "Եթե առաջին լուսանկարը կատարյալ չստացվի, մի անհանգստացեք. ես կհուշեմ, ինչպես նկարել ավելի լավ։ Սա լուսանկարչության քննություն չէ, այլ թիմային աշխատանք։",
+        "",
+        "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը եւ ուղարկեք geolocation-ը։"
+      ].join("\n"),
+      buildWorkplaceLocationReplyMarkup()
     ).catch((error) => {
       console.error("Failed to notify approved Telegram colleague:", sanitizePublicErrorMessage(error));
     });
@@ -4211,7 +4798,7 @@ async function handleTelegramCallbackQuery(
   }
 
   const colleague = await rejectTelegramColleague(supabase, targetChatId);
-  await answerTelegramCallbackQuery(callbackQueryId, "Заявка отклонена.").catch(() => null);
+  await answerTelegramCallbackQuery(callbackQueryId, "Հայտը մերժված է։").catch(() => null);
   if (callbackMessageChatId !== null) {
     await clearTelegramInlineKeyboard(callbackMessageChatId, callbackMessageId).catch(() => null);
     await sendTelegramMessage(
@@ -4222,8 +4809,8 @@ async function handleTelegramCallbackQuery(
   await sendTelegramMessage(
     targetChatId,
     [
-      `${getTelegramColleagueFirstName(colleague)}, сейчас доступ к Mainflow боту не одобрен.`,
-      "Если доступ действительно нужен, пожалуйста, обратитесь к Вадиму Ашотичу."
+      `${getTelegramColleagueFirstName(colleague)}, Mainflow բոտի հասանելիությունը հիմա հաստատված չէ։`,
+      "Եթե հասանելիությունը իսկապես անհրաժեշտ է, խնդրում եմ դիմեք Վադիմ Աշոտիչին։"
     ].join("\n")
   ).catch((error) => {
     console.error("Failed to notify rejected Telegram colleague:", sanitizePublicErrorMessage(error));
@@ -4241,7 +4828,7 @@ async function handleTelegramCommand(
 
   if (["/kollegi_on", "/colleagues_on", "/access_on"].includes(command)) {
     if (!isTelegramAdminChat(accessChatId)) {
-      await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
       return;
     }
     await setTelegramColleaguesEnabled(supabase, true);
@@ -4251,7 +4838,7 @@ async function handleTelegramCommand(
 
   if (["/kollegi_off", "/colleagues_off", "/access_off"].includes(command)) {
     if (!isTelegramAdminChat(accessChatId)) {
-      await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
       return;
     }
     await setTelegramColleaguesEnabled(supabase, false);
@@ -4261,7 +4848,7 @@ async function handleTelegramCommand(
 
   if (["/kollegi_status", "/colleagues_status", "/access_status"].includes(command)) {
     if (!isTelegramAdminChat(accessChatId)) {
-      await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
       return;
     }
     const enabled = await areTelegramColleaguesEnabled(supabase);
@@ -4282,7 +4869,7 @@ async function handleTelegramCommand(
 
   if (["/reminder_12", "/reminder12"].includes(command)) {
     if (!isTelegramAdminChat(accessChatId)) {
-      await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
       return;
     }
     const result = await sendDailyReminderToColleagues(supabase, "midday", { force: true });
@@ -4292,7 +4879,7 @@ async function handleTelegramCommand(
 
   if (["/reminder_17", "/reminder17"].includes(command)) {
     if (!isTelegramAdminChat(accessChatId)) {
-      await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
       return;
     }
     const result = await sendDailyReminderToColleagues(supabase, "evening", { force: true });
@@ -4300,15 +4887,146 @@ async function handleTelegramCommand(
     return;
   }
 
+  if (["/night_reminder", "/night_duty_reminder"].includes(command)) {
+    if (!isTelegramAdminChat(accessChatId)) {
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
+      return;
+    }
+    const result = await sendNightDutyReminderToColleagues(supabase, { force: true });
+    await sendTelegramMessage(chatId, `Утреннее напоминание дежурным отправлено: ${result.sent}.`);
+    return;
+  }
+
+  if (["/geo", "/location", "/work", "/at_work"].includes(command)) {
+    await sendTelegramMessageWithReplyMarkup(
+      chatId,
+      [
+        "Սեղմեք կոճակը եւ ուղարկեք Ձեր գտնվելու վայրը։",
+        "Եթե Դուք հիվանդանոցում եք, ես կնշեմ, որ աշխատանքի եք։ Եթե գիշերային ժամ է, կհասկանամ, որ հերթապահություն է։"
+      ].join("\n"),
+      buildWorkplaceLocationReplyMarkup()
+    );
+    return;
+  }
+
+  if (["/duty", "/дежурю"].includes(command)) {
+    const person = message ? getTelegramPersonFromMessage(message, accessChatId) : {
+      chatId: String(accessChatId),
+      firstName: "",
+      lastName: "",
+      username: "",
+      updatedAt: new Date().toISOString()
+    };
+    await updateTelegramPresenceRecord(supabase, person, { isDuty: true });
+    await sendTelegramMessageWithReplyMarkup(
+      chatId,
+      [
+        `${getTelegramColleagueFirstName(person)}, գիշերային հերթապահության նշումը միացված է։`,
+        "Երբ հիվանդանոցում լինեք, սեղմեք «Ես աշխատանքի եմ», որ առավոտյան հիշեցումը ճիշտ հասնի Ձեզ։"
+      ].join("\n"),
+      buildWorkplaceLocationReplyMarkup()
+    );
+    return;
+  }
+
+  if (["/not_duty", "/no_duty", "/не_дежурю"].includes(command)) {
+    const person = message ? getTelegramPersonFromMessage(message, accessChatId) : {
+      chatId: String(accessChatId),
+      firstName: "",
+      lastName: "",
+      username: "",
+      updatedAt: new Date().toISOString()
+    };
+    await updateTelegramPresenceRecord(supabase, person, { isDuty: false });
+    await sendTelegramMessage(chatId, `${getTelegramColleagueFirstName(person)}, գիշերային հերթապահության նշումը անջատված է։`);
+    return;
+  }
+
+  if (command === "/set_workplace_here") {
+    if (!isTelegramAdminChat(accessChatId)) {
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
+      return;
+    }
+    await setTelegramWorkplaceSetupPending(supabase, accessChatId);
+    await sendTelegramMessageWithReplyMarkup(
+      chatId,
+      [
+        "Կանգնեք հիվանդանոցի այն կետում, որը ուզում եք ընդունել որպես կենտրոն։",
+        "Հետո սեղմեք կոճակը եւ ուղարկեք Ձեր GPS կետը։ Նախնական ռադիուսը կլինի 500 մետր։"
+      ].join("\n"),
+      buildWorkplaceSetupLocationReplyMarkup()
+    );
+    return;
+  }
+
+  if (command === "/set_workplace") {
+    if (!isTelegramAdminChat(accessChatId)) {
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
+      return;
+    }
+    const parts = text.trim().split(/\s+/).slice(1);
+    const latitude = sanitizeCoordinate(parts[0], -90, 90);
+    const longitude = sanitizeCoordinate(parts[1], -180, 180);
+    if (latitude === null || longitude === null) {
+      await sendTelegramMessage(chatId, "Օրինակ՝ /set_workplace 40.12345 44.12345 500");
+      return;
+    }
+    const location: TelegramWorkplaceLocation = {
+      latitude,
+      longitude,
+      radiusMeters: sanitizeRadiusMeters(parts[2]),
+      label: "հիվանդանոց",
+      updatedAt: new Date().toISOString()
+    };
+    await saveTelegramWorkplaceLocation(supabase, location);
+    await clearTelegramWorkplaceSetupPending(supabase);
+    await sendTelegramMessage(chatId, `GPS կետը պահպանված է։\n${buildWorkplaceStatusText(location)}`);
+    return;
+  }
+
+  if (command === "/workplace_status") {
+    if (!isTelegramAdminChat(accessChatId)) {
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
+      return;
+    }
+    const location = await loadTelegramWorkplaceLocation(supabase);
+    const records = await loadTelegramPresenceRecords(supabase);
+    const activeRecords = records.filter((item) => item.status === "at_work");
+    const activeLines = activeRecords.length
+      ? activeRecords.map((item) => {
+        const distance = typeof item.distanceMeters === "number" ? `, ${formatDistanceMeters(item.distanceMeters)}` : "";
+        return `- ${getTelegramColleagueDisplayName(item)}${item.isDuty ? " (հերթապահ)" : ""}${distance}`;
+      })
+      : ["- Հիմա ոչ ոք նշված չէ որպես հիվանդանոցում գտնվող։"];
+    await sendTelegramMessage(
+      chatId,
+      [
+        buildWorkplaceStatusText(location),
+        "",
+        "Ներկա նշված գործընկերներ.",
+        ...activeLines
+      ].join("\n")
+    );
+    return;
+  }
+
   if (command === "/start") {
     const person = message ? getTelegramPersonFromMessage(message, chatId) : null;
-    await sendTelegramMessage(chatId, buildColleagueStartText(person ? getTelegramColleagueFirstName(person) : ""));
+    await sendTelegramMessageWithReplyMarkup(
+      chatId,
+      [
+        buildColleagueStartText(person ? getTelegramColleagueFirstName(person) : ""),
+        "",
+        "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը։"
+      ].join("\n"),
+      buildWorkplaceLocationReplyMarkup()
+    );
     return;
   }
 
   if (command === "/help") {
     if (!isTelegramAdminChat(accessChatId)) {
-      await sendTelegramMessage(chatId, "Команда /help доступна только администратору. Для списка SR-кодов используйте /start или /departments.");
+      await sendTelegramMessage(chatId, "Այս հրամանը հասանելի է միայն ադմինիստրատորին։ SR կոդերի ցանկի համար օգտագործեք /start կամ /departments։");
       return;
     }
     await sendTelegramMessage(chatId, buildAdminHelpText());
@@ -4349,7 +5067,7 @@ async function handleTelegramCommand(
   if (command === "/sheet") {
     const departmentId = detectDepartmentFromHint(text);
     if (!departmentId) {
-      await sendTelegramMessage(chatId, "Укажите отделение после команды: /sheet r4 или /sheet SR-4.");
+      await sendTelegramMessage(chatId, "Խնդրում եմ հրամանից հետո նշել բաժանմունքը՝ /sheet r4 կամ /sheet SR-4։");
       return;
     }
     await sendWorkingSheetForDepartment(supabase, chatId, departmentId, text);
@@ -4359,7 +5077,7 @@ async function handleTelegramCommand(
   if (command === "/form") {
     const departmentId = detectDepartmentFromHint(text);
     if (!departmentId) {
-      await sendTelegramMessage(chatId, "Укажите отделение после команды: /form r4 или /form SR-4.");
+      await sendTelegramMessage(chatId, "Խնդրում եմ հրամանից հետո նշել բաժանմունքը՝ /form r4 կամ /form SR-4։");
       return;
     }
     await sendTelegramWebFormForDepartment(supabase, chatId, departmentId, text);
@@ -4376,16 +5094,16 @@ async function handleTelegramCommand(
     await sendTelegramMessage(
       chatId,
       [
-        "Главный файл готов по этой ссылке:",
+        "Գլխավոր ֆայլը պատրաստ է այս էջում՝",
         getMainPageUrl(),
         "",
-        "Откройте страницу и сохраните PDF через кнопку печати браузера."
+        "Բացեք էջը եւ PDF-ը պահեք բրաուզերի տպման կոճակով։"
       ].join("\n")
     );
     return;
   }
 
-  await sendTelegramMessage(chatId, "Неизвестная команда. Используйте /help.");
+  await sendTelegramMessage(chatId, "Հրամանը չճանաչվեց։ Օգտագործեք /start կամ SR-?՝ բաժանմունքների ցանկը տեսնելու համար։");
 }
 
 async function handleTelegramPhoto(
@@ -4395,7 +5113,7 @@ async function handleTelegramPhoto(
 ) {
   const fileId = extractPhotoFileId(message);
   if (!fileId) {
-    await sendTelegramMessage(chatId, "Нужна фотография бланка. Отправьте фото или изображение как документ.");
+    await sendTelegramMessage(chatId, "Պետք է բլանկի լուսանկար։ Ուղարկեք լուսանկար կամ նկարը որպես փաստաթուղթ։");
     return;
   }
 
@@ -4407,7 +5125,7 @@ async function handleTelegramPhoto(
 
   await sendTelegramMessage(
     chatId,
-    `${senderFirstName}, фото получил. Сейчас аккуратно читаю бланк. Если что, я не ругаюсь — просто подскажу, как снять лучше.`
+    `${senderFirstName}, լուսանկարը ստացել եմ։ Հիմա ուշադիր կարդում եմ բլանկը։ Եթե ինչ-որ բան չստացվի, չեմ բարկանա՝ պարզապես կհուշեմ, ինչպես նկարել ավելի լավ։`
   );
 
   const sourceMessageId = getTelegramMessageId(message);
@@ -4446,7 +5164,7 @@ async function handleTelegramPhoto(
       }
       await sendTelegramMessage(
         chatId,
-        buildPhotoRetakeResponse("не удалось уверенно определить отделение по фото", senderFirstName)
+        buildPhotoRetakeResponse("լուսանկարով բաժանմունքը վստահ որոշել չհաջողվեց", senderFirstName)
       );
       return;
     }
@@ -4508,7 +5226,7 @@ async function handleTelegramSheetDocument(
   chatId: number,
   sheetDocument: { fileId: string; fileName: string; mimeType: string }
 ) {
-  await sendTelegramMessage(chatId, "XLSX-файл получен. Проверяю формулу...");
+  await sendTelegramMessage(chatId, "XLSX ֆայլը ստացել եմ։ Հիմա ստուգում եմ բանաձևը...");
 
   const downloaded = await downloadTelegramFileBytes(sheetDocument.fileId);
   const bytes = downloaded.bytes;
@@ -4522,13 +5240,13 @@ async function handleTelegramSheetDocument(
       fileName,
       bytes,
       [
-        "⚠️ Структура рабочей таблицы изменена.",
-        "Файл возвращаю обратно: нужно взять свежий файл у бота и заполнить только ячейки ввода.",
+        "⚠️ Աշխատանքային աղյուսակի կառուցվածքը փոխված է։",
+        "Ֆայլը վերադարձնում եմ. խնդրում եմ վերցնել թարմ ֆայլը բոտից եւ լրացնել միայն մուտքագրման բջիջները։",
         "",
-        `Отделение: ${meta.department} (${meta.marker})`,
-        `Что найдено: ${result.integrity.issues.join("; ")}.`,
+        `Բաժանմունք: ${meta.department} (${meta.marker})`,
+        `Ինչ է գտնվել: ${result.integrity.issues.join("; ")}.`,
         "",
-        "На телефоне приложение может позволять нажимать на все ячейки, но менять нужно только ячейки ввода с нулями."
+        "Հեռախոսում հավելվածը կարող է թույլ տալ սեղմել բոլոր բջիջները, բայց փոխել պետք է միայն զրոներով մուտքագրման բջիջները։"
       ].join("\n")
     );
     return;
@@ -4542,15 +5260,15 @@ async function handleTelegramSheetDocument(
       fileName,
       bytes,
       [
-        "⚠️ Контроль формулы не пройден.",
-        "Файл возвращаю обратно: нужно чуть поправить данные и отправить его снова.",
+        "⚠️ Բանաձևի վերահսկումը չի անցել։",
+        "Ֆայլը վերադարձնում եմ. պետք է մի փոքր ուղղել տվյալները եւ կրկին ուղարկել։",
         "",
-        `Отделение: ${meta.department} (${meta.marker})`,
-        `Сейчас сумма 13-22: ${result.validation.actual}`,
-        `По формуле должно быть: ${result.validation.expected}`,
-        `Разница: ${differenceText}`,
+        `Բաժանմունք: ${meta.department} (${meta.marker})`,
+        `Հիմա 13-22 գումարը՝ ${result.validation.actual}`,
+        `Բանաձևով պետք է լինի՝ ${result.validation.expected}`,
+        `Տարբերությունը՝ ${differenceText}`,
         "",
-        "Проверьте ячейки ввода, особенно блок 13-22, а также 1, 4, 7, 10, 11."
+        "Խնդրում եմ ստուգել մուտքագրման բջիջները, հատկապես 13-22 բլոկը, ինչպես նաեւ 1, 4, 7, 10, 11։"
       ].join("\n")
     );
     return;
@@ -4559,11 +5277,11 @@ async function handleTelegramSheetDocument(
   await sendTelegramMessage(
     chatId,
     [
-      "Спасибо. Отличная работа. 🙂",
-      "Файл проверен: формула совпала.",
-      `Отделение: ${meta.department} (${meta.marker})`,
-      `Сумма 13-22 = ${result.validation.actual}.`,
-      "Данные приняты на проверку. В общую таблицу пока не внесены автоматически."
+      "Շնորհակալություն։ Գերազանց աշխատանք է։ 🙂",
+      "Ֆայլը ստուգված է. բանաձևը համընկավ։",
+      `Բաժանմունք: ${meta.department} (${meta.marker})`,
+      `13-22 գումարը = ${result.validation.actual}.`,
+      "Տվյալները ընդունված են ստուգման։ Ընդհանուր աղյուսակում դեռ ավտոմատ չեն գրանցվել։"
     ].join("\n")
   );
 }
@@ -4601,6 +5319,12 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
   }
 
   const text = getMessageText(message);
+  const telegramLocation = extractTelegramLocation(message);
+
+  if (telegramLocation) {
+    await handleTelegramLocation(supabase, safeChatId, message, accessChatId, telegramLocation);
+    return;
+  }
 
   if (text.startsWith("/")) {
     await handleTelegramCommand(supabase, safeChatId, text, message, accessChatId);
@@ -4725,6 +5449,31 @@ Deno.serve(async (request) => {
       }
     }
 
+    if (action === "night-duty-reminder") {
+      if (!isTelegramReminderRequestValid(request)) {
+        return jsonResponse({ ok: false, error: "Invalid reminder secret." }, 403);
+      }
+      try {
+        const forceRaw = (currentUrl.searchParams.get("force") || "").trim().toLowerCase();
+        const force = forceRaw === "1" || forceRaw === "true" || forceRaw === "yes";
+        const supabase = createSupabaseAdmin();
+        const result = await sendNightDutyReminderToColleagues(supabase, { force });
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          action,
+          result
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "night_duty_reminder_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
+    }
+
     if (action === "feedback-photo") {
       try {
         const currentUrl = new URL(request.url);
@@ -4785,7 +5534,7 @@ Deno.serve(async (request) => {
     const chatId = message ? getMessageChatId(message) : null;
     if (chatId !== null && isAllowedChat(chatId)) {
       try {
-        await sendTelegramMessage(chatId, `Ошибка обработки запроса: ${publicMessage}`);
+        await sendTelegramMessage(chatId, `Հարցումը մշակել չհաջողվեց: ${publicMessage}`);
       } catch (_sendError) {
         console.error("Failed to notify Telegram chat about processing error.");
       }
