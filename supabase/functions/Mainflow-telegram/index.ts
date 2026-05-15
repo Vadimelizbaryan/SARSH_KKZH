@@ -1426,8 +1426,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
 
   const startX = 22;
   const tableTopY = 510;
-  const markerWidth = 36;
-  const nameWidth = 106;
+  const nameWidth = 142;
   const valueWidth = 28.4;
   const rowHeight = 18;
   const headerHeight = 23;
@@ -1439,7 +1438,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
   const border = rgb(0, 0, 0);
   const labelSize = 6.3;
   const valueSize = 7.2;
-  const valueX = (index: number) => startX + markerWidth + nameWidth + (index * valueWidth);
+  const valueX = (index: number) => startX + nameWidth + (index * valueWidth);
   const valueWidthFor = (count: number) => valueWidth * count;
   const headerY1 = tableTopY - headerHeight;
   const headerY2 = headerY1 - headerHeight;
@@ -1452,14 +1451,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     : getRowPdfValue(row, key);
   const cellLabel = (text: string, fallback = text) => getPdfText(text, fonts, fallback);
 
-  drawPdfCell(page, "SR", startX, headerY2, markerWidth, headerHeight * 2, {
-    font: fonts.bold,
-    size: 7,
-    align: "center",
-    fill: headerFill,
-    border
-  });
-  drawPdfCell(page, cellLabel("Բաժանմունք", "Department"), startX + markerWidth, headerY2, nameWidth, headerHeight * 2, {
+  drawPdfCell(page, cellLabel("Բաժանմունք", "Department"), startX, headerY2, nameWidth, headerHeight * 2, {
     font: fonts.bold,
     size: 7,
     align: "center",
@@ -1560,7 +1552,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     border
   });
 
-  drawPdfCell(page, dateText, startX, headerY3, markerWidth + nameWidth, headerHeight, {
+  drawPdfCell(page, dateText, startX, headerY3, nameWidth, headerHeight, {
     font: fonts.bold,
     size: 6.2,
     align: "center",
@@ -1596,14 +1588,7 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
     const y = firstBodyY - (rowIndex * rowHeight);
     const isSummary = Boolean(row.summaryRows);
     const rowFill = isSummary ? totalFill : undefined;
-    drawPdfCell(page, row.marker || "", startX, y, markerWidth, rowHeight, {
-      font: fonts.bold,
-      size: valueSize,
-      align: "center",
-      fill: rowFill || nameFill,
-      border
-    });
-    drawPdfCell(page, getPdfText(row.department, fonts, row.id), startX + markerWidth, y, nameWidth, rowHeight, {
+    drawPdfCell(page, getPdfText(row.department, fonts, row.id), startX, y, nameWidth, rowHeight, {
       font: isSummary ? fonts.bold : fonts.regular,
       size: isSummary ? 7.2 : (row.department.length > 18 ? 5.1 : 6.2),
       align: isSummary ? "center" : "left",
