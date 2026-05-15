@@ -236,10 +236,19 @@ input {
 
 .tg-night-table-wrap {
   max-height: 70vh;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .tg-night-table {
   min-width: 980px;
+}
+
+.tg-night-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  box-shadow: 0 2px 0 rgba(216, 203, 179, 0.95);
 }
 
 .tg-night-table th:first-child,
@@ -257,6 +266,10 @@ input {
 .tg-night-table thead th:first-child,
 .tg-night-table tfoot th {
   background: #efe0c3;
+}
+
+.tg-night-table thead th:first-child {
+  z-index: 5;
 }
 
 .tg-night-table tfoot th,
