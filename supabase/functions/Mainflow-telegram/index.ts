@@ -18,6 +18,7 @@ const TELEGRAM_WORKPLACE_LOCATION_META_KEY = "telegram_workplace_location";
 const TELEGRAM_WORKPLACE_SETUP_PENDING_META_KEY = "telegram_workplace_setup_pending";
 const TELEGRAM_COLLEAGUE_PRESENCE_META_KEY = "telegram_colleague_presence";
 const TELEGRAM_NIGHT_DUTY_REMINDER_META_KEY = "telegram_night_duty_reminder_sent";
+const TELEGRAM_GPS_SCENARIO_META_KEY = "telegram_gps_scenario_enabled";
 const TELEGRAM_DAILY_REMINDER_META_PREFIX = "telegram_daily_reminder_sent";
 const TELEGRAM_MAIN_PDFS_META_KEY = "telegram_main_pdfs_sent";
 const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
@@ -1438,15 +1439,20 @@ function buildColleagueApprovalReplyMarkup(chatId: string) {
   };
 }
 
-function buildWorkplaceLocationReplyMarkup() {
-  return {
-    keyboard: [
+function buildWorkplaceLocationReplyMarkup(gpsEnabled = false) {
+  const keyboard = gpsEnabled
+    ? [
       [{ text: "Ես աշխատանքի եմ", request_location: true }],
       [{ text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }]
-    ],
+    ]
+    : [
+      [{ text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }]
+    ];
+  return {
+    keyboard,
     resize_keyboard: true,
     one_time_keyboard: false,
-    input_field_placeholder: "Ուղարկեք Ձեր գտնվելու վայրը"
+    input_field_placeholder: gpsEnabled ? "Ուղարկեք Ձեր գտնվելու վայրը" : "Ընտրեք գործողությունը"
   };
 }
 
@@ -1683,6 +1689,21 @@ async function saveMetaValue(
   }
 }
 
+function parseTelegramBooleanFlag(value: string) {
+  return ["1", "true", "yes", "on", "enabled"].includes(value.trim().toLowerCase());
+}
+
+async function isTelegramGpsScenarioEnabled(supabase: ReturnType<typeof createClient>) {
+  return parseTelegramBooleanFlag(await loadMetaValue(supabase, TELEGRAM_GPS_SCENARIO_META_KEY));
+}
+
+async function setTelegramGpsScenarioEnabled(
+  supabase: ReturnType<typeof createClient>,
+  enabled: boolean
+) {
+  await saveMetaValue(supabase, TELEGRAM_GPS_SCENARIO_META_KEY, enabled ? "true" : "false");
+}
+
 async function setTelegramWorkplaceSetupPending(
   supabase: ReturnType<typeof createClient>,
   chatId: number | string
@@ -1737,6 +1758,9 @@ async function sendNightDutyReminderToColleagues(
   options: { force?: boolean } = {}
 ) {
   const dateKey = getYerevanDateKey();
+  if (!await isTelegramGpsScenarioEnabled(supabase)) {
+    return { sent: 0, skipped: "gps_disabled", dateKey };
+  }
   if (!options.force) {
     const lastSentDate = await loadMetaValue(supabase, TELEGRAM_NIGHT_DUTY_REMINDER_META_KEY);
     if (lastSentDate === dateKey) {
@@ -3722,6 +3746,9 @@ function buildAdminHelpText() {
     "/reminder_12 — ձեռքով ուղարկել 14։00-ի հիշեցումը կոլեգաներին։",
     "/reminder_17 — ձեռքով ուղարկել 18։00-ի հիշեցումը կոլեգաներին։",
     "/night_reminder — ձեռքով ուղարկել առավոտյան հիշեցումը գիշերային հերթապահներին։",
+    "/gps_on — միացնել GPS սցենարը եւ աշխատանքի վայրի կոճակը։",
+    "/gps_off — անջատել GPS սցենարը եւ մաքրել ներկայության հին նշումները։",
+    "/gps_status — տեսնել GPS սցենարի վիճակը։",
     "/set_workplace_here — սահմանել հիվանդանոցի GPS կետը Ձեր ընթացիկ տեղից։",
     "/set_workplace LAT LON 500 — սահմանել GPS կետը ձեռքով։",
     "/workplace_status — տեսնել GPS կետը եւ ով է նշված աշխատանքի վայրում։",
@@ -4550,6 +4577,7 @@ async function handleTelegramLocation(
   const person = getTelegramPersonFromMessage(message, accessChatId);
   const firstName = getTelegramColleagueFirstName(person);
   const pendingSetupChatId = await getTelegramWorkplaceSetupPending(supabase);
+  const gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
 
   if (isTelegramAdminChat(accessChatId) && pendingSetupChatId === String(accessChatId)) {
     const location: TelegramWorkplaceLocation = {
@@ -4566,8 +4594,21 @@ async function handleTelegramLocation(
       [
         "Հիվանդանոցի GPS կետը պահպանված է։",
         buildWorkplaceStatusText(location),
-        "Այժմ գործընկերները կարող են սեղմել «Ես աշխատանքի եմ» կոճակը։"
+        gpsEnabled
+          ? "Այժմ գործընկերները կարող են սեղմել «Ես աշխատանքի եմ» կոճակը։"
+          : "GPS սցենարը դեռ անջատված է։ Միացնելու համար գրեք /gps_on։"
       ].join("\n")
+    );
+    return;
+  }
+
+  if (!gpsEnabled) {
+    await sendTelegramMessageWithReplyMarkup(
+      responseChatId,
+      isTelegramAdminChat(accessChatId)
+        ? "GPS սցենարը հիմա անջատված է։ Միացնելու համար գրեք /gps_on։"
+        : `GPS սցենարը հիմա անջատված է։ Գիշերային ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`,
+      buildWorkplaceLocationReplyMarkup(false)
     );
     return;
   }
@@ -4579,7 +4620,7 @@ async function handleTelegramLocation(
       isTelegramAdminChat(accessChatId)
         ? buildWorkplaceSetupHelpText()
         : "GPS կետը դեռ կարգավորված չէ։ Երբ Վադիմ Աշոտիչը սահմանի հիվանդանոցի կետը, կկարողանամ ճանաչել Ձեր ներկայությունը։",
-      isTelegramAdminChat(accessChatId) ? buildWorkplaceSetupLocationReplyMarkup() : buildWorkplaceLocationReplyMarkup()
+      isTelegramAdminChat(accessChatId) ? buildWorkplaceSetupLocationReplyMarkup() : buildWorkplaceLocationReplyMarkup(true)
     );
     return;
   }
@@ -4609,7 +4650,7 @@ async function handleTelegramLocation(
     await sendTelegramMessageWithReplyMarkup(
       responseChatId,
       buildWorkplaceArrivalText(firstName, workplace, distanceMeters, result.previous?.status === "at_work" ? result.current.isDuty : isDuty, alreadyAtWork),
-      buildWorkplaceLocationReplyMarkup()
+      buildWorkplaceLocationReplyMarkup(true)
     );
     if (!alreadyAtWork) {
       await notifyTelegramWorkplaceEvent(
@@ -4639,7 +4680,7 @@ async function handleTelegramLocation(
   await sendTelegramMessageWithReplyMarkup(
     responseChatId,
     buildWorkplaceAwayText(firstName, workplace, distanceMeters, wasAtWork),
-    buildWorkplaceLocationReplyMarkup()
+    buildWorkplaceLocationReplyMarkup(true)
   );
   if (wasAtWork) {
     await notifyTelegramWorkplaceEvent(
@@ -4793,6 +4834,7 @@ async function handleTelegramCallbackQuery(
         ].join("\n")
       );
     }
+    const gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
     await sendTelegramMessageWithReplyMarkup(
       targetChatId,
       [
@@ -4800,9 +4842,11 @@ async function handleTelegramCallbackQuery(
         "Բարի գալուստ։ Ես արդեն իմ փոքրիկ պոստում եմ՝ ընդունում եմ բլանկների լուսանկարներ, ձևեր և գիշերային հերթափոխի տվյալներ։",
         "Եթե առաջին լուսանկարը կատարյալ չստացվի, մի անհանգստացեք. ես կհուշեմ, ինչպես նկարել ավելի լավ։ Սա լուսանկարչության քննություն չէ, այլ թիմային աշխատանք։",
         "",
-        "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը եւ ուղարկեք geolocation-ը։"
+        gpsEnabled
+          ? "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը եւ ուղարկեք geolocation-ը։"
+          : `Գիշերային հերթափոխի ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
       ].join("\n"),
-      buildWorkplaceLocationReplyMarkup()
+      buildWorkplaceLocationReplyMarkup(gpsEnabled)
     ).catch((error) => {
       console.error("Failed to notify approved Telegram colleague:", sanitizePublicErrorMessage(error));
     });
@@ -4879,6 +4923,70 @@ async function handleTelegramCommand(
     return;
   }
 
+  if (["/gps_on", "/geo_on", "/location_on"].includes(command)) {
+    if (!isTelegramAdminChat(accessChatId)) {
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
+      return;
+    }
+    await setTelegramGpsScenarioEnabled(supabase, true);
+    const workplace = await loadTelegramWorkplaceLocation(supabase);
+    await sendTelegramMessageWithReplyMarkup(
+      chatId,
+      [
+        "GPS սցենարը միացված է։",
+        "Կոլեգաները կարող են օգտագործել «Ես աշխատանքի եմ» կոճակը։",
+        workplace
+          ? buildWorkplaceStatusText(workplace)
+          : "Հիվանդանոցի GPS կետը դեռ չկա։ Սահմանեք /set_workplace_here կամ /set_workplace LAT LON 500 հրամանով։"
+      ].join("\n"),
+      buildWorkplaceLocationReplyMarkup(true)
+    );
+    return;
+  }
+
+  if (["/gps_off", "/geo_off", "/location_off"].includes(command)) {
+    if (!isTelegramAdminChat(accessChatId)) {
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
+      return;
+    }
+    await setTelegramGpsScenarioEnabled(supabase, false);
+    await clearTelegramWorkplaceSetupPending(supabase);
+    await saveTelegramPresenceRecords(supabase, []);
+    await sendTelegramMessageWithReplyMarkup(
+      chatId,
+      [
+        "GPS սցենարը անջատված է։",
+        "Հին ներկայության նշումները մաքրված են։",
+        `Բոտը հիմա կթողնի միայն «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
+      ].join("\n"),
+      buildWorkplaceLocationReplyMarkup(false)
+    );
+    return;
+  }
+
+  if (["/gps_status", "/geo_status", "/location_status"].includes(command)) {
+    if (!isTelegramAdminChat(accessChatId)) {
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
+      return;
+    }
+    const gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
+    const workplace = await loadTelegramWorkplaceLocation(supabase);
+    const records = await loadTelegramPresenceRecords(supabase);
+    const activeCount = records.filter((item) => item.status === "at_work").length;
+    await sendTelegramMessage(
+      chatId,
+      [
+        `GPS սցենար: ${gpsEnabled ? "միացված է" : "անջատված է"}։`,
+        buildWorkplaceStatusText(workplace),
+        `Ներկայության ակտիվ նշումներ: ${activeCount}.`,
+        gpsEnabled
+          ? "Անջատելու համար գրեք /gps_off։"
+          : "Միացնելու համար գրեք /gps_on։"
+      ].join("\n")
+    );
+    return;
+  }
+
   if (["/reminder_12", "/reminder12"].includes(command)) {
     if (!isTelegramAdminChat(accessChatId)) {
       await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
@@ -4905,23 +5013,46 @@ async function handleTelegramCommand(
       return;
     }
     const result = await sendNightDutyReminderToColleagues(supabase, { force: true });
-    await sendTelegramMessage(chatId, `Утреннее напоминание дежурным отправлено: ${result.sent}.`);
+    await sendTelegramMessage(
+      chatId,
+      result.skipped === "gps_disabled"
+        ? "GPS-сценарий выключен, утреннее напоминание дежурным не отправлялось. Для включения используйте /gps_on."
+        : `Утреннее напоминание дежурным отправлено: ${result.sent}.`
+    );
     return;
   }
 
   if (["/geo", "/location", "/work", "/at_work"].includes(command)) {
+    const gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
+    if (!gpsEnabled) {
+      await sendTelegramMessageWithReplyMarkup(
+        chatId,
+        `GPS սցենարը հիմա անջատված է։ Գիշերային ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`,
+        buildWorkplaceLocationReplyMarkup(false)
+      );
+      return;
+    }
     await sendTelegramMessageWithReplyMarkup(
       chatId,
       [
         "Սեղմեք կոճակը եւ ուղարկեք Ձեր գտնվելու վայրը։",
         "Եթե Դուք հիվանդանոցում եք, ես կնշեմ, որ աշխատանքի եք։ Եթե գիշերային ժամ է, կհասկանամ, որ հերթապահություն է։"
       ].join("\n"),
-      buildWorkplaceLocationReplyMarkup()
+      buildWorkplaceLocationReplyMarkup(true)
     );
     return;
   }
 
   if (["/duty", "/дежурю"].includes(command)) {
+    const gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
+    if (!gpsEnabled) {
+      await sendTelegramMessageWithReplyMarkup(
+        chatId,
+        `GPS սցենարը հիմա անջատված է։ Գիշերային ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`,
+        buildWorkplaceLocationReplyMarkup(false)
+      );
+      return;
+    }
     const person = message ? getTelegramPersonFromMessage(message, accessChatId) : {
       chatId: String(accessChatId),
       firstName: "",
@@ -4936,7 +5067,7 @@ async function handleTelegramCommand(
         `${getTelegramColleagueFirstName(person)}, գիշերային հերթապահության նշումը միացված է։`,
         "Երբ հիվանդանոցում լինեք, սեղմեք «Ես աշխատանքի եմ», որ առավոտյան հիշեցումը ճիշտ հասնի Ձեզ։"
       ].join("\n"),
-      buildWorkplaceLocationReplyMarkup()
+      buildWorkplaceLocationReplyMarkup(true)
     );
     return;
   }
@@ -4992,7 +5123,15 @@ async function handleTelegramCommand(
     };
     await saveTelegramWorkplaceLocation(supabase, location);
     await clearTelegramWorkplaceSetupPending(supabase);
-    await sendTelegramMessage(chatId, `GPS կետը պահպանված է։\n${buildWorkplaceStatusText(location)}`);
+    const gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
+    await sendTelegramMessage(
+      chatId,
+      [
+        "GPS կետը պահպանված է։",
+        buildWorkplaceStatusText(location),
+        gpsEnabled ? "GPS սցենարը միացված է։" : "GPS սցենարը դեռ անջատված է։ Միացնելու համար գրեք /gps_on։"
+      ].join("\n")
+    );
     return;
   }
 
@@ -5002,6 +5141,7 @@ async function handleTelegramCommand(
       return;
     }
     const location = await loadTelegramWorkplaceLocation(supabase);
+    const gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
     const records = await loadTelegramPresenceRecords(supabase);
     const activeRecords = records.filter((item) => item.status === "at_work");
     const activeLines = activeRecords.length
@@ -5013,6 +5153,8 @@ async function handleTelegramCommand(
     await sendTelegramMessage(
       chatId,
       [
+        `GPS սցենար: ${gpsEnabled ? "միացված է" : "անջատված է"}։`,
+        "",
         buildWorkplaceStatusText(location),
         "",
         "Ներկա նշված գործընկերներ.",
@@ -5024,14 +5166,17 @@ async function handleTelegramCommand(
 
   if (command === "/start") {
     const person = message ? getTelegramPersonFromMessage(message, chatId) : null;
+    const gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
     await sendTelegramMessageWithReplyMarkup(
       chatId,
       [
         buildColleagueStartText(person ? getTelegramColleagueFirstName(person) : ""),
         "",
-        "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը։"
+        gpsEnabled
+          ? "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը։"
+          : `Գիշերային հերթափոխի ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
       ].join("\n"),
-      buildWorkplaceLocationReplyMarkup()
+      buildWorkplaceLocationReplyMarkup(gpsEnabled)
     );
     return;
   }
