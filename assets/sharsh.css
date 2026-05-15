@@ -2291,6 +2291,15 @@ a {
     display: block !important;
   }
 
+  a[href] {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  a[href]::after {
+    content: "" !important;
+  }
+
   .hospital-report-sheet > :not(.hospital-report-print-sheet) {
     display: none !important;
   }

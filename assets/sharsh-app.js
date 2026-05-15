@@ -272,6 +272,7 @@
     feedback: buildInitialFeedbackState()
   };
   const autoRecognizedTelegramFeedbackIds = new Set();
+  let printLinkHrefBackups = [];
 
   function deepCopy(value) {
     return config.deepCopy(value);
@@ -3521,6 +3522,29 @@
     return PRINT_REPORT_TITLE;
   }
 
+  function removePrintableLinks() {
+    restorePrintableLinks();
+    printLinkHrefBackups = Array.from(document.querySelectorAll("a[href]")).map((link) => ({
+      link,
+      href: link.getAttribute("href") || ""
+    }));
+    printLinkHrefBackups.forEach(({ link }) => {
+      link.removeAttribute("href");
+    });
+  }
+
+  function restorePrintableLinks() {
+    if (!printLinkHrefBackups.length) {
+      return;
+    }
+    printLinkHrefBackups.forEach(({ link, href }) => {
+      if (link && link.isConnected) {
+        link.setAttribute("href", href);
+      }
+    });
+    printLinkHrefBackups = [];
+  }
+
   function getAppDocumentTitle() {
     if (mode === "department") {
       const definition = getCurrentDepartmentDefinition();
@@ -6458,9 +6482,11 @@
     if (!state.printHandlersAttached) {
       window.addEventListener("beforeprint", () => {
         document.title = getPrintDocumentTitle();
+        removePrintableLinks();
       });
 
       window.addEventListener("afterprint", () => {
+        restorePrintableLinks();
         document.title = getAppDocumentTitle();
       });
 
