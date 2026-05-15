@@ -6435,7 +6435,7 @@
           button.disabled = true;
         }
 
-        setInfo("Отправляю Report.pdf и ԿԿԶՀ-Շարժ․pdf в Telegram...", false);
+        setInfo("Отправляю Report.pdf и ԿԿԶՀ-Շարժ.pdf в Telegram...", false);
         try {
           if (typeof sync.sendMainPdfsToTelegram !== "function") {
             throw new Error("Отправка PDF в Telegram пока недоступна.");
@@ -6444,7 +6444,7 @@
           const sent = result && result.result && typeof result.result.sent === "number"
             ? result.result.sent
             : 0;
-          setInfo(`PDF отправлены в Telegram: Report.pdf и ԿԿԶՀ-Շարժ․pdf. Получателей: ${sent}.`, false);
+          setInfo(`PDF отправлены в Telegram: Report.pdf и ԿԿԶՀ-Շարժ.pdf. Получателей: ${sent}.`, false);
         } catch (error) {
           setInfo(error instanceof Error ? error.message : "Не удалось отправить PDF в Telegram.", true);
         } finally {
