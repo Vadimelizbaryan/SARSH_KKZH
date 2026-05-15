@@ -1354,19 +1354,26 @@ function drawPdfCell(
   const size = options.size || 8;
   const padding = typeof options.padding === "number" ? options.padding : 3;
   const safeText = String(text ?? "");
-  const textWidth = options.font.widthOfTextAtSize(safeText, size);
-  let textX = x + padding;
-  if (options.align === "center") {
-    textX = x + Math.max(padding, (width - textWidth) / 2);
-  } else if (options.align === "right") {
-    textX = x + Math.max(padding, width - textWidth - padding);
-  }
-  page.drawText(safeText, {
-    x: textX,
-    y: y + Math.max(2, (height - size) / 2),
-    size,
-    font: options.font,
-    color: options.color || rgb(0, 0, 0)
+  const lines = safeText.split(/\r?\n/);
+  const lineHeight = size + 1.5;
+  const textBlockHeight = (lines.length * size) + ((lines.length - 1) * 1.5);
+  const firstLineY = y + Math.max(2, (height - textBlockHeight) / 2) + ((lines.length - 1) * lineHeight);
+
+  lines.forEach((line, index) => {
+    const textWidth = options.font.widthOfTextAtSize(line, size);
+    let textX = x + padding;
+    if (options.align === "center") {
+      textX = x + Math.max(padding, (width - textWidth) / 2);
+    } else if (options.align === "right") {
+      textX = x + Math.max(padding, width - textWidth - padding);
+    }
+    page.drawText(line, {
+      x: textX,
+      y: firstLineY - (index * lineHeight),
+      size,
+      font: options.font,
+      color: options.color || rgb(0, 0, 0)
+    });
   });
 }
 
@@ -1395,90 +1402,225 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
   const fonts = await buildPdfFonts(pdf);
   const page = pdf.addPage([841.92, 595.32]);
   const primaryRows = snapshot.rows.filter((row) => row.group === "primary");
-  const allRows = snapshot.rows;
+  const extraRows = snapshot.rows.filter((row) => row.group === "extra");
+  const allRows = [
+    ...primaryRows,
+    { id: "subtotal", marker: "", department: "Ընդամենը", group: "summary", values: {}, summaryRows: primaryRows },
+    ...extraRows,
+    { id: "grand", marker: "", department: "Ընդամենը", group: "summary", values: {}, summaryRows: snapshot.rows }
+  ] as Array<{
+    id: string;
+    marker: string;
+    department: string;
+    group: string;
+    values: Record<string, number | null>;
+    summaryRows?: Array<{ values: Record<string, number | null> }>;
+  }>;
   const title = getPdfText("ԿԿԶՀ-Շարժ․", fonts, "KKZH-Sharzh");
   const subtitle = getPdfText(`Ամսաթիվ՝ ${snapshot.reportDate}`, fonts, `Date: ${snapshot.reportDate}`);
   const generated = getPdfText(`Ստեղծվել է՝ ${buildDepartmentSheetMessageDateTimeText(snapshot.reportDate)}`, fonts, `Generated: ${snapshot.reportDate}`);
 
-  drawPdfText(page, title, 28, 538, { font: fonts.bold, size: 17, color: rgb(0.03, 0.25, 0.16) });
-  drawPdfText(page, subtitle, 28, 518, { font: fonts.regular, size: 10 });
-  drawPdfText(page, generated, 650, 518, { font: fonts.regular, size: 9, color: rgb(0.32, 0.32, 0.32) });
+  drawPdfText(page, title, 28, 552, { font: fonts.bold, size: 18, color: rgb(0.03, 0.25, 0.16) });
+  drawPdfText(page, subtitle, 28, 531, { font: fonts.regular, size: 10 });
+  drawPdfText(page, generated, 650, 531, { font: fonts.regular, size: 9, color: rgb(0.32, 0.32, 0.32) });
 
-  const startX = 24;
-  const startY = 492;
-  const markerWidth = 42;
-  const nameWidth = 92;
-  const valueWidth = 28.2;
-  const rowHeight = 22;
-  const headerFill = rgb(0.98, 0.78, 0.57);
-  const totalFill = rgb(1, 0.92, 0.02);
+  const startX = 22;
+  const tableTopY = 510;
+  const markerWidth = 36;
+  const nameWidth = 106;
+  const valueWidth = 28.4;
+  const rowHeight = 18;
+  const headerHeight = 23;
+  const headerFill = rgb(0.99, 0.78, 0.56);
+  const headerFillDark = rgb(0.98, 0.72, 0.48);
+  const totalFill = rgb(1, 0.92, 0);
+  const calcFill = rgb(1, 0.96, 0.24);
   const nameFill = rgb(0.99, 0.97, 0.92);
+  const border = rgb(0, 0, 0);
+  const labelSize = 6.3;
+  const valueSize = 7.2;
+  const valueX = (index: number) => startX + markerWidth + nameWidth + (index * valueWidth);
+  const valueWidthFor = (count: number) => valueWidth * count;
+  const headerY1 = tableTopY - headerHeight;
+  const headerY2 = headerY1 - headerHeight;
+  const headerY3 = headerY2 - headerHeight;
+  const firstBodyY = headerY3 - rowHeight;
+  const dateText = buildDepartmentSheetMessageDateTimeText(snapshot.reportDate);
+  const valueKeys = MAIN_PDF_COLUMNS.map((column) => column.key);
+  const rowValue = (row: typeof allRows[number], key: string) => row.summaryRows
+    ? getRowsPdfValue(row.summaryRows, key)
+    : getRowPdfValue(row, key);
+  const cellLabel = (text: string, fallback = text) => getPdfText(text, fonts, fallback);
 
-  drawPdfCell(page, "SR", startX, startY, markerWidth, rowHeight, {
+  drawPdfCell(page, "SR", startX, headerY2, markerWidth, headerHeight * 2, {
     font: fonts.bold,
-    size: 8,
+    size: 7,
     align: "center",
-    fill: headerFill
+    fill: headerFill,
+    border
   });
-  drawPdfCell(page, getPdfText("Բաժանմունք", fonts, "Department"), startX + markerWidth, startY, nameWidth, rowHeight, {
+  drawPdfCell(page, cellLabel("Բաժանմունք", "Department"), startX + markerWidth, headerY2, nameWidth, headerHeight * 2, {
     font: fonts.bold,
-    size: 8,
+    size: 7,
     align: "center",
-    fill: headerFill
+    fill: headerFill,
+    border
   });
 
-  MAIN_PDF_COLUMNS.forEach((column, index) => {
-    drawPdfCell(page, column.label, startX + markerWidth + nameWidth + (index * valueWidth), startY, valueWidth, rowHeight, {
+  drawPdfCell(page, cellLabel("Եղել է", "Been"), valueX(0), headerY2, valueWidthFor(3), headerHeight * 2, {
+    font: fonts.bold,
+    size: 7,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  drawPdfCell(page, cellLabel("Ընդունվել է", "Admitted"), valueX(3), headerY2, valueWidthFor(3), headerHeight * 2, {
+    font: fonts.bold,
+    size: 7,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  drawPdfCell(page, cellLabel("Դ/Գ", "D/G"), valueX(6), headerY2, valueWidthFor(3), headerHeight * 2, {
+    font: fonts.bold,
+    size: 7,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  drawPdfCell(page, cellLabel("Տեղափոխ", "Transfer"), valueX(9), headerY2, valueWidthFor(2), headerHeight * 2, {
+    font: fonts.bold,
+    size: 7,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  drawPdfCell(page, cellLabel("Առկա է", "Present"), valueX(11), headerY1, valueWidthFor(8), headerHeight, {
+    font: fonts.bold,
+    size: 7,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  drawPdfCell(page, cellLabel("որոնցից բուժական", "Medical leave"), valueX(19), headerY1, valueWidthFor(3), headerHeight, {
+    font: fonts.bold,
+    size: 6.4,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  drawPdfCell(page, "", valueX(22), headerY1, valueWidth, headerHeight, {
+    font: fonts.bold,
+    size: 7,
+    align: "center",
+    fill: totalFill,
+    border
+  });
+
+  drawPdfCell(page, cellLabel("Ընդամ", "Total"), valueX(11), headerY2, valueWidth, headerHeight * 2, {
+    font: fonts.bold,
+    size: labelSize,
+    align: "center",
+    fill: totalFill,
+    border
+  });
+  drawPdfCell(page, cellLabel("Զինծառայող", "Soldier"), valueX(12), headerY2, valueWidthFor(3), headerHeight, {
+    font: fonts.bold,
+    size: labelSize,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  [
+    ["Զ/Հ", 15],
+    ["Զ/Ծ\nԸՆՏ", 16],
+    ["Զ/Պ", 17],
+    ["Ք-ի", 18]
+  ].forEach(([label, index]) => {
+    drawPdfCell(page, cellLabel(String(label), String(label)), valueX(Number(index)), headerY2, valueWidth, headerHeight * 2, {
       font: fonts.bold,
-      size: 7,
+      size: labelSize,
       align: "center",
-      fill: headerFill
+      fill: headerFill,
+      border
+    });
+  });
+  drawPdfCell(page, cellLabel("արձակուրդում", "Leave"), valueX(19), headerY2, valueWidthFor(3), headerHeight, {
+    font: fonts.bold,
+    size: labelSize,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+  drawPdfCell(page, cellLabel("Ընդհանուր", "Total"), valueX(22), headerY2, valueWidth, headerHeight * 2, {
+    font: fonts.bold,
+    size: labelSize,
+    align: "center",
+    fill: totalFill,
+    border
+  });
+
+  drawPdfCell(page, dateText, startX, headerY3, markerWidth + nameWidth, headerHeight, {
+    font: fonts.bold,
+    size: 6.2,
+    align: "center",
+    fill: headerFill,
+    border
+  });
+
+  const row3Labels = [
+    "ԸՆԴ", "Զ/Ծ", "ՇԱՐ",
+    "ԸՆԴ", "Զ/Ծ", "ՇԱՐ",
+    "ԸՆԴ", "Զ/Ծ", "ՇԱՐ",
+    "Տեղափ\nբաժնից", "Տեղափ\nբաժին",
+    "",
+    "ՇԱՐ", "ՍՊԱ", "ՊԱՅՄ",
+    "", "", "", "",
+    "ՇԱՐ", "ՍՊԱ", "ՊԱՅՄ",
+    ""
+  ];
+  row3Labels.forEach((label, index) => {
+    if (index === 11 || index === 15 || index === 16 || index === 17 || index === 18 || index === 22) {
+      return;
+    }
+    drawPdfCell(page, cellLabel(label, label), valueX(index), headerY3, valueWidth, headerHeight, {
+      font: fonts.bold,
+      size: labelSize,
+      align: "center",
+      fill: index === 1 || index === 4 || index === 7 ? headerFillDark : headerFill,
+      border
     });
   });
 
   allRows.forEach((row, rowIndex) => {
-    const y = startY - ((rowIndex + 1) * rowHeight);
-    drawPdfCell(page, row.marker, startX, y, markerWidth, rowHeight, {
+    const y = firstBodyY - (rowIndex * rowHeight);
+    const isSummary = Boolean(row.summaryRows);
+    const rowFill = isSummary ? totalFill : undefined;
+    drawPdfCell(page, row.marker || "", startX, y, markerWidth, rowHeight, {
       font: fonts.bold,
-      size: 8,
+      size: valueSize,
       align: "center",
-      fill: nameFill
+      fill: rowFill || nameFill,
+      border
     });
     drawPdfCell(page, getPdfText(row.department, fonts, row.id), startX + markerWidth, y, nameWidth, rowHeight, {
-      font: fonts.regular,
-      size: row.department.length > 16 ? 6.5 : 7,
-      align: "left",
-      fill: nameFill
+      font: isSummary ? fonts.bold : fonts.regular,
+      size: isSummary ? 7.2 : (row.department.length > 18 ? 5.1 : 6.2),
+      align: isSummary ? "center" : "left",
+      fill: rowFill || nameFill,
+      border
     });
-    MAIN_PDF_COLUMNS.forEach((column, columnIndex) => {
-      drawPdfCell(page, String(getRowPdfValue(row, column.key)), startX + markerWidth + nameWidth + (columnIndex * valueWidth), y, valueWidth, rowHeight, {
+    valueKeys.forEach((key, columnIndex) => {
+      const isAccent = key === "presentTotal" || key === "leaveTotal" || (isSummary && (
+        key === "beenSoldier" || key === "presentTotal" || key === "currentShar" || key === "leaveTotal"
+      ));
+      drawPdfCell(page, String(rowValue(row, key)), valueX(columnIndex), y, valueWidth, rowHeight, {
         font: fonts.bold,
-        size: 8,
+        size: valueSize,
         align: "center",
-        fill: column.key === "presentTotal" || column.key === "leaveTotal" ? rgb(1, 0.96, 0.35) : undefined
+        fill: isAccent ? calcFill : rowFill,
+        border
       });
-    });
-  });
-
-  const totalY = startY - ((allRows.length + 1) * rowHeight);
-  drawPdfCell(page, "", startX, totalY, markerWidth, rowHeight, {
-    font: fonts.bold,
-    size: 8,
-    align: "center",
-    fill: totalFill
-  });
-  drawPdfCell(page, getPdfText("Ընդամենը", fonts, "Total"), startX + markerWidth, totalY, nameWidth, rowHeight, {
-    font: fonts.bold,
-    size: 8,
-    align: "center",
-    fill: totalFill
-  });
-  MAIN_PDF_COLUMNS.forEach((column, columnIndex) => {
-    drawPdfCell(page, String(getRowsPdfValue(primaryRows, column.key)), startX + markerWidth + nameWidth + (columnIndex * valueWidth), totalY, valueWidth, rowHeight, {
-      font: fonts.bold,
-      size: 8,
-      align: "center",
-      fill: totalFill
     });
   });
 
