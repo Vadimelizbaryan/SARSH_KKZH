@@ -1211,7 +1211,8 @@ async function isTelegramColleagueApproved(
 async function requestTelegramColleagueApproval(
   supabase: ReturnType<typeof createClient>,
   message: Record<string, unknown>,
-  chatId: number | string
+  chatId: number | string,
+  responseChatId: number | string = chatId
 ) {
   const candidate = getTelegramPersonFromMessage(message, chatId);
   const pendingChats = await loadTelegramPendingColleagueChats(supabase);
@@ -1248,7 +1249,7 @@ async function requestTelegramColleagueApproval(
 
   const firstName = getTelegramColleagueFirstName(candidate);
   await sendTelegramMessage(
-    chatId,
+    responseChatId,
     [
       `${firstName}, заявку на подключение я отправил Вадиму Ашотичу.`,
       "Пока он не нажмёт «Одобрить», рабочие команды закрыты.",
@@ -3632,7 +3633,7 @@ async function sendTelegramWebFormPromptAfterPhoto(
   );
 }
 
-async function sendTelegramNightShiftForm(chatId: number) {
+async function sendTelegramNightShiftForm(chatId: number | string) {
   const reportDateTime = getYerevanDateTimeText();
   const formUrl = getTelegramNightFormUrl(reportDateTime);
   await sendTelegramMessageWithReplyMarkup(
@@ -3994,6 +3995,29 @@ function getMessageChatId(message: Record<string, unknown>) {
   return typeof chat?.id === "number" ? chat.id : null;
 }
 
+function getMessageChatType(message: Record<string, unknown>) {
+  const chat = message.chat as { type?: unknown } | undefined;
+  return typeof chat?.type === "string" ? chat.type : "";
+}
+
+function isTelegramGroupMessage(message: Record<string, unknown>) {
+  const type = getMessageChatType(message);
+  return type === "group" || type === "supergroup";
+}
+
+function getMessageSenderChatId(message: Record<string, unknown>) {
+  const from = message.from as { id?: unknown } | undefined;
+  if (typeof from?.id === "number" || typeof from?.id === "string") {
+    return String(from.id);
+  }
+  return "";
+}
+
+function getTelegramAccessChatId(message: Record<string, unknown>, fallbackChatId: number | string) {
+  const senderId = getMessageSenderChatId(message);
+  return isTelegramGroupMessage(message) && senderId ? senderId : String(fallbackChatId);
+}
+
 function getTelegramMessageId(message: Record<string, unknown>) {
   return typeof message.message_id === "number" ? message.message_id : null;
 }
@@ -4210,12 +4234,13 @@ async function handleTelegramCommand(
   supabase: ReturnType<typeof createClient>,
   chatId: number,
   text: string,
-  message?: Record<string, unknown>
+  message?: Record<string, unknown>,
+  accessChatId: number | string = chatId
 ) {
-  const command = text.trim().split(/\s+/)[0].toLowerCase();
+  const command = text.trim().split(/\s+/)[0].toLowerCase().replace(/@[\w_]+$/, "");
 
   if (["/kollegi_on", "/colleagues_on", "/access_on"].includes(command)) {
-    if (!isTelegramAdminChat(chatId)) {
+    if (!isTelegramAdminChat(accessChatId)) {
       await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
       return;
     }
@@ -4225,7 +4250,7 @@ async function handleTelegramCommand(
   }
 
   if (["/kollegi_off", "/colleagues_off", "/access_off"].includes(command)) {
-    if (!isTelegramAdminChat(chatId)) {
+    if (!isTelegramAdminChat(accessChatId)) {
       await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
       return;
     }
@@ -4235,7 +4260,7 @@ async function handleTelegramCommand(
   }
 
   if (["/kollegi_status", "/colleagues_status", "/access_status"].includes(command)) {
-    if (!isTelegramAdminChat(chatId)) {
+    if (!isTelegramAdminChat(accessChatId)) {
       await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
       return;
     }
@@ -4256,7 +4281,7 @@ async function handleTelegramCommand(
   }
 
   if (["/reminder_12", "/reminder12"].includes(command)) {
-    if (!isTelegramAdminChat(chatId)) {
+    if (!isTelegramAdminChat(accessChatId)) {
       await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
       return;
     }
@@ -4266,7 +4291,7 @@ async function handleTelegramCommand(
   }
 
   if (["/reminder_17", "/reminder17"].includes(command)) {
-    if (!isTelegramAdminChat(chatId)) {
+    if (!isTelegramAdminChat(accessChatId)) {
       await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
       return;
     }
@@ -4282,7 +4307,7 @@ async function handleTelegramCommand(
   }
 
   if (command === "/help") {
-    if (!isTelegramAdminChat(chatId)) {
+    if (!isTelegramAdminChat(accessChatId)) {
       await sendTelegramMessage(chatId, "Команда /help доступна только администратору. Для списка SR-кодов используйте /start или /departments.");
       return;
     }
@@ -4296,6 +4321,27 @@ async function handleTelegramCommand(
   }
 
   if (command === "/night" || command === "/night_shift") {
+    if (message && isTelegramGroupMessage(message) && String(accessChatId) !== String(chatId)) {
+      const person = getTelegramPersonFromMessage(message, accessChatId);
+      const firstName = getTelegramColleagueFirstName(person);
+      try {
+        await sendTelegramNightShiftForm(accessChatId);
+        await sendTelegramMessage(
+          chatId,
+          `${firstName}, գիշերային հերթափոխի ձևը ուղարկեցի Ձեր անձնական չատում։`
+        );
+      } catch (error) {
+        console.error("Failed to send Telegram night form privately from group:", sanitizePublicErrorMessage(error));
+        await sendTelegramMessage(
+          chatId,
+          [
+            `${firstName}, տեսնում եմ /night հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
+            "Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք /night։"
+          ].join("\n")
+        );
+      }
+      return;
+    }
     await sendTelegramNightShiftForm(chatId);
     return;
   }
@@ -4542,13 +4588,14 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
 
   const supabase = createSupabaseAdmin();
   const safeChatId = chatId as number;
-  if (!await isTelegramUserAllowedByRuntimeState(supabase, safeChatId)) {
-    await requestTelegramColleagueApproval(supabase, message, safeChatId);
+  const accessChatId = getTelegramAccessChatId(message, safeChatId);
+  if (!await isTelegramUserAllowedByRuntimeState(supabase, accessChatId)) {
+    await requestTelegramColleagueApproval(supabase, message, accessChatId, safeChatId);
     return;
   }
 
   try {
-    await rememberTelegramColleagueChat(supabase, message, safeChatId);
+    await rememberTelegramColleagueChat(supabase, message, accessChatId);
   } catch (error) {
     console.error("Failed to remember Telegram colleague chat:", sanitizePublicErrorMessage(error));
   }
@@ -4556,7 +4603,7 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
   const text = getMessageText(message);
 
   if (text.startsWith("/")) {
-    await handleTelegramCommand(supabase, safeChatId, text, message);
+    await handleTelegramCommand(supabase, safeChatId, text, message, accessChatId);
     return;
   }
 
