@@ -1,0 +1,69 @@
+name: Telegram reminders
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: Reminder slot
+        required: true
+        type: choice
+        options:
+          - midday
+          - evening
+      force:
+        description: Send even if this slot was already sent today
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  send-reminder:
+    runs-on: ubuntu-latest
+    env:
+      FUNCTION_URL: https://ywecvlapdlaojpvijaqy.functions.supabase.co/Mainflow-telegram
+      TELEGRAM_REMINDER_SECRET: ${{ secrets.TELEGRAM_REMINDER_SECRET }}
+    steps:
+      - name: Pick reminder slot
+        id: params
+        shell: bash
+        run: |
+          slot="${{ github.event.inputs.slot }}"
+          force="${{ github.event.inputs.force }}"
+
+          if [ -z "$slot" ]; then
+            case "${{ github.event.schedule }}" in
+              "0 8 * * *")
+                slot="midday"
+                ;;
+              "0 13 * * *")
+                slot="evening"
+                ;;
+              *)
+                slot="midday"
+                ;;
+            esac
+          fi
+
+          if [ -z "$force" ]; then
+            force="false"
+          fi
+
+          echo "slot=$slot" >> "$GITHUB_OUTPUT"
+          echo "force=$force" >> "$GITHUB_OUTPUT"
+
+      - name: Send Telegram reminder
+        shell: bash
+        run: |
+          url="$FUNCTION_URL?action=daily-reminder&slot=${{ steps.params.outputs.slot }}"
+          if [ "${{ steps.params.outputs.force }}" = "true" ]; then
+            url="$url&force=1"
+          fi
+
+          if [ -n "$TELEGRAM_REMINDER_SECRET" ]; then
+            curl -fsS -H "x-telegram-reminder-secret: $TELEGRAM_REMINDER_SECRET" "$url"
+          else
+            curl -fsS "$url"
+          fi

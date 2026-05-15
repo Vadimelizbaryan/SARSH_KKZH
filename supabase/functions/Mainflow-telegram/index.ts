@@ -11,6 +11,29 @@ const DEPARTMENT_SHEET_TEMPLATE_PATH = "/assets/templates/SHARSH_KKZH_template.x
 const TELEGRAM_RETRY_ATTEMPTS = 3;
 const TELEGRAM_RETRY_BASE_DELAY_MS = 700;
 const TELEGRAM_COLLEAGUES_META_KEY = "telegram_colleagues_access";
+const TELEGRAM_COLLEAGUE_CHATS_META_KEY = "telegram_colleague_chats";
+const TELEGRAM_DAILY_REMINDER_META_PREFIX = "telegram_daily_reminder_sent";
+const TELEGRAM_DAILY_REMINDERS = {
+  midday: {
+    label: "12:00",
+    text: [
+      "Հարգելի կոլլեգաներ։",
+      "Հիշեցնում եմ, որ ժամը 14։00-ին ընդունարանը սպասում է Ձեր բաժանմունքի շարժի բլանկների լուսանկարներին։",
+      "Խնդրում եմ լուսանկարները տեղադրել իմ այս էջում և հետևել հրահանգներին։",
+      "Հարգանքներով՝ Վադիմ Աշոտիչ"
+    ].join("\n")
+  },
+  evening: {
+    label: "17:00",
+    text: [
+      "Հարգելի կոլլեգաներ։",
+      "Հիշեցնում եմ, որ ժամը 18։00-ին ընդունարանը սպասում է Ձեր բաժանմունքի շարժի բլանկների լուսանկարներին։",
+      "Խնդրում եմ լուսանկարները տեղադրել իմ այս էջում և հետևել հրահանգներին։",
+      "Հարգանքներով՝ Վադիմ Աշոտիչ"
+    ].join("\n")
+  }
+} as const;
+type TelegramDailyReminderSlot = keyof typeof TELEGRAM_DAILY_REMINDERS;
 
 const VALUE_KEYS = [
   "beenTotal",
@@ -222,7 +245,7 @@ const PHOTO_TEMPLATE_GUIDE = [
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-telegram-bot-api-secret-token",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-telegram-bot-api-secret-token, x-telegram-reminder-secret",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Content-Type": "application/json; charset=utf-8"
 };
@@ -894,6 +917,197 @@ async function setTelegramColleaguesEnabled(
   if (error) {
     throw error;
   }
+}
+
+type TelegramColleagueChat = {
+  chatId: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  updatedAt: string;
+};
+
+function parseTelegramColleagueChats(raw: unknown): TelegramColleagueChat[] {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") {
+          return null;
+        }
+        const record = item as Record<string, unknown>;
+        const chatId = typeof record.chatId === "string" || typeof record.chatId === "number"
+          ? String(record.chatId).trim()
+          : "";
+        if (!chatId) {
+          return null;
+        }
+        return {
+          chatId,
+          firstName: typeof record.firstName === "string" ? record.firstName : "",
+          lastName: typeof record.lastName === "string" ? record.lastName : "",
+          username: typeof record.username === "string" ? record.username : "",
+          updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : ""
+        };
+      })
+      .filter((item): item is TelegramColleagueChat => item !== null);
+  } catch (_error) {
+    return [];
+  }
+}
+
+async function loadTelegramColleagueChats(supabase: ReturnType<typeof createClient>) {
+  const { data, error } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date")
+    .eq("report_key", TELEGRAM_COLLEAGUE_CHATS_META_KEY)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return parseTelegramColleagueChats(data?.report_date);
+}
+
+async function saveTelegramColleagueChats(
+  supabase: ReturnType<typeof createClient>,
+  chats: TelegramColleagueChat[]
+) {
+  const uniqueChats = Array.from(new Map(chats.map((item) => [item.chatId, item])).values());
+  const { error } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: TELEGRAM_COLLEAGUE_CHATS_META_KEY,
+      report_date: JSON.stringify(uniqueChats),
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function rememberTelegramColleagueChat(
+  supabase: ReturnType<typeof createClient>,
+  message: Record<string, unknown>,
+  chatId: number | string
+) {
+  if (isTelegramAdminChat(chatId)) {
+    return;
+  }
+
+  const from = message.from as {
+    first_name?: unknown;
+    last_name?: unknown;
+    username?: unknown;
+  } | undefined;
+  const chats = await loadTelegramColleagueChats(supabase);
+  const current: TelegramColleagueChat = {
+    chatId: String(chatId),
+    firstName: typeof from?.first_name === "string" ? from.first_name : "",
+    lastName: typeof from?.last_name === "string" ? from.last_name : "",
+    username: typeof from?.username === "string" ? from.username : "",
+    updatedAt: new Date().toISOString()
+  };
+  const nextChats = [current, ...chats.filter((item) => item.chatId !== current.chatId)];
+  await saveTelegramColleagueChats(supabase, nextChats);
+}
+
+function getYerevanDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Yerevan",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function normalizeDailyReminderSlot(value: string | null | undefined): TelegramDailyReminderSlot {
+  const normalized = (value || "").trim().toLowerCase();
+  if (normalized === "evening" || normalized === "17" || normalized === "17:00") {
+    return "evening";
+  }
+  return "midday";
+}
+
+function getDailyReminderMetaKey(slot: TelegramDailyReminderSlot) {
+  return `${TELEGRAM_DAILY_REMINDER_META_PREFIX}_${slot}`;
+}
+
+async function loadMetaValue(
+  supabase: ReturnType<typeof createClient>,
+  reportKey: string
+) {
+  const { data, error } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date")
+    .eq("report_key", reportKey)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return typeof data?.report_date === "string" ? data.report_date : "";
+}
+
+async function saveMetaValue(
+  supabase: ReturnType<typeof createClient>,
+  reportKey: string,
+  value: string
+) {
+  const { error } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: reportKey,
+      report_date: value,
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function sendDailyReminderToColleagues(
+  supabase: ReturnType<typeof createClient>,
+  slot: TelegramDailyReminderSlot,
+  options: { force?: boolean } = {}
+) {
+  const reminder = TELEGRAM_DAILY_REMINDERS[slot];
+  const metaKey = getDailyReminderMetaKey(slot);
+  const dateKey = getYerevanDateKey();
+  if (!options.force) {
+    const lastSentDate = await loadMetaValue(supabase, metaKey);
+    if (lastSentDate === dateKey) {
+      return { sent: 0, skipped: "already_sent", dateKey, slot, label: reminder.label };
+    }
+    if (!await areTelegramColleaguesEnabled(supabase)) {
+      return { sent: 0, skipped: "colleagues_disabled", dateKey, slot, label: reminder.label };
+    }
+  }
+
+  const storedChats = await loadTelegramColleagueChats(supabase);
+  const storedIds = storedChats.map((item) => item.chatId);
+  const fallbackAllowedIds = getTelegramAllowedChatIds()
+    .filter((chatId) => !isTelegramAdminChat(chatId));
+  const chatIds = Array.from(new Set([...storedIds, ...fallbackAllowedIds]))
+    .filter((chatId) => chatId && !isTelegramAdminChat(chatId));
+
+  if (!chatIds.length) {
+    return { sent: 0, skipped: "no_colleagues", dateKey, slot, label: reminder.label };
+  }
+
+  await sendTelegramMessageToMany(chatIds, reminder.text);
+  await saveMetaValue(supabase, metaKey, dateKey);
+  return { sent: chatIds.length, skipped: "", dateKey, slot, label: reminder.label };
 }
 
 async function isTelegramUserAllowedByRuntimeState(
@@ -2129,6 +2343,8 @@ function buildAdminHelpText() {
     "/kollegi_on — подключить коллег: бот принимает сообщения по ссылке.",
     "/kollegi_off — отключить коллег: бот слушает только администратора.",
     "/kollegi_status — проверить, подключены ли коллеги.",
+    "/reminder_12 — вручную отправить коллегам напоминание про 14:00.",
+    "/reminder_17 — вручную отправить коллегам напоминание про 18:00.",
     "",
     "Работа с отделениями:",
     "SR-? — показать коллегам список SR-кодов отделений.",
@@ -2719,6 +2935,19 @@ function isTelegramSecretValid(request: Request) {
   return normalizedActual === expected;
 }
 
+function isTelegramReminderRequestValid(request: Request) {
+  const expected = (Deno.env.get("TELEGRAM_REMINDER_SECRET") || "").trim();
+  if (!expected) {
+    return true;
+  }
+  const currentUrl = new URL(request.url);
+  const actual = request.headers.get("x-telegram-reminder-secret")
+    || request.headers.get("x-telegram-bot-api-secret-token")
+    || currentUrl.searchParams.get("secret")
+    || "";
+  return actual.trim() === expected;
+}
+
 async function handleTelegramCommand(
   supabase: ReturnType<typeof createClient>,
   chatId: number,
@@ -2758,6 +2987,26 @@ async function handleTelegramCommand(
         ? "Коллеги сейчас подключены: бот принимает сообщения по ссылке."
         : "Коллеги сейчас отключены: бот слушает только администратора."
     );
+    return;
+  }
+
+  if (["/reminder_12", "/reminder12"].includes(command)) {
+    if (!isTelegramAdminChat(chatId)) {
+      await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
+      return;
+    }
+    const result = await sendDailyReminderToColleagues(supabase, "midday", { force: true });
+    await sendTelegramMessage(chatId, `Напоминание 12:00 отправлено: ${result.sent}.`);
+    return;
+  }
+
+  if (["/reminder_17", "/reminder17"].includes(command)) {
+    if (!isTelegramAdminChat(chatId)) {
+      await sendTelegramMessage(chatId, "Эта команда доступна только администратору бота.");
+      return;
+    }
+    const result = await sendDailyReminderToColleagues(supabase, "evening", { force: true });
+    await sendTelegramMessage(chatId, `Напоминание 17:00 отправлено: ${result.sent}.`);
     return;
   }
 
@@ -3015,6 +3264,12 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
     return;
   }
 
+  try {
+    await rememberTelegramColleagueChat(supabase, message, safeChatId);
+  } catch (error) {
+    console.error("Failed to remember Telegram colleague chat:", sanitizePublicErrorMessage(error));
+  }
+
   const text = getMessageText(message);
 
   if (text.startsWith("/")) {
@@ -3083,6 +3338,32 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "repair_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
+    }
+
+    if (action === "daily-reminder") {
+      if (!isTelegramReminderRequestValid(request)) {
+        return jsonResponse({ ok: false, error: "Invalid reminder secret." }, 403);
+      }
+      try {
+        const slot = normalizeDailyReminderSlot(currentUrl.searchParams.get("slot"));
+        const forceRaw = (currentUrl.searchParams.get("force") || "").trim().toLowerCase();
+        const force = forceRaw === "1" || forceRaw === "true" || forceRaw === "yes";
+        const supabase = createSupabaseAdmin();
+        const result = await sendDailyReminderToColleagues(supabase, slot, { force });
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          action,
+          result
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "daily_reminder_failed",
           error: error instanceof Error ? error.message : String(error)
         }, 500);
       }
