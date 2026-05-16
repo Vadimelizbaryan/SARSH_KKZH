@@ -658,6 +658,44 @@ async function sendMainPdfsToTelegramFromSync() {
   return payload || { ok: true };
 }
 
+function normalizeShiftFormMode(value: unknown) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "day" || normalized === "day_shift") {
+    return "day";
+  }
+  if (normalized === "discharge" || normalized === "morning" || normalized === "morning_discharge") {
+    return "discharge";
+  }
+  return "night";
+}
+
+async function sendShiftFormToTelegramFromSync(mode: unknown) {
+  const url = new URL(getMainflowTelegramFunctionUrl());
+  url.searchParams.set("action", "send-shift-form");
+  url.searchParams.set("mode", normalizeShiftFormMode(mode));
+
+  const secret = (Deno.env.get("TELEGRAM_REMINDER_SECRET") || "").trim();
+  const headers: Record<string, string> = {};
+  if (secret) {
+    headers["x-telegram-reminder-secret"] = secret;
+  }
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = payload && typeof payload.error === "string"
+      ? payload.error
+      : `Telegram form send failed (${response.status}).`;
+    throw new Error(message);
+  }
+
+  return payload || { ok: true };
+}
+
 async function requestOpenAiStructuredVision(
   prompt: string,
   imageDataUrl: string,
@@ -1667,6 +1705,10 @@ Deno.serve(async (request) => {
 
     if (type === "send_main_pdfs_to_telegram") {
       return jsonResponse(await sendMainPdfsToTelegramFromSync());
+    }
+
+    if (type === "send_shift_form_to_telegram") {
+      return jsonResponse(await sendShiftFormToTelegramFromSync(payload.mode));
     }
 
     if (type === "load_night_shift") {

@@ -1498,12 +1498,10 @@ function buildWorkplaceLocationReplyMarkup(gpsEnabled = false) {
   const keyboard = gpsEnabled
     ? [
       [{ text: "Ես աշխատանքի եմ", request_location: true }],
-      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }],
-      [{ text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
+      [{ text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
     ]
     : [
-      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }],
-      [{ text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
+      [{ text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
     ];
   return {
     keyboard,
@@ -4332,6 +4330,32 @@ async function sendTelegramDischargeShiftForm(chatId: number | string) {
   );
 }
 
+function normalizeShiftFormMode(value: string | null | undefined) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "day" || normalized === "day_shift") {
+    return "day";
+  }
+  if (normalized === "discharge" || normalized === "morning" || normalized === "morning_discharge") {
+    return "discharge";
+  }
+  return "night";
+}
+
+async function sendShiftFormToTelegram(mode: string) {
+  const normalizedMode = normalizeShiftFormMode(mode);
+  const chatIds = getTelegramNotifyChatIds(null);
+  for (const chatId of chatIds) {
+    if (normalizedMode === "day") {
+      await sendTelegramDayShiftForm(chatId);
+    } else if (normalizedMode === "discharge") {
+      await sendTelegramDischargeShiftForm(chatId);
+    } else {
+      await sendTelegramNightShiftForm(chatId);
+    }
+  }
+  return { mode: normalizedMode, sent: chatIds.length };
+}
+
 function rowHasAnyData(values: Record<string, number | null>) {
   return Object.values(values).some((value) => typeof value === "number" && value > 0);
 }
@@ -6188,6 +6212,29 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "main_pdfs_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
+    }
+
+    if (action === "send-shift-form") {
+      if (!isTelegramReminderRequestValid(request)) {
+        return jsonResponse({ ok: false, error: "Invalid reminder secret." }, 403);
+      }
+      try {
+        const mode = normalizeShiftFormMode(currentUrl.searchParams.get("mode"));
+        const result = await sendShiftFormToTelegram(mode);
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          action,
+          result
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "shift_form_send_failed",
           error: error instanceof Error ? error.message : String(error)
         }, 500);
       }

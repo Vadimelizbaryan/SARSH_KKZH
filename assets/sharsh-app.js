@@ -3618,8 +3618,11 @@
             </div>
             <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR feedback</a>
             <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Ночная смена</a>
+            <button type="button" data-send-shift-form="night">TG ночь</button>
             <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Дневная смена</a>
+            <button type="button" data-send-shift-form="day">TG день</button>
             <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Утренняя выписка</a>
+            <button type="button" data-send-shift-form="discharge">TG выписка</button>
             <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Отчётный лист</a>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="refreshBtn">Обновить</button>
@@ -6450,6 +6453,7 @@
     const printBtn = document.getElementById("printBtn");
     const refreshBtn = document.getElementById("refreshBtn");
     const sendTelegramPdfsBtn = document.getElementById("sendTelegramPdfsBtn");
+    const sendShiftFormButtons = Array.from(document.querySelectorAll("[data-send-shift-form]"));
     const resetBtn = document.getElementById("resetBtn");
     const saveBtn = document.getElementById("saveBtn");
     const accessCodeField = document.getElementById("accessCodeField");
@@ -6498,6 +6502,37 @@
         }
       });
     }
+
+    sendShiftFormButtons.forEach((shiftFormButton) => {
+      shiftFormButton.addEventListener("click", async () => {
+        const button = shiftFormButton instanceof HTMLButtonElement ? shiftFormButton : null;
+        const mode = shiftFormButton.getAttribute("data-send-shift-form") || "night";
+        const label = mode === "day" ? "дневной смены"
+          : mode === "discharge" ? "утренней выписки"
+            : "ночной смены";
+        if (button) {
+          button.disabled = true;
+        }
+
+        setInfo(`Отправляю Telegram форму ${label}...`, false);
+        try {
+          if (typeof sync.sendShiftFormToTelegram !== "function") {
+            throw new Error("Отправка Telegram формы пока недоступна.");
+          }
+          const result = await sync.sendShiftFormToTelegram(mode);
+          const sent = result && result.result && typeof result.result.sent === "number"
+            ? result.result.sent
+            : 0;
+          setInfo(`Telegram форма ${label} отправлена. Получателей: ${sent}.`, false);
+        } catch (error) {
+          setInfo(error instanceof Error ? error.message : "Не удалось отправить Telegram форму.", true);
+        } finally {
+          if (button) {
+            button.disabled = false;
+          }
+        }
+      });
+    });
 
     if (!state.printHandlersAttached) {
       window.addEventListener("beforeprint", () => {

@@ -862,6 +862,43 @@
     return payload || { ok: true };
   }
 
+  function normalizeShiftFormMode(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "day" || normalized === "day_shift") {
+      return "day";
+    }
+    if (normalized === "discharge" || normalized === "morning" || normalized === "morning_discharge") {
+      return "discharge";
+    }
+    return "night";
+  }
+
+  async function sendShiftFormToTelegram(mode) {
+    ensureOwnerAuth();
+    if (!hasRemoteSync()) {
+      throw new Error("Онлайн-синхронизация нужна для отправки Telegram формы.");
+    }
+
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "send_shift_form_to_telegram",
+        mode: normalizeShiftFormMode(mode)
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось отправить Telegram форму");
+    }
+
+    return payload || { ok: true };
+  }
+
   async function loadTelegramPhotoFeedback(feedbackId, departmentId) {
     const normalizedId = String(feedbackId || "").trim();
     if (!hasRemoteSync() || !normalizedId) {
@@ -921,6 +958,7 @@
     saveReportDate,
     notifyOwnerLogin,
     sendMainPdfsToTelegram,
+    sendShiftFormToTelegram,
     loadTelegramPhotoFeedback,
     listOcrFeedback,
     verifyDepartmentAccess,
