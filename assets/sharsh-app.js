@@ -3520,8 +3520,8 @@
       : "";
 
     return `
-      <span class="pill remote">${escapeHtml(email || "Владелец")}</span>
-      <button type="button" data-owner-signout>Выйти</button>
+      <span class="pill remote">${escapeHtml(email || "Տեր")}</span>
+      <button type="button" data-owner-signout>Ելք</button>
     `;
   }
 
@@ -3593,7 +3593,7 @@
       ? config.getMainBlankPdfPath(basePath)
       : null;
     const downloadMainPdfButtonHtml = mainBlankPdfPath
-      ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">Скачать PDF</a>`
+      ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">PDF ներբ.</a>`
       : "";
 
     app.innerHTML = `
@@ -3610,23 +3610,23 @@
             <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
             ${buildOwnerAuthActions()}
             ${downloadMainPdfButtonHtml}
-            <button type="button" id="sendTelegramPdfsBtn">Отправить PDF в Telegram</button>
+            <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
             <div class="zoom-control">
-              <label for="zoomRange">Масштаб</label>
+              <label for="zoomRange">Մասշտաբ</label>
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
-            <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR feedback</a>
-            <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Ночная смена</a>
-            <button type="button" data-send-shift-form="night">Գիշերային ընդունում</button>
-            <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Дневная смена</a>
-            <button type="button" data-send-shift-form="day">Ցերեկային ընդունում</button>
-            <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Утренняя выписка</a>
-            <button type="button" data-send-shift-form="discharge">Ցերեկային դուրսգրում</button>
-            <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Отчётный лист</a>
-            <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
-            <button type="button" id="refreshBtn">Обновить</button>
-            <button type="button" id="printBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
+            <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Էջ՝ գիշ. ընդուն.</a>
+            <button type="button" data-send-shift-form="night">TG՝ գիշ. ընդուն.</button>
+            <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. ընդուն.</a>
+            <button type="button" data-send-shift-form="day">TG՝ ցեր. ընդուն.</button>
+            <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. դուրսգր.</a>
+            <button type="button" data-send-shift-form="discharge">TG՝ ցեր. դուրսգր.</button>
+            <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Հաշվետվ.</a>
+            <a class="button-link" href="${escapeHtml(getSetupPath())}">Կարգավ.</a>
+            <button type="button" id="refreshBtn">Թարմ.</button>
+            <button type="button" id="printBtn">Տպել</button>
           </div>
         </div>
 

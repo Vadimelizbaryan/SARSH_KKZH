@@ -926,12 +926,12 @@
 
   function getSourceLabel(source) {
     if (source === "remote") {
-      return "Онлайн-синхронизация";
+      return "Առցանց սինխր.";
     }
     if (source === "local-cache") {
-      return "Локальный кэш";
+      return "Տեղային պահոց";
     }
-    return "Локальный режим";
+    return "Տեղային ռեժիմ";
   }
 
   function getShareQuery() {
