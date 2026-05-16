@@ -1682,6 +1682,17 @@ function getYerevanDateTimeText(date = new Date()) {
   return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
 }
 
+function getYerevanReportDateText(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Asia/Yerevan",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("day")}.${get("month")}.${get("year")}`;
+}
+
 function getYerevanHour(date = new Date()) {
   const hour = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Yerevan",
@@ -4187,8 +4198,7 @@ async function sendWorkingSheetForDepartment(
   departmentId: DepartmentId,
   text: string
 ) {
-  const snapshot = await loadSnapshot(supabase);
-  const reportDate = detectReportDateFromHint(text) || snapshot.reportDate || DEFAULT_DATE;
+  const reportDate = detectReportDateFromHint(text) || getYerevanReportDateText();
   const meta = DEPARTMENTS[departmentId];
   const templateBytes = await fetchDepartmentSheetTemplateBytes();
   const bytes = await buildDepartmentOnlySheetBytes(templateBytes, departmentId, reportDate);
@@ -4215,7 +4225,7 @@ async function sendTelegramWebFormForDepartment(
   text: string
 ) {
   const snapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
-  const reportDate = detectReportDateFromHint(text) || snapshot.reportDate || DEFAULT_DATE;
+  const reportDate = detectReportDateFromHint(text) || getYerevanReportDateText();
   const meta = DEPARTMENTS[departmentId];
   const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
   const formUrl = getTelegramWebFormUrl(departmentId, reportDate, carryoverValues);
@@ -5928,8 +5938,7 @@ async function handleTelegramPhoto(
   }
 
   const recognized = await recognizeDepartmentPhoto(departmentId, dataUrl);
-  const snapshot = await loadSnapshot(supabase);
-  const reportDate = hintedReportDate || recognized.reportDate || snapshot.reportDate || DEFAULT_DATE;
+  const reportDate = hintedReportDate || getYerevanReportDateText();
 
   const structureInvalid = !!recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22);
   const hasRecognizedValues = recognized.recognizedKeys.some((key) => {
