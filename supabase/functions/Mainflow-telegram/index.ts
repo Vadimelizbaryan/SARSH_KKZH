@@ -4710,6 +4710,19 @@ async function handleTelegramWebFormSubmit(request: Request) {
   }
 }
 
+function runTelegramBackgroundTask(task: Promise<unknown>, label: string) {
+  const guardedTask = task.catch((error) => {
+    console.error(`${label} failed:`, sanitizePublicErrorMessage(error));
+  });
+
+  if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") {
+    EdgeRuntime.waitUntil(guardedTask);
+    return;
+  }
+
+  void guardedTask;
+}
+
 async function handleTelegramNightFormSubmit(request: Request) {
   try {
     const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -4743,6 +4756,41 @@ async function handleTelegramNightFormSubmit(request: Request) {
     ].filter(Boolean).join(" ");
     const summaryText = buildNightShiftSummaryText(rows, reportDateTime, userName);
     const notifyChatIds = getTelegramNotifyChatIds(null);
+
+    runTelegramBackgroundTask((async () => {
+      if (notifyChatIds.length) {
+        await sendTelegramMessageToMany(notifyChatIds, summaryText);
+      }
+      if (verifiedUser.userId) {
+        await updateTelegramPresenceRecord(
+          supabase as ReturnType<typeof createClient>,
+          {
+            chatId: String(verifiedUser.userId),
+            firstName: verifiedUser.firstName,
+            lastName: verifiedUser.lastName,
+            username: verifiedUser.username,
+            updatedAt: new Date().toISOString()
+          },
+          { isDuty: false }
+        ).catch((error) => {
+          console.error("Failed to clear Telegram night duty mark:", sanitizePublicErrorMessage(error));
+        });
+        await sendTelegramMessage(
+          verifiedUser.userId,
+          [
+            `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Գիշերային հերթափոխի տվյալները պահպանվել են։`,
+            "Շատ լավ աշխատանք է։ Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
+          ].join("\n")
+        );
+      }
+    })(), "Telegram night form notifications");
+
+    return jsonResponse({
+      ok: true,
+      message: "Գիշերային հերթափոխի տվյալները պահպանվել են։",
+      filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
+      summary: summaryText
+    });
 
     if (notifyChatIds.length) {
       await sendTelegramMessageToMany(notifyChatIds, summaryText);
@@ -4855,6 +4903,28 @@ async function handleTelegramDayFormSubmit(request: Request) {
     const summaryText = buildDayShiftSummaryText(rows, reportDateTime, userName);
     const notifyChatIds = getTelegramNotifyChatIds(null);
 
+    runTelegramBackgroundTask((async () => {
+      if (notifyChatIds.length) {
+        await sendTelegramMessageToMany(notifyChatIds, summaryText);
+      }
+      if (verifiedUser.userId) {
+        await sendTelegramMessage(
+          verifiedUser.userId,
+          [
+            `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Ցերեկային հերթափոխի տվյալները պահպանվել են։`,
+            "Տվյալները արդեն հասանելի են կայքում։ Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
+          ].join("\n")
+        );
+      }
+    })(), "Telegram day form notifications");
+
+    return jsonResponse({
+      ok: true,
+      message: "Ցերեկային հերթափոխի տվյալները պահպանվել են։",
+      filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
+      summary: summaryText
+    });
+
     if (notifyChatIds.length) {
       await sendTelegramMessageToMany(notifyChatIds, summaryText);
     }
@@ -4918,6 +4988,28 @@ async function handleTelegramDischargeFormSubmit(request: Request) {
     ].filter(Boolean).join(" ");
     const summaryText = buildDischargeShiftSummaryText(rows, reportDateTime, userName);
     const notifyChatIds = getTelegramNotifyChatIds(null);
+
+    runTelegramBackgroundTask((async () => {
+      if (notifyChatIds.length) {
+        await sendTelegramMessageToMany(notifyChatIds, summaryText);
+      }
+      if (verifiedUser.userId) {
+        await sendTelegramMessage(
+          verifiedUser.userId,
+          [
+            `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Առավոտյան դուրսգրման տվյալները պահպանվել են։`,
+            "Տվյալները արդեն հասանելի են կայքում։ Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
+          ].join("\n")
+        );
+      }
+    })(), "Telegram discharge form notifications");
+
+    return jsonResponse({
+      ok: true,
+      message: "Առավոտյան դուրսգրման տվյալները պահպանվել են։",
+      filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
+      summary: summaryText
+    });
 
     if (notifyChatIds.length) {
       await sendTelegramMessageToMany(notifyChatIds, summaryText);
