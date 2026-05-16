@@ -229,6 +229,20 @@ function buildCivilReferralIlikePattern(query: string) {
   return `%${query.replace(/[%_]/g, "")}%`;
 }
 
+function buildCivilReferralSearchFilter(pattern: string) {
+  return [
+    `department_name.ilike.${pattern}`,
+    `values->>patientName.ilike.${pattern}`,
+    `values->>medicalCenter.ilike.${pattern}`,
+    `values->>militaryUnit.ilike.${pattern}`,
+    `values->>rank.ilike.${pattern}`,
+    `values->>draftYear.ilike.${pattern}`,
+    `values->>birthYear.ilike.${pattern}`,
+    `values->>referralDate.ilike.${pattern}`,
+    `values->>dischargeDate.ilike.${pattern}`
+  ].join(",");
+}
+
 const CIVIL_ARMENIAN_WORD_RE = /^[\u0531-\u0587]+$/;
 
 function normalizeCivilReferralNameText(value: unknown, options: { medicalCenter?: boolean } = {}) {
@@ -1548,26 +1562,29 @@ async function listCivilReferrals(
 ) {
   const { limit, offset, query } = sanitizeCivilReferralListOptions(options);
   const pattern = buildCivilReferralIlikePattern(query);
-  let request = supabase
+  const searchFilter = query ? buildCivilReferralSearchFilter(pattern) : "";
+
+  let countRequest = supabase
     .from("sharsh_departments")
-    .select("department_id, department_name, values, updated_at", { count: "exact" })
+    .select("department_id", { count: "exact", head: true })
     .eq("department_group", CIVIL_REFERRAL_GROUP);
 
-  if (query) {
-    request = request.or([
-      `department_name.ilike.${pattern}`,
-      `values->>patientName.ilike.${pattern}`,
-      `values->>medicalCenter.ilike.${pattern}`,
-      `values->>militaryUnit.ilike.${pattern}`,
-      `values->>rank.ilike.${pattern}`,
-      `values->>draftYear.ilike.${pattern}`,
-      `values->>birthYear.ilike.${pattern}`,
-      `values->>referralDate.ilike.${pattern}`,
-      `values->>dischargeDate.ilike.${pattern}`
-    ].join(","));
+  let request = supabase
+    .from("sharsh_departments")
+    .select("department_id, department_name, values, updated_at")
+    .eq("department_group", CIVIL_REFERRAL_GROUP);
+
+  if (searchFilter) {
+    countRequest = countRequest.or(searchFilter);
+    request = request.or(searchFilter);
   }
 
-  const { data, error, count } = await request
+  const { count, error: countError } = await countRequest;
+  if (countError) {
+    throw countError;
+  }
+
+  const { data, error } = await request
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -1576,7 +1593,7 @@ async function listCivilReferrals(
   }
 
   return {
-    total: count || 0,
+    total: Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : (data || []).length,
     limit,
     offset,
     query,
