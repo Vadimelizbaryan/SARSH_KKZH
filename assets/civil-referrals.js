@@ -29,11 +29,11 @@
     savedQuery: "",
     sourceFileName: "",
     filter: "",
+    searchDraft: "",
     status: "Загрузите RTF/PDF-файл Word, проверьте найденные строки и сохраните в базу.",
     isBusy: false,
     source: ""
   };
-  let savedSearchTimer = null;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -594,9 +594,17 @@ function isHeaderRow(cells) {
               type="search"
               id="civilFilterInput"
               placeholder="Поиск по ФИО, БК, части, званию, датам..."
-              value="${escapeHtml(state.filter)}"
+              value="${escapeHtml(state.searchDraft)}"
               ${state.isBusy ? "disabled" : ""}
             >
+            <button
+              type="button"
+              id="civilSearchBtn"
+              class="civil-search-button"
+              title="Поиск"
+              aria-label="Поиск"
+              ${state.isBusy ? "disabled" : ""}
+            >&#128269;</button>
             <span class="civil-search-note">Поиск работает по всем колонкам базы и загружает найденные строки с сервера.</span>
           </div>
           ${renderRowsTable(state.savedRows, "В базе пока нет записей.", "saved", { applyFilter: false, rowNumberOffset: state.savedOffset })}
@@ -752,6 +760,14 @@ function isHeaderRow(cells) {
     }
   }
 
+  function runSavedSearch() {
+    const input = document.getElementById("civilFilterInput");
+    state.searchDraft = input instanceof HTMLInputElement ? input.value : state.searchDraft;
+    state.filter = state.searchDraft;
+    state.savedOffset = 0;
+    loadSavedRows();
+  }
+
   function handleTableEdit(event) {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || !input.classList.contains("civil-edit-input")) {
@@ -795,11 +811,17 @@ function isHeaderRow(cells) {
       loadSavedRows();
     });
     document.getElementById("civilFilterInput")?.addEventListener("input", (event) => {
-      state.filter = event.target.value;
-      state.savedOffset = 0;
-      window.clearTimeout(savedSearchTimer);
-      savedSearchTimer = window.setTimeout(() => loadSavedRows(), 350);
+      if (event.target instanceof HTMLInputElement) {
+        state.searchDraft = event.target.value;
+      }
     });
+    document.getElementById("civilFilterInput")?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        runSavedSearch();
+      }
+    });
+    document.getElementById("civilSearchBtn")?.addEventListener("click", runSavedSearch);
     document.querySelectorAll(".civil-page-btn[data-civil-page]").forEach((button) => {
       button.addEventListener("click", () => {
         const page = Number(button.getAttribute("data-civil-page"));

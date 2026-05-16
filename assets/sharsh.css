@@ -2366,6 +2366,25 @@ a {
   font-weight: 800;
 }
 
+.civil-search-button {
+  width: 50px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 999px;
+  background: #0f7a55;
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(29, 90, 72, 0.12);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.civil-search-button:disabled {
+  background: #a8b4aa;
+  color: rgba(255, 255, 255, 0.78);
+}
+
 .civil-database-tools input[type="search"]:focus {
   border-color: #158f60;
   box-shadow: 0 0 0 3px rgba(21, 143, 96, 0.14);
