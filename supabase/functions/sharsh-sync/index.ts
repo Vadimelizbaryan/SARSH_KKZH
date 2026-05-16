@@ -208,6 +208,32 @@ function normalizeCivilReferralText(value: unknown) {
     .trim();
 }
 
+const CIVIL_ARMENIAN_WORD_RE = /^[\u0531-\u0587]+$/;
+
+function normalizeCivilReferralNameText(value: unknown, options: { medicalCenter?: boolean } = {}) {
+  const tokens = normalizeCivilReferralText(value).split(" ").filter(Boolean);
+  const merged: string[] = [];
+
+  tokens.forEach((token) => {
+    const previous = merged[merged.length - 1];
+    const shouldMerge = options.medicalCenter
+      ? (previous?.length ?? 0) <= 3 && token.length <= 3 && token !== "\u0532\u053F"
+      : (previous?.length ?? 0) <= 2 || token.length <= 2;
+    if (
+      previous
+      && CIVIL_ARMENIAN_WORD_RE.test(previous)
+      && CIVIL_ARMENIAN_WORD_RE.test(token)
+      && shouldMerge
+    ) {
+      merged[merged.length - 1] = `${previous}${token}`;
+    } else {
+      merged.push(token);
+    }
+  });
+
+  return merged.join(" ");
+}
+
 function stableCivilReferralHash(record: Record<string, unknown>) {
   const source = CIVIL_REFERRAL_VALUE_KEYS
     .map((key) => normalizeCivilReferralText(record[key]).toLowerCase())
@@ -223,7 +249,11 @@ function sanitizeCivilReferralRecord(record: unknown, sourceFileName = "") {
   const source = record && typeof record === "object" ? record as Record<string, unknown> : {};
   const output: Record<string, string | number | null> = {};
   CIVIL_REFERRAL_VALUE_KEYS.forEach((key) => {
-    output[key] = normalizeCivilReferralText(source[key]);
+    output[key] = key === "patientName"
+      ? normalizeCivilReferralNameText(source[key])
+      : key === "medicalCenter"
+        ? normalizeCivilReferralNameText(source[key], { medicalCenter: true })
+        : normalizeCivilReferralText(source[key]);
   });
   output.sourceFileName = normalizeCivilReferralText(source.sourceFileName || sourceFileName);
   output.sourceRow = Number.isFinite(Number(source.sourceRow)) ? Math.max(0, Math.trunc(Number(source.sourceRow))) : null;

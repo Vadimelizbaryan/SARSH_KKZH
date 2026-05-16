@@ -42,6 +42,50 @@
       .trim();
   }
 
+  const ARMENIAN_WORD_RE = /^[\u0531-\u0587]+$/;
+
+  function mergeShortArmenianSplits(value, options = {}) {
+    const tokens = normalizeText(value).split(" ").filter(Boolean);
+    const merged = [];
+
+    tokens.forEach((token) => {
+      const previous = merged[merged.length - 1];
+      const shouldMerge = options.medicalCenter
+        ? previous?.length <= 3 && token.length <= 3 && token !== "\u0532\u053F"
+        : previous?.length <= 2 || token.length <= 2;
+      if (
+        previous
+        && ARMENIAN_WORD_RE.test(previous)
+        && ARMENIAN_WORD_RE.test(token)
+        && shouldMerge
+      ) {
+        merged[merged.length - 1] = `${previous}${token}`;
+      } else {
+        merged.push(token);
+      }
+    });
+
+    return merged.join(" ");
+  }
+
+  function normalizeCivilNameField(value) {
+    return mergeShortArmenianSplits(value);
+  }
+
+  function normalizeCivilMedicalCenterField(value) {
+    return mergeShortArmenianSplits(value, { medicalCenter: true });
+  }
+
+  function normalizeSearchText(value) {
+    return normalizeText(value).toLowerCase();
+  }
+
+  function normalizeCompactSearchText(value) {
+    return normalizeText(value)
+      .replace(/([\u0531-\u0587])\s+([\u0531-\u0587])/g, "$1$2")
+      .toLowerCase();
+  }
+
   function decodeWindows1251Byte(byte) {
     try {
       return new TextDecoder("windows-1251").decode(new Uint8Array([byte]));
@@ -178,8 +222,8 @@
 
   function normalizeRecord(cells, sourceFileName, sourceRow) {
     return {
-      patientName: normalizeText(cells[0]),
-      medicalCenter: normalizeText(cells[1]),
+      patientName: normalizeCivilNameField(cells[0]),
+      medicalCenter: normalizeCivilMedicalCenterField(cells[1]),
       militaryUnit: normalizeText(cells[2]),
       rank: normalizeText(cells[3]),
       draftYear: normalizeText(cells[4]).replace(/[^\d]/g, ""),
@@ -187,6 +231,23 @@
       referralDate: normalizeReferralDate(cells[6]),
       sourceFileName,
       sourceRow
+    };
+  }
+
+  function normalizePageRecord(record) {
+    const source = record && typeof record === "object" ? record : {};
+    return {
+      ...source,
+      patientName: normalizeCivilNameField(source.patientName),
+      medicalCenter: normalizeCivilMedicalCenterField(source.medicalCenter),
+      militaryUnit: normalizeText(source.militaryUnit),
+      rank: normalizeText(source.rank),
+      draftYear: normalizeText(source.draftYear).replace(/[^\d]/g, ""),
+      birthYear: normalizeText(source.birthYear).replace(/[^\d]/g, ""),
+      referralDate: normalizeReferralDate(source.referralDate),
+      sourceFileName: normalizeText(source.sourceFileName),
+      importedAt: normalizeText(source.importedAt),
+      updatedAt: normalizeText(source.updatedAt)
     };
   }
 
@@ -226,13 +287,15 @@ function isHeaderRow(cells) {
   }
 
   function getFilteredRowEntries(rows) {
-    const query = normalizeText(state.filter).toLowerCase();
+    const query = normalizeSearchText(state.filter);
+    const compactQuery = normalizeCompactSearchText(state.filter);
     return rows.map((row, index) => ({ row, index })).filter(({ row }) => {
       if (!query) {
         return true;
       }
       return FIELD_DEFINITIONS.some((field) => {
-        return String(row[field.key] || "").toLowerCase().includes(query);
+        return normalizeSearchText(row[field.key]).includes(query)
+          || normalizeCompactSearchText(row[field.key]).includes(compactQuery);
       });
     });
   }
@@ -392,7 +455,7 @@ function isHeaderRow(cells) {
       const payload = typeof sync.listCivilReferrals === "function"
         ? await sync.listCivilReferrals()
         : { rows: [] };
-      state.savedRows = Array.isArray(payload?.rows) ? payload.rows : [];
+      state.savedRows = Array.isArray(payload?.rows) ? payload.rows.map(normalizePageRecord) : [];
       state.source = payload?.source || "";
       state.status = `База загружена. Записей: ${state.savedRows.length}.`;
     } catch (error) {
@@ -412,7 +475,9 @@ function isHeaderRow(cells) {
       const payload = typeof sync.saveCivilReferrals === "function"
         ? await sync.saveCivilReferrals(state.parsedRows, state.sourceFileName)
         : { rows: state.parsedRows, saved: state.parsedRows.length };
-      state.savedRows = Array.isArray(payload?.rows) ? payload.rows : state.parsedRows;
+      state.savedRows = Array.isArray(payload?.rows)
+        ? payload.rows.map(normalizePageRecord)
+        : state.parsedRows.map(normalizePageRecord);
       state.status = `Сохранено: ${payload?.saved || state.parsedRows.length}. В базе записей: ${state.savedRows.length}.`;
     } catch (error) {
       state.status = error instanceof Error ? error.message : "Не удалось сохранить строки.";
@@ -431,7 +496,9 @@ function isHeaderRow(cells) {
       const payload = typeof sync.saveCivilReferrals === "function"
         ? await sync.saveCivilReferrals(state.savedRows, "manual-edit")
         : { rows: state.savedRows, saved: state.savedRows.length };
-      state.savedRows = Array.isArray(payload?.rows) ? payload.rows : state.savedRows;
+      state.savedRows = Array.isArray(payload?.rows)
+        ? payload.rows.map(normalizePageRecord)
+        : state.savedRows.map(normalizePageRecord);
       state.status = `Правки сохранены. В базе записей: ${state.savedRows.length}.`;
     } catch (error) {
       state.status = error instanceof Error ? error.message : "Не удалось сохранить правки базы.";
@@ -465,7 +532,13 @@ function isHeaderRow(cells) {
 
     rows[index] = {
       ...rows[index],
-      [key]: key === "referralDate" ? normalizeReferralDate(input.value) : normalizeText(input.value)
+      [key]: key === "referralDate"
+        ? normalizeReferralDate(input.value)
+        : key === "patientName"
+          ? normalizeCivilNameField(input.value)
+          : key === "medicalCenter"
+            ? normalizeCivilMedicalCenterField(input.value)
+            : normalizeText(input.value)
     };
   }
 

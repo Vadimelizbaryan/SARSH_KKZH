@@ -270,6 +270,32 @@
       .trim();
   }
 
+  const CIVIL_ARMENIAN_WORD_RE = /^[\u0531-\u0587]+$/;
+
+  function normalizeCivilNameText(value, options = {}) {
+    const tokens = normalizeCivilText(value).split(" ").filter(Boolean);
+    const merged = [];
+
+    tokens.forEach((token) => {
+      const previous = merged[merged.length - 1];
+      const shouldMerge = options.medicalCenter
+        ? previous?.length <= 3 && token.length <= 3 && token !== "\u0532\u053F"
+        : previous?.length <= 2 || token.length <= 2;
+      if (
+        previous
+        && CIVIL_ARMENIAN_WORD_RE.test(previous)
+        && CIVIL_ARMENIAN_WORD_RE.test(token)
+        && shouldMerge
+      ) {
+        merged[merged.length - 1] = `${previous}${token}`;
+      } else {
+        merged.push(token);
+      }
+    });
+
+    return merged.join(" ");
+  }
+
   function stableCivilReferralHash(record) {
     const source = CIVIL_REFERRAL_FIELDS
       .map((key) => normalizeCivilText(record[key]).toLowerCase())
@@ -284,7 +310,11 @@
   function normalizeCivilReferralRecord(record, sourceFileName = "") {
     const output = {};
     CIVIL_REFERRAL_FIELDS.forEach((key) => {
-      output[key] = normalizeCivilText(record && record[key]);
+      output[key] = key === "patientName"
+        ? normalizeCivilNameText(record && record[key])
+        : key === "medicalCenter"
+          ? normalizeCivilNameText(record && record[key], { medicalCenter: true })
+          : normalizeCivilText(record && record[key]);
     });
     output.sourceFileName = normalizeCivilText(record?.sourceFileName || sourceFileName);
     output.sourceRow = Number.isFinite(Number(record?.sourceRow)) ? Math.max(0, Math.trunc(Number(record.sourceRow))) : null;
