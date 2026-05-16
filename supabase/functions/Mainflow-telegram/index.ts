@@ -2140,6 +2140,53 @@ async function loadDischargeShiftDraftRows(supabase: ReturnType<typeof createCli
   })) as Record<string, Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>>;
 }
 
+async function loadShiftDraftMeta(
+  supabase: ReturnType<typeof createClient>,
+  reportKey: string
+) {
+  const { data, error } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date, updated_at")
+    .eq("report_key", reportKey)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    reportDateTime: typeof data?.report_date === "string" ? data.report_date : "",
+    updatedAt: typeof data?.updated_at === "string" ? data.updated_at : ""
+  };
+}
+
+async function loadShiftDraftByMode(
+  supabase: ReturnType<typeof createClient>,
+  mode: "night" | "day" | "discharge"
+) {
+  if (mode === "day") {
+    const [rows, meta] = await Promise.all([
+      loadDayShiftDraftRows(supabase),
+      loadShiftDraftMeta(supabase, DAY_SHIFT_META_KEY)
+    ]);
+    return { mode, rows, ...meta };
+  }
+
+  if (mode === "discharge") {
+    const [rows, meta] = await Promise.all([
+      loadDischargeShiftDraftRows(supabase),
+      loadShiftDraftMeta(supabase, DISCHARGE_SHIFT_META_KEY)
+    ]);
+    return { mode, rows, ...meta };
+  }
+
+  const [rows, meta] = await Promise.all([
+    loadNightShiftDraftRows(supabase),
+    loadShiftDraftMeta(supabase, NIGHT_SHIFT_META_KEY)
+  ]);
+  return { mode, rows, ...meta };
+}
+
 let armenianPdfFontBytesPromise: Promise<Uint8Array | null> | null = null;
 
 async function getArmenianPdfFontBytes() {
@@ -4741,6 +4788,39 @@ async function handleTelegramNightFormSubmit(request: Request) {
   }
 }
 
+async function handleTelegramShiftFormLoad(
+  request: Request,
+  mode: "night" | "day" | "discharge"
+) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const verifiedUser = await verifyTelegramWebAppInitData(String(payload?.initData || ""));
+    if (!verifiedUser) {
+      return jsonResponse({ ok: false, error: "Telegram Web App authorization failed." }, 403);
+    }
+
+    const supabase = createSupabaseAdmin();
+    if (!await isTelegramUserAllowedByRuntimeState(supabase, verifiedUser.userId)) {
+      return jsonResponse({
+        ok: false,
+        error: "Բոտը ժամանակավորապես անջատված է կոլլեգաների համար։ Խնդրում ենք դիմել ադմինիստրատորին։"
+      }, 403);
+    }
+
+    const draft = await loadShiftDraftByMode(supabase as ReturnType<typeof createClient>, mode);
+    return jsonResponse({
+      ok: true,
+      ...draft,
+      filledDepartments: Object.values(draft.rows).filter((row) => getNightShiftRowTotal(row) > 0).length
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      error: sanitizePublicErrorMessage(error)
+    }, 500);
+  }
+}
+
 async function handleTelegramDayFormSubmit(request: Request) {
   try {
     const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -6322,6 +6402,15 @@ Deno.serve(async (request) => {
   const postUrl = new URL(request.url);
   if (postUrl.searchParams.get("action") === "web-form-submit") {
     return await handleTelegramWebFormSubmit(request);
+  }
+  if (postUrl.searchParams.get("action") === "night-form-load") {
+    return await handleTelegramShiftFormLoad(request, "night");
+  }
+  if (postUrl.searchParams.get("action") === "day-form-load") {
+    return await handleTelegramShiftFormLoad(request, "day");
+  }
+  if (postUrl.searchParams.get("action") === "discharge-form-load") {
+    return await handleTelegramShiftFormLoad(request, "discharge");
   }
   if (postUrl.searchParams.get("action") === "night-form-submit") {
     return await handleTelegramNightFormSubmit(request);

@@ -61,6 +61,8 @@
       aria: "Գիշերային հերթափոխի աղյուսակ"
     };
 
+  let reportDateTime = getQuery().get("date") || getYerevanDateTime();
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -75,7 +77,7 @@
   }
 
   function getReportDateTime() {
-    return getQuery().get("date") || getYerevanDateTime();
+    return reportDateTime;
   }
 
   function getYerevanDateTime() {
@@ -104,6 +106,11 @@
   function getEndpoint() {
     const baseUrl = String(runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co").replace(/\/+$/, "");
     return `${baseUrl}/functions/v1/Mainflow-telegram?action=${copy.action}`;
+  }
+
+  function getLoadEndpoint() {
+    const baseUrl = String(runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co").replace(/\/+$/, "");
+    return `${baseUrl}/functions/v1/Mainflow-telegram?action=${copy.action.replace("-submit", "-load")}`;
   }
 
   function getDepartments() {
@@ -166,6 +173,60 @@
     const grand = root.querySelector("[data-grand-total]");
     if (grand) {
       grand.textContent = String(getGrandTotal());
+    }
+  }
+
+  function applyRows(rows) {
+    if (!rows || typeof rows !== "object") {
+      return;
+    }
+    getDepartments().forEach((department) => {
+      columns.forEach((column) => {
+        const input = root.querySelector(`[data-department="${department.id}"][data-key="${column.key}"]`);
+        if (!input) {
+          return;
+        }
+        input.value = String(toNumber(rows?.[department.id]?.[column.key]));
+      });
+    });
+    updateTotals();
+  }
+
+  async function loadSavedDraft() {
+    const message = root.querySelector("[data-message]");
+    if (!getInitData()) {
+      return;
+    }
+
+    try {
+      const response = await fetch(getLoadEndpoint(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData: getInitData() })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload || payload.ok !== true) {
+        throw new Error(payload && payload.error ? payload.error : copy.fail);
+      }
+
+      if (typeof payload.reportDateTime === "string" && payload.reportDateTime.trim()) {
+        reportDateTime = payload.reportDateTime.trim();
+        const dateTarget = root.querySelector("[data-report-date-time]");
+        if (dateTarget) {
+          dateTarget.textContent = reportDateTime;
+        }
+      }
+
+      applyRows(payload.rows);
+      if (message && typeof payload.filledDepartments === "number" && payload.filledDepartments > 0) {
+        message.className = "tg-form-message success";
+        message.textContent = `Բացված են արդեն պահպանված տվյալները։ Լրացված բաժանմունքներ՝ ${payload.filledDepartments}։`;
+      }
+    } catch (error) {
+      if (message) {
+        message.className = "tg-form-message error";
+        message.textContent = error instanceof Error ? error.message : copy.fail;
+      }
     }
   }
 
@@ -270,7 +331,7 @@
             <h1 class="tg-form-title">${escapeHtml(copy.title)}</h1>
           </div>
           <div class="tg-form-meta">
-            <span class="tg-form-pill">${escapeHtml(getReportDateTime())}</span>
+            <span class="tg-form-pill" data-report-date-time>${escapeHtml(getReportDateTime())}</span>
             <span class="tg-form-pill">Telegram ձև</span>
           </div>
         </header>
@@ -321,6 +382,7 @@
       form.addEventListener("submit", submitForm);
     }
     updateTotals();
+    loadSavedDraft();
   }
 
   if (telegram) {
