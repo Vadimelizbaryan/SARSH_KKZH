@@ -502,6 +502,20 @@ function isHeaderRow(cells) {
           </div>
         </section>
 
+        <section class="panel civil-database-panel">
+          <div class="civil-section-head">
+            <div>
+              <h2>Загруженная база</h2>
+              <p class="hint">Эти данные уже сохранены на сервере. Строки можно исправить прямо здесь и сохранить правки.</p>
+            </div>
+            <div class="civil-section-actions">
+              <span class="civil-count-pill">${filteredSavedCount} / ${savedCount}</span>
+              <button type="button" id="civilSaveDatabaseBtn" ${!savedCount || state.isBusy ? "disabled" : ""}>Сохранить правки базы</button>
+            </div>
+          </div>
+          ${renderRowsTable(state.savedRows, "В базе пока нет записей.", "saved")}
+        </section>
+
         <section class="panel civil-upload-panel">
           <h2>Загрузить документ</h2>
           <p class="hint">Поддерживается RTF или PDF из Word. Если файл в DOC/DOCX, сохраните его в Word как RTF/PDF и загрузите сюда.</p>
@@ -510,30 +524,26 @@ function isHeaderRow(cells) {
               <input type="file" id="civilFileInput" accept=".rtf,.pdf,.txt,application/pdf,application/rtf,text/rtf,text/plain" ${state.isBusy ? "disabled" : ""}>
               Выбрать RTF/PDF
             </label>
-            <button type="button" id="civilSaveBtn" ${!parsedCount || state.isBusy ? "disabled" : ""}>Сохранить найденные строки</button>
             <input type="search" id="civilFilterInput" placeholder="Поиск по ФИО, БК, части..." value="${escapeHtml(state.filter)}">
           </div>
           <div class="civil-status">${escapeHtml(state.status)}</div>
         </section>
 
         ${state.parsedRows.length ? `
-          <section class="panel">
-            <h2>Предварительный просмотр: ${escapeHtml(state.sourceFileName)}</h2>
-            <p class="hint">Можно исправить значения прямо в таблице перед сохранением.</p>
+          <section class="panel civil-draft-panel">
+            <div class="civil-section-head">
+              <div>
+                <h2>Новые строки перед сохранением</h2>
+                <p class="hint">Источник: ${escapeHtml(state.sourceFileName)}. Проверьте и исправьте эти строки, затем сохраните их в базу.</p>
+              </div>
+              <div class="civil-section-actions">
+                <span class="civil-count-pill">${filteredParsedCount} / ${parsedCount}</span>
+                <button type="button" id="civilSaveBtn" ${state.isBusy ? "disabled" : ""}>Сохранить найденные строки</button>
+              </div>
+            </div>
             ${renderRowsTable(state.parsedRows, "По текущему фильтру строк не найдено.", "parsed")}
           </section>
         ` : ""}
-
-        <section class="panel">
-          <div class="civil-section-head">
-            <div>
-              <h2>Сохраненная база</h2>
-              <p class="hint">Здесь тоже можно исправить строку и сохранить правки в базе.</p>
-            </div>
-            <button type="button" id="civilSaveDatabaseBtn" ${!savedCount || state.isBusy ? "disabled" : ""}>Сохранить правки базы</button>
-          </div>
-          ${renderRowsTable(state.savedRows, "В базе пока нет записей.", "saved")}
-        </section>
       </main>
     `;
 
