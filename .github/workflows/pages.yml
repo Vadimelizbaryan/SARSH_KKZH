@@ -42,6 +42,7 @@ jobs:
           cp morning-discharge.html _site/
           cp eti77ylq.html _site/
           cp hospital-report.html _site/
+          cp civil-referrals.html _site/
           cp "Օրվա շարժ․.html" _site/
           cp department-instructions.html _site/
           cp department-instructions.pdf _site/

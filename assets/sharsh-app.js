@@ -41,6 +41,7 @@
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
   const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
+  const CIVIL_REFERRALS_FILENAME = "civil-referrals.html";
   const NIGHT_SHIFT_FILENAME = "index.html";
   const DAY_SHIFT_FILENAME = "index.html";
   const DISCHARGE_SHIFT_FILENAME = "index.html";
@@ -3131,6 +3132,14 @@
     return appendShareQuery(`${prefix}${HOSPITAL_REPORT_FILENAME}`);
   }
 
+  function getCivilReferralsPath() {
+    if (basePath === "@site") {
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent(CIVIL_REFERRALS_FILENAME)}`);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return appendShareQuery(`${prefix}${CIVIL_REFERRALS_FILENAME}`);
+  }
+
   function getNightShiftPath() {
     if (basePath === "@site") {
       return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent(NIGHT_SHIFT_FILENAME)}&view=night`);
@@ -3620,6 +3629,7 @@
             <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Էջ՝ գիշ. ընդուն.</a>
             <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. ընդուն.</a>
             <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. դուրսգր.</a>
+            <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}" target="_blank" rel="noopener">Քաղ. ԲԿ բազա</a>
             <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Հաշվետվ.</a>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Կարգավ.</a>
             <button type="button" id="refreshBtn">Թարմ.</button>

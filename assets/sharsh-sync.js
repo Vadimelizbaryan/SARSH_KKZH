@@ -251,6 +251,128 @@
     return payload;
   }
 
+  const CIVIL_REFERRALS_LOCAL_STORAGE_KEY = `${config.STORAGE_NAMESPACE || "sarsh-kkzh-v2"}:civil-referrals:v1`;
+  const CIVIL_REFERRAL_FIELDS = [
+    "patientName",
+    "medicalCenter",
+    "militaryUnit",
+    "rank",
+    "draftYear",
+    "birthYear",
+    "referralDate"
+  ];
+
+  function normalizeCivilText(value) {
+    return String(value ?? "")
+      .replace(/\u0000/g, "")
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t\r\n]+/g, " ")
+      .trim();
+  }
+
+  function stableCivilReferralHash(record) {
+    const source = CIVIL_REFERRAL_FIELDS
+      .map((key) => normalizeCivilText(record[key]).toLowerCase())
+      .join("|");
+    let hash = 5381;
+    for (let index = 0; index < source.length; index += 1) {
+      hash = ((hash << 5) + hash + source.charCodeAt(index)) >>> 0;
+    }
+    return hash.toString(36).padStart(7, "0");
+  }
+
+  function normalizeCivilReferralRecord(record, sourceFileName = "") {
+    const output = {};
+    CIVIL_REFERRAL_FIELDS.forEach((key) => {
+      output[key] = normalizeCivilText(record && record[key]);
+    });
+    output.sourceFileName = normalizeCivilText(record?.sourceFileName || sourceFileName);
+    output.sourceRow = Number.isFinite(Number(record?.sourceRow)) ? Math.max(0, Math.trunc(Number(record.sourceRow))) : null;
+    output.id = normalizeCivilText(record?.id) || stableCivilReferralHash(output);
+    output.importedAt = normalizeCivilText(record?.importedAt);
+    output.updatedAt = normalizeCivilText(record?.updatedAt);
+    return output;
+  }
+
+  function normalizeCivilReferralRows(rows, sourceFileName = "") {
+    return Array.isArray(rows)
+      ? rows
+        .map((row) => normalizeCivilReferralRecord(row, sourceFileName))
+        .filter((row) => row.patientName && row.medicalCenter)
+      : [];
+  }
+
+  function readLocalCivilReferrals() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(CIVIL_REFERRALS_LOCAL_STORAGE_KEY) || "[]");
+      return normalizeCivilReferralRows(parsed);
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function writeLocalCivilReferrals(rows) {
+    const normalized = normalizeCivilReferralRows(rows)
+      .sort((a, b) => String(b.updatedAt || b.importedAt || "").localeCompare(String(a.updatedAt || a.importedAt || "")));
+    localStorage.setItem(CIVIL_REFERRALS_LOCAL_STORAGE_KEY, JSON.stringify(normalized));
+    return normalized;
+  }
+
+  async function listCivilReferrals() {
+    if (hasRemoteSync()) {
+      const payload = await postRemotePayload(
+        { type: "list_civil_referrals" },
+        "Не удалось загрузить базу гражданских направлений"
+      );
+      return {
+        rows: normalizeCivilReferralRows(payload?.rows),
+        source: "remote"
+      };
+    }
+
+    return {
+      rows: readLocalCivilReferrals(),
+      source: "local-only"
+    };
+  }
+
+  async function saveCivilReferrals(rows, sourceFileName = "") {
+    const normalized = normalizeCivilReferralRows(rows, sourceFileName);
+    if (hasRemoteSync()) {
+      const payload = await postRemotePayload(
+        {
+          type: "save_civil_referrals",
+          sourceFileName,
+          rows: normalized
+        },
+        "Не удалось сохранить базу гражданских направлений"
+      );
+      return {
+        rows: normalizeCivilReferralRows(payload?.rows),
+        saved: Number(payload?.saved) || normalized.length,
+        source: "remote"
+      };
+    }
+
+    const now = new Date().toISOString();
+    const existing = readLocalCivilReferrals();
+    const map = new Map(existing.map((row) => [row.id, row]));
+    normalized.forEach((row) => {
+      map.set(row.id, {
+        ...map.get(row.id),
+        ...row,
+        sourceFileName: row.sourceFileName || sourceFileName,
+        importedAt: row.importedAt || now,
+        updatedAt: now
+      });
+    });
+    return {
+      rows: writeLocalCivilReferrals([...map.values()]),
+      saved: normalized.length,
+      source: "local-only"
+    };
+  }
+
   async function verifyDepartmentAccess(departmentId, accessCode) {
     ensureOwnerAuth();
     if (!hasRemoteSync()) {
@@ -954,6 +1076,8 @@
     loadDischargeShiftDraft,
     saveDischargeShiftDraft,
     clearDischargeShiftDraft,
+    listCivilReferrals,
+    saveCivilReferrals,
     saveOcrFeedback,
     saveReportDate,
     notifyOwnerLogin,

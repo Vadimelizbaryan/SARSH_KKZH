@@ -45,6 +45,17 @@ const DAY_SHIFT_ROW_PREFIX = "day:";
 const DAY_SHIFT_META_KEY = "day_shift";
 const DISCHARGE_SHIFT_ROW_PREFIX = "discharge:";
 const DISCHARGE_SHIFT_META_KEY = "discharge_shift";
+const CIVIL_REFERRAL_ROW_PREFIX = "civil-referral:";
+const CIVIL_REFERRAL_GROUP = "civil_referral";
+const CIVIL_REFERRAL_VALUE_KEYS = [
+  "patientName",
+  "medicalCenter",
+  "militaryUnit",
+  "rank",
+  "draftYear",
+  "birthYear",
+  "referralDate"
+] as const;
 
 const PHOTO_FIELD_MAPPINGS = [
   { cell: 1, key: "beenTotal", label: "been / total" },
@@ -187,6 +198,47 @@ function getDayShiftRowId(departmentId: string) {
 
 function getDischargeShiftRowId(departmentId: string) {
   return `${DISCHARGE_SHIFT_ROW_PREFIX}${departmentId}`;
+}
+
+function normalizeCivilReferralText(value: unknown) {
+  return String(value ?? "")
+    .replace(/\u0000/g, "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t\r\n]+/g, " ")
+    .trim();
+}
+
+function stableCivilReferralHash(record: Record<string, unknown>) {
+  const source = CIVIL_REFERRAL_VALUE_KEYS
+    .map((key) => normalizeCivilReferralText(record[key]).toLowerCase())
+    .join("|");
+  let hash = 5381;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = ((hash << 5) + hash + source.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36).padStart(7, "0");
+}
+
+function sanitizeCivilReferralRecord(record: unknown, sourceFileName = "") {
+  const source = record && typeof record === "object" ? record as Record<string, unknown> : {};
+  const output: Record<string, string | number | null> = {};
+  CIVIL_REFERRAL_VALUE_KEYS.forEach((key) => {
+    output[key] = normalizeCivilReferralText(source[key]);
+  });
+  output.sourceFileName = normalizeCivilReferralText(source.sourceFileName || sourceFileName);
+  output.sourceRow = Number.isFinite(Number(source.sourceRow)) ? Math.max(0, Math.trunc(Number(source.sourceRow))) : null;
+  output.id = normalizeCivilReferralText(source.id) || stableCivilReferralHash(output);
+  output.importedAt = normalizeCivilReferralText(source.importedAt);
+  output.updatedAt = normalizeCivilReferralText(source.updatedAt);
+  return output;
+}
+
+function sanitizeCivilReferralRows(rows: unknown, sourceFileName = "") {
+  return Array.isArray(rows)
+    ? rows
+      .map((row) => sanitizeCivilReferralRecord(row, sourceFileName))
+      .filter((row) => row.patientName && row.medicalCenter)
+    : [];
 }
 
 function addValue(values: Record<string, number | null>, key: string, amount: number) {
@@ -1407,6 +1459,63 @@ async function clearDischargeShiftDraft(
   return await saveDischargeShiftDraft(supabase, {}, reportDateTime);
 }
 
+async function listCivilReferrals(supabase: ReturnType<typeof createClient>) {
+  const { data, error } = await supabase
+    .from("sharsh_departments")
+    .select("department_id, department_name, values, updated_at")
+    .eq("department_group", CIVIL_REFERRAL_GROUP)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    rows: (data || []).map((row) => ({
+      ...sanitizeCivilReferralRecord(row.values),
+      id: String(row.department_id || "").replace(CIVIL_REFERRAL_ROW_PREFIX, ""),
+      patientName: normalizeCivilReferralText(row.department_name) || normalizeCivilReferralText((row.values as Record<string, unknown> | null)?.patientName),
+      updatedAt: row.updated_at || ""
+    }))
+  };
+}
+
+async function saveCivilReferrals(
+  supabase: ReturnType<typeof createClient>,
+  rows: unknown,
+  sourceFileName: string
+) {
+  const now = new Date().toISOString();
+  const cleanRows = sanitizeCivilReferralRows(rows, sourceFileName);
+  const updates = cleanRows.map((row) => ({
+    department_id: `${CIVIL_REFERRAL_ROW_PREFIX}${row.id}`,
+    department_name: String(row.patientName || ""),
+    department_group: CIVIL_REFERRAL_GROUP,
+    values: {
+      ...row,
+      sourceFileName: row.sourceFileName || sourceFileName,
+      importedAt: row.importedAt || now,
+      updatedAt: now
+    },
+    updated_at: now
+  }));
+
+  if (updates.length) {
+    const { error } = await supabase
+      .from("sharsh_departments")
+      .upsert(updates);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  return {
+    ...(await listCivilReferrals(supabase)),
+    saved: updates.length
+  };
+}
+
 async function listOcrFeedbackRecords(supabase: ReturnType<typeof createClient>, limit: number) {
   const safeLimit = Math.min(200, Math.max(1, Math.trunc(limit || 100)));
   const { data, error } = await supabase
@@ -1763,6 +1872,15 @@ Deno.serve(async (request) => {
         ? payload.reportDateTime.trim()
         : DEFAULT_DATE;
       return jsonResponse(await clearDischargeShiftDraft(supabase, reportDateTime));
+    }
+
+    if (type === "list_civil_referrals") {
+      return jsonResponse(await listCivilReferrals(supabase));
+    }
+
+    if (type === "save_civil_referrals") {
+      const sourceFileName = typeof payload.sourceFileName === "string" ? payload.sourceFileName.trim() : "";
+      return jsonResponse(await saveCivilReferrals(supabase, payload.rows, sourceFileName));
     }
 
     if (type === "apply_night_shift") {

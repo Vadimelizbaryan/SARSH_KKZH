@@ -2270,6 +2270,146 @@ a {
   }
 }
 
+.civil-page {
+  display: grid;
+  gap: 18px;
+}
+
+.civil-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 28px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(255, 221, 143, 0.52), transparent 32%),
+    linear-gradient(135deg, #1d5a48, #2f7c62);
+  color: #fffdf3;
+  box-shadow: 0 22px 48px rgba(19, 62, 50, 0.22);
+}
+
+.civil-hero h2 {
+  margin: 8px 0 10px;
+  font-size: clamp(32px, 5vw, 56px);
+  line-height: 0.98;
+}
+
+.civil-hero p {
+  max-width: 820px;
+  margin: 0;
+  color: rgba(255, 253, 243, 0.88);
+  font-size: 18px;
+}
+
+.civil-kicker {
+  color: #ffe38f;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.civil-stats {
+  display: grid;
+  gap: 8px;
+  min-width: 190px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.civil-stats span {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.civil-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.civil-file-label input {
+  display: none;
+}
+
+.civil-actions input[type="search"] {
+  min-width: min(420px, 100%);
+  flex: 1 1 260px;
+  padding: 13px 16px;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 999px;
+  font: inherit;
+}
+
+.civil-status,
+.civil-empty {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #f7f1e5;
+  color: #3f3b32;
+}
+
+.civil-table-wrap {
+  overflow: auto;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.civil-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.civil-table th,
+.civil-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.1);
+  border-right: 1px solid rgba(17, 17, 17, 0.08);
+  vertical-align: top;
+}
+
+.civil-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f4dfb9;
+  color: #17140d;
+  font-weight: 900;
+  text-align: left;
+}
+
+.civil-table td:first-child,
+.civil-table th:first-child {
+  width: 48px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.civil-table td:nth-child(2) {
+  min-width: 240px;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .civil-hero {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+
+  .civil-stats {
+    min-width: 0;
+  }
+}
+
 @page {
   size: landscape;
   margin: 10mm;
