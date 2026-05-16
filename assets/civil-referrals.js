@@ -592,8 +592,14 @@ function isHeaderRow(cells) {
   }
 
   async function loadSavedRows() {
-    setBusy(true, "Загружаю сохраненную базу...");
+    setBusy(true, "Проверяю сессию владельца...");
     try {
+      const authReady = window.SHARSH_AUTH_READY;
+      if (authReady && typeof authReady.then === "function") {
+        await authReady;
+      }
+      state.status = "Загружаю сохраненную базу...";
+      render();
       const payload = typeof sync.listCivilReferrals === "function"
         ? await sync.listCivilReferrals()
         : { rows: [] };
