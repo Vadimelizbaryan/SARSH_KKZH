@@ -222,18 +222,24 @@ function isHeaderRow(cells) {
   }
 
   function getFilteredRows(rows) {
-    const query = normalizeText(state.filter).toLowerCase();
-    if (!query) {
-      return rows;
-    }
-    return rows.filter((row) => FIELD_DEFINITIONS.some((field) => {
-      return String(row[field.key] || "").toLowerCase().includes(query);
-    }));
+    return getFilteredRowEntries(rows).map((entry) => entry.row);
   }
 
-  function renderRowsTable(rows, emptyText) {
-    const visibleRows = getFilteredRows(rows);
-    if (!visibleRows.length) {
+  function getFilteredRowEntries(rows) {
+    const query = normalizeText(state.filter).toLowerCase();
+    return rows.map((row, index) => ({ row, index })).filter(({ row }) => {
+      if (!query) {
+        return true;
+      }
+      return FIELD_DEFINITIONS.some((field) => {
+        return String(row[field.key] || "").toLowerCase().includes(query);
+      });
+    });
+  }
+
+  function renderRowsTable(rows, emptyText, sourceName) {
+    const visibleEntries = getFilteredRowEntries(rows);
+    if (!visibleEntries.length) {
       return `<div class="civil-empty">${escapeHtml(emptyText)}</div>`;
     }
 
@@ -247,10 +253,22 @@ function isHeaderRow(cells) {
             </tr>
           </thead>
           <tbody>
-            ${visibleRows.map((row, index) => `
+            ${visibleEntries.map(({ row, index }, visibleIndex) => `
               <tr>
-                <td>${index + 1}</td>
-                ${FIELD_DEFINITIONS.map((field) => `<td>${escapeHtml(row[field.key] || "")}</td>`).join("")}
+                <td>${visibleIndex + 1}</td>
+                ${FIELD_DEFINITIONS.map((field) => `
+                  <td>
+                    <input
+                      class="civil-edit-input"
+                      type="text"
+                      value="${escapeHtml(row[field.key] || "")}"
+                      data-source="${escapeHtml(sourceName)}"
+                      data-index="${index}"
+                      data-key="${escapeHtml(field.key)}"
+                      aria-label="${escapeHtml(field.label)}"
+                    >
+                  </td>
+                `).join("")}
               </tr>
             `).join("")}
           </tbody>
@@ -311,13 +329,20 @@ function isHeaderRow(cells) {
         ${state.parsedRows.length ? `
           <section class="panel">
             <h2>Предварительный просмотр: ${escapeHtml(state.sourceFileName)}</h2>
-            ${renderRowsTable(state.parsedRows, "По текущему фильтру строк не найдено.")}
+            <p class="hint">Можно исправить значения прямо в таблице перед сохранением.</p>
+            ${renderRowsTable(state.parsedRows, "По текущему фильтру строк не найдено.", "parsed")}
           </section>
         ` : ""}
 
         <section class="panel">
-          <h2>Сохраненная база</h2>
-          ${renderRowsTable(state.savedRows, "В базе пока нет записей.")}
+          <div class="civil-section-head">
+            <div>
+              <h2>Сохраненная база</h2>
+              <p class="hint">Здесь тоже можно исправить строку и сохранить правки в базе.</p>
+            </div>
+            <button type="button" id="civilSaveDatabaseBtn" ${!savedCount || state.isBusy ? "disabled" : ""}>Сохранить правки базы</button>
+          </div>
+          ${renderRowsTable(state.savedRows, "В базе пока нет записей.", "saved")}
         </section>
       </main>
     `;
@@ -397,13 +422,65 @@ function isHeaderRow(cells) {
     }
   }
 
+  async function saveSavedRows() {
+    if (!state.savedRows.length) {
+      return;
+    }
+    setBusy(true, "Сохраняю ручные правки в базу...");
+    try {
+      const payload = typeof sync.saveCivilReferrals === "function"
+        ? await sync.saveCivilReferrals(state.savedRows, "manual-edit")
+        : { rows: state.savedRows, saved: state.savedRows.length };
+      state.savedRows = Array.isArray(payload?.rows) ? payload.rows : state.savedRows;
+      state.status = `Правки сохранены. В базе записей: ${state.savedRows.length}.`;
+    } catch (error) {
+      state.status = error instanceof Error ? error.message : "Не удалось сохранить правки базы.";
+    } finally {
+      state.isBusy = false;
+      render();
+    }
+  }
+
+  function handleTableEdit(event) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !input.classList.contains("civil-edit-input")) {
+      return;
+    }
+
+    const source = input.dataset.source;
+    const index = Number(input.dataset.index);
+    const key = input.dataset.key;
+    if (!Number.isInteger(index) || !key || !FIELD_DEFINITIONS.some((field) => field.key === key)) {
+      return;
+    }
+
+    const rows = source === "parsed"
+      ? state.parsedRows
+      : source === "saved"
+        ? state.savedRows
+        : null;
+    if (!rows || !rows[index]) {
+      return;
+    }
+
+    rows[index] = {
+      ...rows[index],
+      [key]: key === "referralDate" ? normalizeReferralDate(input.value) : normalizeText(input.value)
+    };
+  }
+
   function bindEvents() {
     document.getElementById("civilFileInput")?.addEventListener("change", handleFileUpload);
     document.getElementById("civilSaveBtn")?.addEventListener("click", saveParsedRows);
+    document.getElementById("civilSaveDatabaseBtn")?.addEventListener("click", saveSavedRows);
     document.getElementById("civilReloadBtn")?.addEventListener("click", loadSavedRows);
     document.getElementById("civilFilterInput")?.addEventListener("input", (event) => {
       state.filter = event.target.value;
       render();
+    });
+    document.querySelectorAll(".civil-edit-input").forEach((input) => {
+      input.addEventListener("input", handleTableEdit);
+      input.addEventListener("change", handleTableEdit);
     });
   }
 

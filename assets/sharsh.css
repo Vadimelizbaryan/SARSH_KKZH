@@ -2399,6 +2399,39 @@ a {
   font-weight: 800;
 }
 
+.civil-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.civil-section-head h2 {
+  margin-bottom: 4px;
+}
+
+.civil-edit-input {
+  width: 100%;
+  min-width: 96px;
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: #ffffff;
+  font: inherit;
+  font-weight: 700;
+}
+
+.civil-edit-input:focus {
+  border-color: #158f60;
+  box-shadow: 0 0 0 3px rgba(21, 143, 96, 0.14);
+  outline: none;
+}
+
+.civil-table td:nth-child(2) .civil-edit-input {
+  min-width: 220px;
+}
+
 @media (max-width: 760px) {
   .civil-hero {
     grid-template-columns: 1fr;
@@ -2407,6 +2440,10 @@ a {
 
   .civil-stats {
     min-width: 0;
+  }
+
+  .civil-section-head {
+    display: grid;
   }
 }
 
