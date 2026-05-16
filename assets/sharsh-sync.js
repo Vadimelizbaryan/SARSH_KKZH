@@ -274,6 +274,34 @@
       .trim();
   }
 
+  function normalizeCivilDateText(value) {
+    const text = normalizeCivilText(value)
+      .replace(/[^\d.,/-]/g, "")
+      .replace(/[,\-\/]+/g, ".")
+      .replace(/\.{2,}/g, ".")
+      .replace(/^\./, "")
+      .slice(0, 10);
+    const compact = text.replace(/\D/g, "");
+    const compactMatch = compact.length === 6
+      ? compact.match(/^(\d{2})(\d{2})(\d{2})$/)
+      : compact.length === 8
+        ? compact.match(/^(\d{2})(\d{2})(\d{4})$/)
+        : null;
+    const match = compactMatch || text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+    if (!match) {
+      return "";
+    }
+    const dayNumber = Number(match[1]);
+    const monthNumber = Number(match[2]);
+    if (dayNumber < 1 || dayNumber > 31 || monthNumber < 1 || monthNumber > 12) {
+      return "";
+    }
+    const day = match[1].padStart(2, "0");
+    const month = match[2].padStart(2, "0");
+    const year = match[3].length === 4 ? match[3].slice(-2) : match[3].padStart(2, "0");
+    return `${day}.${month}.${year}`;
+  }
+
   function normalizeCivilListOptions(options = {}) {
     const limit = Math.min(
       CIVIL_REFERRALS_MAX_LIMIT,
@@ -363,7 +391,9 @@
         ? normalizeCivilNameText(record && record[key])
         : key === "medicalCenter"
           ? normalizeCivilNameText(record && record[key], { medicalCenter: true })
-          : normalizeCivilText(record && record[key]);
+          : key === "referralDate" || key === "dischargeDate"
+            ? normalizeCivilDateText(record && record[key])
+            : normalizeCivilText(record && record[key]);
     });
     output.sourceFileName = normalizeCivilText(record?.sourceFileName || sourceFileName);
     output.sourceRow = Number.isFinite(Number(record?.sourceRow)) ? Math.max(0, Math.trunc(Number(record.sourceRow))) : null;

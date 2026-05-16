@@ -212,6 +212,34 @@ function normalizeCivilReferralText(value: unknown) {
     .trim();
 }
 
+function normalizeCivilReferralDateText(value: unknown) {
+  const text = normalizeCivilReferralText(value)
+    .replace(/[^\d.,/-]/g, "")
+    .replace(/[,\-\/]+/g, ".")
+    .replace(/\.{2,}/g, ".")
+    .replace(/^\./, "")
+    .slice(0, 10);
+  const compact = text.replace(/\D/g, "");
+  const compactMatch = compact.length === 6
+    ? compact.match(/^(\d{2})(\d{2})(\d{2})$/)
+    : compact.length === 8
+      ? compact.match(/^(\d{2})(\d{2})(\d{4})$/)
+      : null;
+  const match = compactMatch || text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (!match) {
+    return "";
+  }
+  const dayNumber = Number(match[1]);
+  const monthNumber = Number(match[2]);
+  if (dayNumber < 1 || dayNumber > 31 || monthNumber < 1 || monthNumber > 12) {
+    return "";
+  }
+  const day = match[1].padStart(2, "0");
+  const month = match[2].padStart(2, "0");
+  const year = match[3].length === 4 ? match[3].slice(-2) : match[3].padStart(2, "0");
+  return `${day}.${month}.${year}`;
+}
+
 function sanitizeCivilReferralListOptions(source: Record<string, unknown> = {}) {
   const limit = Math.min(
     CIVIL_REFERRAL_MAX_LIMIT,
@@ -288,7 +316,9 @@ function sanitizeCivilReferralRecord(record: unknown, sourceFileName = "") {
       ? normalizeCivilReferralNameText(source[key])
       : key === "medicalCenter"
         ? normalizeCivilReferralNameText(source[key], { medicalCenter: true })
-        : normalizeCivilReferralText(source[key]);
+        : key === "referralDate" || key === "dischargeDate"
+          ? normalizeCivilReferralDateText(source[key])
+          : normalizeCivilReferralText(source[key]);
   });
   output.sourceFileName = normalizeCivilReferralText(source.sourceFileName || sourceFileName);
   output.sourceRow = Number.isFinite(Number(source.sourceRow)) ? Math.max(0, Math.trunc(Number(source.sourceRow))) : null;

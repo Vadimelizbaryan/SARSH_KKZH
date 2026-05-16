@@ -18,6 +18,7 @@
     { key: "dischargeDate", label: "Դուրսգրում", hint: "День выписки" }
   ];
   const IMPORT_FIELD_DEFINITIONS = FIELD_DEFINITIONS.filter((field) => field.key !== "dischargeDate");
+  const DATE_FIELD_KEYS = new Set(["referralDate", "dischargeDate"]);
   const SAVED_PAGE_SIZE = 80;
 
   const state = {
@@ -52,6 +53,19 @@
       .replace(/[ \t\r\n]+/g, " ")
       .replace(/\s+([։:.,])/g, "$1")
       .trim();
+  }
+
+  function isDateFieldKey(key) {
+    return DATE_FIELD_KEYS.has(key);
+  }
+
+  function sanitizeDateDraft(value) {
+    return normalizeText(value)
+      .replace(/[^\d.,/-]/g, "")
+      .replace(/[,\-\/]+/g, ".")
+      .replace(/\.{2,}/g, ".")
+      .replace(/^\./, "")
+      .slice(0, 10);
   }
 
   const ARMENIAN_WORD_RE = /^[\u0531-\u0587]+$/;
@@ -344,10 +358,21 @@
   }
 
   function normalizeReferralDate(value) {
-    const text = normalizeText(value);
-    const match = text.match(/(\d{1,2})\D+(\d{1,2})\D+(\d{2,4})/);
+    const text = sanitizeDateDraft(value);
+    const compact = text.replace(/\D/g, "");
+    const compactMatch = compact.length === 6
+      ? compact.match(/^(\d{2})(\d{2})(\d{2})$/)
+      : compact.length === 8
+        ? compact.match(/^(\d{2})(\d{2})(\d{4})$/)
+        : null;
+    const match = compactMatch || text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
     if (!match) {
-      return text;
+      return "";
+    }
+    const dayNumber = Number(match[1]);
+    const monthNumber = Number(match[2]);
+    if (dayNumber < 1 || dayNumber > 31 || monthNumber < 1 || monthNumber > 12) {
+      return "";
     }
     const day = match[1].padStart(2, "0");
     const month = match[2].padStart(2, "0");
@@ -525,12 +550,13 @@ function isHeaderRow(cells) {
                 ${FIELD_DEFINITIONS.map((field) => `
                   <td>
                     <input
-                      class="civil-edit-input"
+                      class="civil-edit-input${isDateFieldKey(field.key) ? " civil-date-input" : ""}"
                       type="text"
                       value="${escapeHtml(row[field.key] || "")}"
                       data-source="${escapeHtml(sourceName)}"
                       data-index="${index}"
                       data-key="${escapeHtml(field.key)}"
+                      ${isDateFieldKey(field.key) ? 'inputmode="numeric" maxlength="10" placeholder="дд.мм.гг" autocomplete="off"' : ""}
                       aria-label="${escapeHtml(field.label)}"
                     >
                   </td>
@@ -790,10 +816,16 @@ function isHeaderRow(cells) {
       return;
     }
 
+    if (isDateFieldKey(key)) {
+      input.value = event.type === "change"
+        ? normalizeReferralDate(input.value)
+        : sanitizeDateDraft(input.value);
+    }
+
     rows[index] = {
       ...rows[index],
-      [key]: key === "referralDate" || key === "dischargeDate"
-        ? normalizeReferralDate(input.value)
+      [key]: isDateFieldKey(key)
+        ? input.value
         : key === "patientName"
           ? normalizeCivilNameField(input.value)
           : key === "medicalCenter"
