@@ -2,6 +2,10 @@
   const config = window.SHARSH_CONFIG || {};
   const sync = window.SHARSH_SYNC || {};
   const app = document.getElementById("app");
+  const scriptBaseUrl = document.currentScript instanceof HTMLScriptElement && document.currentScript.src
+    ? document.currentScript.src
+    : new URL("assets/civil-referrals.js", window.location.href).href;
+  let pdfJsModulePromise = null;
 
   const FIELD_DEFINITIONS = [
     { key: "patientName", label: "Ա․Ա․Հ․", hint: "Фамилия имя отчество" },
@@ -18,7 +22,7 @@
     savedRows: [],
     sourceFileName: "",
     filter: "",
-    status: "Загрузите RTF-файл Word, проверьте найденные строки и сохраните в базу.",
+    status: "Загрузите RTF/PDF-файл Word, проверьте найденные строки и сохраните в базу.",
     isBusy: false,
     source: ""
   };
@@ -208,6 +212,129 @@
     return rows;
   }
 
+  async function loadPdfJs() {
+    if (!pdfJsModulePromise) {
+      pdfJsModulePromise = import(new URL("vendor/pdfjs/pdf.mjs", scriptBaseUrl).href).then((pdfjs) => {
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL("vendor/pdfjs/pdf.worker.mjs", scriptBaseUrl).href;
+        return pdfjs;
+      });
+    }
+    return pdfJsModulePromise;
+  }
+
+  function getPdfItemText(item) {
+    return normalizeText(item && item.str);
+  }
+
+  function groupPdfItemsIntoLines(items) {
+    const lines = [];
+    const sorted = items
+      .filter((item) => item.text)
+      .sort((a, b) => a.page - b.page || b.y - a.y || a.x - b.x);
+
+    sorted.forEach((item) => {
+      const line = lines.find((candidate) => {
+        return candidate.page === item.page && Math.abs(candidate.y - item.y) <= 3.5;
+      });
+      if (line) {
+        line.items.push(item);
+        line.y = (line.y + item.y) / 2;
+      } else {
+        lines.push({ page: item.page, y: item.y, width: item.pageWidth, items: [item] });
+      }
+    });
+
+    return lines.map((line) => ({
+      ...line,
+      items: line.items.sort((a, b) => a.x - b.x)
+    }));
+  }
+
+  function splitPdfLineToCells(line) {
+    let items = line.items.filter((item) => item.text);
+    if (items.length < FIELD_DEFINITIONS.length) {
+      return null;
+    }
+
+    if (/^\d{1,4}$/.test(items[0]?.text || "") && items.length > FIELD_DEFINITIONS.length) {
+      items = items.slice(1);
+    }
+
+    if (items.length === FIELD_DEFINITIONS.length) {
+      return items.map((item) => item.text);
+    }
+
+    const gaps = [];
+    for (let index = 0; index < items.length - 1; index += 1) {
+      const current = items[index];
+      const next = items[index + 1];
+      gaps.push({
+        index,
+        gap: next.x - (current.x + Math.max(current.width, 0))
+      });
+    }
+
+    const splitIndexes = gaps
+      .filter((gap) => gap.gap > Math.max(3, line.width * 0.004))
+      .sort((a, b) => b.gap - a.gap)
+      .slice(0, FIELD_DEFINITIONS.length - 1)
+      .map((gap) => gap.index)
+      .sort((a, b) => a - b);
+
+    if (splitIndexes.length < FIELD_DEFINITIONS.length - 1) {
+      return null;
+    }
+
+    const groups = [];
+    let startIndex = 0;
+    splitIndexes.forEach((splitIndex) => {
+      groups.push(items.slice(startIndex, splitIndex + 1));
+      startIndex = splitIndex + 1;
+    });
+    groups.push(items.slice(startIndex));
+
+    return groups.map((group) => normalizeText(group.map((item) => item.text).join(" ")));
+  }
+
+  async function parseCivilReferralPdf(file) {
+    const pdfjs = await loadPdfJs();
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const documentTask = pdfjs.getDocument({ data: bytes });
+    const pdf = await documentTask.promise;
+    const items = [];
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 1 });
+      const textContent = await page.getTextContent();
+      textContent.items.forEach((item) => {
+        const text = getPdfItemText(item);
+        if (!text) {
+          return;
+        }
+        const transform = item.transform || [];
+        items.push({
+          page: pageNumber,
+          pageWidth: viewport.width,
+          text,
+          x: Number(transform[4]) || 0,
+          y: Number(transform[5]) || 0,
+          width: Number(item.width) || 0
+        });
+      });
+    }
+
+    const rows = groupPdfItemsIntoLines(items)
+      .map(splitPdfLineToCells)
+      .filter((cells) => Array.isArray(cells) && cells.length >= FIELD_DEFINITIONS.length)
+      .map((cells) => cells.slice(0, FIELD_DEFINITIONS.length))
+      .filter((cells) => !isHeaderRow(cells))
+      .map((cells, index) => normalizeRecord(cells, file.name, index + 1))
+      .filter((record) => record.patientName && record.medicalCenter && record.referralDate);
+
+    return rows;
+  }
+
   function normalizeReferralDate(value) {
     const text = normalizeText(value);
     const match = text.match(/(\d{1,2})\D+(\d{1,2})\D+(\d{2,4})/);
@@ -353,7 +480,7 @@ function isHeaderRow(cells) {
       <div class="toolbar no-print">
         <div>
           <h1>Քաղ. ԲԿ բազա</h1>
-          <p>Загрузка Word/RTF-документа с направленными в гражданские медцентры.</p>
+          <p>Загрузка Word/RTF/PDF-документа с направленными в гражданские медцентры.</p>
         </div>
         <div class="toolbar-actions">
           <a class="button-link" href="${escapeHtml(getMainPagePath())}">К главному</a>
@@ -377,11 +504,11 @@ function isHeaderRow(cells) {
 
         <section class="panel civil-upload-panel">
           <h2>Загрузить документ</h2>
-          <p class="hint">Поддерживается RTF из Word. Если файл в DOC/DOCX, сохраните его в Word как RTF и загрузите сюда.</p>
+          <p class="hint">Поддерживается RTF или PDF из Word. Если файл в DOC/DOCX, сохраните его в Word как RTF/PDF и загрузите сюда.</p>
           <div class="civil-actions">
             <label class="button-link civil-file-label">
-              <input type="file" id="civilFileInput" accept=".rtf,.txt,application/rtf,text/rtf,text/plain" ${state.isBusy ? "disabled" : ""}>
-              Выбрать RTF
+              <input type="file" id="civilFileInput" accept=".rtf,.pdf,.txt,application/pdf,application/rtf,text/rtf,text/plain" ${state.isBusy ? "disabled" : ""}>
+              Выбрать RTF/PDF
             </label>
             <button type="button" id="civilSaveBtn" ${!parsedCount || state.isBusy ? "disabled" : ""}>Сохранить найденные строки</button>
             <input type="search" id="civilFilterInput" placeholder="Поиск по ФИО, БК, части..." value="${escapeHtml(state.filter)}">
@@ -428,13 +555,18 @@ function isHeaderRow(cells) {
     }
     setBusy(true, `Читаю файл: ${file.name}`);
     try {
-      const text = await file.text();
-      if (!text.includes("\\rtf")) {
-        throw new Error("Это не похоже на RTF-файл. Откройте документ в Word и сохраните как RTF.");
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      const isRtf = /\.rtf$/i.test(file.name) || /rtf|text\/plain/i.test(file.type || "");
+      const rows = isPdf
+        ? await parseCivilReferralPdf(file)
+        : isRtf
+          ? parseCivilReferralRtf(await file.text(), file.name)
+          : [];
+      if (!isPdf && !isRtf) {
+        throw new Error("Можно загрузить RTF или PDF. Если документ в DOC/DOCX, сохраните его в Word как RTF или PDF.");
       }
-      const rows = parseCivilReferralRtf(text, file.name);
       if (!rows.length) {
-        throw new Error("Не нашел строки с 7 колонками. Проверьте, что документ сохранен как RTF из Word.");
+        throw new Error("Не нашел строки с 7 колонками. Проверьте, что документ сохранен из Word как RTF/PDF и таблица читается как текст.");
       }
       state.parsedRows = rows;
       state.sourceFileName = file.name;
