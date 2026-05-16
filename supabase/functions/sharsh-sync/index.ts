@@ -234,11 +234,43 @@ function sanitizeCivilReferralRecord(record: unknown, sourceFileName = "") {
 }
 
 function sanitizeCivilReferralRows(rows: unknown, sourceFileName = "") {
-  return Array.isArray(rows)
-    ? rows
-      .map((row) => sanitizeCivilReferralRecord(row, sourceFileName))
-      .filter((row) => row.patientName && row.medicalCenter)
-    : [];
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  const byId = new Map<string, Record<string, string | number | null>>();
+  rows
+    .map((row) => sanitizeCivilReferralRecord(row, sourceFileName))
+    .filter((row) => row.patientName && row.medicalCenter)
+    .forEach((row) => {
+      const id = String(row.id || "");
+      if (id && !byId.has(id)) {
+        byId.set(id, row);
+      }
+    });
+  return [...byId.values()];
+}
+
+function getServerErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  if (error && typeof error === "object") {
+    const source = error as Record<string, unknown>;
+    for (const key of ["message", "details", "hint", "code"]) {
+      if (typeof source[key] === "string" && source[key].trim()) {
+        return source[key].trim();
+      }
+    }
+    try {
+      const serialized = JSON.stringify(source);
+      if (serialized && serialized !== "{}") {
+        return serialized.slice(0, 500);
+      }
+    } catch (_jsonError) {
+    }
+  }
+  return "Unexpected server error.";
 }
 
 function addValue(values: Record<string, number | null>, key: string, amount: number) {
@@ -2039,8 +2071,7 @@ Deno.serve(async (request) => {
 
     return jsonResponse(await loadSnapshot(supabase));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected server error.";
-    return jsonResponse({ error: message }, 500);
+    return jsonResponse({ error: getServerErrorMessage(error) }, 500);
   }
 });
 

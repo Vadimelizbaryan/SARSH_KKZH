@@ -295,11 +295,20 @@
   }
 
   function normalizeCivilReferralRows(rows, sourceFileName = "") {
-    return Array.isArray(rows)
-      ? rows
-        .map((row) => normalizeCivilReferralRecord(row, sourceFileName))
-        .filter((row) => row.patientName && row.medicalCenter)
-      : [];
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+
+    const byId = new Map();
+    rows
+      .map((row) => normalizeCivilReferralRecord(row, sourceFileName))
+      .filter((row) => row.patientName && row.medicalCenter)
+      .forEach((row) => {
+        if (!byId.has(row.id)) {
+          byId.set(row.id, row);
+        }
+      });
+    return [...byId.values()];
   }
 
   function readLocalCivilReferrals() {
