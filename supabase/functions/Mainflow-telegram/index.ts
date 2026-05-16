@@ -5342,6 +5342,10 @@ async function handleTelegramCallbackQuery(
   const callbackMessageChatId = callbackMessage ? getMessageChatId(callbackMessage) : null;
   const callbackMessageId = callbackMessage ? getTelegramMessageId(callbackMessage) : null;
 
+  if (callbackMessage && isTelegramGroupMessage(callbackMessage)) {
+    return;
+  }
+
   if (!callbackQueryId || !data) {
     return;
   }
@@ -6054,6 +6058,11 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
 
   const chatId = getMessageChatId(message);
   if (chatId === null) {
+    return;
+  }
+
+  // The bot must stay silent in shared groups: no approvals, no OCR, no hints.
+  if (isTelegramGroupMessage(message)) {
     return;
   }
 
