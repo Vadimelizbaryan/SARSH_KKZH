@@ -3618,11 +3618,11 @@
             </div>
             <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR feedback</a>
             <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Ночная смена</a>
-            <button type="button" data-send-shift-form="night">TG ночь</button>
+            <button type="button" data-send-shift-form="night">Գիշերային ընդունում</button>
             <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Дневная смена</a>
-            <button type="button" data-send-shift-form="day">TG день</button>
+            <button type="button" data-send-shift-form="day">Ցերեկային ընդունում</button>
             <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Утренняя выписка</a>
-            <button type="button" data-send-shift-form="discharge">TG выписка</button>
+            <button type="button" data-send-shift-form="discharge">Ցերեկային դուրսգրում</button>
             <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Отчётный лист</a>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="refreshBtn">Обновить</button>
