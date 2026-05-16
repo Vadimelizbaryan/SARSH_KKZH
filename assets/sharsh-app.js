@@ -3618,11 +3618,8 @@
             </div>
             <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
             <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Էջ՝ գիշ. ընդուն.</a>
-            <button type="button" data-send-shift-form="night">TG՝ գիշ. ընդուն.</button>
             <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. ընդուն.</a>
-            <button type="button" data-send-shift-form="day">TG՝ ցեր. ընդուն.</button>
             <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. դուրսգր.</a>
-            <button type="button" data-send-shift-form="discharge">TG՝ ցեր. դուրսգր.</button>
             <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Հաշվետվ.</a>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Կարգավ.</a>
             <button type="button" id="refreshBtn">Թարմ.</button>
