@@ -62,6 +62,7 @@
     };
 
   let reportDateTime = getQuery().get("date") || getYerevanDateTime();
+  const touchedDepartmentIds = new Set();
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -137,6 +138,10 @@
         values: rows[department.id] || {}
       }))
       .filter((item) => columns.some((column) => toNumber(item.values[column.key]) > 0));
+  }
+
+  function readTouchedRows() {
+    return Array.from(touchedDepartmentIds);
   }
 
   function getRowTotal(departmentId) {
@@ -252,7 +257,8 @@
           initData: getInitData(),
           reportDateTime: getReportDateTime(),
           rows: readRows(),
-          filledRows: readFilledRows()
+          filledRows: readFilledRows(),
+          touchedRows: readTouchedRows()
         })
       });
       const payload = await response.json().catch(() => null);
@@ -369,6 +375,9 @@
 
     root.querySelectorAll(".tg-form-input").forEach((input) => {
       input.addEventListener("input", () => {
+        if (input.dataset.department) {
+          touchedDepartmentIds.add(input.dataset.department);
+        }
         const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
         if (input.value !== digitsOnly) {
           input.value = digitsOnly;

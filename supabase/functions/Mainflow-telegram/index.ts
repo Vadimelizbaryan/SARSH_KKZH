@@ -458,6 +458,21 @@ function normalizeNightShiftSubmittedRows(payload: Record<string, unknown> | nul
   return output;
 }
 
+function normalizeTouchedDepartmentIds(payload: Record<string, unknown> | null) {
+  const touchedRows = payload?.touchedRows;
+  const output = new Set<string>();
+
+  if (Array.isArray(touchedRows)) {
+    touchedRows.forEach((departmentId) => {
+      if (typeof departmentId === "string" && Object.prototype.hasOwnProperty.call(DEPARTMENTS, departmentId)) {
+        output.add(departmentId);
+      }
+    });
+  }
+
+  return output;
+}
+
 function getNightShiftRowId(departmentId: string) {
   return `${NIGHT_SHIFT_ROW_PREFIX}${departmentId}`;
 }
@@ -1940,14 +1955,17 @@ async function saveNightShiftDraft(
   supabase: ReturnType<typeof createClient>,
   rows: unknown,
   reportDateTime: string,
-  options: { mergeExisting?: boolean } = {}
+  options: { mergeExisting?: boolean; touchedDepartmentIds?: Set<string> } = {}
 ) {
   const submittedRows = sanitizeNightShiftRows(rows);
   const nightRows = options.mergeExisting
     ? await loadNightShiftDraftRows(supabase)
     : submittedRows;
+  const touchedDepartmentIds = options.touchedDepartmentIds || new Set<string>();
   const departmentIdsToSave = options.mergeExisting
-    ? Object.keys(DEPARTMENTS).filter((departmentId) => getNightShiftRowTotal(submittedRows[departmentId]) > 0)
+    ? Object.keys(DEPARTMENTS).filter((departmentId) =>
+      getNightShiftRowTotal(submittedRows[departmentId]) > 0 || touchedDepartmentIds.has(departmentId)
+    )
     : Object.keys(DEPARTMENTS);
 
   departmentIdsToSave.forEach((departmentId) => {
@@ -2008,14 +2026,17 @@ async function saveDayShiftDraft(
   supabase: ReturnType<typeof createClient>,
   rows: unknown,
   reportDateTime: string,
-  options: { mergeExisting?: boolean } = {}
+  options: { mergeExisting?: boolean; touchedDepartmentIds?: Set<string> } = {}
 ) {
   const submittedRows = sanitizeNightShiftRows(rows);
   const dayRows = options.mergeExisting
     ? await loadDayShiftDraftRows(supabase)
     : submittedRows;
+  const touchedDepartmentIds = options.touchedDepartmentIds || new Set<string>();
   const departmentIdsToSave = options.mergeExisting
-    ? Object.keys(DEPARTMENTS).filter((departmentId) => getNightShiftRowTotal(submittedRows[departmentId]) > 0)
+    ? Object.keys(DEPARTMENTS).filter((departmentId) =>
+      getNightShiftRowTotal(submittedRows[departmentId]) > 0 || touchedDepartmentIds.has(departmentId)
+    )
     : Object.keys(DEPARTMENTS);
 
   departmentIdsToSave.forEach((departmentId) => {
@@ -2076,14 +2097,17 @@ async function saveDischargeShiftDraft(
   supabase: ReturnType<typeof createClient>,
   rows: unknown,
   reportDateTime: string,
-  options: { mergeExisting?: boolean } = {}
+  options: { mergeExisting?: boolean; touchedDepartmentIds?: Set<string> } = {}
 ) {
   const submittedRows = sanitizeNightShiftRows(rows);
   const dischargeRows = options.mergeExisting
     ? await loadDischargeShiftDraftRows(supabase)
     : submittedRows;
+  const touchedDepartmentIds = options.touchedDepartmentIds || new Set<string>();
   const departmentIdsToSave = options.mergeExisting
-    ? Object.keys(DEPARTMENTS).filter((departmentId) => getNightShiftRowTotal(submittedRows[departmentId]) > 0)
+    ? Object.keys(DEPARTMENTS).filter((departmentId) =>
+      getNightShiftRowTotal(submittedRows[departmentId]) > 0 || touchedDepartmentIds.has(departmentId)
+    )
     : Object.keys(DEPARTMENTS);
 
   departmentIdsToSave.forEach((departmentId) => {
@@ -4743,11 +4767,12 @@ async function handleTelegramNightFormSubmit(request: Request) {
       ? payload.reportDateTime.trim()
       : getYerevanDateTimeText();
     const submittedRows = normalizeNightShiftSubmittedRows(payload);
+    const touchedDepartmentIds = normalizeTouchedDepartmentIds(payload);
     const rows = await saveNightShiftDraft(
       supabase as ReturnType<typeof createClient>,
       submittedRows,
       reportDateTime,
-      { mergeExisting: true }
+      { mergeExisting: true, touchedDepartmentIds }
     );
     const userName = [
       verifiedUser.firstName,
@@ -4889,11 +4914,12 @@ async function handleTelegramDayFormSubmit(request: Request) {
       ? payload.reportDateTime.trim()
       : getYerevanDateTimeText();
     const submittedRows = normalizeNightShiftSubmittedRows(payload);
+    const touchedDepartmentIds = normalizeTouchedDepartmentIds(payload);
     const rows = await saveDayShiftDraft(
       supabase as ReturnType<typeof createClient>,
       submittedRows,
       reportDateTime,
-      { mergeExisting: true }
+      { mergeExisting: true, touchedDepartmentIds }
     );
     const userName = [
       verifiedUser.firstName,
@@ -4975,11 +5001,12 @@ async function handleTelegramDischargeFormSubmit(request: Request) {
       ? payload.reportDateTime.trim()
       : getYerevanDateTimeText();
     const submittedRows = normalizeNightShiftSubmittedRows(payload);
+    const touchedDepartmentIds = normalizeTouchedDepartmentIds(payload);
     const rows = await saveDischargeShiftDraft(
       supabase as ReturnType<typeof createClient>,
       submittedRows,
       reportDateTime,
-      { mergeExisting: true }
+      { mergeExisting: true, touchedDepartmentIds }
     );
     const userName = [
       verifiedUser.firstName,
