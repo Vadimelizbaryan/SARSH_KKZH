@@ -14,18 +14,26 @@
     { key: "rank", label: "Կոչում", hint: "Звание" },
     { key: "draftYear", label: "Զորակ", hint: "Год призыва" },
     { key: "birthYear", label: "Ծնված", hint: "Год рождения" },
-    { key: "referralDate", label: "Ուղեգրման", hint: "Дата направления" }
+    { key: "referralDate", label: "Ուղեգրման", hint: "Дата направления" },
+    { key: "dischargeDate", label: "Դուրսգրում", hint: "День выписки" }
   ];
+  const IMPORT_FIELD_DEFINITIONS = FIELD_DEFINITIONS.filter((field) => field.key !== "dischargeDate");
+  const SAVED_PAGE_SIZE = 80;
 
   const state = {
     parsedRows: [],
     savedRows: [],
+    savedTotal: 0,
+    savedLimit: SAVED_PAGE_SIZE,
+    savedOffset: 0,
+    savedQuery: "",
     sourceFileName: "",
     filter: "",
     status: "Загрузите RTF/PDF-файл Word, проверьте найденные строки и сохраните в базу.",
     isBusy: false,
     source: ""
   };
+  let savedSearchTimer = null;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -252,15 +260,15 @@
 
   function splitPdfLineToCells(line) {
     let items = line.items.filter((item) => item.text);
-    if (items.length < FIELD_DEFINITIONS.length) {
+    if (items.length < IMPORT_FIELD_DEFINITIONS.length) {
       return null;
     }
 
-    if (/^\d{1,4}$/.test(items[0]?.text || "") && items.length > FIELD_DEFINITIONS.length) {
+    if (/^\d{1,4}$/.test(items[0]?.text || "") && items.length > IMPORT_FIELD_DEFINITIONS.length) {
       items = items.slice(1);
     }
 
-    if (items.length === FIELD_DEFINITIONS.length) {
+    if (items.length === IMPORT_FIELD_DEFINITIONS.length) {
       return items.map((item) => item.text);
     }
 
@@ -277,11 +285,11 @@
     const splitIndexes = gaps
       .filter((gap) => gap.gap > Math.max(3, line.width * 0.004))
       .sort((a, b) => b.gap - a.gap)
-      .slice(0, FIELD_DEFINITIONS.length - 1)
+      .slice(0, IMPORT_FIELD_DEFINITIONS.length - 1)
       .map((gap) => gap.index)
       .sort((a, b) => a - b);
 
-    if (splitIndexes.length < FIELD_DEFINITIONS.length - 1) {
+    if (splitIndexes.length < IMPORT_FIELD_DEFINITIONS.length - 1) {
       return null;
     }
 
@@ -326,8 +334,8 @@
 
     const rows = groupPdfItemsIntoLines(items)
       .map(splitPdfLineToCells)
-      .filter((cells) => Array.isArray(cells) && cells.length >= FIELD_DEFINITIONS.length)
-      .map((cells) => cells.slice(0, FIELD_DEFINITIONS.length))
+      .filter((cells) => Array.isArray(cells) && cells.length >= IMPORT_FIELD_DEFINITIONS.length)
+      .map((cells) => cells.slice(0, IMPORT_FIELD_DEFINITIONS.length))
       .filter((cells) => !isHeaderRow(cells))
       .map((cells, index) => normalizeRecord(cells, file.name, index + 1))
       .filter((record) => record.patientName && record.medicalCenter && record.referralDate);
@@ -356,6 +364,7 @@
       draftYear: normalizeText(cells[4]).replace(/[^\d]/g, ""),
       birthYear: normalizeText(cells[5]).replace(/[^\d]/g, ""),
       referralDate: normalizeReferralDate(cells[6]),
+      dischargeDate: "",
       sourceFileName,
       sourceRow
     };
@@ -372,6 +381,7 @@
       draftYear: normalizeText(source.draftYear).replace(/[^\d]/g, ""),
       birthYear: normalizeText(source.birthYear).replace(/[^\d]/g, ""),
       referralDate: normalizeReferralDate(source.referralDate),
+      dischargeDate: normalizeReferralDate(source.dischargeDate),
       sourceFileName: normalizeText(source.sourceFileName),
       importedAt: normalizeText(source.importedAt),
       updatedAt: normalizeText(source.updatedAt)
@@ -396,8 +406,8 @@ function isHeaderRow(cells) {
   function parseCivilReferralRtf(rtfText, sourceFileName) {
     const tableRows = parseRtfTableRows(rtfText);
     return tableRows
-      .filter((cells) => cells.length >= FIELD_DEFINITIONS.length)
-      .map((cells) => cells.slice(0, FIELD_DEFINITIONS.length))
+      .filter((cells) => cells.length >= IMPORT_FIELD_DEFINITIONS.length)
+      .map((cells) => cells.slice(0, IMPORT_FIELD_DEFINITIONS.length))
       .filter((cells) => !isHeaderRow(cells))
       .map((cells, index) => normalizeRecord(cells, sourceFileName, index + 1))
       .filter((record) => record.patientName && record.medicalCenter);
@@ -427,8 +437,74 @@ function isHeaderRow(cells) {
     });
   }
 
-  function renderRowsTable(rows, emptyText, sourceName) {
-    const visibleEntries = getFilteredRowEntries(rows);
+  function getSavedListOptions(offset = state.savedOffset) {
+    return {
+      limit: state.savedLimit || SAVED_PAGE_SIZE,
+      offset: Math.max(0, Math.trunc(Number(offset) || 0)),
+      query: normalizeText(state.filter).slice(0, 120)
+    };
+  }
+
+  function applySavedPayload(payload) {
+    state.savedRows = Array.isArray(payload?.rows) ? payload.rows.map(normalizePageRecord) : [];
+    state.savedTotal = Number.isFinite(Number(payload?.total))
+      ? Math.max(0, Math.trunc(Number(payload.total)))
+      : state.savedRows.length;
+    state.savedLimit = Math.max(1, Math.trunc(Number(payload?.limit) || state.savedLimit || SAVED_PAGE_SIZE));
+    state.savedOffset = Math.max(0, Math.trunc(Number(payload?.offset) || 0));
+    state.savedQuery = normalizeText(payload?.query || "");
+    state.source = payload?.source || "";
+  }
+
+  function getSavedRangeText() {
+    if (!state.savedTotal) {
+      return "0 / 0";
+    }
+    const from = state.savedOffset + 1;
+    const to = Math.min(state.savedOffset + state.savedRows.length, state.savedTotal);
+    return `${from}-${to} / ${state.savedTotal}`;
+  }
+
+  function renderSavedPagination() {
+    const totalPages = Math.ceil((state.savedTotal || 0) / (state.savedLimit || SAVED_PAGE_SIZE));
+    if (totalPages <= 1) {
+      return "";
+    }
+
+    const currentPage = Math.floor(state.savedOffset / state.savedLimit) + 1;
+    const pageSet = new Set([1, totalPages, currentPage - 2, currentPage - 1, currentPage, currentPage + 1, currentPage + 2]);
+    const pages = [...pageSet]
+      .filter((page) => page >= 1 && page <= totalPages)
+      .sort((a, b) => a - b);
+    const parts = [];
+    pages.forEach((page, index) => {
+      if (index && page - pages[index - 1] > 1) {
+        parts.push(`<span class="civil-page-gap">...</span>`);
+      }
+      parts.push(`
+        <button
+          type="button"
+          class="civil-page-btn ${page === currentPage ? "is-active" : ""}"
+          data-civil-page="${page}"
+          ${page === currentPage || state.isBusy ? "disabled" : ""}
+        >${page}</button>
+      `);
+    });
+
+    return `
+      <div class="civil-pagination" aria-label="Страницы базы">
+        <button type="button" class="civil-page-btn" data-civil-page="${currentPage - 1}" ${currentPage <= 1 || state.isBusy ? "disabled" : ""}>Назад</button>
+        ${parts.join("")}
+        <button type="button" class="civil-page-btn" data-civil-page="${currentPage + 1}" ${currentPage >= totalPages || state.isBusy ? "disabled" : ""}>Вперёд</button>
+      </div>
+    `;
+  }
+
+  function renderRowsTable(rows, emptyText, sourceName, options = {}) {
+    const visibleEntries = options.applyFilter === false
+      ? rows.map((row, index) => ({ row, index }))
+      : getFilteredRowEntries(rows);
+    const rowNumberOffset = Math.max(0, Math.trunc(Number(options.rowNumberOffset) || 0));
     if (!visibleEntries.length) {
       return `<div class="civil-empty">${escapeHtml(emptyText)}</div>`;
     }
@@ -445,7 +521,7 @@ function isHeaderRow(cells) {
           <tbody>
             ${visibleEntries.map(({ row, index }, visibleIndex) => `
               <tr>
-                <td>${visibleIndex + 1}</td>
+                <td>${rowNumberOffset + visibleIndex + 1}</td>
                 ${FIELD_DEFINITIONS.map((field) => `
                   <td>
                     <input
@@ -472,8 +548,8 @@ function isHeaderRow(cells) {
       return;
     }
     const parsedCount = state.parsedRows.length;
-    const savedCount = state.savedRows.length;
-    const filteredSavedCount = getFilteredRows(state.savedRows).length;
+    const savedCount = state.savedTotal || state.savedRows.length;
+    const savedPageCount = state.savedRows.length;
     const filteredParsedCount = getFilteredRows(state.parsedRows).length;
 
     app.innerHTML = `
@@ -498,7 +574,7 @@ function isHeaderRow(cells) {
           <div class="civil-stats">
             <span>Найдено: <strong>${parsedCount}</strong></span>
             <span>В базе: <strong>${savedCount}</strong></span>
-            <span>Показано: <strong>${state.parsedRows.length ? filteredParsedCount : filteredSavedCount}</strong></span>
+            <span>Показано: <strong>${state.parsedRows.length ? filteredParsedCount : savedPageCount}</strong></span>
           </div>
         </section>
 
@@ -509,11 +585,12 @@ function isHeaderRow(cells) {
               <p class="hint">Эти данные уже сохранены на сервере. Строки можно исправить прямо здесь и сохранить правки.</p>
             </div>
             <div class="civil-section-actions">
-              <span class="civil-count-pill">${filteredSavedCount} / ${savedCount}</span>
-              <button type="button" id="civilSaveDatabaseBtn" ${!savedCount || state.isBusy ? "disabled" : ""}>Сохранить правки базы</button>
+              <span class="civil-count-pill">${escapeHtml(getSavedRangeText())}</span>
+              <button type="button" id="civilSaveDatabaseBtn" ${!savedPageCount || state.isBusy ? "disabled" : ""}>Сохранить правки базы</button>
             </div>
           </div>
-          ${renderRowsTable(state.savedRows, "В базе пока нет записей.", "saved")}
+          ${renderRowsTable(state.savedRows, "В базе пока нет записей.", "saved", { applyFilter: false, rowNumberOffset: state.savedOffset })}
+          ${renderSavedPagination()}
         </section>
 
         <section class="panel civil-upload-panel">
@@ -591,7 +668,10 @@ function isHeaderRow(cells) {
     }
   }
 
-  async function loadSavedRows() {
+  async function loadSavedRows(options = {}) {
+    if (Number.isFinite(Number(options.offset))) {
+      state.savedOffset = Math.max(0, Math.trunc(Number(options.offset)));
+    }
     setBusy(true, "Проверяю сессию владельца...");
     try {
       const authReady = window.SHARSH_AUTH_READY;
@@ -600,12 +680,20 @@ function isHeaderRow(cells) {
       }
       state.status = "Загружаю сохраненную базу...";
       render();
+      const listOptions = getSavedListOptions();
       const payload = typeof sync.listCivilReferrals === "function"
-        ? await sync.listCivilReferrals()
+        ? await sync.listCivilReferrals(listOptions)
         : { rows: [] };
-      state.savedRows = Array.isArray(payload?.rows) ? payload.rows.map(normalizePageRecord) : [];
-      state.source = payload?.source || "";
-      state.status = `База загружена. Записей: ${state.savedRows.length}.`;
+      applySavedPayload(payload);
+      if (!state.savedRows.length && state.savedTotal > 0 && state.savedOffset > 0) {
+        const lastOffset = Math.floor((state.savedTotal - 1) / state.savedLimit) * state.savedLimit;
+        state.savedOffset = lastOffset;
+        return await loadSavedRows({ offset: lastOffset });
+      }
+      const searchText = state.savedQuery ? ` Поиск: ${state.savedQuery}.` : "";
+      state.status = state.savedTotal
+        ? `База загружена: ${getSavedRangeText()}.${searchText}`
+        : `В базе пока нет записей.${searchText}`;
     } catch (error) {
       state.status = error instanceof Error ? error.message : "Не удалось загрузить базу.";
     } finally {
@@ -620,13 +708,13 @@ function isHeaderRow(cells) {
     }
     setBusy(true, "Сохраняю строки в базу...");
     try {
+      state.savedOffset = 0;
+      const listOptions = getSavedListOptions(0);
       const payload = typeof sync.saveCivilReferrals === "function"
-        ? await sync.saveCivilReferrals(state.parsedRows, state.sourceFileName)
+        ? await sync.saveCivilReferrals(state.parsedRows, state.sourceFileName, listOptions)
         : { rows: state.parsedRows, saved: state.parsedRows.length };
-      state.savedRows = Array.isArray(payload?.rows)
-        ? payload.rows.map(normalizePageRecord)
-        : state.parsedRows.map(normalizePageRecord);
-      state.status = `Сохранено: ${payload?.saved || state.parsedRows.length}. В базе записей: ${state.savedRows.length}.`;
+      applySavedPayload(payload);
+      state.status = `Сохранено: ${payload?.saved || state.parsedRows.length}. В базе записей: ${state.savedTotal}.`;
     } catch (error) {
       state.status = error instanceof Error ? error.message : "Не удалось сохранить строки.";
     } finally {
@@ -641,13 +729,12 @@ function isHeaderRow(cells) {
     }
     setBusy(true, "Сохраняю ручные правки в базу...");
     try {
+      const listOptions = getSavedListOptions();
       const payload = typeof sync.saveCivilReferrals === "function"
-        ? await sync.saveCivilReferrals(state.savedRows, "manual-edit")
+        ? await sync.saveCivilReferrals(state.savedRows, "manual-edit", listOptions)
         : { rows: state.savedRows, saved: state.savedRows.length };
-      state.savedRows = Array.isArray(payload?.rows)
-        ? payload.rows.map(normalizePageRecord)
-        : state.savedRows.map(normalizePageRecord);
-      state.status = `Правки сохранены. В базе записей: ${state.savedRows.length}.`;
+      applySavedPayload(payload);
+      state.status = `Правки сохранены. В базе записей: ${state.savedTotal}.`;
     } catch (error) {
       state.status = error instanceof Error ? error.message : "Не удалось сохранить правки базы.";
     } finally {
@@ -680,7 +767,7 @@ function isHeaderRow(cells) {
 
     rows[index] = {
       ...rows[index],
-      [key]: key === "referralDate"
+      [key]: key === "referralDate" || key === "dischargeDate"
         ? normalizeReferralDate(input.value)
         : key === "patientName"
           ? normalizeCivilNameField(input.value)
@@ -694,10 +781,25 @@ function isHeaderRow(cells) {
     document.getElementById("civilFileInput")?.addEventListener("change", handleFileUpload);
     document.getElementById("civilSaveBtn")?.addEventListener("click", saveParsedRows);
     document.getElementById("civilSaveDatabaseBtn")?.addEventListener("click", saveSavedRows);
-    document.getElementById("civilReloadBtn")?.addEventListener("click", loadSavedRows);
+    document.getElementById("civilReloadBtn")?.addEventListener("click", () => {
+      state.savedOffset = 0;
+      loadSavedRows();
+    });
     document.getElementById("civilFilterInput")?.addEventListener("input", (event) => {
       state.filter = event.target.value;
-      render();
+      state.savedOffset = 0;
+      window.clearTimeout(savedSearchTimer);
+      savedSearchTimer = window.setTimeout(() => loadSavedRows(), 350);
+    });
+    document.querySelectorAll(".civil-page-btn[data-civil-page]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const page = Number(button.getAttribute("data-civil-page"));
+        if (!Number.isFinite(page) || page < 1) {
+          return;
+        }
+        const offset = (Math.trunc(page) - 1) * state.savedLimit;
+        loadSavedRows({ offset });
+      });
     });
     document.querySelectorAll(".civil-edit-input").forEach((input) => {
       input.addEventListener("input", handleTableEdit);

@@ -2364,7 +2364,7 @@ a {
 
 .civil-table {
   width: 100%;
-  min-width: 1120px;
+  min-width: 1240px;
   border-collapse: collapse;
   font-size: 15px;
   table-layout: fixed;
@@ -2428,6 +2428,11 @@ a {
   width: 120px;
 }
 
+.civil-table th:nth-child(9),
+.civil-table td:nth-child(9) {
+  width: 120px;
+}
+
 .civil-section-head {
   display: flex;
   justify-content: space-between;
@@ -2456,6 +2461,44 @@ a {
   font-size: 13px;
   font-weight: 900;
   white-space: nowrap;
+}
+
+.civil-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.civil-page-btn {
+  min-width: 42px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1d5a48;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.civil-page-btn.is-active,
+.civil-page-btn:disabled.is-active {
+  background: #1d5a48;
+  color: #ffffff;
+}
+
+.civil-page-btn:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.civil-page-gap {
+  padding: 0 2px;
+  color: #777166;
+  font-weight: 900;
 }
 
 .civil-section-head h2 {

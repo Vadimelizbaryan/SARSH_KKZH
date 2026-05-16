@@ -259,8 +259,12 @@
     "rank",
     "draftYear",
     "birthYear",
-    "referralDate"
+    "referralDate",
+    "dischargeDate"
   ];
+  const CIVIL_REFERRAL_HASH_FIELDS = CIVIL_REFERRAL_FIELDS.filter((key) => key !== "dischargeDate");
+  const CIVIL_REFERRALS_DEFAULT_LIMIT = 80;
+  const CIVIL_REFERRALS_MAX_LIMIT = 200;
 
   function normalizeCivilText(value) {
     return String(value ?? "")
@@ -268,6 +272,51 @@
       .replace(/\u00a0/g, " ")
       .replace(/[ \t\r\n]+/g, " ")
       .trim();
+  }
+
+  function normalizeCivilListOptions(options = {}) {
+    const limit = Math.min(
+      CIVIL_REFERRALS_MAX_LIMIT,
+      Math.max(1, Math.trunc(Number(options.limit) || CIVIL_REFERRALS_DEFAULT_LIMIT))
+    );
+    const offset = Math.max(0, Math.trunc(Number(options.offset) || 0));
+    const query = normalizeCivilText(options.query).slice(0, 120);
+    return { limit, offset, query };
+  }
+
+  function normalizeCivilSearchText(value) {
+    return normalizeCivilText(value).toLocaleLowerCase("hy-AM");
+  }
+
+  function normalizeCivilCompactSearchText(value) {
+    return normalizeCivilSearchText(value).replace(/\s+/g, "");
+  }
+
+  function filterCivilReferralRows(rows, query) {
+    const normalizedQuery = normalizeCivilSearchText(query);
+    const compactQuery = normalizeCivilCompactSearchText(query);
+    if (!normalizedQuery) {
+      return rows;
+    }
+
+    return rows.filter((row) => {
+      return CIVIL_REFERRAL_FIELDS.some((key) => {
+        return normalizeCivilSearchText(row[key]).includes(normalizedQuery)
+          || normalizeCivilCompactSearchText(row[key]).includes(compactQuery);
+      });
+    });
+  }
+
+  function pageCivilReferralRows(rows, options = {}) {
+    const { limit, offset, query } = normalizeCivilListOptions(options);
+    const filteredRows = filterCivilReferralRows(rows, query);
+    return {
+      rows: filteredRows.slice(offset, offset + limit),
+      total: filteredRows.length,
+      limit,
+      offset,
+      query
+    };
   }
 
   const CIVIL_ARMENIAN_WORD_RE = /^[\u0531-\u0587]+$/;
@@ -297,7 +346,7 @@
   }
 
   function stableCivilReferralHash(record) {
-    const source = CIVIL_REFERRAL_FIELDS
+    const source = CIVIL_REFERRAL_HASH_FIELDS
       .map((key) => normalizeCivilText(record[key]).toLowerCase())
       .join("|");
     let hash = 5381;
@@ -357,37 +406,49 @@
     return normalized;
   }
 
-  async function listCivilReferrals() {
+  async function listCivilReferrals(options = {}) {
+    const listOptions = normalizeCivilListOptions(options);
     if (hasRemoteSync()) {
       const payload = await postRemotePayload(
-        { type: "list_civil_referrals" },
+        { type: "list_civil_referrals", ...listOptions },
         "Не удалось загрузить базу гражданских направлений"
       );
       return {
         rows: normalizeCivilReferralRows(payload?.rows),
+        total: Number(payload?.total) || 0,
+        limit: Number(payload?.limit) || listOptions.limit,
+        offset: Number(payload?.offset) || listOptions.offset,
+        query: normalizeCivilText(payload?.query || listOptions.query),
         source: "remote"
       };
     }
 
+    const paged = pageCivilReferralRows(readLocalCivilReferrals(), listOptions);
     return {
-      rows: readLocalCivilReferrals(),
+      ...paged,
       source: "local-only"
     };
   }
 
-  async function saveCivilReferrals(rows, sourceFileName = "") {
+  async function saveCivilReferrals(rows, sourceFileName = "", options = {}) {
     const normalized = normalizeCivilReferralRows(rows, sourceFileName);
+    const listOptions = normalizeCivilListOptions(options);
     if (hasRemoteSync()) {
       const payload = await postRemotePayload(
         {
           type: "save_civil_referrals",
           sourceFileName,
-          rows: normalized
+          rows: normalized,
+          ...listOptions
         },
         "Не удалось сохранить базу гражданских направлений"
       );
       return {
         rows: normalizeCivilReferralRows(payload?.rows),
+        total: Number(payload?.total) || 0,
+        limit: Number(payload?.limit) || listOptions.limit,
+        offset: Number(payload?.offset) || listOptions.offset,
+        query: normalizeCivilText(payload?.query || listOptions.query),
         saved: Number(payload?.saved) || normalized.length,
         source: "remote"
       };
@@ -405,8 +466,9 @@
         updatedAt: now
       });
     });
+    const paged = pageCivilReferralRows(writeLocalCivilReferrals([...map.values()]), listOptions);
     return {
-      rows: writeLocalCivilReferrals([...map.values()]),
+      ...paged,
       saved: normalized.length,
       source: "local-only"
     };

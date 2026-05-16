@@ -47,6 +47,8 @@ const DISCHARGE_SHIFT_ROW_PREFIX = "discharge:";
 const DISCHARGE_SHIFT_META_KEY = "discharge_shift";
 const CIVIL_REFERRAL_ROW_PREFIX = "civil-referral:";
 const CIVIL_REFERRAL_GROUP = "civil_referral";
+const CIVIL_REFERRAL_DEFAULT_LIMIT = 80;
+const CIVIL_REFERRAL_MAX_LIMIT = 200;
 const CIVIL_REFERRAL_VALUE_KEYS = [
   "patientName",
   "medicalCenter",
@@ -54,8 +56,10 @@ const CIVIL_REFERRAL_VALUE_KEYS = [
   "rank",
   "draftYear",
   "birthYear",
-  "referralDate"
+  "referralDate",
+  "dischargeDate"
 ] as const;
+const CIVIL_REFERRAL_HASH_KEYS = CIVIL_REFERRAL_VALUE_KEYS.filter((key) => key !== "dischargeDate");
 
 const PHOTO_FIELD_MAPPINGS = [
   { cell: 1, key: "beenTotal", label: "been / total" },
@@ -208,6 +212,23 @@ function normalizeCivilReferralText(value: unknown) {
     .trim();
 }
 
+function sanitizeCivilReferralListOptions(source: Record<string, unknown> = {}) {
+  const limit = Math.min(
+    CIVIL_REFERRAL_MAX_LIMIT,
+    Math.max(1, Math.trunc(Number(source.limit) || CIVIL_REFERRAL_DEFAULT_LIMIT))
+  );
+  const offset = Math.max(0, Math.trunc(Number(source.offset) || 0));
+  const query = normalizeCivilReferralText(source.query)
+    .replace(/[(),]/g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 120);
+  return { limit, offset, query };
+}
+
+function buildCivilReferralIlikePattern(query: string) {
+  return `%${query.replace(/[%_]/g, "")}%`;
+}
+
 const CIVIL_ARMENIAN_WORD_RE = /^[\u0531-\u0587]+$/;
 
 function normalizeCivilReferralNameText(value: unknown, options: { medicalCenter?: boolean } = {}) {
@@ -235,7 +256,7 @@ function normalizeCivilReferralNameText(value: unknown, options: { medicalCenter
 }
 
 function stableCivilReferralHash(record: Record<string, unknown>) {
-  const source = CIVIL_REFERRAL_VALUE_KEYS
+  const source = CIVIL_REFERRAL_HASH_KEYS
     .map((key) => normalizeCivilReferralText(record[key]).toLowerCase())
     .join("|");
   let hash = 5381;
@@ -1521,18 +1542,44 @@ async function clearDischargeShiftDraft(
   return await saveDischargeShiftDraft(supabase, {}, reportDateTime);
 }
 
-async function listCivilReferrals(supabase: ReturnType<typeof createClient>) {
-  const { data, error } = await supabase
+async function listCivilReferrals(
+  supabase: ReturnType<typeof createClient>,
+  options: Record<string, unknown> = {}
+) {
+  const { limit, offset, query } = sanitizeCivilReferralListOptions(options);
+  const pattern = buildCivilReferralIlikePattern(query);
+  let request = supabase
     .from("sharsh_departments")
-    .select("department_id, department_name, values, updated_at")
-    .eq("department_group", CIVIL_REFERRAL_GROUP)
-    .order("updated_at", { ascending: false });
+    .select("department_id, department_name, values, updated_at", { count: "exact" })
+    .eq("department_group", CIVIL_REFERRAL_GROUP);
+
+  if (query) {
+    request = request.or([
+      `department_name.ilike.${pattern}`,
+      `values->>patientName.ilike.${pattern}`,
+      `values->>medicalCenter.ilike.${pattern}`,
+      `values->>militaryUnit.ilike.${pattern}`,
+      `values->>rank.ilike.${pattern}`,
+      `values->>draftYear.ilike.${pattern}`,
+      `values->>birthYear.ilike.${pattern}`,
+      `values->>referralDate.ilike.${pattern}`,
+      `values->>dischargeDate.ilike.${pattern}`
+    ].join(","));
+  }
+
+  const { data, error, count } = await request
+    .order("updated_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     throw error;
   }
 
   return {
+    total: count || 0,
+    limit,
+    offset,
+    query,
     rows: (data || []).map((row) => ({
       ...sanitizeCivilReferralRecord(row.values),
       id: String(row.department_id || "").replace(CIVIL_REFERRAL_ROW_PREFIX, ""),
@@ -1545,7 +1592,8 @@ async function listCivilReferrals(supabase: ReturnType<typeof createClient>) {
 async function saveCivilReferrals(
   supabase: ReturnType<typeof createClient>,
   rows: unknown,
-  sourceFileName: string
+  sourceFileName: string,
+  options: Record<string, unknown> = {}
 ) {
   const now = new Date().toISOString();
   const cleanRows = sanitizeCivilReferralRows(rows, sourceFileName);
@@ -1573,7 +1621,7 @@ async function saveCivilReferrals(
   }
 
   return {
-    ...(await listCivilReferrals(supabase)),
+    ...(await listCivilReferrals(supabase, options)),
     saved: updates.length
   };
 }
@@ -1937,12 +1985,12 @@ Deno.serve(async (request) => {
     }
 
     if (type === "list_civil_referrals") {
-      return jsonResponse(await listCivilReferrals(supabase));
+      return jsonResponse(await listCivilReferrals(supabase, payload));
     }
 
     if (type === "save_civil_referrals") {
       const sourceFileName = typeof payload.sourceFileName === "string" ? payload.sourceFileName.trim() : "";
-      return jsonResponse(await saveCivilReferrals(supabase, payload.rows, sourceFileName));
+      return jsonResponse(await saveCivilReferrals(supabase, payload.rows, sourceFileName, payload));
     }
 
     if (type === "apply_night_shift") {
