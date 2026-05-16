@@ -128,6 +128,32 @@
     return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
   }
 
+  function normalizeReportDateTime(value, fallback = getYerevanDateTime()) {
+    const raw = String(value ?? "").trim().replace(/\s+/g, " ");
+    if (!raw) {
+      return fallback;
+    }
+
+    const dateTimeMatch = raw.match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{2,4})[\s,]+(\d{1,2}):(\d{2})$/);
+    const dateOnlyMatch = raw.match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{2,4})$/);
+    const match = dateTimeMatch || dateOnlyMatch;
+    if (!match) {
+      return /\d{1,2}:\d{2}/.test(raw) ? raw : fallback;
+    }
+
+    const day = match[1].padStart(2, "0");
+    const month = match[2].padStart(2, "0");
+    const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+    if (day === "05" && month === "05" && year === "2026") {
+      return fallback;
+    }
+    if (!dateTimeMatch) {
+      return fallback;
+    }
+
+    return `${day}.${month}.${year} ${match[4].padStart(2, "0")}:${match[5]}`;
+  }
+
   function getMainPageHref() {
     if (window.location.pathname.includes("/functions/v1/site")) {
       return `${window.location.origin}/functions/v1/site?path=${encodeURIComponent(config.MAIN_PAGE_FILENAME || "index.html")}`;
@@ -170,7 +196,7 @@
         });
       }
       return {
-        reportDateTime: typeof parsed?.reportDateTime === "string" ? parsed.reportDateTime : fallback.reportDateTime,
+        reportDateTime: normalizeReportDateTime(parsed?.reportDateTime, fallback.reportDateTime),
         savedAt: typeof parsed?.savedAt === "string" ? parsed.savedAt : "",
         rows
       };
@@ -180,6 +206,7 @@
   }
 
   function saveState() {
+    state.reportDateTime = normalizeReportDateTime(state.reportDateTime);
     state.savedAt = getYerevanDateTime();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
@@ -198,9 +225,7 @@
       });
     });
     state.rows = rows;
-    state.reportDateTime = typeof draft.reportDateTime === "string" && draft.reportDateTime.trim()
-      ? draft.reportDateTime.trim()
-      : state.reportDateTime;
+    state.reportDateTime = normalizeReportDateTime(draft.reportDateTime, state.reportDateTime);
     state.savedAt = typeof draft.savedAt === "string" && draft.savedAt.trim()
       ? draft.savedAt.trim()
       : state.savedAt;

@@ -702,19 +702,19 @@ function getTelegramWebFormUrl(
 
 function getTelegramNightFormUrl(reportDateTime: string) {
   const params = new URLSearchParams();
-  params.set("date", reportDateTime || DEFAULT_DATE);
+  params.set("date", normalizeShiftReportDateTime(reportDateTime));
   return `${getPublicSiteBaseUrl()}/tg-night-form.html?${params.toString()}`;
 }
 
 function getTelegramDayFormUrl(reportDateTime: string) {
   const params = new URLSearchParams();
-  params.set("date", reportDateTime || DEFAULT_DATE);
+  params.set("date", normalizeShiftReportDateTime(reportDateTime));
   return `${getPublicSiteBaseUrl()}/tg-day-form.html?${params.toString()}`;
 }
 
 function getTelegramDischargeFormUrl(reportDateTime: string) {
   const params = new URLSearchParams();
-  params.set("date", reportDateTime || DEFAULT_DATE);
+  params.set("date", normalizeShiftReportDateTime(reportDateTime));
   return `${getPublicSiteBaseUrl()}/tg-discharge-form.html?${params.toString()}`;
 }
 
@@ -1697,6 +1697,32 @@ function getYerevanDateTimeText(date = new Date()) {
   return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
 }
 
+function normalizeShiftReportDateTime(value: unknown, fallback = getYerevanDateTimeText()) {
+  const raw = String(value || "").trim().replace(/\s+/g, " ");
+  if (!raw) {
+    return fallback;
+  }
+
+  const dateTimeMatch = raw.match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{2,4})[\s,]+(\d{1,2}):(\d{2})$/);
+  const dateOnlyMatch = raw.match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{2,4})$/);
+  const match = dateTimeMatch || dateOnlyMatch;
+  if (!match) {
+    return /\d{1,2}:\d{2}/.test(raw) ? raw : fallback;
+  }
+
+  const day = match[1].padStart(2, "0");
+  const month = match[2].padStart(2, "0");
+  const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+  if (day === "05" && month === "05" && year === "2026") {
+    return fallback;
+  }
+  if (!dateTimeMatch) {
+    return fallback;
+  }
+
+  return `${day}.${month}.${year} ${match[4].padStart(2, "0")}:${match[5]}`;
+}
+
 function getYerevanReportDateText(date = new Date()) {
   const parts = new Intl.DateTimeFormat("ru-RU", {
     timeZone: "Asia/Yerevan",
@@ -1993,7 +2019,7 @@ async function saveNightShiftDraft(
     .from("sharsh_report_meta")
     .upsert({
       report_key: NIGHT_SHIFT_META_KEY,
-      report_date: reportDateTime || DEFAULT_DATE,
+      report_date: normalizeShiftReportDateTime(reportDateTime),
       updated_at: now
     });
 
@@ -2064,7 +2090,7 @@ async function saveDayShiftDraft(
     .from("sharsh_report_meta")
     .upsert({
       report_key: DAY_SHIFT_META_KEY,
-      report_date: reportDateTime || DEFAULT_DATE,
+      report_date: normalizeShiftReportDateTime(reportDateTime),
       updated_at: now
     });
 
@@ -2135,7 +2161,7 @@ async function saveDischargeShiftDraft(
     .from("sharsh_report_meta")
     .upsert({
       report_key: DISCHARGE_SHIFT_META_KEY,
-      report_date: reportDateTime || DEFAULT_DATE,
+      report_date: normalizeShiftReportDateTime(reportDateTime),
       updated_at: now
     });
 
@@ -2179,7 +2205,7 @@ async function loadShiftDraftMeta(
   }
 
   return {
-    reportDateTime: typeof data?.report_date === "string" ? data.report_date : "",
+    reportDateTime: normalizeShiftReportDateTime(data?.report_date),
     updatedAt: typeof data?.updated_at === "string" ? data.updated_at : ""
   };
 }
@@ -4763,9 +4789,7 @@ async function handleTelegramNightFormSubmit(request: Request) {
       }, 403);
     }
 
-    const reportDateTime = typeof payload?.reportDateTime === "string" && payload.reportDateTime.trim()
-      ? payload.reportDateTime.trim()
-      : getYerevanDateTimeText();
+    const reportDateTime = normalizeShiftReportDateTime(payload?.reportDateTime);
     const submittedRows = normalizeNightShiftSubmittedRows(payload);
     const touchedDepartmentIds = normalizeTouchedDepartmentIds(payload);
     const rows = await saveNightShiftDraft(
@@ -4910,9 +4934,7 @@ async function handleTelegramDayFormSubmit(request: Request) {
       }, 403);
     }
 
-    const reportDateTime = typeof payload?.reportDateTime === "string" && payload.reportDateTime.trim()
-      ? payload.reportDateTime.trim()
-      : getYerevanDateTimeText();
+    const reportDateTime = normalizeShiftReportDateTime(payload?.reportDateTime);
     const submittedRows = normalizeNightShiftSubmittedRows(payload);
     const touchedDepartmentIds = normalizeTouchedDepartmentIds(payload);
     const rows = await saveDayShiftDraft(
@@ -4997,9 +5019,7 @@ async function handleTelegramDischargeFormSubmit(request: Request) {
       }, 403);
     }
 
-    const reportDateTime = typeof payload?.reportDateTime === "string" && payload.reportDateTime.trim()
-      ? payload.reportDateTime.trim()
-      : getYerevanDateTimeText();
+    const reportDateTime = normalizeShiftReportDateTime(payload?.reportDateTime);
     const submittedRows = normalizeNightShiftSubmittedRows(payload);
     const touchedDepartmentIds = normalizeTouchedDepartmentIds(payload);
     const rows = await saveDischargeShiftDraft(

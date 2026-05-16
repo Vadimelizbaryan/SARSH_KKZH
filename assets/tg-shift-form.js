@@ -61,7 +61,7 @@
       aria: "Գիշերային հերթափոխի աղյուսակ"
     };
 
-  let reportDateTime = getQuery().get("date") || getYerevanDateTime();
+  let reportDateTime = normalizeReportDateTime(getQuery().get("date"));
   const touchedDepartmentIds = new Set();
 
   function escapeHtml(value) {
@@ -78,6 +78,7 @@
   }
 
   function getReportDateTime() {
+    reportDateTime = normalizeReportDateTime(reportDateTime);
     return reportDateTime;
   }
 
@@ -93,6 +94,32 @@
     }).formatToParts(new Date());
     const get = (type) => parts.find((part) => part.type === type)?.value || "";
     return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
+  }
+
+  function normalizeReportDateTime(value, fallback = getYerevanDateTime()) {
+    const raw = String(value ?? "").trim().replace(/\s+/g, " ");
+    if (!raw) {
+      return fallback;
+    }
+
+    const dateTimeMatch = raw.match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{2,4})[\s,]+(\d{1,2}):(\d{2})$/);
+    const dateOnlyMatch = raw.match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{2,4})$/);
+    const match = dateTimeMatch || dateOnlyMatch;
+    if (!match) {
+      return /\d{1,2}:\d{2}/.test(raw) ? raw : fallback;
+    }
+
+    const day = match[1].padStart(2, "0");
+    const month = match[2].padStart(2, "0");
+    const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+    if (day === "05" && month === "05" && year === "2026") {
+      return fallback;
+    }
+    if (!dateTimeMatch) {
+      return fallback;
+    }
+
+    return `${day}.${month}.${year} ${match[4].padStart(2, "0")}:${match[5]}`;
   }
 
   function toNumber(value) {
@@ -215,7 +242,7 @@
       }
 
       if (typeof payload.reportDateTime === "string" && payload.reportDateTime.trim()) {
-        reportDateTime = payload.reportDateTime.trim();
+        reportDateTime = normalizeReportDateTime(payload.reportDateTime, reportDateTime);
         const dateTarget = root.querySelector("[data-report-date-time]");
         if (dateTarget) {
           dateTarget.textContent = reportDateTime;
