@@ -2346,6 +2346,38 @@ a {
   font: inherit;
 }
 
+.civil-database-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin: 0 0 12px;
+}
+
+.civil-database-tools input[type="search"] {
+  width: min(680px, 100%);
+  min-height: 48px;
+  padding: 13px 18px;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(29, 90, 72, 0.08);
+  font: inherit;
+  font-weight: 800;
+}
+
+.civil-database-tools input[type="search"]:focus {
+  border-color: #158f60;
+  box-shadow: 0 0 0 3px rgba(21, 143, 96, 0.14);
+  outline: none;
+}
+
+.civil-search-note {
+  color: #666055;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .civil-status,
 .civil-empty {
   margin-top: 12px;

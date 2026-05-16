@@ -589,6 +589,16 @@ function isHeaderRow(cells) {
               <button type="button" id="civilSaveDatabaseBtn" ${!savedPageCount || state.isBusy ? "disabled" : ""}>Сохранить правки базы</button>
             </div>
           </div>
+          <div class="civil-database-tools">
+            <input
+              type="search"
+              id="civilFilterInput"
+              placeholder="Поиск по ФИО, БК, части, званию, датам..."
+              value="${escapeHtml(state.filter)}"
+              ${state.isBusy ? "disabled" : ""}
+            >
+            <span class="civil-search-note">Поиск работает по всем колонкам базы и загружает найденные строки с сервера.</span>
+          </div>
           ${renderRowsTable(state.savedRows, "В базе пока нет записей.", "saved", { applyFilter: false, rowNumberOffset: state.savedOffset })}
           ${renderSavedPagination()}
         </section>
@@ -601,7 +611,6 @@ function isHeaderRow(cells) {
               <input type="file" id="civilFileInput" accept=".rtf,.pdf,.txt,application/pdf,application/rtf,text/rtf,text/plain" ${state.isBusy ? "disabled" : ""}>
               Выбрать RTF/PDF
             </label>
-            <input type="search" id="civilFilterInput" placeholder="Поиск по ФИО, БК, части..." value="${escapeHtml(state.filter)}">
           </div>
           <div class="civil-status">${escapeHtml(state.status)}</div>
         </section>
