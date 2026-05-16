@@ -2364,9 +2364,10 @@ a {
 
 .civil-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 1120px;
   border-collapse: collapse;
   font-size: 15px;
+  table-layout: fixed;
 }
 
 .civil-table th,
@@ -2394,9 +2395,37 @@ a {
   font-weight: 800;
 }
 
+.civil-table th:nth-child(2),
 .civil-table td:nth-child(2) {
-  min-width: 240px;
+  width: 360px;
   font-weight: 800;
+}
+
+.civil-table th:nth-child(3),
+.civil-table td:nth-child(3) {
+  width: 190px;
+}
+
+.civil-table th:nth-child(4),
+.civil-table td:nth-child(4) {
+  width: 150px;
+}
+
+.civil-table th:nth-child(5),
+.civil-table td:nth-child(5) {
+  width: 130px;
+}
+
+.civil-table th:nth-child(6),
+.civil-table td:nth-child(6),
+.civil-table th:nth-child(7),
+.civil-table td:nth-child(7) {
+  width: 92px;
+}
+
+.civil-table th:nth-child(8),
+.civil-table td:nth-child(8) {
+  width: 120px;
 }
 
 .civil-section-head {
@@ -2413,7 +2442,7 @@ a {
 
 .civil-edit-input {
   width: 100%;
-  min-width: 96px;
+  min-width: 0;
   border: 1px solid rgba(17, 17, 17, 0.18);
   border-radius: 12px;
   padding: 8px 10px;
@@ -2429,7 +2458,7 @@ a {
 }
 
 .civil-table td:nth-child(2) .civil-edit-input {
-  min-width: 220px;
+  min-width: 330px;
 }
 
 @media (max-width: 760px) {
