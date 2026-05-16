@@ -5,9 +5,10 @@
   const queryParams = new URLSearchParams(window.location.search);
   const view = queryParams.get("view");
   const bodyView = document.body.dataset.view || "";
-  const mode = view === "day" || bodyView === "day-shift" ? "day"
-    : view === "night" || bodyView === "night-shift" ? "night"
-      : "";
+  const mode = view === "discharge" || bodyView === "discharge-shift" || bodyView === "morning-discharge" ? "discharge"
+    : view === "day" || bodyView === "day-shift" ? "day"
+      : view === "night" || bodyView === "night-shift" ? "night"
+        : "";
 
   if (!config || !app || !mode) {
     return;
@@ -63,6 +64,30 @@
       confirmClear: "Очистить все значения дневной смены?",
       applyFn: "applyDayShiftToMain",
       loadFn: "loadDayShiftDraft"
+    },
+    discharge: {
+      storage: "discharge-shift",
+      title: "Утренняя выписка",
+      lead: "Выписка из стационара по всем отделениям. Формулы переноса будут добавлены отдельно.",
+      kicker: "Черновик утренней выписки",
+      subtitle: "Заполняем выписанных утром пациентов",
+      help: "Telegram форма утренней выписки сохраняет значения сюда. Перенос в основную таблицу пока выключен до добавления формул.",
+      clearLabel: "Очистить выписку",
+      totalLabel: "Итого выписано",
+      noValues: "Утренняя выписка сохранена локально. Для переноса в основную таблицу пока нет значений.",
+      syncMissing: "Перенос в основную таблицу пока недоступен: модуль синхронизации не загружен.",
+      saving: "Сохраняю утреннюю выписку...",
+      saved: "Утренняя выписка сохранена",
+      cleared: "Таблица утренней выписки очищена.",
+      loadOk: "Загружены данные утренней выписки, отправленные через Telegram форму.",
+      loadFail: "Не удалось загрузить утреннюю выписку из Telegram формы.",
+      confirmClear: "Очистить все значения утренней выписки?",
+      transferPending: true,
+      transferPendingText: "Формулы переноса утренней выписки ещё не заданы. Данные оставлены на этой странице и не перенесены в основную таблицу.",
+      applyFn: "",
+      loadFn: "loadDischargeShiftDraft",
+      saveFn: "saveDischargeShiftDraft",
+      clearFn: "clearDischargeShiftDraft"
     }
   };
 
@@ -353,6 +378,37 @@
       return;
     }
 
+    if (copy.transferPending) {
+      const saveFn = sync && sync[copy.saveFn];
+      if (typeof saveFn !== "function") {
+        setStatus(copy.syncMissing, true);
+        render();
+        return;
+      }
+
+      if (button instanceof HTMLButtonElement) {
+        button.disabled = true;
+      }
+      setStatus(copy.saving, false);
+      render();
+
+      try {
+        const result = await saveFn(state.rows, state.reportDateTime);
+        const draft = result && result.draft ? result.draft : null;
+        if (draft && typeof draft.savedAt === "string" && draft.savedAt) {
+          state.savedAt = draft.savedAt;
+          saveState();
+        }
+        const sourceText = result && result.source === "remote" ? "онлайн" : "локально";
+        setStatus(`${copy.saved} (${sourceText}). ${copy.transferPendingText}`, false);
+        render();
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : copy.syncMissing, true);
+        render();
+      }
+      return;
+    }
+
     const applyFn = sync && sync[copy.applyFn];
     if (typeof applyFn !== "function") {
       setStatus(copy.syncMissing, true);
@@ -378,6 +434,35 @@
     }
   }
 
+  async function handleReset(button) {
+    resetState();
+    const clearFn = sync && sync[copy.clearFn];
+    if (typeof clearFn !== "function") {
+      setStatus(copy.cleared, false);
+      render();
+      return;
+    }
+
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = true;
+    }
+    render();
+
+    try {
+      const result = await clearFn(state.reportDateTime);
+      const draft = result && result.draft ? result.draft : null;
+      if (draft && typeof draft.savedAt === "string") {
+        state.savedAt = draft.savedAt;
+        saveState();
+      }
+      setStatus(copy.cleared, false);
+      render();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : copy.cleared, true);
+      render();
+    }
+  }
+
   app.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
@@ -389,8 +474,7 @@
     }
     if (target.id === "shiftResetBtn") {
       if (window.confirm(copy.confirmClear)) {
-        resetState();
-        render();
+        handleReset(target);
       }
       return;
     }

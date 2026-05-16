@@ -25,6 +25,7 @@ const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
 const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է միայն բոտի ադմինիստրատորին։";
 const TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT = "Գիշերային հերթափոխ";
 const TELEGRAM_DAY_SHIFT_BUTTON_TEXT = "Ցերեկային հերթափոխ";
+const TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT = "Առավոտյան դուրսգրում";
 const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
 const REPORT_PDF_FILE_NAME = "Report.pdf";
 const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarmenian/NotoSansArmenian%5Bwdth,wght%5D.ttf";
@@ -352,6 +353,8 @@ const NIGHT_SHIFT_ROW_PREFIX = "night:";
 const NIGHT_SHIFT_META_KEY = "night_shift";
 const DAY_SHIFT_ROW_PREFIX = "day:";
 const DAY_SHIFT_META_KEY = "day_shift";
+const DISCHARGE_SHIFT_ROW_PREFIX = "discharge:";
+const DISCHARGE_SHIFT_META_KEY = "discharge_shift";
 const NIGHT_SHIFT_LABELS: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], string> = {
   shar: "ՇԱՐ",
   spa: "ՍՊԱ",
@@ -461,6 +464,10 @@ function getNightShiftRowId(departmentId: string) {
 
 function getDayShiftRowId(departmentId: string) {
   return `${DAY_SHIFT_ROW_PREFIX}${departmentId}`;
+}
+
+function getDischargeShiftRowId(departmentId: string) {
+  return `${DISCHARGE_SHIFT_ROW_PREFIX}${departmentId}`;
 }
 
 function sanitizeRightCellValues(value: unknown) {
@@ -688,6 +695,12 @@ function getTelegramDayFormUrl(reportDateTime: string) {
   const params = new URLSearchParams();
   params.set("date", reportDateTime || DEFAULT_DATE);
   return `${getPublicSiteBaseUrl()}/tg-day-form.html?${params.toString()}`;
+}
+
+function getTelegramDischargeFormUrl(reportDateTime: string) {
+  const params = new URLSearchParams();
+  params.set("date", reportDateTime || DEFAULT_DATE);
+  return `${getPublicSiteBaseUrl()}/tg-discharge-form.html?${params.toString()}`;
 }
 
 function getOcrTemplateBlankImageUrl() {
@@ -1485,10 +1498,12 @@ function buildWorkplaceLocationReplyMarkup(gpsEnabled = false) {
   const keyboard = gpsEnabled
     ? [
       [{ text: "Ես աշխատանքի եմ", request_location: true }],
-      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }]
+      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }],
+      [{ text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
     ]
     : [
-      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }]
+      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }],
+      [{ text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
     ];
   return {
     keyboard,
@@ -2044,6 +2059,74 @@ async function loadDayShiftDraftRows(supabase: ReturnType<typeof createClient>) 
   const map = new Map(savedRows.map((row) => [String(row.department_id || ""), row]));
   return Object.fromEntries(Object.keys(DEPARTMENTS).map((departmentId) => {
     const saved = map.get(getDayShiftRowId(departmentId));
+    return [departmentId, sanitizeNightShiftRows({ [departmentId]: saved?.values })[departmentId]];
+  })) as Record<string, Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>>;
+}
+
+async function saveDischargeShiftDraft(
+  supabase: ReturnType<typeof createClient>,
+  rows: unknown,
+  reportDateTime: string,
+  options: { mergeExisting?: boolean } = {}
+) {
+  const submittedRows = sanitizeNightShiftRows(rows);
+  const dischargeRows = options.mergeExisting
+    ? await loadDischargeShiftDraftRows(supabase)
+    : submittedRows;
+  const departmentIdsToSave = options.mergeExisting
+    ? Object.keys(DEPARTMENTS).filter((departmentId) => getNightShiftRowTotal(submittedRows[departmentId]) > 0)
+    : Object.keys(DEPARTMENTS);
+
+  departmentIdsToSave.forEach((departmentId) => {
+    dischargeRows[departmentId] = submittedRows[departmentId];
+  });
+
+  const now = new Date().toISOString();
+  const updates = Object.entries(DEPARTMENTS).map(([departmentId, meta]) => ({
+    department_id: getDischargeShiftRowId(departmentId),
+    department_name: meta.department,
+    department_group: "discharge_shift",
+    values: dischargeRows[departmentId],
+    updated_at: now
+  }));
+
+  const { error: rowsError } = await supabase
+    .from("sharsh_departments")
+    .upsert(updates);
+
+  if (rowsError) {
+    throw rowsError;
+  }
+
+  const { error: metaError } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: DISCHARGE_SHIFT_META_KEY,
+      report_date: reportDateTime || DEFAULT_DATE,
+      updated_at: now
+    });
+
+  if (metaError) {
+    throw metaError;
+  }
+
+  return dischargeRows;
+}
+
+async function loadDischargeShiftDraftRows(supabase: ReturnType<typeof createClient>) {
+  const { data, error } = await supabase
+    .from("sharsh_departments")
+    .select("department_id, values")
+    .eq("department_group", "discharge_shift");
+
+  if (error) {
+    throw error;
+  }
+
+  const savedRows = Array.isArray(data) ? data as Array<Record<string, unknown>> : [];
+  const map = new Map(savedRows.map((row) => [String(row.department_id || ""), row]));
+  return Object.fromEntries(Object.keys(DEPARTMENTS).map((departmentId) => {
+    const saved = map.get(getDischargeShiftRowId(departmentId));
     return [departmentId, sanitizeNightShiftRows({ [departmentId]: saved?.values })[departmentId]];
   })) as Record<string, Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>>;
 }
@@ -3859,6 +3942,10 @@ function isTelegramDayShiftButtonRequest(text: string) {
   return text.trim() === TELEGRAM_DAY_SHIFT_BUTTON_TEXT;
 }
 
+function isTelegramDischargeShiftButtonRequest(text: string) {
+  return text.trim() === TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT;
+}
+
 function buildColleagueStartText(firstName = "") {
   const greeting = firstName
     ? `Բարև, ${firstName}։ Սա Mainflow բոտն է բաժանմունքների տվյալները ուղարկելու համար։`
@@ -3871,7 +3958,7 @@ function buildColleagueStartText(firstName = "") {
     "1. Ուղարկեք բաժանմունքի կոդը, օրինակ՝ SR-7։",
     "2. Բոտը կուղարկի ընթացիկ PDF-ը և Telegram ձևը բացելու կոճակը։",
     "3. Լրացրեք ձևը և ուղարկեք բլանկի լուսանկարը։",
-    "Գիշերային հերթափոխի համար օգտագործեք /night հրամանը, ցերեկայինի համար՝ /day։",
+    "Գիշերային հերթափոխի համար օգտագործեք /night հրամանը, ցերեկայինի համար՝ /day, իսկ առավոտյան դուրսգրման համար՝ /discharge։",
     "",
     "SR-? հրամանը ցույց կտա բաժանմունքների ցանկը։",
     "",
@@ -3903,6 +3990,7 @@ function buildAdminHelpText() {
     "/form SR-7 — ընթացիկ տվյալների PDF + Telegram ձևի կոճակ։",
     "/night — բացել գիշերային հերթափոխի Telegram ձևը։",
     "/day — բացել ցերեկային հերթափոխի Telegram ձևը։",
+    "/discharge — բացել առավոտյան դուրսգրման Telegram ձևը։",
     "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը։",
     "/duty — նշել, որ կոլեգան գիշերային հերթապահ է։",
     "/not_duty — անջատել գիշերային հերթապահության նշումը։",
@@ -3939,6 +4027,7 @@ function buildHelpText() {
     "/form SR-4 — ստանալ ընթացիկ տվյալների PDF-ը և բացել Telegram Web App ձևը",
     "/night — բացել գիշերային հերթափոխի Telegram Web App ձևը",
     "/day — բացել ցերեկային հերթափոխի Telegram Web App ձևը",
+    "/discharge — բացել առավոտյան դուրսգրման Telegram Web App ձևը",
     "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը",
     "/duty — նշել գիշերային հերթապահությունը",
     "/sheet SR-4 — ստանալ հին XLSX ֆայլը",
@@ -4081,6 +4170,19 @@ function buildTelegramDayFormReplyMarkup(formUrl: string) {
   };
 }
 
+function buildTelegramDischargeFormReplyMarkup(formUrl: string) {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "Բացել դուրսգրման ձևը",
+          web_app: { url: formUrl }
+        }
+      ]
+    ]
+  };
+}
+
 async function sendWorkingSheetForDepartment(
   supabase: ReturnType<typeof createClient>,
   chatId: number,
@@ -4210,6 +4312,23 @@ async function sendTelegramDayShiftForm(chatId: number | string) {
       `Ժամանակ: ${reportDateTime}`
     ].join("\n"),
     buildTelegramDayFormReplyMarkup(formUrl)
+  );
+}
+
+async function sendTelegramDischargeShiftForm(chatId: number | string) {
+  const reportDateTime = getYerevanDateTimeText();
+  const formUrl = getTelegramDischargeFormUrl(reportDateTime);
+  await sendTelegramMessageWithReplyMarkup(
+    chatId,
+    [
+      "Առավոտյան դուրսգրման ձևը պատրաստ է։",
+      "Լրացրեք միայն այն բաժանմունքները, որտեղ ստացիոնարից դուրսգրում է եղել։",
+      "Ուղարկելուց հետո տվյալները կպահպանվեն կայքի «Առավոտյան դուրսգրում» էջում և Վադիմ Աշոտիչին կուղարկվի ամփոփում։",
+      "Հիմնական աղյուսակ տեղափոխումը դեռ անջատված է՝ մինչև բանաձևերի ավելացումը։",
+      "",
+      `Ժամանակ: ${reportDateTime}`
+    ].join("\n"),
+    buildTelegramDischargeFormReplyMarkup(formUrl)
   );
 }
 
@@ -4350,6 +4469,54 @@ function buildDayShiftSummaryText(
     "",
     `Ընդամենը: ${grandTotal}`,
     "Տվյալները պահպանվել են միայն «Ցերեկային հերթափոխ» էջում։ Հիմնական աղյուսակ տեղափոխումը կատարեք կայքի էջից։"
+  ].filter((line) => line !== "").join("\n");
+}
+
+function buildDischargeShiftSummaryText(
+  rows: Record<string, Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>>,
+  reportDateTime: string,
+  userName: string
+) {
+  const filledDepartments = Object.entries(DEPARTMENTS)
+    .map(([departmentId, meta]) => {
+      const row = rows[departmentId] || sanitizeNightShiftRows({})[departmentId];
+      const total = getNightShiftRowTotal(row);
+      return { departmentId, meta, row, total };
+    })
+    .filter((item) => item.total > 0);
+
+  const columnTotals = Object.fromEntries(
+    NIGHT_SHIFT_VALUE_KEYS.map((key) => [
+      key,
+      filledDepartments.reduce((sum, item) => sum + safeNumber(item.row[key]), 0)
+    ])
+  ) as Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>;
+  const grandTotal = filledDepartments.reduce((sum, item) => sum + item.total, 0);
+
+  const departmentLines = filledDepartments.length
+    ? filledDepartments.map((item) => {
+      const details = buildNightShiftValuesText(item.row);
+      return `- ${item.meta.marker} ${item.meta.department}: ${item.total}${details ? ` (${details})` : ""}`;
+    })
+    : ["- Դուրսգրում նշված չէ։"];
+  const totalLines = NIGHT_SHIFT_VALUE_KEYS
+    .filter((key) => safeNumber(columnTotals[key]) > 0)
+    .map((key) => `- ${NIGHT_SHIFT_LABELS[key]}: ${safeNumber(columnTotals[key])}`);
+
+  return [
+    "Առավոտյան դուրսգրման տվյալներ են ստացվել։",
+    `Ժամանակ: ${reportDateTime}`,
+    userName ? `Ուղարկող: ${userName}` : "",
+    `Լրացված բաժանմունքներ: ${filledDepartments.length}`,
+    "",
+    "Ըստ բաժանմունքների.",
+    ...departmentLines,
+    "",
+    "Ըստ կոնտինգենտի.",
+    ...(totalLines.length ? totalLines : ["- Չկա"]),
+    "",
+    `Ընդամենը: ${grandTotal}`,
+    "Տվյալները պահպանվել են միայն «Առավոտյան դուրսգրում» էջում։ Հիմնական աղյուսակ տեղափոխման բանաձևերը դեռ ավելացված չեն։"
   ].filter((line) => line !== "").join("\n");
 }
 
@@ -4593,6 +4760,70 @@ async function handleTelegramDayFormSubmit(request: Request) {
     return jsonResponse({
       ok: true,
       message: "Ցերեկային հերթափոխի տվյալները պահպանվել են։",
+      filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
+      summary: summaryText
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      error: sanitizePublicErrorMessage(error)
+    }, 500);
+  }
+}
+
+async function handleTelegramDischargeFormSubmit(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const verifiedUser = await verifyTelegramWebAppInitData(String(payload?.initData || ""));
+    if (!verifiedUser) {
+      return jsonResponse({ ok: false, error: "Telegram Web App authorization failed." }, 403);
+    }
+
+    const supabase = createSupabaseAdmin();
+    if (!await isTelegramUserAllowedByRuntimeState(supabase, verifiedUser.userId)) {
+      return jsonResponse({
+        ok: false,
+        error: "Բոտը ժամանակավորապես անջատված է կոլլեգաների համար։ Խնդրում ենք դիմել ադմինիստրատորին։"
+      }, 403);
+    }
+
+    const reportDateTime = typeof payload?.reportDateTime === "string" && payload.reportDateTime.trim()
+      ? payload.reportDateTime.trim()
+      : getYerevanDateTimeText();
+    const submittedRows = normalizeNightShiftSubmittedRows(payload);
+    const rows = await saveDischargeShiftDraft(
+      supabase as ReturnType<typeof createClient>,
+      submittedRows,
+      reportDateTime,
+      { mergeExisting: true }
+    );
+    const userName = [
+      verifiedUser.firstName,
+      verifiedUser.lastName,
+      verifiedUser.username ? `@${verifiedUser.username}` : ""
+    ].filter(Boolean).join(" ");
+    const summaryText = buildDischargeShiftSummaryText(rows, reportDateTime, userName);
+    const notifyChatIds = getTelegramNotifyChatIds(null);
+
+    if (notifyChatIds.length) {
+      await sendTelegramMessageToMany(notifyChatIds, summaryText);
+    }
+    if (verifiedUser.userId) {
+      await sendTelegramMessage(
+        verifiedUser.userId,
+        [
+          `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Առավոտյան դուրսգրման տվյալները պահպանվել են։`,
+          "Շատ լավ աշխատանք է։ Տվյալները արդեն հասանելի են կայքի «Առավոտյան դուրսգրում» էջում։",
+          "Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
+        ].join("\n")
+      ).catch((error) => {
+        console.error("Failed to notify Telegram discharge form user:", sanitizePublicErrorMessage(error));
+      });
+    }
+
+    return jsonResponse({
+      ok: true,
+      message: "Առավոտյան դուրսգրման տվյալները պահպանվել են։",
       filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
       summary: summaryText
     });
@@ -5537,6 +5768,31 @@ async function handleTelegramCommand(
     return;
   }
 
+  if (command === "/discharge" || command === "/morning" || command === "/morning_discharge") {
+    if (message && isTelegramGroupMessage(message) && String(accessChatId) !== String(chatId)) {
+      const person = getTelegramPersonFromMessage(message, accessChatId);
+      const firstName = getTelegramColleagueFirstName(person);
+      try {
+        await sendTelegramDischargeShiftForm(accessChatId);
+        await sendTelegramMessage(
+          chatId,
+          `${firstName}, առավոտյան դուրսգրման ձևը ուղարկեցի Ձեր անձնական չատում։`
+        );
+      } catch (error) {
+        await sendTelegramMessage(
+          chatId,
+          [
+            `${firstName}, տեսնում եմ /discharge հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
+            "Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք /discharge։"
+          ].join("\n")
+        );
+      }
+      return;
+    }
+    await sendTelegramDischargeShiftForm(chatId);
+    return;
+  }
+
   if (command === "/sheet") {
     const departmentId = detectDepartmentFromHint(text);
     if (!departmentId) {
@@ -5820,6 +6076,11 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
     return;
   }
 
+  if (isTelegramDischargeShiftButtonRequest(text)) {
+    await handleTelegramCommand(supabase, safeChatId, "/discharge", message, accessChatId);
+    return;
+  }
+
   if (isSrDepartmentsListRequest(text)) {
     await sendTelegramMessage(safeChatId, buildSrDepartmentsText());
     return;
@@ -6002,6 +6263,9 @@ Deno.serve(async (request) => {
   }
   if (postUrl.searchParams.get("action") === "day-form-submit") {
     return await handleTelegramDayFormSubmit(request);
+  }
+  if (postUrl.searchParams.get("action") === "discharge-form-submit") {
+    return await handleTelegramDischargeFormSubmit(request);
   }
 
   if (!isTelegramSecretValid(request)) {

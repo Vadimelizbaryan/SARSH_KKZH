@@ -663,6 +663,76 @@
     };
   }
 
+  function normalizeDischargeShiftDraft(payload) {
+    return {
+      reportDateTime: typeof payload?.reportDateTime === "string" ? payload.reportDateTime : "",
+      savedAt: typeof payload?.savedAt === "string" ? payload.savedAt : "",
+      rows: sanitizeNightShiftRows(payload?.rows)
+    };
+  }
+
+  async function loadDischargeShiftDraft() {
+    if (!hasRemoteSync()) {
+      return {
+        draft: normalizeDischargeShiftDraft(null),
+        source: "local-only"
+      };
+    }
+
+    const payload = await postRemotePayload(
+      { type: "load_discharge_shift" },
+      "Не удалось загрузить утреннюю выписку"
+    );
+    return {
+      draft: normalizeDischargeShiftDraft(payload),
+      source: "remote"
+    };
+  }
+
+  async function saveDischargeShiftDraft(rows, reportDateTime) {
+    const dischargeRows = sanitizeNightShiftRows(rows);
+    if (!hasRemoteSync()) {
+      return {
+        draft: normalizeDischargeShiftDraft({ rows: dischargeRows, reportDateTime }),
+        source: "local-only"
+      };
+    }
+
+    const payload = await postRemotePayload(
+      {
+        type: "save_discharge_shift",
+        reportDateTime,
+        rows: dischargeRows
+      },
+      "Не удалось сохранить утреннюю выписку"
+    );
+    return {
+      draft: normalizeDischargeShiftDraft(payload),
+      source: "remote"
+    };
+  }
+
+  async function clearDischargeShiftDraft(reportDateTime) {
+    if (!hasRemoteSync()) {
+      return {
+        draft: normalizeDischargeShiftDraft({ reportDateTime }),
+        source: "local-only"
+      };
+    }
+
+    const payload = await postRemotePayload(
+      {
+        type: "clear_discharge_shift",
+        reportDateTime
+      },
+      "Не удалось очистить утреннюю выписку"
+    );
+    return {
+      draft: normalizeDischargeShiftDraft(payload),
+      source: "remote"
+    };
+  }
+
   async function listOcrFeedback(limit) {
     if (!hasRemoteSync()) {
       return [];
@@ -844,6 +914,9 @@
     loadDayShiftDraft,
     saveDayShiftDraft,
     clearDayShiftDraft,
+    loadDischargeShiftDraft,
+    saveDischargeShiftDraft,
+    clearDischargeShiftDraft,
     saveOcrFeedback,
     saveReportDate,
     notifyOwnerLogin,

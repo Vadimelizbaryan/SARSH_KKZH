@@ -33,10 +33,13 @@ jobs:
           cp tg-form.html _site/
           cp tg-night-form.html _site/
           cp tg-day-form.html _site/
+          cp tg-discharge-form.html _site/
           cp night.html _site/
           cp night-shift.html _site/
           cp day.html _site/
           cp day-shift.html _site/
+          cp discharge.html _site/
+          cp morning-discharge.html _site/
           cp eti77ylq.html _site/
           cp hospital-report.html _site/
           cp "Օրվա շարժ․.html" _site/

@@ -2,8 +2,12 @@
   const config = window.SHARSH_CONFIG || {};
   const runtime = window.SHARSH_RUNTIME_CONFIG || {};
   const telegram = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-  const root = document.getElementById("tg-night-form-root") || document.getElementById("tg-day-form-root");
-  const mode = root && root.dataset.shift === "day" ? "day" : "night";
+  const root = document.getElementById("tg-night-form-root")
+    || document.getElementById("tg-day-form-root")
+    || document.getElementById("tg-discharge-form-root");
+  const mode = root && root.dataset.shift === "day" ? "day"
+    : root && root.dataset.shift === "discharge" ? "discharge"
+      : "night";
 
   const columns = [
     { key: "shar", label: "ՇԱՐ" },
@@ -29,7 +33,21 @@
       fail: "Չհաջողվեց ուղարկել ցերեկային ձևը։",
       aria: "Ցերեկային հերթափոխի աղյուսակ"
     }
-    : {
+    : mode === "discharge"
+      ? {
+        action: "discharge-form-submit",
+        kicker: "Առավոտյան դուրսգրում",
+        title: "Ստացիոնարից դուրս գրվածներ",
+        button: "Ուղարկել ամփոփումը",
+        sending: "Ուղարկվում է...",
+        saving: "Պահպանում եմ առավոտյան դուրսգրման տվյալները...",
+        openWithBot: "Բացեք ձևը Telegram բոտի կոճակով։",
+        hint: "Լրացրեք միայն այն բաժանմունքները, որտեղ առավոտյան դուրսգրում է եղել։",
+        success: "Շնորհակալություն։ Տվյալները պահպանվել են և ամփոփումը ուղարկվել է։",
+        fail: "Չհաջողվեց ուղարկել առավոտյան դուրսգրման ձևը։",
+        aria: "Առավոտյան դուրսգրման աղյուսակ"
+      }
+      : {
       action: "night-form-submit",
       kicker: "Գիշերային հերթափոխ",
       title: "Նոր ընդունվածներ",

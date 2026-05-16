@@ -43,6 +43,8 @@ const NIGHT_SHIFT_ROW_PREFIX = "night:";
 const NIGHT_SHIFT_META_KEY = "night_shift";
 const DAY_SHIFT_ROW_PREFIX = "day:";
 const DAY_SHIFT_META_KEY = "day_shift";
+const DISCHARGE_SHIFT_ROW_PREFIX = "discharge:";
+const DISCHARGE_SHIFT_META_KEY = "discharge_shift";
 
 const PHOTO_FIELD_MAPPINGS = [
   { cell: 1, key: "beenTotal", label: "been / total" },
@@ -181,6 +183,10 @@ function getNightShiftRowId(departmentId: string) {
 
 function getDayShiftRowId(departmentId: string) {
   return `${DAY_SHIFT_ROW_PREFIX}${departmentId}`;
+}
+
+function getDischargeShiftRowId(departmentId: string) {
+  return `${DISCHARGE_SHIFT_ROW_PREFIX}${departmentId}`;
 }
 
 function addValue(values: Record<string, number | null>, key: string, amount: number) {
@@ -1284,6 +1290,85 @@ async function clearDayShiftDraft(
   return await saveDayShiftDraft(supabase, {}, reportDateTime);
 }
 
+async function loadDischargeShiftDraft(supabase: ReturnType<typeof createClient>) {
+  const rowIds = Object.keys(DEPARTMENTS).map(getDischargeShiftRowId);
+  const { data: dischargeRows, error: rowsError } = await supabase
+    .from("sharsh_departments")
+    .select("department_id, values, updated_at")
+    .in("department_id", rowIds);
+
+  if (rowsError) {
+    throw rowsError;
+  }
+
+  const { data: metaRow, error: metaError } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date, updated_at")
+    .eq("report_key", DISCHARGE_SHIFT_META_KEY)
+    .maybeSingle();
+
+  if (metaError) {
+    throw metaError;
+  }
+
+  const map = new Map((dischargeRows || []).map((row) => [row.department_id, row]));
+  const rows = Object.fromEntries(Object.keys(DEPARTMENTS).map((departmentId) => {
+    const saved = map.get(getDischargeShiftRowId(departmentId));
+    return [departmentId, sanitizeNightShiftRows({ [departmentId]: saved?.values })[departmentId]];
+  }));
+
+  return {
+    reportDateTime: metaRow?.report_date || DEFAULT_DATE,
+    savedAt: metaRow?.updated_at || null,
+    rows
+  };
+}
+
+async function saveDischargeShiftDraft(
+  supabase: ReturnType<typeof createClient>,
+  rows: unknown,
+  reportDateTime: string
+) {
+  const dischargeRows = sanitizeNightShiftRows(rows);
+  const now = new Date().toISOString();
+  const updates = Object.entries(DEPARTMENTS).map(([departmentId, meta]) => ({
+    department_id: getDischargeShiftRowId(departmentId),
+    department_name: meta.department,
+    department_group: "discharge_shift",
+    values: dischargeRows[departmentId],
+    updated_at: now
+  }));
+
+  const { error: rowsError } = await supabase
+    .from("sharsh_departments")
+    .upsert(updates);
+
+  if (rowsError) {
+    throw rowsError;
+  }
+
+  const { error: metaError } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: DISCHARGE_SHIFT_META_KEY,
+      report_date: reportDateTime || DEFAULT_DATE,
+      updated_at: now
+    });
+
+  if (metaError) {
+    throw metaError;
+  }
+
+  return await loadDischargeShiftDraft(supabase);
+}
+
+async function clearDischargeShiftDraft(
+  supabase: ReturnType<typeof createClient>,
+  reportDateTime: string
+) {
+  return await saveDischargeShiftDraft(supabase, {}, reportDateTime);
+}
+
 async function listOcrFeedbackRecords(supabase: ReturnType<typeof createClient>, limit: number) {
   const safeLimit = Math.min(200, Math.max(1, Math.trunc(limit || 100)));
   const { data, error } = await supabase
@@ -1618,6 +1703,24 @@ Deno.serve(async (request) => {
         ? payload.reportDateTime.trim()
         : DEFAULT_DATE;
       return jsonResponse(await clearDayShiftDraft(supabase, reportDateTime));
+    }
+
+    if (type === "load_discharge_shift") {
+      return jsonResponse(await loadDischargeShiftDraft(supabase));
+    }
+
+    if (type === "save_discharge_shift") {
+      const reportDateTime = typeof payload.reportDateTime === "string" && payload.reportDateTime.trim()
+        ? payload.reportDateTime.trim()
+        : DEFAULT_DATE;
+      return jsonResponse(await saveDischargeShiftDraft(supabase, payload.rows, reportDateTime));
+    }
+
+    if (type === "clear_discharge_shift") {
+      const reportDateTime = typeof payload.reportDateTime === "string" && payload.reportDateTime.trim()
+        ? payload.reportDateTime.trim()
+        : DEFAULT_DATE;
+      return jsonResponse(await clearDischargeShiftDraft(supabase, reportDateTime));
     }
 
     if (type === "apply_night_shift") {
