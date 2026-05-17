@@ -28,6 +28,7 @@
     savedLimit: SAVED_PAGE_SIZE,
     savedOffset: 0,
     savedQuery: "",
+    newRow: createEmptyRecord(),
     sourceFileName: "",
     filter: "",
     searchDraft: "",
@@ -35,6 +36,13 @@
     isBusy: false,
     source: ""
   };
+
+  function createEmptyRecord() {
+    return FIELD_DEFINITIONS.reduce((record, field) => {
+      record[field.key] = "";
+      return record;
+    }, {});
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -525,6 +533,34 @@ function isHeaderRow(cells) {
     `;
   }
 
+  function renderNewRowForm() {
+    return `
+      <div class="civil-new-entry">
+        <div class="civil-new-entry-head">
+          <strong>Новая строка</strong>
+          <span>Введите данные здесь и добавьте запись в базу.</span>
+        </div>
+        <div class="civil-new-entry-grid">
+          ${FIELD_DEFINITIONS.map((field) => `
+            <label class="civil-new-field ${field.key === "patientName" ? "is-wide" : ""}">
+              <span title="${escapeHtml(field.hint)}">${escapeHtml(field.label)}</span>
+              <input
+                class="civil-new-input${isDateFieldKey(field.key) ? " civil-date-input" : ""}"
+                type="text"
+                value="${escapeHtml(state.newRow[field.key] || "")}"
+                data-key="${escapeHtml(field.key)}"
+                ${isDateFieldKey(field.key) ? 'inputmode="numeric" maxlength="10" placeholder="дд.мм.гг" autocomplete="off"' : ""}
+                ${state.isBusy ? "disabled" : ""}
+                aria-label="${escapeHtml(field.label)}"
+              >
+            </label>
+          `).join("")}
+          <button type="button" id="civilAddRowBtn" class="civil-new-add" ${state.isBusy ? "disabled" : ""}>Добавить</button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderRowsTable(rows, emptyText, sourceName, options = {}) {
     const visibleEntries = options.applyFilter === false
       ? rows.map((row, index) => ({ row, index }))
@@ -615,6 +651,7 @@ function isHeaderRow(cells) {
               <button type="button" id="civilSaveDatabaseBtn" ${!savedPageCount || state.isBusy ? "disabled" : ""}>Сохранить правки базы</button>
             </div>
           </div>
+          ${renderNewRowForm()}
           <div class="civil-database-tools">
             <input
               type="search"
@@ -786,6 +823,71 @@ function isHeaderRow(cells) {
     }
   }
 
+  function normalizeEditableFieldValue(key, value, commit = false) {
+    if (isDateFieldKey(key)) {
+      return commit ? normalizeReferralDate(value) : sanitizeDateDraft(value);
+    }
+    if (key === "patientName") {
+      return normalizeCivilNameField(value);
+    }
+    if (key === "medicalCenter") {
+      return normalizeCivilMedicalCenterField(value);
+    }
+    return normalizeText(value);
+  }
+
+  function getNormalizedNewRow() {
+    return FIELD_DEFINITIONS.reduce((record, field) => {
+      record[field.key] = normalizeEditableFieldValue(field.key, state.newRow[field.key], true);
+      return record;
+    }, {});
+  }
+
+  function handleNewRowEdit(event) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !input.classList.contains("civil-new-input")) {
+      return;
+    }
+    const key = input.dataset.key;
+    if (!key || !FIELD_DEFINITIONS.some((field) => field.key === key)) {
+      return;
+    }
+    const value = normalizeEditableFieldValue(key, input.value, event.type === "change");
+    input.value = value;
+    state.newRow = {
+      ...state.newRow,
+      [key]: value
+    };
+  }
+
+  async function saveNewRow() {
+    if (state.isBusy) {
+      return;
+    }
+    const row = getNormalizedNewRow();
+    if (!row.patientName || !row.medicalCenter) {
+      state.status = "Для новой строки заполните минимум ФИО и БК.";
+      render();
+      return;
+    }
+    setBusy(true, "Добавляю новую строку в базу...");
+    try {
+      state.savedOffset = 0;
+      const listOptions = getSavedListOptions(0);
+      const payload = typeof sync.saveCivilReferrals === "function"
+        ? await sync.saveCivilReferrals([row], "manual-add", listOptions)
+        : { rows: [row], saved: 1 };
+      applySavedPayload(payload);
+      state.newRow = createEmptyRecord();
+      state.status = `Новая строка сохранена. В базе записей: ${state.savedTotal}.`;
+    } catch (error) {
+      state.status = error instanceof Error ? error.message : "Не удалось добавить новую строку.";
+    } finally {
+      state.isBusy = false;
+      render();
+    }
+  }
+
   function runSavedSearch() {
     const input = document.getElementById("civilFilterInput");
     state.searchDraft = input instanceof HTMLInputElement ? input.value : state.searchDraft;
@@ -838,6 +940,7 @@ function isHeaderRow(cells) {
     document.getElementById("civilFileInput")?.addEventListener("change", handleFileUpload);
     document.getElementById("civilSaveBtn")?.addEventListener("click", saveParsedRows);
     document.getElementById("civilSaveDatabaseBtn")?.addEventListener("click", saveSavedRows);
+    document.getElementById("civilAddRowBtn")?.addEventListener("click", saveNewRow);
     document.getElementById("civilReloadBtn")?.addEventListener("click", () => {
       state.savedOffset = 0;
       loadSavedRows();
@@ -867,6 +970,16 @@ function isHeaderRow(cells) {
     document.querySelectorAll(".civil-edit-input").forEach((input) => {
       input.addEventListener("input", handleTableEdit);
       input.addEventListener("change", handleTableEdit);
+    });
+    document.querySelectorAll(".civil-new-input").forEach((input) => {
+      input.addEventListener("input", handleNewRowEdit);
+      input.addEventListener("change", handleNewRowEdit);
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          saveNewRow();
+        }
+      });
     });
   }
 

@@ -324,9 +324,100 @@ input {
   cursor: pointer;
 }
 
+.tg-civil-new-row {
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid rgba(15, 139, 76, 0.16);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 222, 139, 0.32), rgba(255, 255, 255, 0.92)),
+    #fff8e8;
+}
+
+.tg-civil-new-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.tg-civil-new-head strong {
+  color: var(--tg-accent);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.tg-civil-new-head span {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-civil-new-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(260px, 2fr)
+    minmax(150px, 1fr)
+    minmax(140px, 0.9fr)
+    minmax(78px, 0.55fr)
+    minmax(74px, 0.45fr)
+    minmax(74px, 0.45fr)
+    minmax(116px, 0.72fr)
+    minmax(116px, 0.72fr)
+    auto;
+  gap: 8px;
+  align-items: end;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.tg-civil-new-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tg-civil-new-field span {
+  color: var(--tg-muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.tg-civil-new-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(31, 42, 36, 0.16);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.tg-civil-new-add {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--tg-accent);
+  color: #ffffff;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tg-civil-new-add:disabled {
+  cursor: not-allowed;
+  background: #a8b4aa;
+}
+
 .tg-civil-search:focus,
 .tg-civil-search-btn:focus,
-.tg-civil-input:focus {
+.tg-civil-input:focus,
+.tg-civil-new-input:focus {
   outline: 3px solid rgba(15, 139, 76, 0.18);
   border-color: var(--tg-accent);
 }
@@ -532,5 +623,24 @@ input {
     min-height: 34px;
     font-size: 13px;
     padding: 0 8px;
+  }
+
+  .tg-civil-new-grid {
+    grid-template-columns:
+      minmax(250px, 2fr)
+      minmax(140px, 1fr)
+      minmax(128px, 0.9fr)
+      minmax(76px, 0.55fr)
+      minmax(70px, 0.45fr)
+      minmax(70px, 0.45fr)
+      minmax(112px, 0.72fr)
+      minmax(112px, 0.72fr)
+      auto;
+  }
+
+  .tg-civil-new-input,
+  .tg-civil-new-add {
+    min-height: 34px;
+    font-size: 13px;
   }
 }

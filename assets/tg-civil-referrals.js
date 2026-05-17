@@ -21,10 +21,18 @@
     offset: 0,
     query: "",
     searchDraft: "",
+    newRow: createEmptyRecord(),
     isBusy: false,
     message: "",
     messageType: ""
   };
+
+  function createEmptyRecord() {
+    return fields.reduce((record, field) => {
+      record[field.key] = "";
+      return record;
+    }, {});
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -198,6 +206,63 @@
     }
   }
 
+  function normalizeFieldValue(key, value, commit = false) {
+    if (dateFieldKeys.has(key)) {
+      return commit
+        ? normalizeDate(value)
+        : normalizeText(value).replace(/[^\d.,/-]/g, "").slice(0, 10);
+    }
+    return normalizeText(value);
+  }
+
+  function getNormalizedNewRow() {
+    return fields.reduce((record, field) => {
+      record[field.key] = normalizeFieldValue(field.key, state.newRow[field.key], true);
+      return record;
+    }, {});
+  }
+
+  async function saveNewRow() {
+    if (state.isBusy) {
+      return;
+    }
+    const row = getNormalizedNewRow();
+    if (!row.patientName || !row.medicalCenter) {
+      setMessage("Նոր տողի համար լրացրեք առնվազն Ա.Ա.Հ. և ԲԿ դաշտերը։", "error");
+      render();
+      return;
+    }
+    state.isBusy = true;
+    setMessage("Նոր տողը պահպանվում է...", "");
+    render();
+    try {
+      const payload = await requestServer("civil-referrals-save", {
+        rows: [row],
+        limit: pageSize,
+        offset: 0,
+        query: ""
+      });
+      state.rows = normalizeRows(payload.rows);
+      state.total = Math.max(0, Number(payload.total) || state.total);
+      state.offset = Math.max(0, Number(payload.offset) || 0);
+      state.query = normalizeText(payload.query || "");
+      state.searchDraft = state.query;
+      state.newRow = createEmptyRecord();
+      setMessage(payload.message || "Նոր տողը պահպանված է։", "success");
+      if (telegram && telegram.HapticFeedback) {
+        telegram.HapticFeedback.notificationOccurred("success");
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Չհաջողվեց պահպանել նոր տողը։", "error");
+      if (telegram && telegram.HapticFeedback) {
+        telegram.HapticFeedback.notificationOccurred("error");
+      }
+    } finally {
+      state.isBusy = false;
+      render();
+    }
+  }
+
   function renderPagination() {
     const start = state.total ? state.offset + 1 : 0;
     const end = Math.min(state.offset + state.rows.length, state.total);
@@ -207,6 +272,33 @@
         <span>${escapeHtml(`${start}-${end} / ${state.total}`)}</span>
         <button type="button" data-page="next" ${state.offset + pageSize >= state.total || state.isBusy ? "disabled" : ""}>Հաջորդ</button>
       </div>
+    `;
+  }
+
+  function renderNewRowForm() {
+    return `
+      <section class="tg-civil-new-row">
+        <div class="tg-civil-new-head">
+          <strong>Նոր տող</strong>
+          <span>Լրացրեք տվյալները և պահպանեք բազայում։</span>
+        </div>
+        <div class="tg-civil-new-grid">
+          ${fields.map((field) => `
+            <label class="tg-civil-new-field ${field.key === "patientName" ? "is-wide" : ""}">
+              <span>${escapeHtml(field.label)}</span>
+              <input
+                class="tg-civil-new-input${dateFieldKeys.has(field.key) ? " tg-civil-date-input" : ""}"
+                data-key="${escapeHtml(field.key)}"
+                value="${escapeHtml(state.newRow[field.key] || "")}"
+                ${dateFieldKeys.has(field.key) ? 'inputmode="numeric" maxlength="10" placeholder="օր.ամ.տտ"' : 'type="text"'}
+                autocomplete="off"
+                ${state.isBusy ? "disabled" : ""}
+              >
+            </label>
+          `).join("")}
+          <button id="tgCivilAddRowBtn" class="tg-civil-new-add" type="button" ${state.isBusy ? "disabled" : ""}>Ավելացնել</button>
+        </div>
+      </section>
     `;
   }
 
@@ -269,6 +361,8 @@
           </div>
         </header>
 
+        ${renderNewRowForm()}
+
         <div class="tg-civil-toolbar">
           <input id="tgCivilSearchInput" class="tg-civil-search" type="search" value="${escapeHtml(state.searchDraft)}" placeholder="Որոնում՝ ԱԱՀ, ԲԿ, զորամաս, ամսաթիվ...">
           <button id="tgCivilSearchBtn" class="tg-civil-search-btn" type="button" ${state.isBusy ? "disabled" : ""} aria-label="Որոնել">⌕</button>
@@ -305,6 +399,7 @@
     document.getElementById("tgCivilSearchBtn")?.addEventListener("click", () => {
       loadRows(0, state.searchDraft);
     });
+    document.getElementById("tgCivilAddRowBtn")?.addEventListener("click", saveNewRow);
     document.getElementById("tgCivilSaveBtn")?.addEventListener("click", saveRows);
     root.querySelectorAll("[data-page]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -338,6 +433,32 @@
           : normalizeText(input.value);
         input.value = normalized;
         state.rows[rowIndex][key] = normalized;
+      });
+    });
+    root.querySelectorAll(".tg-civil-new-input").forEach((input) => {
+      input.addEventListener("input", () => {
+        const key = input.getAttribute("data-key");
+        if (!key) {
+          return;
+        }
+        const value = normalizeFieldValue(key, input.value, false);
+        input.value = value;
+        state.newRow[key] = value;
+      });
+      input.addEventListener("blur", () => {
+        const key = input.getAttribute("data-key");
+        if (!key) {
+          return;
+        }
+        const value = normalizeFieldValue(key, input.value, true);
+        input.value = value;
+        state.newRow[key] = value;
+      });
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          saveNewRow();
+        }
       });
     });
   }
