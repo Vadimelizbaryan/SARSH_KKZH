@@ -217,6 +217,10 @@
     return `
       <div class="tg-form-table-wrap tg-civil-table-wrap">
         <table class="tg-form-table tg-civil-table">
+          <colgroup>
+            <col class="tg-civil-col-index">
+            ${fields.map((field) => `<col class="tg-civil-col-${escapeHtml(field.key)}">`).join("")}
+          </colgroup>
           <thead>
             <tr>
               <th scope="col">#</th>

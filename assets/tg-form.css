@@ -368,7 +368,37 @@ input {
 }
 
 .tg-civil-table {
-  min-width: 1120px;
+  min-width: 1270px;
+}
+
+.tg-civil-col-index {
+  width: 54px;
+}
+
+.tg-civil-col-patientName {
+  width: 360px;
+}
+
+.tg-civil-col-medicalCenter {
+  width: 170px;
+}
+
+.tg-civil-col-militaryUnit {
+  width: 160px;
+}
+
+.tg-civil-col-rank {
+  width: 88px;
+}
+
+.tg-civil-col-draftYear,
+.tg-civil-col-birthYear {
+  width: 82px;
+}
+
+.tg-civil-col-referralDate,
+.tg-civil-col-dischargeDate {
+  width: 137px;
 }
 
 .tg-civil-table thead th {
@@ -395,11 +425,11 @@ input {
 }
 
 .tg-civil-wide-head {
-  min-width: 220px;
+  min-width: 170px;
 }
 
 .tg-civil-wide-cell {
-  min-width: 220px;
+  min-width: 170px;
 }
 
 .tg-civil-input {
@@ -466,12 +496,30 @@ input {
   }
 
   .tg-civil-table {
-    min-width: 980px;
+    min-width: 1180px;
   }
 
-  .tg-civil-wide-head,
-  .tg-civil-wide-cell {
-    min-width: 190px;
+  .tg-civil-col-patientName {
+    width: 330px;
+  }
+
+  .tg-civil-col-medicalCenter,
+  .tg-civil-col-militaryUnit {
+    width: 150px;
+  }
+
+  .tg-civil-col-rank {
+    width: 80px;
+  }
+
+  .tg-civil-col-draftYear,
+  .tg-civil-col-birthYear {
+    width: 76px;
+  }
+
+  .tg-civil-col-referralDate,
+  .tg-civil-col-dischargeDate {
+    width: 128px;
   }
 
   .tg-civil-table th:first-child,
