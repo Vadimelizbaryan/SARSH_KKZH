@@ -22,6 +22,7 @@ const TELEGRAM_NIGHT_SHIFT_SUMMARY_META_KEY = "telegram_night_shift_summary_sent
 const TELEGRAM_GPS_SCENARIO_META_KEY = "telegram_gps_scenario_enabled";
 const TELEGRAM_DAILY_REMINDER_META_PREFIX = "telegram_daily_reminder_sent";
 const TELEGRAM_MAIN_PDFS_META_KEY = "telegram_main_pdfs_sent";
+const TELEGRAM_PENDING_PHOTO_APPROVALS_META_KEY = "telegram_pending_photo_approvals";
 const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
 const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է միայն բոտի ադմինիստրատորին։";
 const TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT = "Գիշերային ընդունում";
@@ -1501,6 +1502,21 @@ type TelegramColleaguePresence = TelegramColleagueChat & {
   distanceMeters: number | null;
 };
 
+type TelegramPendingPhotoApproval = {
+  id: string;
+  chatId: string;
+  fileId: string;
+  hintText: string;
+  message: Record<string, unknown>;
+  senderName: string;
+  createdAt: string;
+};
+
+type TelegramPhotoHandlingOptions = {
+  approved?: boolean;
+  skipAdminPhotoCopy?: boolean;
+};
+
 function parseTelegramColleagueChats(raw: unknown): TelegramColleagueChat[] {
   if (typeof raw !== "string" || !raw.trim()) {
     return [];
@@ -1630,6 +1646,54 @@ function parseTelegramPresenceRecords(raw: unknown): TelegramColleaguePresence[]
         };
       })
       .filter((item): item is TelegramColleaguePresence => item !== null);
+  } catch (_error) {
+    return [];
+  }
+}
+
+function parseTelegramPendingPhotoApprovals(raw: unknown): TelegramPendingPhotoApproval[] {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") {
+          return null;
+        }
+        const record = item as Record<string, unknown>;
+        const id = typeof record.id === "string" ? record.id.trim() : "";
+        const chatId = typeof record.chatId === "string" || typeof record.chatId === "number"
+          ? String(record.chatId).trim()
+          : "";
+        const fileId = typeof record.fileId === "string" ? record.fileId.trim() : "";
+        const message = record.message && typeof record.message === "object"
+          ? record.message as Record<string, unknown>
+          : {};
+        if (!id || !chatId || !fileId) {
+          return null;
+        }
+        const createdAt = typeof record.createdAt === "string" ? record.createdAt : "";
+        const createdTime = Date.parse(createdAt);
+        if (Number.isFinite(createdTime) && createdTime < cutoff) {
+          return null;
+        }
+        return {
+          id,
+          chatId,
+          fileId,
+          hintText: typeof record.hintText === "string" ? record.hintText : "",
+          message,
+          senderName: typeof record.senderName === "string" ? record.senderName : "",
+          createdAt
+        };
+      })
+      .filter((item): item is TelegramPendingPhotoApproval => item !== null);
   } catch (_error) {
     return [];
   }
@@ -2144,6 +2208,41 @@ async function saveMetaValue(
   if (error) {
     throw error;
   }
+}
+
+async function loadTelegramPendingPhotoApprovals(supabase: ReturnType<typeof createClient>) {
+  return parseTelegramPendingPhotoApprovals(
+    await loadMetaValue(supabase, TELEGRAM_PENDING_PHOTO_APPROVALS_META_KEY)
+  );
+}
+
+async function saveTelegramPendingPhotoApprovals(
+  supabase: ReturnType<typeof createClient>,
+  records: TelegramPendingPhotoApproval[]
+) {
+  const uniqueRecords = Array.from(new Map(records.map((item) => [item.id, item])).values())
+    .slice(0, 80);
+  await saveMetaValue(supabase, TELEGRAM_PENDING_PHOTO_APPROVALS_META_KEY, JSON.stringify(uniqueRecords));
+}
+
+async function addTelegramPendingPhotoApproval(
+  supabase: ReturnType<typeof createClient>,
+  record: TelegramPendingPhotoApproval
+) {
+  const records = await loadTelegramPendingPhotoApprovals(supabase);
+  await saveTelegramPendingPhotoApprovals(supabase, [record, ...records.filter((item) => item.id !== record.id)]);
+}
+
+async function takeTelegramPendingPhotoApproval(
+  supabase: ReturnType<typeof createClient>,
+  id: string
+) {
+  const records = await loadTelegramPendingPhotoApprovals(supabase);
+  const found = records.find((item) => item.id === id) || null;
+  if (found) {
+    await saveTelegramPendingPhotoApprovals(supabase, records.filter((item) => item.id !== id));
+  }
+  return found;
 }
 
 function parseTelegramBooleanFlag(value: string) {
@@ -4062,7 +4161,8 @@ async function copyTelegramMessage(
   chatId: number | string,
   fromChatId: number | string,
   messageId: number,
-  caption?: string
+  caption?: string,
+  replyMarkup?: Record<string, unknown>
 ) {
   const body: Record<string, unknown> = {
     chat_id: chatId,
@@ -4072,6 +4172,9 @@ async function copyTelegramMessage(
   if (caption) {
     body.caption = caption;
   }
+  if (replyMarkup) {
+    body.reply_markup = replyMarkup;
+  }
   await callTelegramApi("copyMessage", body);
 }
 
@@ -4079,11 +4182,12 @@ async function copyTelegramMessageToMany(
   chatIds: Array<number | string>,
   fromChatId: number | string,
   messageId: number,
-  caption?: string
+  caption?: string,
+  replyMarkup?: Record<string, unknown>
 ) {
   for (const chatId of chatIds) {
     try {
-      await copyTelegramMessage(chatId, fromChatId, messageId, caption);
+      await copyTelegramMessage(chatId, fromChatId, messageId, caption, replyMarkup);
     } catch (error) {
       console.error("Failed to copy Telegram photo notification:", sanitizePublicErrorMessage(error));
     }
@@ -6346,6 +6450,35 @@ function buildIncomingPhotoAdminCaption(
   ].filter(Boolean).join("\n");
 }
 
+function buildPhotoApprovalReplyMarkup(approvalId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Принять", callback_data: `approve_photo:${approvalId}` },
+        { text: "Отклонить", callback_data: `reject_photo:${approvalId}` }
+      ]
+    ]
+  };
+}
+
+function getPrivateTelegramAdminChatIds(excludeChatId?: number | string | null) {
+  const excluded = excludeChatId === null || typeof excludeChatId === "undefined" ? "" : String(excludeChatId);
+  return getTelegramAdminChatIds()
+    .filter((chatId) => chatId && chatId !== excluded && !chatId.startsWith("-"));
+}
+
+function buildPendingPhotoMessage(record: TelegramPendingPhotoApproval) {
+  if (record.message && typeof record.message === "object" && Object.keys(record.message).length) {
+    return record.message;
+  }
+  return {
+    chat: { id: Number(record.chatId), type: "private" },
+    from: { id: Number(record.chatId), first_name: record.senderName },
+    caption: record.hintText,
+    photo: [{ file_id: record.fileId, width: 1, height: 1 }]
+  } as Record<string, unknown>;
+}
+
 function formatDistanceMeters(distanceMeters: number) {
   if (distanceMeters >= 1000) {
     return `${(distanceMeters / 1000).toFixed(1).replace(".", ",")} կմ`;
@@ -6676,6 +6809,67 @@ async function handleTelegramCallbackQuery(
 
   if (!isTelegramAdminChat(adminChatId)) {
     await answerTelegramCallbackQuery(callbackQueryId, "Այս կոճակը հասանելի է միայն ադմինիստրատորին։").catch(() => null);
+    return;
+  }
+
+  const photoApprovalMatch = data.match(/^(approve_photo|reject_photo):(.+)$/);
+  if (photoApprovalMatch) {
+    const action = photoApprovalMatch[1];
+    const approvalId = photoApprovalMatch[2].trim();
+    const pendingPhoto = approvalId ? await takeTelegramPendingPhotoApproval(supabase, approvalId) : null;
+    if (!pendingPhoto) {
+      await answerTelegramCallbackQuery(callbackQueryId, "Фото уже обработано или заявка устарела.").catch(() => null);
+      if (callbackMessageChatId !== null) {
+        await clearTelegramInlineKeyboard(callbackMessageChatId, callbackMessageId).catch(() => null);
+      }
+      return;
+    }
+
+    if (callbackMessageChatId !== null) {
+      await clearTelegramInlineKeyboard(callbackMessageChatId, callbackMessageId).catch(() => null);
+    }
+
+    if (action === "reject_photo") {
+      await answerTelegramCallbackQuery(callbackQueryId, "Фото отклонено.").catch(() => null);
+      if (callbackMessageChatId !== null) {
+        await sendTelegramMessage(callbackMessageChatId, `Отклонено: ${pendingPhoto.senderName || pendingPhoto.chatId}.`);
+      }
+      await sendTelegramMessage(
+        pendingPhoto.chatId,
+        "Լուսանկարը դեռ մշակման չի ընդունվել։ Խնդրում եմ ուղարկել բլանկի ավելի հստակ և ճիշտ լուսանկար։"
+      ).catch((error) => {
+        console.error("Failed to notify rejected photo sender:", sanitizePublicErrorMessage(error));
+      });
+      return;
+    }
+
+    await answerTelegramCallbackQuery(callbackQueryId, "Принято. Запускаю обработку фото.").catch(() => null);
+    if (callbackMessageChatId !== null) {
+      await sendTelegramMessage(
+        callbackMessageChatId,
+        `Принято: ${pendingPhoto.senderName || pendingPhoto.chatId}. Запускаю OCR.`
+      ).catch(() => null);
+    }
+    try {
+      const senderChatId = Number(pendingPhoto.chatId);
+      if (!Number.isFinite(senderChatId)) {
+        throw new Error(`Invalid pending photo chat id: ${pendingPhoto.chatId}`);
+      }
+      await handleTelegramPhoto(
+        supabase,
+        senderChatId,
+        buildPendingPhotoMessage(pendingPhoto),
+        { approved: true, skipAdminPhotoCopy: true }
+      );
+    } catch (error) {
+      if (callbackMessageChatId !== null) {
+        await sendTelegramMessage(
+          callbackMessageChatId,
+          `Не удалось обработать принятое фото: ${sanitizePublicErrorMessage(error)}`
+        ).catch(() => null);
+      }
+      console.error("Failed to process approved Telegram photo:", sanitizePublicErrorMessage(error));
+    }
     return;
   }
 
@@ -7235,10 +7429,54 @@ async function handleTelegramCommand(
   await sendTelegramMessage(chatId, "Հրամանը չճանաչվեց։ Օգտագործեք /start կամ SR-?՝ բաժանմունքների ցանկը տեսնելու համար։");
 }
 
+async function requestTelegramPhotoApproval(
+  supabase: ReturnType<typeof createClient>,
+  chatId: number,
+  message: Record<string, unknown>,
+  fileId: string,
+  hintText: string,
+  senderPerson: TelegramColleagueChat
+) {
+  const approvalId = crypto.randomUUID();
+  const senderName = getTelegramColleagueDisplayName(senderPerson);
+  await addTelegramPendingPhotoApproval(supabase, {
+    id: approvalId,
+    chatId: String(chatId),
+    fileId,
+    hintText,
+    message,
+    senderName,
+    createdAt: new Date().toISOString()
+  });
+
+  const adminChatIds = getPrivateTelegramAdminChatIds(chatId);
+  const caption = [
+    buildIncomingPhotoAdminCaption(message, chatId, hintText),
+    "",
+    "Нужно ваше решение: принять фото в обработку или отклонить."
+  ].join("\n");
+  const replyMarkup = buildPhotoApprovalReplyMarkup(approvalId);
+  const sourceMessageId = getTelegramMessageId(message);
+
+  if (adminChatIds.length && sourceMessageId !== null) {
+    await copyTelegramMessageToMany(adminChatIds, chatId, sourceMessageId, caption, replyMarkup);
+  } else if (adminChatIds.length) {
+    await sendTelegramMessageWithReplyMarkup(adminChatIds[0], caption, replyMarkup);
+  } else {
+    console.warn("Telegram photo approval was not sent: admin chat is not configured.");
+  }
+
+  await sendTelegramMessage(
+    chatId,
+    `${getTelegramColleagueFirstName(senderPerson)}, լուսանկարը ստացվել է։ Սպասում եմ Վադիմ Աշոտիչի հաստատմանը, հետո միայն կսկսեմ մշակումը։`
+  );
+}
+
 async function handleTelegramPhoto(
   supabase: ReturnType<typeof createClient>,
   chatId: number,
-  message: Record<string, unknown>
+  message: Record<string, unknown>,
+  options: TelegramPhotoHandlingOptions = {}
 ) {
   const fileId = extractPhotoFileId(message);
   if (!fileId) {
@@ -7252,6 +7490,11 @@ async function handleTelegramPhoto(
   const senderPerson = getTelegramPersonFromMessage(message, chatId);
   const senderFirstName = getTelegramColleagueFirstName(senderPerson);
 
+  if (!options.approved && !isTelegramAdminChat(chatId)) {
+    await requestTelegramPhotoApproval(supabase, chatId, message, fileId, hintText, senderPerson);
+    return;
+  }
+
   await sendTelegramMessage(
     chatId,
     `${senderFirstName}, լուսանկարը ստացել եմ։ Հիմա ուշադիր կարդում եմ բլանկը։ Եթե ինչ-որ բան չստացվի, չեմ բարկանա՝ պարզապես կհուշեմ, ինչպես նկարել ավելի լավ։`
@@ -7260,14 +7503,14 @@ async function handleTelegramPhoto(
   const sourceMessageId = getTelegramMessageId(message);
   const photoNotifyChatIds = getTelegramNotifyChatIds(chatId)
     .filter((targetChatId) => String(targetChatId) !== String(chatId));
-  if (photoNotifyChatIds.length && sourceMessageId !== null) {
+  if (!options.skipAdminPhotoCopy && photoNotifyChatIds.length && sourceMessageId !== null) {
     await copyTelegramMessageToMany(
       photoNotifyChatIds,
       chatId,
       sourceMessageId,
       buildIncomingPhotoAdminCaption(message, chatId, hintText)
     );
-  } else if (photoNotifyChatIds.length) {
+  } else if (!options.skipAdminPhotoCopy && photoNotifyChatIds.length) {
     console.warn("Telegram photo copy was not sent: original message_id is missing.");
   }
 
