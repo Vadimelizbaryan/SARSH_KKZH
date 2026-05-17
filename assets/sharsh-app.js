@@ -3002,13 +3002,13 @@
     `;
   }
 
-  function renderSummaryRow(summaryId, label, rowClass) {
+  function renderSummaryRow(summaryId, label, rowClass, snapshot, rows) {
     return `
       <tr class="${rowClass}">
         <td class="dept-cell">${escapeHtml(label)}</td>
         ${config.columns.map((key) => `
           <td class="${getCellClasses(key, null, rowClass === "grand-row" ? "grand" : "summary")}">
-            <span data-summary="${summaryId}" data-key="${key}"></span>
+            <span data-summary="${summaryId}" data-key="${key}">${escapeHtml(String(getSummaryValue(snapshot, rows, key)))}</span>
           </td>
         `).join("")}
       </tr>
@@ -3025,14 +3025,14 @@
       const extraRows = rows.filter((row) => row.group === "extra");
       bodyHtml = [
         ...primaryRows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode)),
-        renderSummaryRow("subtotal", "Ընդամենը", "subtotal-row"),
+        renderSummaryRow("subtotal", "Ընդամենը", "subtotal-row", snapshot, primaryRows),
         ...extraRows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode)),
-        renderSummaryRow("grand", "Ընդամենը", "grand-row")
+        renderSummaryRow("grand", "Ընդամենը", "grand-row", snapshot, rows)
       ].join("");
     } else {
       bodyHtml = [
         ...rows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode)),
-        renderSummaryRow("single", "Итог отделения", "single-total-row")
+        renderSummaryRow("single", "Итог отделения", "single-total-row", snapshot, rows)
       ].join("");
     }
 
