@@ -830,6 +830,29 @@
   }
 
   const NIGHT_SHIFT_TRANSFER_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"];
+  const MORNING_ROLLOVER_DONE_PREFIX = `${config.STORAGE_NAMESPACE || "sarsh-kkzh-v2"}:morning-rollover-done:`;
+  const MORNING_ROLLOVER_PRESENT_KEYS = [
+    "currentShar",
+    "currentSpa",
+    "currentPaym",
+    "currentZh",
+    "family",
+    "officer",
+    "civil",
+    "leaveSharq",
+    "leaveSpa",
+    "leavePaym"
+  ];
+  const MORNING_ROLLOVER_ZERO_KEYS = [
+    "admittedTotal",
+    "admittedSoldier",
+    "admittedSeries",
+    "dgTotal",
+    "dgSoldier",
+    "dgSeries",
+    "transferFromDepartment",
+    "transferToDepartment"
+  ];
 
   function sanitizeNightShiftRows(rows) {
     const output = {};
@@ -849,6 +872,88 @@
 
   function addCell(values, key, amount) {
     values[key] = config.normalizeCellValue(values[key]) + config.normalizeCellValue(amount);
+  }
+
+  function getLocalRowNumber(values, key) {
+    return config.normalizeCellValue(values && values[key]) || 0;
+  }
+
+  function applyMorningRolloverRowsToSnapshot(snapshot, reportDate) {
+    const normalized = config.buildSnapshotFromSaved(snapshot);
+    const now = new Date().toISOString();
+
+    normalized.rows.forEach((row) => {
+      const values = config.normalizeRowValues(row.values);
+      const currentShar = getLocalRowNumber(values, "currentShar");
+      const currentSpa = getLocalRowNumber(values, "currentSpa");
+      const currentPaym = getLocalRowNumber(values, "currentPaym");
+      const presentKeys = Array.isArray(row.presentKeys) && row.presentKeys.length
+        ? row.presentKeys
+        : MORNING_ROLLOVER_PRESENT_KEYS;
+      const presentTotal = presentKeys.reduce((sum, key) => sum + getLocalRowNumber(values, key), 0);
+
+      values.beenTotal = presentTotal;
+      values.beenSoldier = currentShar + currentSpa + currentPaym;
+      values.beenSeries = currentShar;
+      MORNING_ROLLOVER_ZERO_KEYS.forEach((key) => {
+        values[key] = 0;
+      });
+
+      row.values = values;
+      row.updatedAt = now;
+    });
+
+    if (typeof reportDate === "string" && reportDate.trim()) {
+      normalized.reportDate = reportDate.trim();
+    }
+    normalized.updatedAt = now;
+    return normalized;
+  }
+
+  async function rolloverMainAfterArchive(archiveKey, reportDate) {
+    const safeArchiveKey = typeof archiveKey === "string" ? archiveKey.trim() : "";
+    if (!safeArchiveKey) {
+      throw new Error("Не указан день архива для утреннего переноса.");
+    }
+
+    if (hasRemoteSync()) {
+      const payload = await postRemotePayload(
+        {
+          type: "rollover_main_after_archive",
+          archiveKey: safeArchiveKey,
+          reportDate
+        },
+        "Не удалось выполнить утренний перенос главной таблицы"
+      );
+      const snapshot = config.buildSnapshotFromSaved(payload);
+      writeLocalSnapshot(snapshot);
+      return {
+        snapshot,
+        source: "remote",
+        rolloverApplied: Boolean(payload && payload.rolloverApplied),
+        rolloverAlreadyApplied: Boolean(payload && payload.rolloverAlreadyApplied)
+      };
+    }
+
+    const doneKey = `${MORNING_ROLLOVER_DONE_PREFIX}${safeArchiveKey}`;
+    if (localStorage.getItem(doneKey) === "1") {
+      return {
+        snapshot: loadLocalSnapshot(),
+        source: "local-only",
+        rolloverApplied: false,
+        rolloverAlreadyApplied: true
+      };
+    }
+
+    const snapshot = applyMorningRolloverRowsToSnapshot(loadLocalSnapshot(), reportDate);
+    writeLocalSnapshot(snapshot);
+    localStorage.setItem(doneKey, "1");
+    return {
+      snapshot,
+      source: "local-only",
+      rolloverApplied: true,
+      rolloverAlreadyApplied: false
+    };
   }
 
   function applyNightShiftRowsToSnapshot(snapshot, rows, reportDate) {
@@ -1366,6 +1471,7 @@
     hasRemoteSync,
     loadSnapshot,
     saveDepartment,
+    rolloverMainAfterArchive,
     applyNightShiftToMain,
     loadNightShiftDraft,
     saveNightShiftDraft,

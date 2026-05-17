@@ -28,6 +28,7 @@
   const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
   const SAVE_RULE_TEXT_SHORT = "сумма блока АРКА Э = (1 + 4 + 11) - (7 + 10)";
   const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
+  const MORNING_ROLLOVER_PENDING_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:morning-rollover-pending:v1`;
   const ARCHIVE_TIMEZONE = "Asia/Yerevan";
   const ARCHIVE_CAPTURE_HOUR = 10;
   const MAX_ARCHIVE_RECORDS = 60;
@@ -266,6 +267,8 @@
     updateAttentionBound: false,
     archiveRecords: [],
     selectedArchiveKey: "",
+    morningRolloverInFlight: false,
+    morningRolloverCompletedKeys: new Set(),
     initialized: false,
     photoImport: buildInitialPhotoImportState(),
     photoLightbox: buildInitialPhotoLightboxState(),
@@ -2036,6 +2039,33 @@
     return ensureArchiveRecordsLoaded().find((record) => record.archiveKey === archiveKey) || null;
   }
 
+  function getPendingMorningRolloverKey() {
+    try {
+      return localStorage.getItem(MORNING_ROLLOVER_PENDING_STORAGE_KEY) || "";
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function setPendingMorningRolloverKey(archiveKey) {
+    if (!archiveKey) {
+      return;
+    }
+    try {
+      localStorage.setItem(MORNING_ROLLOVER_PENDING_STORAGE_KEY, archiveKey);
+    } catch (_error) {
+    }
+  }
+
+  function clearPendingMorningRolloverKey(archiveKey) {
+    try {
+      if (!archiveKey || getPendingMorningRolloverKey() === archiveKey) {
+        localStorage.removeItem(MORNING_ROLLOVER_PENDING_STORAGE_KEY);
+      }
+    } catch (_error) {
+    }
+  }
+
   function maybeCaptureDailyArchive() {
     if (mode !== "main" || !state.initialized) {
       return null;
@@ -2048,7 +2078,10 @@
 
     const existing = ensureArchiveRecordsLoaded().find((record) => record.archiveKey === context.key);
     if (existing) {
-      return existing;
+      return {
+        record: existing,
+        shouldRollover: getPendingMorningRolloverKey() === context.key
+      };
     }
 
     const nextRecord = {
@@ -2061,7 +2094,43 @@
     };
 
     writeArchiveRecords([nextRecord, ...ensureArchiveRecordsLoaded()]);
-    return nextRecord;
+    setPendingMorningRolloverKey(context.key);
+    return {
+      record: nextRecord,
+      shouldRollover: true
+    };
+  }
+
+  async function maybeApplyMorningRolloverAfterArchive(record) {
+    if (mode !== "main"
+      || !record
+      || !record.archiveKey
+      || state.morningRolloverInFlight
+      || state.morningRolloverCompletedKeys.has(record.archiveKey)
+      || typeof sync.rolloverMainAfterArchive !== "function"
+      || getPendingMorningRolloverKey() !== record.archiveKey) {
+      return;
+    }
+
+    state.morningRolloverInFlight = true;
+    try {
+      const result = await sync.rolloverMainAfterArchive(record.archiveKey, state.snapshot.reportDate);
+      state.morningRolloverCompletedKeys.add(record.archiveKey);
+      clearPendingMorningRolloverKey(record.archiveKey);
+      if (result && result.snapshot) {
+        applyLoadedSnapshot(result);
+      }
+      const archiveLabel = record.archiveLabel || record.archiveKey;
+      setInfo(result && result.rolloverAlreadyApplied
+        ? `Архив ${archiveLabel} уже сохранён, утренний перенос уже был выполнен.`
+        : `Архив ${archiveLabel} сохранён. Утренний перенос выполнен: 12→1, 13→3, 13+14+15→2, 4–11 обнулены.`,
+      false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error || "неизвестная ошибка");
+      setInfo(`Архив сохранён, но утренний перенос пока не выполнен: ${message}`, true);
+    } finally {
+      state.morningRolloverInFlight = false;
+    }
   }
 
   function buildArchiveItem(record) {
@@ -4464,7 +4533,10 @@
     }
 
     if (mode === "main") {
-      maybeCaptureDailyArchive();
+      const archiveCapture = maybeCaptureDailyArchive();
+      if (archiveCapture && archiveCapture.shouldRollover) {
+        void maybeApplyMorningRolloverAfterArchive(archiveCapture.record);
+      }
       const stats = buildFreshnessStats(state.snapshot.rows);
       const overallUpdateStatus = getOverallUpdateStatus(stats, state.snapshot.rows.length);
       const freshCount = document.getElementById("freshCount");

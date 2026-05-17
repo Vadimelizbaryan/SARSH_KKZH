@@ -39,6 +39,30 @@ const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-
 const OCR_FEEDBACK_STATUSES = ["accepted_as_is", "corrected_by_operator"] as const;
 const PHOTO_FEEDBACK_VALUE_KEYS = new Set<string>([...VALUE_KEYS, "presentTotal"]);
 const NIGHT_SHIFT_VALUE_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"] as const;
+const MORNING_ROLLOVER_PRESENT_KEYS = [
+  "currentShar",
+  "currentSpa",
+  "currentPaym",
+  "currentZh",
+  "family",
+  "officer",
+  "civil",
+  "leaveSharq",
+  "leaveSpa",
+  "leavePaym"
+] as const;
+const MORNING_ROLLOVER_ZERO_KEYS = [
+  "admittedTotal",
+  "admittedSoldier",
+  "admittedSeries",
+  "dgTotal",
+  "dgSoldier",
+  "dgSeries",
+  "transferFromDepartment",
+  "transferToDepartment"
+] as const;
+const MORNING_ROLLOVER_META_KEY = "main_morning_rollover";
+const QH_CALC_DEPARTMENT_IDS = new Set(["r19", "r20", "r21"]);
 const NIGHT_SHIFT_ROW_PREFIX = "night:";
 const NIGHT_SHIFT_META_KEY = "night_shift";
 const DAY_SHIFT_ROW_PREFIX = "day:";
@@ -573,6 +597,63 @@ function applyDayShiftValues(
 ) {
   // Day-shift admissions currently follow the same transfer formula as night shift.
   return applyNightShiftValues(values, dayRow);
+}
+
+function primeQhMorningBaseValues(values: Record<string, number | null>) {
+  const hasBaseValues =
+    safeNumber(values.qhBaseSoldier) !== 0
+    || safeNumber(values.qhBaseOfficer) !== 0
+    || safeNumber(values.qhBaseContract) !== 0;
+  const hasCurrentValues =
+    safeNumber(values.currentShar) !== 0
+    || safeNumber(values.currentSpa) !== 0
+    || safeNumber(values.currentPaym) !== 0;
+
+  if (!hasBaseValues && hasCurrentValues) {
+    values.qhBaseSoldier = safeNumber(values.currentShar);
+    values.qhBaseOfficer = safeNumber(values.currentSpa);
+    values.qhBaseContract = safeNumber(values.currentPaym);
+  }
+}
+
+function syncQhMorningCalculatedValues(departmentId: string, values: Record<string, number | null>) {
+  if (!QH_CALC_DEPARTMENT_IDS.has(departmentId)) {
+    return;
+  }
+
+  primeQhMorningBaseValues(values);
+  values.currentShar = safeNumber(values.qhBaseSoldier)
+    + safeNumber(values.qhIncomingSoldier)
+    - safeNumber(values.qhDischargedSoldier);
+  values.currentSpa = safeNumber(values.qhBaseOfficer)
+    + safeNumber(values.qhIncomingOfficer)
+    - safeNumber(values.qhDischargedOfficer);
+  values.currentPaym = safeNumber(values.qhBaseContract)
+    + safeNumber(values.qhIncomingContract)
+    - safeNumber(values.qhDischargedContract);
+}
+
+function applyMorningRolloverValues(
+  departmentId: string,
+  values: Record<string, unknown> | null | undefined
+) {
+  const output = sanitizeValues(values);
+  syncQhMorningCalculatedValues(departmentId, output);
+
+  const currentShar = safeNumber(output.currentShar);
+  const currentSpa = safeNumber(output.currentSpa);
+  const currentPaym = safeNumber(output.currentPaym);
+  const presentTotal = MORNING_ROLLOVER_PRESENT_KEYS
+    .reduce((sum, key) => sum + safeNumber(output[key]), 0);
+
+  output.beenTotal = presentTotal;
+  output.beenSoldier = currentShar + currentSpa + currentPaym;
+  output.beenSeries = currentShar;
+  MORNING_ROLLOVER_ZERO_KEYS.forEach((key) => {
+    output[key] = 0;
+  });
+
+  return output;
 }
 
 function sanitizeRightCellValues(value: unknown) {
@@ -2223,6 +2304,81 @@ Deno.serve(async (request) => {
 
     if (type === "delete_civil_referrals") {
       return jsonResponse(await deleteCivilReferrals(supabase, payload.ids, payload));
+    }
+
+    if (type === "rollover_main_after_archive") {
+      const archiveKey = typeof payload.archiveKey === "string" ? payload.archiveKey.trim() : "";
+      if (!archiveKey) {
+        return jsonResponse({ error: "Archive key is required." }, 400);
+      }
+
+      const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()
+        ? payload.reportDate.trim()
+        : DEFAULT_DATE;
+
+      const { data: rolloverMeta, error: rolloverMetaError } = await supabase
+        .from("sharsh_report_meta")
+        .select("report_date, updated_at")
+        .eq("report_key", MORNING_ROLLOVER_META_KEY)
+        .maybeSingle();
+
+      if (rolloverMetaError) {
+        throw rolloverMetaError;
+      }
+
+      if (rolloverMeta?.report_date === archiveKey) {
+        return jsonResponse({
+          ...await loadSnapshot(supabase),
+          rolloverApplied: false,
+          rolloverAlreadyApplied: true
+        });
+      }
+
+      const snapshot = await loadSnapshot(supabase);
+      const now = new Date().toISOString();
+      const updates = snapshot.rows.map((row) => {
+        const departmentMeta = DEPARTMENTS[row.id as keyof typeof DEPARTMENTS];
+        return {
+          department_id: row.id,
+          department_name: departmentMeta.department,
+          department_group: departmentMeta.group,
+          values: applyMorningRolloverValues(row.id, row.values),
+          updated_at: now
+        };
+      });
+
+      const { error: rowsError } = await supabase
+        .from("sharsh_departments")
+        .upsert(updates);
+
+      if (rowsError) {
+        throw rowsError;
+      }
+
+      const { error: metaError } = await supabase
+        .from("sharsh_report_meta")
+        .upsert([
+          {
+            report_key: "main",
+            report_date: reportDate,
+            updated_at: now
+          },
+          {
+            report_key: MORNING_ROLLOVER_META_KEY,
+            report_date: archiveKey,
+            updated_at: now
+          }
+        ]);
+
+      if (metaError) {
+        throw metaError;
+      }
+
+      return jsonResponse({
+        ...await loadSnapshot(supabase),
+        rolloverApplied: true,
+        rolloverAlreadyApplied: false
+      });
     }
 
     if (type === "apply_night_shift") {
