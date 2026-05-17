@@ -1313,6 +1313,23 @@
     return payload;
   }
 
+  async function deleteDepartmentFeedback(departmentId, feedbackId) {
+    if (!hasRemoteSync()) {
+      throw new Error("Удаление отправленных данных доступно только в онлайн-режиме владельца.");
+    }
+
+    const snapshot = await postRemote({
+      type: "delete_department_feedback",
+      departmentId: String(departmentId || ""),
+      feedbackId: Number(feedbackId)
+    });
+
+    return {
+      snapshot,
+      source: "remote"
+    };
+  }
+
   async function saveReportDate(reportDate) {
     const localSnapshot = loadLocalSnapshot();
     localSnapshot.reportDate = typeof reportDate === "string" && reportDate.trim()
@@ -1487,6 +1504,7 @@
     saveCivilReferrals,
     deleteCivilReferrals,
     saveOcrFeedback,
+    deleteDepartmentFeedback,
     saveReportDate,
     notifyOwnerLogin,
     sendMainPdfsToTelegram,

@@ -2072,6 +2072,36 @@ async function markDepartmentPhotoPending(
   }
 }
 
+async function deleteDepartmentFeedback(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: keyof typeof DEPARTMENTS,
+  feedbackId: number
+) {
+  const { error: deleteError } = await supabase
+    .from("sharsh_ocr_feedback")
+    .delete()
+    .eq("id", feedbackId)
+    .eq("department_id", departmentId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  const { error: updateError } = await supabase
+    .from("sharsh_departments")
+    .update({
+      photo_workflow_status: "idle",
+      photo_feedback_id: null,
+      photo_feedback_updated_at: null,
+      photo_name: null
+    })
+    .eq("department_id", departmentId);
+
+  if (updateError) {
+    throw updateError;
+  }
+}
+
 function createSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -2224,6 +2254,20 @@ Deno.serve(async (request) => {
 
       await insertOcrFeedbackRecord(supabase, feedback);
       return jsonResponse({ ok: true });
+    }
+
+    if (type === "delete_department_feedback") {
+      const departmentId = typeof payload.departmentId === "string" ? payload.departmentId : "";
+      const feedbackId = Number(payload.feedbackId);
+      if (!Object.prototype.hasOwnProperty.call(DEPARTMENTS, departmentId)) {
+        return jsonResponse({ error: "Unknown department." }, 400);
+      }
+      if (!Number.isInteger(feedbackId) || feedbackId <= 0) {
+        return jsonResponse({ error: "A valid feedback id is required." }, 400);
+      }
+
+      await deleteDepartmentFeedback(supabase, departmentId as keyof typeof DEPARTMENTS, feedbackId);
+      return jsonResponse(await loadSnapshot(supabase));
     }
 
     if (type === "notify_owner_login") {

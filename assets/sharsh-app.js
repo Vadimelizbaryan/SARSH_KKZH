@@ -3154,6 +3154,7 @@
         <div class="link-card-actions">
           <a href="${escapeHtml(relativePath)}" target="_blank" rel="noopener">Открыть</a>
           <a href="${escapeHtml(feedbackPath || relativePath)}" target="_blank" rel="noopener" data-department-feedback-link="${definition.id}"${feedbackPath ? "" : " hidden"}>Открыть отправленное</a>
+          <button type="button" data-delete-feedback="${definition.id}" data-feedback-id="${row && row.photoFeedbackId ? row.photoFeedbackId : ""}"${feedbackPath ? "" : " hidden"}>Удалить отправленное</button>
           <button type="button" data-copy-link="${escapeHtml(relativePath)}">Копировать ссылку</button>
         </div>
       </div>
@@ -4605,6 +4606,7 @@
         const ageEl = document.querySelector(`[data-department-age="${row.id}"]`);
         const openCardEl = document.querySelector(`[data-department-open-card="${row.id}"]`);
         const feedbackLinkEl = document.querySelector(`[data-department-feedback-link="${row.id}"]`);
+        const deleteFeedbackBtn = document.querySelector(`[data-delete-feedback="${row.id}"]`);
         const listStatusEl = document.querySelector(`[data-update-status="${row.id}"]`);
         const listTimeEl = document.querySelector(`[data-update-time="${row.id}"]`);
         const listAgeEl = document.querySelector(`[data-update-age="${row.id}"]`);
@@ -4630,6 +4632,15 @@
             feedbackLinkEl.setAttribute("href", appendQueryParams(config.getDepartmentPagePath(basePath, row.id), { tgFeedback: row.photoFeedbackId }));
           } else {
             feedbackLinkEl.setAttribute("hidden", "");
+          }
+        }
+        if (deleteFeedbackBtn) {
+          if (row.photoFeedbackId) {
+            deleteFeedbackBtn.removeAttribute("hidden");
+            deleteFeedbackBtn.setAttribute("data-feedback-id", String(row.photoFeedbackId));
+          } else {
+            deleteFeedbackBtn.setAttribute("hidden", "");
+            deleteFeedbackBtn.removeAttribute("data-feedback-id");
           }
         }
         if (listStatusEl) {
@@ -5400,6 +5411,41 @@
     }
     state.photoLightbox = buildInitialPhotoLightboxState();
     renderPage();
+  }
+
+  async function handleDeleteDepartmentFeedback(button) {
+    const departmentIdToDelete = button.getAttribute("data-delete-feedback") || "";
+    const row = getDepartmentRow(state.snapshot, departmentIdToDelete);
+    const feedbackId = button.getAttribute("data-feedback-id") || (row && row.photoFeedbackId ? String(row.photoFeedbackId) : "");
+    const department = config.getDepartmentById(departmentIdToDelete);
+    const departmentName = department ? department.department : departmentIdToDelete;
+
+    if (!departmentIdToDelete || !feedbackId) {
+      setInfo("У этого отделения нет отправленных данных для удаления.", false);
+      return;
+    }
+
+    if (typeof sync.deleteDepartmentFeedback !== "function") {
+      setInfo("Удаление отправленных данных пока недоступно. Обновите файлы синхронизации.", true);
+      return;
+    }
+
+    const confirmed = window.confirm(`Удалить отправленные данные отделения ${departmentName}? Основная таблица не изменится.`);
+    if (!confirmed) {
+      return;
+    }
+
+    button.disabled = true;
+    setInfo(`Удаляю отправленные данные: ${departmentName}...`, false);
+    try {
+      const result = await sync.deleteDepartmentFeedback(departmentIdToDelete, feedbackId);
+      applyLoadedSnapshot(result);
+      setInfo(`Отправленные данные удалены: ${departmentName}.`, false);
+      renderPage();
+    } catch (error) {
+      setInfo(error instanceof Error ? error.message : "Не удалось удалить отправленные данные.", true);
+      button.disabled = false;
+    }
   }
 
   function renderMainPhotoRoutePanel() {
@@ -6678,6 +6724,14 @@
           setInfo(`Ссылка скопирована: ${relativeLink}`, false);
         } catch (error) {
           window.prompt("Скопируйте ссылку вручную", absoluteLink);
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-delete-feedback]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button instanceof HTMLButtonElement) {
+          handleDeleteDepartmentFeedback(button);
         }
       });
     });

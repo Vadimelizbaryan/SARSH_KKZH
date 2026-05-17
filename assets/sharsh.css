@@ -1026,6 +1026,15 @@ a {
   font-weight: 800;
 }
 
+.link-card-actions [data-delete-feedback] {
+  border-color: rgba(197, 59, 45, 0.32);
+  color: #9f2d23;
+}
+
+.link-card-actions [data-delete-feedback]:hover {
+  background: #fff0ed;
+}
+
 .link-card[data-workflow-tone="pending"] .link-card-actions [data-department-feedback-link] {
   background: #c53b2d;
   border-color: #c53b2d;
