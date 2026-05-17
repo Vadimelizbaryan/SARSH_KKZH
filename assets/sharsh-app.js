@@ -2990,9 +2990,12 @@
     `;
   }
 
-  function renderDetailRow(snapshot, row, interactive) {
+  function renderDetailRow(snapshot, row, interactive, viewMode) {
+    const freshness = viewMode === "main" ? getRowFreshnessMeta(row) : null;
+    const freshnessClass = freshness && freshness.level === "fresh" ? " main-fresh-row" : "";
+    const freshnessAttr = freshness ? ` data-row-freshness="${escapeHtml(freshness.level)}"` : "";
     return `
-      <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}" data-row-id="${row.id}">
+      <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}" data-row-id="${row.id}"${freshnessAttr}>
         <td class="dept-cell" title="${escapeHtml(row.department)}">${renderResponsiveDepartmentName(row.department)}</td>
         ${config.columns.map((key) => renderDetailCell(snapshot, row, key, interactive)).join("")}
       </tr>
@@ -3021,14 +3024,14 @@
       const primaryRows = rows.filter((row) => row.group === "primary");
       const extraRows = rows.filter((row) => row.group === "extra");
       bodyHtml = [
-        ...primaryRows.map((row) => renderDetailRow(snapshot, row, interactive)),
+        ...primaryRows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode)),
         renderSummaryRow("subtotal", "Ընդամենը", "subtotal-row"),
-        ...extraRows.map((row) => renderDetailRow(snapshot, row, interactive)),
+        ...extraRows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode)),
         renderSummaryRow("grand", "Ընդամենը", "grand-row")
       ].join("");
     } else {
       bodyHtml = [
-        ...rows.map((row) => renderDetailRow(snapshot, row, interactive)),
+        ...rows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode)),
         renderSummaryRow("single", "Итог отделения", "single-total-row")
       ].join("");
     }
@@ -4534,6 +4537,7 @@
         const listStatusEl = document.querySelector(`[data-update-status="${row.id}"]`);
         const listTimeEl = document.querySelector(`[data-update-time="${row.id}"]`);
         const listAgeEl = document.querySelector(`[data-update-age="${row.id}"]`);
+        const sheetRowEl = document.querySelector(`tr.detail-row[data-row-id="${row.id}"]`);
 
         if (statusEl) {
           statusEl.textContent = meta.label;
@@ -4566,6 +4570,10 @@
         }
         if (listAgeEl) {
           listAgeEl.textContent = meta.age;
+        }
+        if (sheetRowEl) {
+          sheetRowEl.setAttribute("data-row-freshness", meta.level);
+          sheetRowEl.classList.toggle("main-fresh-row", meta.level === "fresh");
         }
       });
     }
