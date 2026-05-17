@@ -277,7 +277,6 @@
     mainPhotoRoute: buildInitialMainPhotoRouteState(),
     feedback: buildInitialFeedbackState()
   };
-  const autoRecognizedTelegramFeedbackIds = new Set();
   let printLinkHrefBackups = [];
 
   function deepCopy(value) {
@@ -4802,17 +4801,16 @@
       const preparedPhoto = await compressImageFile(file);
       state.photoImport.imageDataUrl = preparedPhoto.dataUrl;
       state.photoImport.isProcessing = false;
-      const canAutoRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
+      const canRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
       const orientationNote = preparedPhoto.rotatedToLandscape
         ? " Фото автоматически выровнено: надпись SR перемещена вправо вверх."
         : "";
-      if (canAutoRecognize) {
-        setPhotoImportStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Автоматически распознаю цифры...`, false);
-        renderPage();
-        await handlePhotoRecognition();
-        return;
-      }
-      setPhotoImportStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Нажмите "Распознать".`, false);
+      setPhotoImportStatus(
+        canRecognize
+          ? `Фото готово: ${file.name || "image"}.${orientationNote} При необходимости поверните фото, затем нажмите "Распознать".`
+          : `Фото готово: ${file.name || "image"}.${orientationNote} Распознавание доступно только в онлайн-режиме владельца.`,
+        !canRecognize
+      );
       renderPage();
     } catch (error) {
       state.photoImport = buildInitialPhotoImportState();
@@ -4877,8 +4875,8 @@
     setPhotoImportStatus("Распознаю цифры на бланке для текущего отделения. Маркер SR здесь игнорируется.", false);
     setPhotoImportStatus(
       state.photoImport.queueRemainingCount > 0
-        ? `Фото перенесено с главного файла. Начинаю распознавание для этого отделения. После сохранения откроется следующее фото, осталось: ${state.photoImport.queueRemainingCount}.`
-        : "Фото перенесено с главного файла. Начинаю распознавание для этого отделения. Это последнее фото из очереди.",
+        ? `Фото перенесено с главного файла. Распознаю это отделение. Автоматическое открытие следующего фото отключено, в очереди осталось: ${state.photoImport.queueRemainingCount}.`
+        : "Фото перенесено с главного файла. Распознаю это отделение. Это последнее фото из очереди.",
       false
     );
     if (!state.photoImport.queueMode) {
@@ -4934,6 +4932,23 @@
       renderPage();
     }
   }
+
+  function resetPhotoImportAfterSuccessfulSave() {
+    const hadPhoto = Boolean(
+      state.photoImport
+        && (
+          state.photoImport.imageDataUrl
+          || state.photoImport.feedbackId
+          || (Array.isArray(state.photoImport.lastAppliedKeys) && state.photoImport.lastAppliedKeys.length)
+        )
+    );
+    state.photoImport = buildInitialPhotoImportState();
+    if (hadPhoto) {
+      state.photoImport.status = "Данные сохранены. Фото очищено, страница готова к новой загрузке бланка.";
+      state.photoImport.isError = false;
+    }
+  }
+
   function clearPhotoImportSelection() {
     const keepDraft = hasPhotoImportDraft();
     const next = buildInitialPhotoImportState();
@@ -5713,16 +5728,14 @@
     const nextPendingRoute = !transferId ? peekPendingMainPhotoRoute() : null;
     const nextDepartment = nextPendingRoute ? config.getDepartmentById(nextPendingRoute.departmentId) : null;
     state.photoImport.queueNextDepartmentName = nextDepartment ? nextDepartment.department : "";
-    setPhotoImportStatus("Фото перенесено с главного файла. Начинаю распознавание для этого отделения...", false);
+    const canRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
+    setPhotoImportStatus(
+      canRecognize
+        ? "Фото перенесено на страницу отделения. Поверните его при необходимости, затем нажмите \"Распознать\"."
+        : "Фото перенесено на страницу отделения. Для распознавания нужен онлайн-режим владельца.",
+      !canRecognize
+    );
     renderPage();
-
-    if (!sync.hasRemoteSync() || typeof sync.recognizeDepartmentPhoto !== "function") {
-      setPhotoImportStatus("Фото перенесено на страницу отделения. Для распознавания нужен онлайн-режим владельца.", true);
-      renderPage();
-      return;
-    }
-
-    await handlePhotoRecognition();
   }
 
   async function maybeLoadTelegramFeedbackPhoto() {
@@ -5971,23 +5984,9 @@
   }
 
   async function maybeAutoRecognizeLoadedTelegramPhoto() {
-    if (mode !== "department" || !sync.hasRemoteSync() || typeof sync.recognizeDepartmentPhoto !== "function") {
-      return;
-    }
-
-    const photoState = state.photoImport;
-    if (!photoState || photoState.isProcessing || photoState.draftMode || !photoState.imageDataUrl) {
-      return;
-    }
-
-    const feedbackId = String(photoState.feedbackId || "").trim();
-    const shouldAutoRecognize = photoState.workflowStatus === "pending" || Boolean(queryParams.get("tgFeedback"));
-    if (!feedbackId || !shouldAutoRecognize || autoRecognizedTelegramFeedbackIds.has(feedbackId)) {
-      return;
-    }
-
-    autoRecognizedTelegramFeedbackIds.add(feedbackId);
-    await handlePhotoRecognition();
+    // Department photos are recognized only after the user rotates/checks
+    // the image and presses the recognition button manually.
+    return;
   }
 
   function getStylesheetUrl() {
@@ -6376,6 +6375,7 @@
             const nextStats = buildFreshnessStats(nextRows);
             const nextOverall = getOverallUpdateStatus(nextStats, nextRows.length);
             let feedbackWarning = "";
+            const wasPhotoQueueMode = Boolean(state.photoImport && state.photoImport.queueMode);
 
             state.photoImport.draftMode = false;
             if (state.photoImport.feedbackId) {
@@ -6404,8 +6404,9 @@
 
             setInfo(manual ? "Данные отделения сохранены. Проверка записи пройдена." : "Изменения отправлены и проверка записи пройдена.", false);
             state.warning = feedbackWarning;
-            refreshTableData();
-            if (manual && state.photoImport.queueMode) {
+            resetPhotoImportAfterSuccessfulSave();
+            renderPage();
+            if (manual && wasPhotoQueueMode) {
               setInfo("Данные отделения сохранены, проверка записи пройдена. Автоматическое открытие следующих страниц отключено.", false);
             }
             return;
