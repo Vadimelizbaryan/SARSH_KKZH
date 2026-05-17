@@ -20,6 +20,7 @@
   const IMPORT_FIELD_DEFINITIONS = FIELD_DEFINITIONS.filter((field) => field.key !== "dischargeDate");
   const DATE_FIELD_KEYS = new Set(["referralDate", "dischargeDate"]);
   const SAVED_PAGE_SIZE = 80;
+  const DOCUMENT_EXPORT_LIMIT = 1000;
 
   const state = {
     parsedRows: [],
@@ -28,6 +29,7 @@
     savedLimit: SAVED_PAGE_SIZE,
     savedOffset: 0,
     savedQuery: "",
+    selectedSavedIds: [],
     newRow: createEmptyRecord(),
     sourceFileName: "",
     filter: "",
@@ -421,6 +423,129 @@
     };
   }
 
+  function padTwo(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function formatDocumentDateTime(date = new Date()) {
+    return `${padTwo(date.getDate())}.${padTwo(date.getMonth() + 1)}.${String(date.getFullYear()).slice(-2)},${padTwo(date.getHours())}:${padTwo(date.getMinutes())}`;
+  }
+
+  function getDocumentFileName() {
+    return `Քաղ_ԲԿ_բազա_${formatDocumentDateTime().replace(/[.:,]/g, "-")}.doc`;
+  }
+
+  function buildCivilDocumentHtml(rows) {
+    const generatedAt = formatDocumentDateTime();
+    const searchText = normalizeText(state.filter);
+    const metaText = searchText
+      ? `Որոնում՝ ${searchText}`
+      : "Բոլոր ցուցադրված տողերը";
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Քաղ. ԲԿ բազա</title>
+  <style>
+    @page { size: 29.7cm 21cm; margin: 1.1cm; }
+    body { font-family: "Times New Roman", "Sylfaen", serif; color: #000; font-size: 11pt; }
+    h1 { margin: 0 0 8px; text-align: center; font-size: 18pt; }
+    .meta { width: 100%; margin: 0 0 10px; border-collapse: collapse; }
+    .meta td { border: 0; padding: 0 0 6px; font-size: 10pt; }
+    .meta .right { text-align: right; }
+    table.referrals { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    table.referrals th, table.referrals td { border: 1px solid #000; padding: 4px 5px; vertical-align: middle; }
+    table.referrals th { background: #f6c894; text-align: center; font-weight: 700; }
+    table.referrals td { background: #fff; }
+    table.referrals td:nth-child(2) { font-weight: 700; }
+    col.num { width: 0.8cm; }
+    col.patient { width: 6.3cm; }
+    col.center { width: 3.9cm; }
+    col.unit { width: 3.2cm; }
+    col.rank { width: 2.7cm; }
+    col.short { width: 1.6cm; }
+    col.date { width: 2.3cm; }
+  </style>
+</head>
+<body>
+  <h1>Քաղաքացիական հիվանդանոցներ</h1>
+  <table class="meta">
+    <tr>
+      <td>${escapeHtml(metaText)}</td>
+      <td class="right">Ստեղծվել է՝ ${escapeHtml(generatedAt)}</td>
+    </tr>
+  </table>
+  <table class="referrals">
+    <colgroup>
+      <col class="num">
+      <col class="patient">
+      <col class="center">
+      <col class="unit">
+      <col class="rank">
+      <col class="short">
+      <col class="short">
+      <col class="date">
+      <col class="date">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>#</th>
+        ${FIELD_DEFINITIONS.map((field) => `<th>${escapeHtml(field.label)}</th>`).join("")}
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map((row, index) => `
+        <tr>
+          <td style="text-align:center;">${index + 1}</td>
+          ${FIELD_DEFINITIONS.map((field) => `<td>${escapeHtml(row[field.key] || "")}</td>`).join("")}
+        </tr>
+      `).join("")}
+    </tbody>
+  </table>
+</body>
+</html>`;
+  }
+
+  async function loadDocumentRows() {
+    const listOptions = {
+      ...getSavedListOptions(0),
+      limit: DOCUMENT_EXPORT_LIMIT,
+      offset: 0
+    };
+    if (typeof sync.listCivilReferrals !== "function") {
+      return state.savedRows.map(normalizePageRecord);
+    }
+    const payload = await sync.listCivilReferrals(listOptions);
+    return Array.isArray(payload?.rows) ? payload.rows.map(normalizePageRecord) : [];
+  }
+
+  function downloadWordDocument(rows) {
+    const html = buildCivilDocumentHtml(rows);
+    const blob = new Blob([`\ufeff${html}`], { type: "application/msword;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = getDocumentFileName();
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function printDocument(rows, printWindow) {
+    const targetWindow = printWindow || window.open("", "_blank");
+    if (!targetWindow) {
+      state.status = "Браузер заблокировал окно печати. Попробуйте сохранить Word-документ.";
+      render();
+      return;
+    }
+    targetWindow.document.open();
+    targetWindow.document.write(buildCivilDocumentHtml(rows));
+    targetWindow.document.close();
+    targetWindow.focus();
+    targetWindow.setTimeout(() => targetWindow.print(), 350);
+  }
+
 function isHeaderRow(cells) {
   const first = cells[0] || "";
   const third = cells[2] || "";
@@ -478,6 +603,29 @@ function isHeaderRow(cells) {
     };
   }
 
+  function getSavedRowId(row) {
+    return normalizeText(row && row.id);
+  }
+
+  function pruneSelectedSavedIds() {
+    const visibleIds = new Set(state.savedRows.map(getSavedRowId).filter(Boolean));
+    state.selectedSavedIds = state.selectedSavedIds.filter((id) => visibleIds.has(id));
+  }
+
+  function updateSelectedSavedId(id, isSelected) {
+    const cleanId = normalizeText(id);
+    if (!cleanId) {
+      return;
+    }
+    const selected = new Set(state.selectedSavedIds);
+    if (isSelected) {
+      selected.add(cleanId);
+    } else {
+      selected.delete(cleanId);
+    }
+    state.selectedSavedIds = [...selected];
+  }
+
   function applySavedPayload(payload) {
     state.savedRows = Array.isArray(payload?.rows) ? payload.rows.map(normalizePageRecord) : [];
     state.savedTotal = Number.isFinite(Number(payload?.total))
@@ -487,6 +635,7 @@ function isHeaderRow(cells) {
     state.savedOffset = Math.max(0, Math.trunc(Number(payload?.offset) || 0));
     state.savedQuery = normalizeText(payload?.query || "");
     state.source = payload?.source || "";
+    pruneSelectedSavedIds();
   }
 
   function getSavedRangeText() {
@@ -566,6 +715,8 @@ function isHeaderRow(cells) {
       ? rows.map((row, index) => ({ row, index }))
       : getFilteredRowEntries(rows);
     const rowNumberOffset = Math.max(0, Math.trunc(Number(options.rowNumberOffset) || 0));
+    const isSavedTable = sourceName === "saved";
+    const selectedSavedIds = new Set(state.selectedSavedIds);
     if (!visibleEntries.length) {
       return `<div class="civil-empty">${escapeHtml(emptyText)}</div>`;
     }
@@ -580,25 +731,44 @@ function isHeaderRow(cells) {
             </tr>
           </thead>
           <tbody>
-            ${visibleEntries.map(({ row, index }, visibleIndex) => `
-              <tr>
-                <td>${rowNumberOffset + visibleIndex + 1}</td>
-                ${FIELD_DEFINITIONS.map((field) => `
+            ${visibleEntries.map(({ row, index }, visibleIndex) => {
+              const rowNumber = rowNumberOffset + visibleIndex + 1;
+              const rowId = isSavedTable ? getSavedRowId(row) : "";
+              const isSelected = rowId && selectedSavedIds.has(rowId);
+              return `
+                <tr class="${isSelected ? "is-selected" : ""}">
                   <td>
-                    <input
-                      class="civil-edit-input${isDateFieldKey(field.key) ? " civil-date-input" : ""}"
-                      type="text"
-                      value="${escapeHtml(row[field.key] || "")}"
-                      data-source="${escapeHtml(sourceName)}"
-                      data-index="${index}"
-                      data-key="${escapeHtml(field.key)}"
-                      ${isDateFieldKey(field.key) ? 'inputmode="numeric" maxlength="10" placeholder="дд.мм.гг" autocomplete="off"' : ""}
-                      aria-label="${escapeHtml(field.label)}"
-                    >
+                    ${isSavedTable ? `
+                      <label class="civil-row-select" title="Выбрать строку">
+                        <input
+                          class="civil-row-checkbox"
+                          type="checkbox"
+                          data-id="${escapeHtml(rowId)}"
+                          ${rowId ? "" : "disabled"}
+                          ${isSelected ? "checked" : ""}
+                          ${state.isBusy ? "disabled" : ""}
+                        >
+                        <span>${rowNumber}</span>
+                      </label>
+                    ` : rowNumber}
                   </td>
-                `).join("")}
-              </tr>
-            `).join("")}
+                  ${FIELD_DEFINITIONS.map((field) => `
+                    <td>
+                      <input
+                        class="civil-edit-input${isDateFieldKey(field.key) ? " civil-date-input" : ""}"
+                        type="text"
+                        value="${escapeHtml(row[field.key] || "")}"
+                        data-source="${escapeHtml(sourceName)}"
+                        data-index="${index}"
+                        data-key="${escapeHtml(field.key)}"
+                        ${isDateFieldKey(field.key) ? 'inputmode="numeric" maxlength="10" placeholder="дд.мм.гг" autocomplete="off"' : ""}
+                        aria-label="${escapeHtml(field.label)}"
+                      >
+                    </td>
+                  `).join("")}
+                </tr>
+              `;
+            }).join("")}
           </tbody>
         </table>
       </div>
@@ -613,6 +783,7 @@ function isHeaderRow(cells) {
     const savedCount = state.savedTotal || state.savedRows.length;
     const savedPageCount = state.savedRows.length;
     const filteredParsedCount = getFilteredRows(state.parsedRows).length;
+    const selectedSavedCount = state.selectedSavedIds.length;
 
     app.innerHTML = `
       <div class="toolbar no-print">
@@ -648,6 +819,9 @@ function isHeaderRow(cells) {
             </div>
             <div class="civil-section-actions">
               <span class="civil-count-pill">${escapeHtml(getSavedRangeText())}</span>
+              <button type="button" id="civilPrintDocBtn" class="civil-document-button" ${!savedCount || state.isBusy ? "disabled" : ""}>Печать документа</button>
+              <button type="button" id="civilExportDocBtn" class="civil-document-button" ${!savedCount || state.isBusy ? "disabled" : ""}>Сохранить Word</button>
+              <button type="button" id="civilDeleteSelectedBtn" class="civil-delete-button" ${!selectedSavedCount || state.isBusy ? "disabled" : ""}>Удалить${selectedSavedCount ? ` (${selectedSavedCount})` : ""}</button>
               <button type="button" id="civilSaveDatabaseBtn" ${!savedPageCount || state.isBusy ? "disabled" : ""}>Сохранить правки базы</button>
             </div>
           </div>
@@ -668,7 +842,7 @@ function isHeaderRow(cells) {
               aria-label="Поиск"
               ${state.isBusy ? "disabled" : ""}
             >&#128269;</button>
-            <span class="civil-search-note">Поиск работает по всем колонкам базы и загружает найденные строки с сервера.</span>
+            <span class="civil-search-note">Поиск работает по всем колонкам. Печать и Word берут строки текущего поиска.</span>
           </div>
           ${renderRowsTable(state.savedRows, "В базе пока нет записей.", "saved", { applyFilter: false, rowNumberOffset: state.savedOffset })}
           ${renderSavedPagination()}
@@ -823,6 +997,41 @@ function isHeaderRow(cells) {
     }
   }
 
+  async function deleteSelectedSavedRows() {
+    const ids = [...new Set(state.selectedSavedIds.map(normalizeText).filter(Boolean))];
+    if (!ids.length || state.isBusy) {
+      return;
+    }
+    const message = ids.length === 1
+      ? "Удалить выбранную строку из базы?"
+      : `Удалить выбранные строки из базы: ${ids.length}?`;
+    if (!window.confirm(message)) {
+      return;
+    }
+
+    setBusy(true, "Удаляю выбранные строки...");
+    try {
+      const listOptions = getSavedListOptions();
+      const payload = typeof sync.deleteCivilReferrals === "function"
+        ? await sync.deleteCivilReferrals(ids, listOptions)
+        : { rows: state.savedRows.filter((row) => !ids.includes(getSavedRowId(row))), deleted: ids.length };
+      state.selectedSavedIds = [];
+      applySavedPayload(payload);
+      if (!state.savedRows.length && state.savedTotal > 0 && state.savedOffset > 0) {
+        const previousOffset = Math.max(0, state.savedOffset - state.savedLimit);
+        state.savedOffset = previousOffset;
+        await loadSavedRows({ offset: previousOffset });
+        return;
+      }
+      state.status = `Удалено строк: ${payload?.deleted || ids.length}. В базе записей: ${state.savedTotal}.`;
+    } catch (error) {
+      state.status = error instanceof Error ? error.message : "Не удалось удалить выбранные строки.";
+    } finally {
+      state.isBusy = false;
+      render();
+    }
+  }
+
   function normalizeEditableFieldValue(key, value, commit = false) {
     if (isDateFieldKey(key)) {
       return commit ? normalizeReferralDate(value) : sanitizeDateDraft(value);
@@ -888,6 +1097,55 @@ function isHeaderRow(cells) {
     }
   }
 
+  async function exportCurrentDocument() {
+    if (state.isBusy) {
+      return;
+    }
+    setBusy(true, "Готовлю Word-документ по текущему поиску...");
+    try {
+      const rows = await loadDocumentRows();
+      if (!rows.length) {
+        state.status = "Нет строк для сохранения в Word. Проверьте поисковый фильтр.";
+        return;
+      }
+      downloadWordDocument(rows);
+      state.status = `Word-документ подготовлен: ${rows.length} строк.`;
+    } catch (error) {
+      state.status = error instanceof Error ? error.message : "Не удалось подготовить Word-документ.";
+    } finally {
+      state.isBusy = false;
+      render();
+    }
+  }
+
+  async function printCurrentDocument() {
+    if (state.isBusy) {
+      return;
+    }
+    const printWindow = window.open("", "_blank");
+    setBusy(true, "Готовлю документ к печати...");
+    try {
+      const rows = await loadDocumentRows();
+      if (!rows.length) {
+        state.status = "Нет строк для печати. Проверьте поисковый фильтр.";
+        if (printWindow) {
+          printWindow.close();
+        }
+        return;
+      }
+      printDocument(rows, printWindow);
+      state.status = `Документ для печати открыт: ${rows.length} строк.`;
+    } catch (error) {
+      if (printWindow) {
+        printWindow.close();
+      }
+      state.status = error instanceof Error ? error.message : "Не удалось подготовить печать.";
+    } finally {
+      state.isBusy = false;
+      render();
+    }
+  }
+
   function runSavedSearch() {
     const input = document.getElementById("civilFilterInput");
     state.searchDraft = input instanceof HTMLInputElement ? input.value : state.searchDraft;
@@ -936,10 +1194,22 @@ function isHeaderRow(cells) {
     };
   }
 
+  function handleSavedRowSelection(event) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !input.classList.contains("civil-row-checkbox")) {
+      return;
+    }
+    updateSelectedSavedId(input.dataset.id, input.checked);
+    render();
+  }
+
   function bindEvents() {
     document.getElementById("civilFileInput")?.addEventListener("change", handleFileUpload);
     document.getElementById("civilSaveBtn")?.addEventListener("click", saveParsedRows);
     document.getElementById("civilSaveDatabaseBtn")?.addEventListener("click", saveSavedRows);
+    document.getElementById("civilPrintDocBtn")?.addEventListener("click", printCurrentDocument);
+    document.getElementById("civilExportDocBtn")?.addEventListener("click", exportCurrentDocument);
+    document.getElementById("civilDeleteSelectedBtn")?.addEventListener("click", deleteSelectedSavedRows);
     document.getElementById("civilAddRowBtn")?.addEventListener("click", saveNewRow);
     document.getElementById("civilReloadBtn")?.addEventListener("click", () => {
       state.savedOffset = 0;
@@ -970,6 +1240,9 @@ function isHeaderRow(cells) {
     document.querySelectorAll(".civil-edit-input").forEach((input) => {
       input.addEventListener("input", handleTableEdit);
       input.addEventListener("change", handleTableEdit);
+    });
+    document.querySelectorAll(".civil-row-checkbox").forEach((input) => {
+      input.addEventListener("change", handleSavedRowSelection);
     });
     document.querySelectorAll(".civil-new-input").forEach((input) => {
       input.addEventListener("input", handleNewRowEdit);

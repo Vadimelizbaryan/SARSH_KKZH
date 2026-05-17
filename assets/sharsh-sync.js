@@ -264,7 +264,7 @@
   ];
   const CIVIL_REFERRAL_HASH_FIELDS = CIVIL_REFERRAL_FIELDS.filter((key) => key !== "dischargeDate");
   const CIVIL_REFERRALS_DEFAULT_LIMIT = 80;
-  const CIVIL_REFERRALS_MAX_LIMIT = 200;
+  const CIVIL_REFERRALS_MAX_LIMIT = 1000;
 
   function normalizeCivilText(value) {
     return String(value ?? "")
@@ -312,6 +312,12 @@
     return { limit, offset, query };
   }
 
+  function normalizeCivilReferralIds(ids) {
+    return Array.isArray(ids)
+      ? [...new Set(ids.map((id) => normalizeCivilText(id)).filter(Boolean))]
+      : [];
+  }
+
   function normalizeCivilSearchText(value) {
     return normalizeCivilText(value).toLocaleLowerCase("hy-AM");
   }
@@ -335,9 +341,41 @@
     });
   }
 
+  function getCivilReferralDateSortValue(value) {
+    const text = normalizeCivilDateText(value);
+    const match = text.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+    if (!match) {
+      return 0;
+    }
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = 2000 + Number(match[3]);
+    const time = Date.UTC(year, month - 1, day);
+    return Number.isFinite(time) ? time : 0;
+  }
+
+  function getCivilReferralRowSortValue(row) {
+    const referralTime = getCivilReferralDateSortValue(row && row.referralDate);
+    if (referralTime) {
+      return referralTime;
+    }
+    const updatedTime = Date.parse(String(row && (row.updatedAt || row.importedAt) || ""));
+    return Number.isFinite(updatedTime) ? updatedTime : 0;
+  }
+
+  function sortCivilReferralRows(rows) {
+    return [...rows].sort((a, b) => {
+      const byDate = getCivilReferralRowSortValue(b) - getCivilReferralRowSortValue(a);
+      if (byDate) {
+        return byDate;
+      }
+      return normalizeCivilSearchText(a.patientName).localeCompare(normalizeCivilSearchText(b.patientName), "hy-AM");
+    });
+  }
+
   function pageCivilReferralRows(rows, options = {}) {
     const { limit, offset, query } = normalizeCivilListOptions(options);
-    const filteredRows = filterCivilReferralRows(rows, query);
+    const filteredRows = sortCivilReferralRows(filterCivilReferralRows(rows, query));
     return {
       rows: filteredRows.slice(offset, offset + limit),
       total: filteredRows.length,
@@ -430,8 +468,7 @@
   }
 
   function writeLocalCivilReferrals(rows) {
-    const normalized = normalizeCivilReferralRows(rows)
-      .sort((a, b) => String(b.updatedAt || b.importedAt || "").localeCompare(String(a.updatedAt || a.importedAt || "")));
+    const normalized = sortCivilReferralRows(normalizeCivilReferralRows(rows));
     localStorage.setItem(CIVIL_REFERRALS_LOCAL_STORAGE_KEY, JSON.stringify(normalized));
     return normalized;
   }
@@ -500,6 +537,41 @@
     return {
       ...paged,
       saved: normalized.length,
+      source: "local-only"
+    };
+  }
+
+  async function deleteCivilReferrals(ids, options = {}) {
+    const cleanIds = normalizeCivilReferralIds(ids);
+    const listOptions = normalizeCivilListOptions(options);
+    if (hasRemoteSync()) {
+      const payload = await postRemotePayload(
+        {
+          type: "delete_civil_referrals",
+          ids: cleanIds,
+          ...listOptions
+        },
+        "Не удалось удалить строки гражданских направлений"
+      );
+      return {
+        rows: normalizeCivilReferralRows(payload?.rows),
+        total: Number(payload?.total) || 0,
+        limit: Number(payload?.limit) || listOptions.limit,
+        offset: Number(payload?.offset) || listOptions.offset,
+        query: normalizeCivilText(payload?.query || listOptions.query),
+        deleted: Number(payload?.deleted) || cleanIds.length,
+        source: "remote"
+      };
+    }
+
+    if (cleanIds.length) {
+      const idSet = new Set(cleanIds);
+      writeLocalCivilReferrals(readLocalCivilReferrals().filter((row) => !idSet.has(row.id)));
+    }
+    const paged = pageCivilReferralRows(readLocalCivilReferrals(), listOptions);
+    return {
+      ...paged,
+      deleted: cleanIds.length,
       source: "local-only"
     };
   }
@@ -1209,6 +1281,7 @@
     clearDischargeShiftDraft,
     listCivilReferrals,
     saveCivilReferrals,
+    deleteCivilReferrals,
     saveOcrFeedback,
     saveReportDate,
     notifyOwnerLogin,

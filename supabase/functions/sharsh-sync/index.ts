@@ -48,7 +48,7 @@ const DISCHARGE_SHIFT_META_KEY = "discharge_shift";
 const CIVIL_REFERRAL_ROW_PREFIX = "civil-referral:";
 const CIVIL_REFERRAL_GROUP = "civil_referral";
 const CIVIL_REFERRAL_DEFAULT_LIMIT = 80;
-const CIVIL_REFERRAL_MAX_LIMIT = 200;
+const CIVIL_REFERRAL_MAX_LIMIT = 1000;
 const CIVIL_REFERRAL_VALUE_KEYS = [
   "patientName",
   "medicalCenter",
@@ -344,6 +344,45 @@ function sanitizeCivilReferralRows(rows: unknown, sourceFileName = "") {
       }
     });
   return [...byId.values()];
+}
+
+function sanitizeCivilReferralIds(ids: unknown) {
+  if (!Array.isArray(ids)) {
+    return [];
+  }
+  return [...new Set(ids.map((id) => normalizeCivilReferralText(id)).filter(Boolean))];
+}
+
+function getCivilReferralDateSortValue(value: unknown) {
+  const text = normalizeCivilReferralDateText(value);
+  const match = text.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+  if (!match) {
+    return 0;
+  }
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = 2000 + Number(match[3]);
+  const time = Date.UTC(year, month - 1, day);
+  return Number.isFinite(time) ? time : 0;
+}
+
+function getCivilReferralRowSortValue(row: Record<string, unknown>) {
+  const referralTime = getCivilReferralDateSortValue(row.referralDate);
+  if (referralTime) {
+    return referralTime;
+  }
+  const updatedTime = Date.parse(String(row.updatedAt || row.importedAt || ""));
+  return Number.isFinite(updatedTime) ? updatedTime : 0;
+}
+
+function sortCivilReferralRows(rows: Array<Record<string, unknown>>) {
+  return [...rows].sort((a, b) => {
+    const byDate = getCivilReferralRowSortValue(b) - getCivilReferralRowSortValue(a);
+    if (byDate) {
+      return byDate;
+    }
+    return normalizeCivilReferralText(a.patientName).localeCompare(normalizeCivilReferralText(b.patientName), "hy-AM");
+  });
 }
 
 function getServerErrorMessage(error: unknown) {
@@ -1615,24 +1654,26 @@ async function listCivilReferrals(
   }
 
   const { data, error } = await request
-    .order("updated_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .limit(5000);
 
   if (error) {
     throw error;
   }
 
+  const normalizedRows = ((data || []) as Array<Record<string, unknown>>).map((row) => ({
+    ...sanitizeCivilReferralRecord(row.values),
+    id: String(row.department_id || "").replace(CIVIL_REFERRAL_ROW_PREFIX, ""),
+    patientName: normalizeCivilReferralText(row.department_name) || normalizeCivilReferralText((row.values as Record<string, unknown> | null)?.patientName),
+    updatedAt: row.updated_at || ""
+  }));
+  const sortedRows = sortCivilReferralRows(normalizedRows);
+
   return {
-    total: Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : (data || []).length,
+    total: Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : sortedRows.length,
     limit,
     offset,
     query,
-    rows: (data || []).map((row) => ({
-      ...sanitizeCivilReferralRecord(row.values),
-      id: String(row.department_id || "").replace(CIVIL_REFERRAL_ROW_PREFIX, ""),
-      patientName: normalizeCivilReferralText(row.department_name) || normalizeCivilReferralText((row.values as Record<string, unknown> | null)?.patientName),
-      updatedAt: row.updated_at || ""
-    }))
+    rows: sortedRows.slice(offset, offset + limit)
   };
 }
 
@@ -1670,6 +1711,32 @@ async function saveCivilReferrals(
   return {
     ...(await listCivilReferrals(supabase, options)),
     saved: updates.length
+  };
+}
+
+async function deleteCivilReferrals(
+  supabase: ReturnType<typeof createClient>,
+  ids: unknown,
+  options: Record<string, unknown> = {}
+) {
+  const cleanIds = sanitizeCivilReferralIds(ids);
+
+  if (cleanIds.length) {
+    const departmentIds = cleanIds.map((id) => `${CIVIL_REFERRAL_ROW_PREFIX}${id}`);
+    const { error } = await supabase
+      .from("sharsh_departments")
+      .delete()
+      .eq("department_group", CIVIL_REFERRAL_GROUP)
+      .in("department_id", departmentIds);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  return {
+    ...(await listCivilReferrals(supabase, options)),
+    deleted: cleanIds.length
   };
 }
 
@@ -2038,6 +2105,10 @@ Deno.serve(async (request) => {
     if (type === "save_civil_referrals") {
       const sourceFileName = typeof payload.sourceFileName === "string" ? payload.sourceFileName.trim() : "";
       return jsonResponse(await saveCivilReferrals(supabase, payload.rows, sourceFileName, payload));
+    }
+
+    if (type === "delete_civil_referrals") {
+      return jsonResponse(await deleteCivilReferrals(supabase, payload.ids, payload));
     }
 
     if (type === "apply_night_shift") {

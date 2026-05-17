@@ -4,6 +4,7 @@
   const telegram = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   const root = document.getElementById("tg-civil-referrals-root");
   const pageSize = 20;
+  const documentExportLimit = 1000;
   const dateFieldKeys = new Set(["referralDate", "dischargeDate"]);
   const fields = [
     { key: "patientName", label: "Ա.Ա.Հ.", wide: true },
@@ -21,6 +22,7 @@
     offset: 0,
     query: "",
     searchDraft: "",
+    selectedIds: [],
     newRow: createEmptyRecord(),
     isBusy: false,
     message: "",
@@ -109,9 +111,157 @@
       : [];
   }
 
+  function getRowId(row) {
+    return normalizeText(row && row.id);
+  }
+
+  function pruneSelectedIds() {
+    const visibleIds = new Set(state.rows.map(getRowId).filter(Boolean));
+    state.selectedIds = state.selectedIds.filter((id) => visibleIds.has(id));
+  }
+
+  function updateSelectedId(id, isSelected) {
+    const cleanId = normalizeText(id);
+    if (!cleanId) {
+      return;
+    }
+    const selected = new Set(state.selectedIds);
+    if (isSelected) {
+      selected.add(cleanId);
+    } else {
+      selected.delete(cleanId);
+    }
+    state.selectedIds = [...selected];
+  }
+
+  function padTwo(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function formatDocumentDateTime(date = new Date()) {
+    return `${padTwo(date.getDate())}.${padTwo(date.getMonth() + 1)}.${String(date.getFullYear()).slice(-2)},${padTwo(date.getHours())}:${padTwo(date.getMinutes())}`;
+  }
+
+  function getDocumentFileName() {
+    return `Քաղ_ԲԿ_բազա_${formatDocumentDateTime().replace(/[.:,]/g, "-")}.doc`;
+  }
+
+  function buildDocumentHtml(rows) {
+    const generatedAt = formatDocumentDateTime();
+    const searchText = normalizeText(state.query || state.searchDraft);
+    const metaText = searchText ? `Որոնում՝ ${searchText}` : "Բոլոր ցուցադրված տողերը";
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Քաղ. ԲԿ բազա</title>
+  <style>
+    @page { size: 29.7cm 21cm; margin: 1.1cm; }
+    body { font-family: "Times New Roman", "Sylfaen", serif; color: #000; font-size: 11pt; }
+    h1 { margin: 0 0 8px; text-align: center; font-size: 18pt; }
+    .meta { width: 100%; margin: 0 0 10px; border-collapse: collapse; }
+    .meta td { border: 0; padding: 0 0 6px; font-size: 10pt; }
+    .meta .right { text-align: right; }
+    table.referrals { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    table.referrals th, table.referrals td { border: 1px solid #000; padding: 4px 5px; vertical-align: middle; }
+    table.referrals th { background: #f6c894; text-align: center; font-weight: 700; }
+    table.referrals td:nth-child(2) { font-weight: 700; }
+    col.num { width: 0.8cm; }
+    col.patient { width: 6.3cm; }
+    col.center { width: 3.9cm; }
+    col.unit { width: 3.2cm; }
+    col.rank { width: 2.7cm; }
+    col.short { width: 1.6cm; }
+    col.date { width: 2.3cm; }
+  </style>
+</head>
+<body>
+  <h1>Քաղաքացիական հիվանդանոցներ</h1>
+  <table class="meta">
+    <tr>
+      <td>${escapeHtml(metaText)}</td>
+      <td class="right">Ստեղծվել է՝ ${escapeHtml(generatedAt)}</td>
+    </tr>
+  </table>
+  <table class="referrals">
+    <colgroup>
+      <col class="num">
+      <col class="patient">
+      <col class="center">
+      <col class="unit">
+      <col class="rank">
+      <col class="short">
+      <col class="short">
+      <col class="date">
+      <col class="date">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>#</th>
+        ${fields.map((field) => `<th>${escapeHtml(field.label)}</th>`).join("")}
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map((row, index) => `
+        <tr>
+          <td style="text-align:center;">${index + 1}</td>
+          ${fields.map((field) => `<td>${escapeHtml(row[field.key] || "")}</td>`).join("")}
+        </tr>
+      `).join("")}
+    </tbody>
+  </table>
+</body>
+</html>`;
+  }
+
+  async function loadDocumentRows() {
+    const payload = await requestServer("civil-referrals-load", {
+      limit: documentExportLimit,
+      offset: 0,
+      query: state.query || state.searchDraft
+    });
+    return normalizeRows(payload.rows);
+  }
+
+  function downloadWordDocument(rows) {
+    const blob = new Blob([`\ufeff${buildDocumentHtml(rows)}`], { type: "application/msword;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = getDocumentFileName();
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function printDocument(rows, printWindow) {
+    const targetWindow = printWindow || window.open("", "_blank");
+    if (!targetWindow) {
+      setMessage("Telegram-ը արգելափակեց տպման պատուհանը։ Փորձեք Word ֆայլը պահպանել։", "error");
+      render();
+      return;
+    }
+    targetWindow.document.open();
+    targetWindow.document.write(buildDocumentHtml(rows));
+    targetWindow.document.close();
+    targetWindow.focus();
+    targetWindow.setTimeout(() => targetWindow.print(), 350);
+  }
+
   function setMessage(message, type = "") {
     state.message = message;
     state.messageType = type;
+  }
+
+  function confirmAction(message) {
+    return new Promise((resolve) => {
+      if (telegram && typeof telegram.showConfirm === "function") {
+        telegram.showConfirm(message, (confirmed) => resolve(Boolean(confirmed)));
+        return;
+      }
+      resolve(window.confirm(message));
+    });
   }
 
   async function requestServer(action, body) {
@@ -159,6 +309,7 @@
       state.offset = Math.max(0, Number(payload.offset) || 0);
       state.query = normalizeText(payload.query || query);
       state.searchDraft = state.query;
+      pruneSelectedIds();
       setMessage(state.rows.length ? "Տողերը բեռնված են։ Կարող եք խմբագրել և պահպանել։" : "Այս որոնմամբ տողեր չկան։", state.rows.length ? "success" : "");
       if (telegram && telegram.HapticFeedback) {
         telegram.HapticFeedback.notificationOccurred("success");
@@ -191,6 +342,7 @@
       state.rows = normalizeRows(payload.rows);
       state.total = Math.max(0, Number(payload.total) || state.total);
       state.offset = Math.max(0, Number(payload.offset) || state.offset);
+      pruneSelectedIds();
       setMessage(payload.message || "Փոփոխությունները պահպանված են։", "success");
       if (telegram && telegram.HapticFeedback) {
         telegram.HapticFeedback.notificationOccurred("success");
@@ -248,12 +400,119 @@
       state.query = normalizeText(payload.query || "");
       state.searchDraft = state.query;
       state.newRow = createEmptyRecord();
+      state.selectedIds = [];
       setMessage(payload.message || "Նոր տողը պահպանված է։", "success");
       if (telegram && telegram.HapticFeedback) {
         telegram.HapticFeedback.notificationOccurred("success");
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Չհաջողվեց պահպանել նոր տողը։", "error");
+      if (telegram && telegram.HapticFeedback) {
+        telegram.HapticFeedback.notificationOccurred("error");
+      }
+    } finally {
+      state.isBusy = false;
+      render();
+    }
+  }
+
+  async function exportCurrentDocument() {
+    if (state.isBusy) {
+      return;
+    }
+    state.isBusy = true;
+    setMessage("Պատրաստում եմ Word ֆայլը...", "");
+    render();
+    try {
+      const rows = await loadDocumentRows();
+      if (!rows.length) {
+        setMessage("Այս որոնմամբ պահպանելու տողեր չկան։", "error");
+        return;
+      }
+      downloadWordDocument(rows);
+      setMessage(`Word ֆայլը պատրաստ է՝ ${rows.length} տող։`, "success");
+      if (telegram && telegram.HapticFeedback) {
+        telegram.HapticFeedback.notificationOccurred("success");
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Չհաջողվեց պատրաստել Word ֆայլը։", "error");
+      if (telegram && telegram.HapticFeedback) {
+        telegram.HapticFeedback.notificationOccurred("error");
+      }
+    } finally {
+      state.isBusy = false;
+      render();
+    }
+  }
+
+  async function printCurrentDocument() {
+    if (state.isBusy) {
+      return;
+    }
+    const printWindow = window.open("", "_blank");
+    state.isBusy = true;
+    setMessage("Պատրաստում եմ տպման ֆայլը...", "");
+    render();
+    try {
+      const rows = await loadDocumentRows();
+      if (!rows.length) {
+        if (printWindow) {
+          printWindow.close();
+        }
+        setMessage("Այս որոնմամբ տպելու տողեր չկան։", "error");
+        return;
+      }
+      printDocument(rows, printWindow);
+      setMessage(`Տպման փաստաթուղթը բացված է՝ ${rows.length} տող։`, "success");
+    } catch (error) {
+      if (printWindow) {
+        printWindow.close();
+      }
+      setMessage(error instanceof Error ? error.message : "Չհաջողվեց բացել տպումը։", "error");
+    } finally {
+      state.isBusy = false;
+      render();
+    }
+  }
+
+  async function deleteSelectedRows() {
+    const ids = [...new Set(state.selectedIds.map(normalizeText).filter(Boolean))];
+    if (!ids.length || state.isBusy) {
+      return;
+    }
+    const confirmed = await confirmAction(ids.length === 1
+      ? "Ջնջե՞լ ընտրված տողը։"
+      : `Ջնջե՞լ ընտրված ${ids.length} տողերը։`);
+    if (!confirmed) {
+      return;
+    }
+
+    state.isBusy = true;
+    setMessage("Ջնջվում է...", "");
+    render();
+    try {
+      const payload = await requestServer("civil-referrals-delete", {
+        ids,
+        limit: pageSize,
+        offset: state.offset,
+        query: state.query
+      });
+      state.selectedIds = [];
+      state.rows = normalizeRows(payload.rows);
+      state.total = Math.max(0, Number(payload.total) || 0);
+      state.offset = Math.max(0, Number(payload.offset) || 0);
+      state.query = normalizeText(payload.query || state.query);
+      state.searchDraft = state.query;
+      if (!state.rows.length && state.total > 0 && state.offset > 0) {
+        await loadRows(Math.max(0, state.offset - pageSize), state.query);
+        return;
+      }
+      setMessage(payload.message || `Ջնջված է՝ ${payload.deleted || ids.length} տող։`, "success");
+      if (telegram && telegram.HapticFeedback) {
+        telegram.HapticFeedback.notificationOccurred("success");
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Չհաջողվեց ջնջել ընտրված տողերը։", "error");
       if (telegram && telegram.HapticFeedback) {
         telegram.HapticFeedback.notificationOccurred("error");
       }
@@ -306,6 +565,7 @@
     if (!state.rows.length) {
       return `<div class="tg-civil-empty">Տվյալներ չկան։</div>`;
     }
+    const selectedIds = new Set(state.selectedIds);
     return `
       <div class="tg-form-table-wrap tg-civil-table-wrap">
         <table class="tg-form-table tg-civil-table">
@@ -320,23 +580,39 @@
             </tr>
           </thead>
           <tbody>
-            ${state.rows.map((row, rowIndex) => `
-              <tr>
-                <th scope="row">${state.offset + rowIndex + 1}</th>
-                ${fields.map((field) => `
-                  <td class="${field.wide ? "tg-civil-wide-cell" : ""}">
-                    <input
-                      class="tg-civil-input${dateFieldKeys.has(field.key) ? " tg-civil-date-input" : ""}"
-                      data-row="${rowIndex}"
-                      data-key="${escapeHtml(field.key)}"
-                      value="${escapeHtml(row[field.key])}"
-                      ${dateFieldKeys.has(field.key) ? 'inputmode="numeric" maxlength="10" placeholder="օր.ամ.տտ"' : 'type="text"'}
-                      autocomplete="off"
-                    >
-                  </td>
-                `).join("")}
-              </tr>
-            `).join("")}
+            ${state.rows.map((row, rowIndex) => {
+              const rowId = getRowId(row);
+              const isSelected = rowId && selectedIds.has(rowId);
+              return `
+                <tr class="${isSelected ? "is-selected" : ""}">
+                  <th scope="row">
+                    <label class="tg-civil-row-select" title="Ընտրել տողը">
+                      <input
+                        class="tg-civil-row-checkbox"
+                        type="checkbox"
+                        data-id="${escapeHtml(rowId)}"
+                        ${rowId ? "" : "disabled"}
+                        ${isSelected ? "checked" : ""}
+                        ${state.isBusy ? "disabled" : ""}
+                      >
+                      <span>${state.offset + rowIndex + 1}</span>
+                    </label>
+                  </th>
+                  ${fields.map((field) => `
+                    <td class="${field.wide ? "tg-civil-wide-cell" : ""}">
+                      <input
+                        class="tg-civil-input${dateFieldKeys.has(field.key) ? " tg-civil-date-input" : ""}"
+                        data-row="${rowIndex}"
+                        data-key="${escapeHtml(field.key)}"
+                        value="${escapeHtml(row[field.key])}"
+                        ${dateFieldKeys.has(field.key) ? 'inputmode="numeric" maxlength="10" placeholder="օր.ամ.տտ"' : 'type="text"'}
+                        autocomplete="off"
+                      >
+                    </td>
+                  `).join("")}
+                </tr>
+              `;
+            }).join("")}
           </tbody>
         </table>
       </div>
@@ -347,6 +623,7 @@
     if (!root) {
       return;
     }
+    const selectedCount = state.selectedIds.length;
     root.innerHTML = `
       <section class="tg-form-card tg-civil-card">
         <header class="tg-form-head">
@@ -366,6 +643,12 @@
         <div class="tg-civil-toolbar">
           <input id="tgCivilSearchInput" class="tg-civil-search" type="search" value="${escapeHtml(state.searchDraft)}" placeholder="Որոնում՝ ԱԱՀ, ԲԿ, զորամաս, ամսաթիվ...">
           <button id="tgCivilSearchBtn" class="tg-civil-search-btn" type="button" ${state.isBusy ? "disabled" : ""} aria-label="Որոնել">⌕</button>
+        </div>
+        <div class="tg-civil-document-actions">
+          <button id="tgCivilPrintBtn" type="button" ${state.isBusy || !state.total ? "disabled" : ""}>Տպել</button>
+          <button id="tgCivilExportBtn" type="button" ${state.isBusy || !state.total ? "disabled" : ""}>Word</button>
+          <button id="tgCivilDeleteBtn" class="tg-civil-delete-btn" type="button" ${state.isBusy || !selectedCount ? "disabled" : ""}>Ջնջել${selectedCount ? ` (${selectedCount})` : ""}</button>
+          <span>Կոճակները վերցնում են ընթացիկ որոնման տողերը։</span>
         </div>
 
         ${renderPagination()}
@@ -400,6 +683,9 @@
       loadRows(0, state.searchDraft);
     });
     document.getElementById("tgCivilAddRowBtn")?.addEventListener("click", saveNewRow);
+    document.getElementById("tgCivilPrintBtn")?.addEventListener("click", printCurrentDocument);
+    document.getElementById("tgCivilExportBtn")?.addEventListener("click", exportCurrentDocument);
+    document.getElementById("tgCivilDeleteBtn")?.addEventListener("click", deleteSelectedRows);
     document.getElementById("tgCivilSaveBtn")?.addEventListener("click", saveRows);
     root.querySelectorAll("[data-page]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -433,6 +719,12 @@
           : normalizeText(input.value);
         input.value = normalized;
         state.rows[rowIndex][key] = normalized;
+      });
+    });
+    root.querySelectorAll(".tg-civil-row-checkbox").forEach((input) => {
+      input.addEventListener("change", () => {
+        updateSelectedId(input.getAttribute("data-id"), input.checked);
+        render();
       });
     });
     root.querySelectorAll(".tg-civil-new-input").forEach((input) => {

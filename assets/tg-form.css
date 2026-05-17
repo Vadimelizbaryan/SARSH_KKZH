@@ -324,6 +324,43 @@ input {
   cursor: pointer;
 }
 
+.tg-civil-document-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.tg-civil-document-actions button {
+  min-height: 36px;
+  border: 1px solid rgba(15, 139, 76, 0.2);
+  border-radius: 999px;
+  background: #eaf6ef;
+  color: var(--tg-accent);
+  padding: 0 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-civil-document-actions button:disabled {
+  cursor: not-allowed;
+  color: var(--tg-muted);
+  background: #eef1ec;
+}
+
+.tg-civil-document-actions .tg-civil-delete-btn {
+  border-color: rgba(188, 70, 46, 0.28);
+  background: #fff0ed;
+  color: #a33123;
+}
+
+.tg-civil-document-actions span {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .tg-civil-new-row {
   margin: 12px 0;
   padding: 10px;
@@ -513,6 +550,33 @@ input {
 .tg-civil-table thead th:first-child {
   z-index: 5;
   background: #efe0c3;
+}
+
+.tg-civil-table tr.is-selected th,
+.tg-civil-table tr.is-selected td {
+  background: #e7f7ec;
+}
+
+.tg-civil-table tr.is-selected .tg-civil-input {
+  border-color: rgba(21, 144, 94, 0.44);
+  background: #f6fff8;
+}
+
+.tg-civil-row-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tg-civil-row-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #15905e;
 }
 
 .tg-civil-wide-head {

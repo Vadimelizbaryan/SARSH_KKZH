@@ -358,7 +358,7 @@ const DISCHARGE_SHIFT_META_KEY = "discharge_shift";
 const CIVIL_REFERRAL_ROW_PREFIX = "civil-referral:";
 const CIVIL_REFERRAL_GROUP = "civil_referral";
 const CIVIL_REFERRAL_DEFAULT_LIMIT = 40;
-const CIVIL_REFERRAL_MAX_LIMIT = 120;
+const CIVIL_REFERRAL_MAX_LIMIT = 1000;
 const CIVIL_REFERRAL_VALUE_KEYS = [
   "patientName",
   "medicalCenter",
@@ -584,6 +584,45 @@ function sanitizeCivilReferralRows(rows: unknown, sourceFileName = "") {
       }
     });
   return [...byId.values()];
+}
+
+function sanitizeCivilReferralIds(ids: unknown) {
+  if (!Array.isArray(ids)) {
+    return [];
+  }
+  return [...new Set(ids.map((id) => normalizeCivilReferralText(id)).filter(Boolean))];
+}
+
+function getCivilReferralDateSortValue(value: unknown) {
+  const text = normalizeCivilReferralDateText(value);
+  const match = text.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+  if (!match) {
+    return 0;
+  }
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = 2000 + Number(match[3]);
+  const time = Date.UTC(year, month - 1, day);
+  return Number.isFinite(time) ? time : 0;
+}
+
+function getCivilReferralRowSortValue(row: Record<string, unknown>) {
+  const referralTime = getCivilReferralDateSortValue(row.referralDate);
+  if (referralTime) {
+    return referralTime;
+  }
+  const updatedTime = Date.parse(String(row.updatedAt || row.importedAt || ""));
+  return Number.isFinite(updatedTime) ? updatedTime : 0;
+}
+
+function sortCivilReferralRows(rows: Array<Record<string, unknown>>) {
+  return [...rows].sort((a, b) => {
+    const byDate = getCivilReferralRowSortValue(b) - getCivilReferralRowSortValue(a);
+    if (byDate) {
+      return byDate;
+    }
+    return normalizeCivilReferralText(a.patientName).localeCompare(normalizeCivilReferralText(b.patientName), "hy-AM");
+  });
 }
 
 function normalizeNightShiftSubmittedRows(payload: Record<string, unknown> | null) {
@@ -2427,8 +2466,7 @@ async function listCivilReferrals(
   }
 
   const { data, error } = await request
-    .order("updated_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .limit(5000);
 
   if (error) {
     throw error;
@@ -2445,13 +2483,14 @@ async function listCivilReferrals(
       updatedAt: row.updated_at || ""
     };
   });
+  const sortedRows = sortCivilReferralRows(normalizedRows);
 
   return {
-    total: Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : (data || []).length,
+    total: Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : sortedRows.length,
     limit,
     offset,
     query,
-    rows: normalizedRows
+    rows: sortedRows.slice(offset, offset + limit)
   };
 }
 
@@ -2489,6 +2528,32 @@ async function saveCivilReferrals(
   return {
     ...(await listCivilReferrals(supabase, options)),
     saved: updates.length
+  };
+}
+
+async function deleteCivilReferrals(
+  supabase: ReturnType<typeof createClient>,
+  ids: unknown,
+  options: Record<string, unknown> = {}
+) {
+  const cleanIds = sanitizeCivilReferralIds(ids);
+
+  if (cleanIds.length) {
+    const departmentIds = cleanIds.map((id) => `${CIVIL_REFERRAL_ROW_PREFIX}${id}`);
+    const { error } = await supabase
+      .from("sharsh_departments")
+      .delete()
+      .eq("department_group", CIVIL_REFERRAL_GROUP)
+      .in("department_id", departmentIds);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  return {
+    ...(await listCivilReferrals(supabase, options)),
+    deleted: cleanIds.length
   };
 }
 
@@ -5264,6 +5329,40 @@ async function handleTelegramCivilReferralsSave(request: Request) {
   }
 }
 
+async function handleTelegramCivilReferralsDelete(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const verifiedUser = await verifyTelegramWebAppInitData(String(payload?.initData || ""));
+    if (!verifiedUser) {
+      return jsonResponse({ ok: false, error: "Telegram Web App authorization failed." }, 403);
+    }
+
+    if (!isTelegramAdminChat(verifiedUser.userId)) {
+      return jsonResponse({
+        ok: false,
+        error: "Այս բաժինը հասանելի է միայն ադմինիստրատորին։"
+      }, 403);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const result = await deleteCivilReferrals(
+      supabase as ReturnType<typeof createClient>,
+      payload?.ids,
+      payload || {}
+    );
+    return jsonResponse({
+      ok: true,
+      ...result,
+      message: `Ջնջված է՝ ${result.deleted || 0} տող։`
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      error: sanitizePublicErrorMessage(error)
+    }, 500);
+  }
+}
+
 async function handleTelegramDayFormSubmit(request: Request) {
   try {
     const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -6920,6 +7019,9 @@ Deno.serve(async (request) => {
   }
   if (postUrl.searchParams.get("action") === "civil-referrals-save") {
     return await handleTelegramCivilReferralsSave(request);
+  }
+  if (postUrl.searchParams.get("action") === "civil-referrals-delete") {
+    return await handleTelegramCivilReferralsDelete(request);
   }
 
   if (!isTelegramSecretValid(request)) {
