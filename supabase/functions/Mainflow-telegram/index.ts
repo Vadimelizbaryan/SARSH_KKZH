@@ -2860,8 +2860,37 @@ function getCivilReferralTelegramSearchQuery(text: string) {
   return smartQuery && smartQuery.mode !== "sr" ? firstToken : "";
 }
 
+function getCivilReferralDocumentFields(rows: Array<Record<string, unknown>>) {
+  const hasDischargeDate = rows.some((row) => normalizeCivilReferralText(row.dischargeDate));
+  return CIVIL_REFERRAL_FIELD_DEFINITIONS.filter((field) => {
+    return hasDischargeDate
+      ? field.key !== "referralDate"
+      : field.key !== "dischargeDate";
+  });
+}
+
+function getCivilReferralDocumentColumnClass(field: typeof CIVIL_REFERRAL_FIELD_DEFINITIONS[number]) {
+  if (field.key === "patientName") {
+    return "patient";
+  }
+  if (field.key === "medicalCenter") {
+    return "center";
+  }
+  if (field.key === "militaryUnit") {
+    return "unit";
+  }
+  if (field.key === "rank") {
+    return "rank";
+  }
+  if (field.key === "referralDate" || field.key === "dischargeDate") {
+    return "date";
+  }
+  return "short";
+}
+
 function buildCivilReferralSearchDocumentHtml(rows: Array<Record<string, unknown>>, query: string, total: number) {
   const generatedAt = getYerevanDateTimeText();
+  const documentFields = getCivilReferralDocumentFields(rows);
   const metaText = query
     ? `Որոնում՝ ${query}`
     : "Բոլոր ցուցադրված տողերը";
@@ -2902,26 +2931,19 @@ function buildCivilReferralSearchDocumentHtml(rows: Array<Record<string, unknown
   <table class="referrals">
     <colgroup>
       <col class="num">
-      <col class="patient">
-      <col class="center">
-      <col class="unit">
-      <col class="rank">
-      <col class="short">
-      <col class="short">
-      <col class="date">
-      <col class="date">
+      ${documentFields.map((field) => `<col class="${getCivilReferralDocumentColumnClass(field)}">`).join("")}
     </colgroup>
     <thead>
       <tr>
         <th>#</th>
-        ${CIVIL_REFERRAL_FIELD_DEFINITIONS.map((field) => `<th>${escapeCivilReferralHtml(field.label)}</th>`).join("")}
+        ${documentFields.map((field) => `<th>${escapeCivilReferralHtml(field.label)}</th>`).join("")}
       </tr>
     </thead>
     <tbody>
       ${rows.map((row, index) => `
         <tr>
           <td style="text-align:center;">${index + 1}</td>
-          ${CIVIL_REFERRAL_FIELD_DEFINITIONS.map((field) => `<td>${escapeCivilReferralHtml(row[field.key] || "")}</td>`).join("")}
+          ${documentFields.map((field) => `<td>${escapeCivilReferralHtml(row[field.key] || "")}</td>`).join("")}
         </tr>
       `).join("")}
     </tbody>
