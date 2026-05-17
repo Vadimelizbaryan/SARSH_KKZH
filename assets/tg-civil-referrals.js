@@ -641,7 +641,7 @@
         ${renderNewRowForm()}
 
         <div class="tg-civil-toolbar">
-          <input id="tgCivilSearchInput" class="tg-civil-search" type="search" value="${escapeHtml(state.searchDraft)}" placeholder="Որոնում՝ ԱԱՀ, ԲԿ, SR-21-7, SR-21-out-14.05.25">
+          <input id="tgCivilSearchInput" class="tg-civil-search" type="search" value="${escapeHtml(state.searchDraft)}" placeholder="Որոնում՝ ԱԱՀ, ԲԿ, SR-21-7, SR-21-out-7">
           <button id="tgCivilSearchBtn" class="tg-civil-search-btn" type="button" ${state.isBusy ? "disabled" : ""} aria-label="Որոնել">⌕</button>
         </div>
         <div class="tg-civil-document-actions">

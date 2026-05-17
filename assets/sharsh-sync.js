@@ -343,10 +343,15 @@
       return { srMarker, mode: "sr" };
     }
 
-    if (!isDischarge && /^\d{1,4}$/.test(suffix)) {
+    if (/^\d{1,4}$/.test(suffix)) {
       const days = Number(suffix);
       if (days >= 1 && days <= 3650) {
-        return { srMarker, mode: "range", days, dateField: "referralDate" };
+        return {
+          srMarker,
+          mode: "range",
+          days,
+          dateField: isDischarge ? "dischargeDate" : "referralDate"
+        };
       }
     }
 
