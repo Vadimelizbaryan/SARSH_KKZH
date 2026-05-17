@@ -34,6 +34,7 @@ jobs:
           cp tg-night-form.html _site/
           cp tg-day-form.html _site/
           cp tg-discharge-form.html _site/
+          cp tg-civil-referrals.html _site/
           cp night.html _site/
           cp night-shift.html _site/
           cp day.html _site/
