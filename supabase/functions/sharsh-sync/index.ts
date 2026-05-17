@@ -276,7 +276,7 @@ function buildCivilReferralSearchFilter(pattern: string) {
 
 type CivilReferralSmartQuery =
   | { srMarker: string; mode: "sr" }
-  | { srMarker: string; mode: "range"; days: number; dateField: "referralDate" }
+  | { srMarker: string; mode: "range"; days: number; dateField: "referralDate" | "dischargeDate" }
   | { srMarker: string; mode: "date"; date: string; dateField: "referralDate" | "dischargeDate" };
 
 function normalizeCivilReferralSearchText(value: unknown) {

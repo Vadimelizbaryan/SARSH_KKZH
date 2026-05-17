@@ -371,6 +371,16 @@ const CIVIL_REFERRAL_VALUE_KEYS = [
   "referralDate",
   "dischargeDate"
 ] as const;
+const CIVIL_REFERRAL_FIELD_DEFINITIONS = [
+  { key: "patientName", label: "Ա.Ա.Հ." },
+  { key: "medicalCenter", label: "ԲԿ" },
+  { key: "militaryUnit", label: "Զորամաս" },
+  { key: "rank", label: "Կոչում" },
+  { key: "draftYear", label: "Զորակ" },
+  { key: "birthYear", label: "Ծնված" },
+  { key: "referralDate", label: "Ուղեգրման" },
+  { key: "dischargeDate", label: "Դուրսգրում" }
+] as const;
 const CIVIL_REFERRAL_HASH_KEYS = CIVIL_REFERRAL_VALUE_KEYS.filter((key) => key !== "dischargeDate");
 const NIGHT_SHIFT_LABELS: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], string> = {
   shar: "ՇԱՐ",
@@ -516,7 +526,7 @@ function buildCivilReferralSearchFilter(pattern: string) {
 
 type CivilReferralSmartQuery =
   | { srMarker: string; mode: "sr" }
-  | { srMarker: string; mode: "range"; days: number; dateField: "referralDate" }
+  | { srMarker: string; mode: "range"; days: number; dateField: "referralDate" | "dischargeDate" }
   | { srMarker: string; mode: "date"; date: string; dateField: "referralDate" | "dischargeDate" };
 
 function normalizeCivilReferralSearchText(value: unknown) {
@@ -2669,6 +2679,134 @@ async function deleteCivilReferrals(
     ...(await listCivilReferrals(supabase, options)),
     deleted: cleanIds.length
   };
+}
+
+function escapeCivilReferralHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function getCivilReferralTelegramSearchQuery(text: string) {
+  const firstToken = normalizeCivilReferralText(text)
+    .split(/\s+/)[0]
+    .replace(/^\/+/, "")
+    .replace(/@[\w_]+$/, "");
+  const smartQuery = parseCivilReferralSmartQuery(firstToken);
+  return smartQuery && smartQuery.mode !== "sr" ? firstToken : "";
+}
+
+function buildCivilReferralSearchDocumentHtml(rows: Array<Record<string, unknown>>, query: string, total: number) {
+  const generatedAt = getYerevanDateTimeText();
+  const metaText = query
+    ? `Որոնում՝ ${query}`
+    : "Բոլոր ցուցադրված տողերը";
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Քաղ. ԲԿ բազա</title>
+  <style>
+    @page { size: 29.7cm 21cm; margin: 1.1cm; }
+    body { font-family: "Times New Roman", "Sylfaen", serif; color: #000; font-size: 11pt; }
+    h1 { margin: 0 0 8px; text-align: center; font-size: 18pt; }
+    .meta { width: 100%; margin: 0 0 10px; border-collapse: collapse; }
+    .meta td { border: 0; padding: 0 0 6px; font-size: 10pt; }
+    .meta .right { text-align: right; }
+    table.referrals { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    table.referrals th, table.referrals td { border: 1px solid #000; padding: 4px 5px; vertical-align: middle; }
+    table.referrals th { background: #f6c894; text-align: center; font-weight: 700; }
+    table.referrals td { background: #fff; }
+    table.referrals td:nth-child(2) { font-weight: 700; }
+    col.num { width: 0.8cm; }
+    col.patient { width: 6.3cm; }
+    col.center { width: 3.9cm; }
+    col.unit { width: 3.2cm; }
+    col.rank { width: 2.7cm; }
+    col.short { width: 1.6cm; }
+    col.date { width: 2.3cm; }
+  </style>
+</head>
+<body>
+  <h1>Քաղաքացիական հիվանդանոցներ</h1>
+  <table class="meta">
+    <tr>
+      <td>${escapeCivilReferralHtml(metaText)} · ${escapeCivilReferralHtml(`Գտնվել է՝ ${total}`)}</td>
+      <td class="right">Ստեղծվել է՝ ${escapeCivilReferralHtml(generatedAt)}</td>
+    </tr>
+  </table>
+  <table class="referrals">
+    <colgroup>
+      <col class="num">
+      <col class="patient">
+      <col class="center">
+      <col class="unit">
+      <col class="rank">
+      <col class="short">
+      <col class="short">
+      <col class="date">
+      <col class="date">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>#</th>
+        ${CIVIL_REFERRAL_FIELD_DEFINITIONS.map((field) => `<th>${escapeCivilReferralHtml(field.label)}</th>`).join("")}
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map((row, index) => `
+        <tr>
+          <td style="text-align:center;">${index + 1}</td>
+          ${CIVIL_REFERRAL_FIELD_DEFINITIONS.map((field) => `<td>${escapeCivilReferralHtml(row[field.key] || "")}</td>`).join("")}
+        </tr>
+      `).join("")}
+    </tbody>
+  </table>
+</body>
+</html>`;
+}
+
+function buildCivilReferralSearchDocumentBytes(rows: Array<Record<string, unknown>>, query: string, total: number) {
+  return new TextEncoder().encode(`\ufeff${buildCivilReferralSearchDocumentHtml(rows, query, total)}`);
+}
+
+function buildCivilReferralSearchDocumentFileName(query: string) {
+  const safeQuery = sanitizeSheetFileNamePart(query || "search") || "search";
+  const safeDate = sanitizeSheetFileNamePart(getYerevanDateTimeText().replace(/[.:]/g, "-")) || "now";
+  return `Qagh_BK_${safeQuery}_${safeDate}.doc`;
+}
+
+async function sendCivilReferralSearchWordDocument(
+  supabase: ReturnType<typeof createClient>,
+  chatId: number | string,
+  query: string
+) {
+  const payload = await listCivilReferrals(supabase, {
+    limit: CIVIL_REFERRAL_MAX_LIMIT,
+    offset: 0,
+    query
+  });
+  const rows = Array.isArray(payload.rows) ? payload.rows as Array<Record<string, unknown>> : [];
+  const total = Number(payload.total) || rows.length;
+  const clippedText = total > rows.length
+    ? `\nՖայլում՝ ${rows.length} տող։ Եթե պետք է ամբողջը, նեղացրեք որոնումը։`
+    : "";
+  const caption = [
+    "Քաղ. ԲԿ բազա",
+    `Հարցում՝ ${query}`,
+    `Գտնվել է՝ ${total}${clippedText}`
+  ].join("\n");
+
+  await sendTelegramDocument(
+    chatId,
+    buildCivilReferralSearchDocumentFileName(query),
+    buildCivilReferralSearchDocumentBytes(rows, query, total),
+    caption,
+    "application/msword;charset=utf-8"
+  );
 }
 
 let armenianPdfFontBytesPromise: Promise<Uint8Array | null> | null = null;
@@ -6881,6 +7019,20 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
 
   if (telegramLocation) {
     await handleTelegramLocation(supabase, safeChatId, message, accessChatId, telegramLocation);
+    return;
+  }
+
+  const civilReferralSearchQuery = getCivilReferralTelegramSearchQuery(text);
+  if (civilReferralSearchQuery) {
+    if (!isTelegramAdminChat(accessChatId)) {
+      await sendTelegramMessage(safeChatId, TELEGRAM_ADMIN_ONLY_TEXT);
+      return;
+    }
+    await sendCivilReferralSearchWordDocument(
+      supabase as ReturnType<typeof createClient>,
+      safeChatId,
+      civilReferralSearchQuery
+    );
     return;
   }
 
