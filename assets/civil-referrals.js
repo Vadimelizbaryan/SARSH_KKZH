@@ -830,7 +830,7 @@ function isHeaderRow(cells) {
             <input
               type="search"
               id="civilFilterInput"
-              placeholder="Поиск по ФИО, БК, части, званию, датам..."
+              placeholder="Поиск: ФИО, БК, SR-21-7, SR-21-14.05.25, SR-21-out-14.05.25"
               value="${escapeHtml(state.searchDraft)}"
               ${state.isBusy ? "disabled" : ""}
             >
@@ -842,7 +842,7 @@ function isHeaderRow(cells) {
               aria-label="Поиск"
               ${state.isBusy ? "disabled" : ""}
             >&#128269;</button>
-            <span class="civil-search-note">Поиск работает по всем колонкам. Печать и Word берут строки текущего поиска.</span>
+            <span class="civil-search-note">Примеры: SR-21-7 покажет последние 7 дней по направлению, SR-21-14.05.25 - дату направления, SR-21-out-14.05.25 - дату выписки.</span>
           </div>
           ${renderRowsTable(state.savedRows, "В базе пока нет записей.", "saved", { applyFilter: false, rowNumberOffset: state.savedOffset })}
           ${renderSavedPagination()}

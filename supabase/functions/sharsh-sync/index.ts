@@ -49,6 +49,8 @@ const CIVIL_REFERRAL_ROW_PREFIX = "civil-referral:";
 const CIVIL_REFERRAL_GROUP = "civil_referral";
 const CIVIL_REFERRAL_DEFAULT_LIMIT = 80;
 const CIVIL_REFERRAL_MAX_LIMIT = 1000;
+const CIVIL_REFERRAL_DAY_MS = 24 * 60 * 60 * 1000;
+const ARMENIA_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
 const CIVIL_REFERRAL_VALUE_KEYS = [
   "patientName",
   "medicalCenter",
@@ -267,8 +269,124 @@ function buildCivilReferralSearchFilter(pattern: string) {
     `values->>draftYear.ilike.${pattern}`,
     `values->>birthYear.ilike.${pattern}`,
     `values->>referralDate.ilike.${pattern}`,
-    `values->>dischargeDate.ilike.${pattern}`
+    `values->>dischargeDate.ilike.${pattern}`,
+    `values->>sourceFileName.ilike.${pattern}`
   ].join(",");
+}
+
+type CivilReferralSmartQuery =
+  | { srMarker: string; mode: "sr" }
+  | { srMarker: string; mode: "range"; days: number; dateField: "referralDate" }
+  | { srMarker: string; mode: "date"; date: string; dateField: "referralDate" | "dischargeDate" };
+
+function normalizeCivilReferralSearchText(value: unknown) {
+  return normalizeCivilReferralText(value).toLocaleLowerCase("hy-AM");
+}
+
+function normalizeCivilReferralCompactSearchText(value: unknown) {
+  return normalizeCivilReferralSearchText(value).replace(/\s+/g, "");
+}
+
+function parseCivilReferralSmartQuery(query: string): CivilReferralSmartQuery | null {
+  const compact = normalizeCivilReferralText(query).replace(/\s+/g, "");
+  const match = compact.match(/^SR[-_]?(\d{1,2})(?:-(out)-(.+)|-(.+))?$/i);
+  if (!match) {
+    return null;
+  }
+
+  const srMarker = `SR-${Number(match[1])}`;
+  const isDischarge = Boolean(match[2]);
+  const suffix = match[3] || match[4] || "";
+  if (!suffix) {
+    return { srMarker, mode: "sr" };
+  }
+
+  if (!isDischarge && /^\d{1,4}$/.test(suffix)) {
+    const days = Number(suffix);
+    if (days >= 1 && days <= 3650) {
+      return { srMarker, mode: "range", days, dateField: "referralDate" };
+    }
+  }
+
+  const date = normalizeCivilReferralDateText(suffix);
+  if (date) {
+    return {
+      srMarker,
+      mode: "date",
+      date,
+      dateField: isDischarge ? "dischargeDate" : "referralDate"
+    };
+  }
+
+  return null;
+}
+
+function normalizeCivilReferralSrText(value: unknown) {
+  return normalizeCivilReferralSearchText(value)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function rowMatchesCivilReferralSr(row: Record<string, unknown>, srMarker: string) {
+  const marker = normalizeCivilReferralSrText(srMarker);
+  if (!marker) {
+    return true;
+  }
+  return [
+    row.sourceFileName,
+    row.departmentId,
+    row.departmentName,
+    row.source,
+    row.fileName
+  ].some((value) => normalizeCivilReferralSrText(value).includes(marker));
+}
+
+function getCivilReferralTodayTime() {
+  const armeniaNow = new Date(Date.now() + ARMENIA_UTC_OFFSET_MS);
+  return Date.UTC(
+    armeniaNow.getUTCFullYear(),
+    armeniaNow.getUTCMonth(),
+    armeniaNow.getUTCDate()
+  );
+}
+
+function rowMatchesCivilReferralSmartQuery(row: Record<string, unknown>, smartQuery: CivilReferralSmartQuery) {
+  if (!rowMatchesCivilReferralSr(row, smartQuery.srMarker)) {
+    return false;
+  }
+  if (smartQuery.mode === "sr") {
+    return true;
+  }
+  const dateValue = getCivilReferralDateSortValue(row[smartQuery.dateField]);
+  if (!dateValue) {
+    return false;
+  }
+  if (smartQuery.mode === "date") {
+    return normalizeCivilReferralDateText(row[smartQuery.dateField]) === smartQuery.date;
+  }
+  const end = getCivilReferralTodayTime();
+  const start = end - (smartQuery.days - 1) * CIVIL_REFERRAL_DAY_MS;
+  return dateValue >= start && dateValue <= end;
+}
+
+function filterCivilReferralRows(rows: Array<Record<string, unknown>>, query: string) {
+  const smartQuery = parseCivilReferralSmartQuery(query);
+  if (smartQuery) {
+    return rows.filter((row) => rowMatchesCivilReferralSmartQuery(row, smartQuery));
+  }
+
+  const normalizedQuery = normalizeCivilReferralSearchText(query);
+  const compactQuery = normalizeCivilReferralCompactSearchText(query);
+  if (!normalizedQuery) {
+    return rows;
+  }
+
+  const fields = [...CIVIL_REFERRAL_VALUE_KEYS, "sourceFileName"];
+  return rows.filter((row) => fields.some((key) => {
+    const value = row[String(key)];
+    return normalizeCivilReferralSearchText(value).includes(normalizedQuery)
+      || normalizeCivilReferralCompactSearchText(value).includes(compactQuery);
+  }));
 }
 
 const CIVIL_ARMENIAN_WORD_RE = /^[\u0531-\u0587]+$/;
@@ -1630,13 +1748,9 @@ async function listCivilReferrals(
   options: Record<string, unknown> = {}
 ) {
   const { limit, offset, query } = sanitizeCivilReferralListOptions(options);
-  const pattern = buildCivilReferralIlikePattern(query);
-  const searchFilter = query ? buildCivilReferralSearchFilter(pattern) : "";
-
-  let countRequest = supabase
-    .from("sharsh_departments")
-    .select("department_id", { count: "exact", head: true })
-    .eq("department_group", CIVIL_REFERRAL_GROUP);
+  const smartQuery = parseCivilReferralSmartQuery(query);
+  const pattern = !smartQuery && query ? buildCivilReferralIlikePattern(query) : "";
+  const searchFilter = pattern ? buildCivilReferralSearchFilter(pattern) : "";
 
   let request = supabase
     .from("sharsh_departments")
@@ -1644,13 +1758,7 @@ async function listCivilReferrals(
     .eq("department_group", CIVIL_REFERRAL_GROUP);
 
   if (searchFilter) {
-    countRequest = countRequest.or(searchFilter);
     request = request.or(searchFilter);
-  }
-
-  const { count, error: countError } = await countRequest;
-  if (countError) {
-    throw countError;
   }
 
   const { data, error } = await request
@@ -1663,13 +1771,14 @@ async function listCivilReferrals(
   const normalizedRows = ((data || []) as Array<Record<string, unknown>>).map((row) => ({
     ...sanitizeCivilReferralRecord(row.values),
     id: String(row.department_id || "").replace(CIVIL_REFERRAL_ROW_PREFIX, ""),
+    departmentId: String(row.department_id || ""),
     patientName: normalizeCivilReferralText(row.department_name) || normalizeCivilReferralText((row.values as Record<string, unknown> | null)?.patientName),
     updatedAt: row.updated_at || ""
   }));
-  const sortedRows = sortCivilReferralRows(normalizedRows);
+  const sortedRows = sortCivilReferralRows(filterCivilReferralRows(normalizedRows, query));
 
   return {
-    total: Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : sortedRows.length,
+    total: sortedRows.length,
     limit,
     offset,
     query,

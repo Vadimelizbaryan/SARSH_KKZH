@@ -262,9 +262,12 @@
     "referralDate",
     "dischargeDate"
   ];
+  const CIVIL_REFERRAL_SEARCH_FIELDS = [...CIVIL_REFERRAL_FIELDS, "sourceFileName"];
   const CIVIL_REFERRAL_HASH_FIELDS = CIVIL_REFERRAL_FIELDS.filter((key) => key !== "dischargeDate");
   const CIVIL_REFERRALS_DEFAULT_LIMIT = 80;
   const CIVIL_REFERRALS_MAX_LIMIT = 1000;
+  const CIVIL_REFERRAL_DAY_MS = 24 * 60 * 60 * 1000;
+  const ARMENIA_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
 
   function normalizeCivilText(value) {
     return String(value ?? "")
@@ -326,7 +329,97 @@
     return normalizeCivilSearchText(value).replace(/\s+/g, "");
   }
 
+  function parseCivilReferralSmartQuery(query) {
+    const compact = normalizeCivilText(query).replace(/\s+/g, "");
+    const match = compact.match(/^SR[-_]?(\d{1,2})(?:-(out)-(.+)|-(.+))?$/i);
+    if (!match) {
+      return null;
+    }
+
+    const srMarker = `SR-${Number(match[1])}`;
+    const isDischarge = Boolean(match[2]);
+    const suffix = match[3] || match[4] || "";
+    if (!suffix) {
+      return { srMarker, mode: "sr" };
+    }
+
+    if (!isDischarge && /^\d{1,4}$/.test(suffix)) {
+      const days = Number(suffix);
+      if (days >= 1 && days <= 3650) {
+        return { srMarker, mode: "range", days, dateField: "referralDate" };
+      }
+    }
+
+    const date = normalizeCivilDateText(suffix);
+    if (date) {
+      return {
+        srMarker,
+        mode: "date",
+        date,
+        dateField: isDischarge ? "dischargeDate" : "referralDate"
+      };
+    }
+
+    return null;
+  }
+
+  function normalizeCivilSrText(value) {
+    return normalizeCivilSearchText(value)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+  }
+
+  function rowMatchesCivilSr(row, srMarker) {
+    const marker = normalizeCivilSrText(srMarker);
+    if (!marker) {
+      return true;
+    }
+    return [
+      row && row.sourceFileName,
+      row && row.departmentId,
+      row && row.departmentName,
+      row && row.source,
+      row && row.fileName
+    ].some((value) => normalizeCivilSrText(value).includes(marker));
+  }
+
+  function getCivilReferralTodayTime() {
+    const armeniaNow = new Date(Date.now() + ARMENIA_UTC_OFFSET_MS);
+    return Date.UTC(
+      armeniaNow.getUTCFullYear(),
+      armeniaNow.getUTCMonth(),
+      armeniaNow.getUTCDate()
+    );
+  }
+
+  function rowMatchesCivilSmartQuery(row, smartQuery) {
+    if (!rowMatchesCivilSr(row, smartQuery.srMarker)) {
+      return false;
+    }
+    if (smartQuery.mode === "sr") {
+      return true;
+    }
+    const dateValue = getCivilReferralDateSortValue(row && row[smartQuery.dateField]);
+    if (!dateValue) {
+      return false;
+    }
+    if (smartQuery.mode === "date") {
+      return normalizeCivilDateText(row && row[smartQuery.dateField]) === smartQuery.date;
+    }
+    if (smartQuery.mode === "range") {
+      const end = getCivilReferralTodayTime();
+      const start = end - (smartQuery.days - 1) * CIVIL_REFERRAL_DAY_MS;
+      return dateValue >= start && dateValue <= end;
+    }
+    return false;
+  }
+
   function filterCivilReferralRows(rows, query) {
+    const smartQuery = parseCivilReferralSmartQuery(query);
+    if (smartQuery) {
+      return rows.filter((row) => rowMatchesCivilSmartQuery(row, smartQuery));
+    }
+
     const normalizedQuery = normalizeCivilSearchText(query);
     const compactQuery = normalizeCivilCompactSearchText(query);
     if (!normalizedQuery) {
@@ -334,7 +427,7 @@
     }
 
     return rows.filter((row) => {
-      return CIVIL_REFERRAL_FIELDS.some((key) => {
+      return CIVIL_REFERRAL_SEARCH_FIELDS.some((key) => {
         return normalizeCivilSearchText(row[key]).includes(normalizedQuery)
           || normalizeCivilCompactSearchText(row[key]).includes(compactQuery);
       });
