@@ -293,6 +293,144 @@ input {
   font-weight: 900;
 }
 
+.tg-civil-card {
+  padding: 12px;
+}
+
+.tg-civil-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.tg-civil-search,
+.tg-civil-search-btn {
+  min-height: 44px;
+  border: 1px solid rgba(31, 42, 36, 0.16);
+  border-radius: 16px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  font-weight: 900;
+}
+
+.tg-civil-search {
+  min-width: 0;
+  padding: 0 14px;
+  text-align: left;
+}
+
+.tg-civil-search-btn {
+  cursor: pointer;
+}
+
+.tg-civil-search:focus,
+.tg-civil-search-btn:focus,
+.tg-civil-input:focus {
+  outline: 3px solid rgba(15, 139, 76, 0.18);
+  border-color: var(--tg-accent);
+}
+
+.tg-civil-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0;
+  color: var(--tg-muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tg-civil-pagination button {
+  min-height: 36px;
+  border: 1px solid rgba(31, 42, 36, 0.14);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  padding: 0 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-civil-pagination button:disabled,
+.tg-civil-search-btn:disabled {
+  cursor: not-allowed;
+  color: var(--tg-muted);
+  background: #eef1ec;
+}
+
+.tg-civil-table-wrap {
+  max-height: 64vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.tg-civil-table {
+  min-width: 1120px;
+}
+
+.tg-civil-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  box-shadow: 0 2px 0 rgba(216, 203, 179, 0.95);
+}
+
+.tg-civil-table th:first-child,
+.tg-civil-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 54px;
+  min-width: 54px;
+  background: #fff8e8;
+  font-weight: 900;
+}
+
+.tg-civil-table thead th:first-child {
+  z-index: 5;
+  background: #efe0c3;
+}
+
+.tg-civil-wide-head {
+  min-width: 220px;
+}
+
+.tg-civil-wide-cell {
+  min-width: 220px;
+}
+
+.tg-civil-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(31, 42, 36, 0.16);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.tg-civil-date-input {
+  text-align: center;
+}
+
+.tg-civil-empty {
+  padding: 18px;
+  border: 1px dashed rgba(101, 115, 108, 0.4);
+  border-radius: 18px;
+  color: var(--tg-muted);
+  font-weight: 900;
+}
+
+.tg-civil-actions {
+  margin-top: 12px;
+}
+
 @media (max-width: 720px) {
   .tg-form-root {
     padding: 8px;
@@ -325,5 +463,26 @@ input {
 
   .tg-night-table tbody strong {
     max-width: 82px;
+  }
+
+  .tg-civil-table {
+    min-width: 980px;
+  }
+
+  .tg-civil-wide-head,
+  .tg-civil-wide-cell {
+    min-width: 190px;
+  }
+
+  .tg-civil-table th:first-child,
+  .tg-civil-table td:first-child {
+    width: 44px;
+    min-width: 44px;
+  }
+
+  .tg-civil-input {
+    min-height: 34px;
+    font-size: 13px;
+    padding: 0 8px;
   }
 }

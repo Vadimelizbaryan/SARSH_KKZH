@@ -355,6 +355,21 @@ const DAY_SHIFT_ROW_PREFIX = "day:";
 const DAY_SHIFT_META_KEY = "day_shift";
 const DISCHARGE_SHIFT_ROW_PREFIX = "discharge:";
 const DISCHARGE_SHIFT_META_KEY = "discharge_shift";
+const CIVIL_REFERRAL_ROW_PREFIX = "civil-referral:";
+const CIVIL_REFERRAL_GROUP = "civil_referral";
+const CIVIL_REFERRAL_DEFAULT_LIMIT = 40;
+const CIVIL_REFERRAL_MAX_LIMIT = 120;
+const CIVIL_REFERRAL_VALUE_KEYS = [
+  "patientName",
+  "medicalCenter",
+  "militaryUnit",
+  "rank",
+  "draftYear",
+  "birthYear",
+  "referralDate",
+  "dischargeDate"
+] as const;
+const CIVIL_REFERRAL_HASH_KEYS = CIVIL_REFERRAL_VALUE_KEYS.filter((key) => key !== "dischargeDate");
 const NIGHT_SHIFT_LABELS: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], string> = {
   shar: "ՇԱՐ",
   spa: "ՍՊԱ",
@@ -427,6 +442,148 @@ function sanitizeNightShiftRows(rows: unknown) {
       Object.fromEntries(NIGHT_SHIFT_VALUE_KEYS.map((key) => [key, safeNumber(source[key])]))
     ];
   })) as Record<string, Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>>;
+}
+
+function normalizeCivilReferralText(value: unknown) {
+  return String(value ?? "")
+    .replace(/\u0000/g, "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t\r\n]+/g, " ")
+    .trim();
+}
+
+function normalizeCivilReferralDateText(value: unknown) {
+  const text = normalizeCivilReferralText(value)
+    .replace(/[^\d.,/-]/g, "")
+    .replace(/[,\-\/]+/g, ".")
+    .replace(/\.{2,}/g, ".")
+    .replace(/^\./, "")
+    .slice(0, 10);
+  const compact = text.replace(/\D/g, "");
+  const compactMatch = compact.length === 6
+    ? compact.match(/^(\d{2})(\d{2})(\d{2})$/)
+    : compact.length === 8
+      ? compact.match(/^(\d{2})(\d{2})(\d{4})$/)
+      : null;
+  const match = compactMatch || text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (!match) {
+    return "";
+  }
+  const dayNumber = Number(match[1]);
+  const monthNumber = Number(match[2]);
+  if (dayNumber < 1 || dayNumber > 31 || monthNumber < 1 || monthNumber > 12) {
+    return "";
+  }
+  const day = match[1].padStart(2, "0");
+  const month = match[2].padStart(2, "0");
+  const year = match[3].length === 4 ? match[3].slice(-2) : match[3].padStart(2, "0");
+  return `${day}.${month}.${year}`;
+}
+
+function sanitizeCivilReferralListOptions(source: Record<string, unknown> = {}) {
+  const limit = Math.min(
+    CIVIL_REFERRAL_MAX_LIMIT,
+    Math.max(1, Math.trunc(Number(source.limit) || CIVIL_REFERRAL_DEFAULT_LIMIT))
+  );
+  const offset = Math.max(0, Math.trunc(Number(source.offset) || 0));
+  const query = normalizeCivilReferralText(source.query)
+    .replace(/[(),]/g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 120);
+  return { limit, offset, query };
+}
+
+function buildCivilReferralIlikePattern(query: string) {
+  return `%${query.replace(/[%_]/g, "")}%`;
+}
+
+function buildCivilReferralSearchFilter(pattern: string) {
+  return [
+    `department_name.ilike.${pattern}`,
+    `values->>patientName.ilike.${pattern}`,
+    `values->>medicalCenter.ilike.${pattern}`,
+    `values->>militaryUnit.ilike.${pattern}`,
+    `values->>rank.ilike.${pattern}`,
+    `values->>draftYear.ilike.${pattern}`,
+    `values->>birthYear.ilike.${pattern}`,
+    `values->>referralDate.ilike.${pattern}`,
+    `values->>dischargeDate.ilike.${pattern}`
+  ].join(",");
+}
+
+const CIVIL_ARMENIAN_WORD_RE = /^[\u0531-\u0587]+$/;
+
+function normalizeCivilReferralNameText(value: unknown, options: { medicalCenter?: boolean } = {}) {
+  const tokens = normalizeCivilReferralText(value).split(" ").filter(Boolean);
+  const merged: string[] = [];
+
+  tokens.forEach((token) => {
+    const previous = merged[merged.length - 1];
+    const shouldMerge = options.medicalCenter
+      ? (previous?.length ?? 0) <= 3 && token.length <= 3 && token !== "ԲԿ"
+      : (previous?.length ?? 0) <= 2 || token.length <= 2;
+    if (
+      previous
+      && CIVIL_ARMENIAN_WORD_RE.test(previous)
+      && CIVIL_ARMENIAN_WORD_RE.test(token)
+      && shouldMerge
+    ) {
+      merged[merged.length - 1] = `${previous}${token}`;
+    } else {
+      merged.push(token);
+    }
+  });
+
+  return merged.join(" ");
+}
+
+function stableCivilReferralHash(record: Record<string, unknown>) {
+  const source = CIVIL_REFERRAL_HASH_KEYS
+    .map((key) => normalizeCivilReferralText(record[key]).toLowerCase())
+    .join("|");
+  let hash = 5381;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = ((hash << 5) + hash + source.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36).padStart(7, "0");
+}
+
+function sanitizeCivilReferralRecord(record: unknown, sourceFileName = "") {
+  const source = record && typeof record === "object" ? record as Record<string, unknown> : {};
+  const output: Record<string, string | number | null> = {};
+  CIVIL_REFERRAL_VALUE_KEYS.forEach((key) => {
+    output[key] = key === "patientName"
+      ? normalizeCivilReferralNameText(source[key])
+      : key === "medicalCenter"
+        ? normalizeCivilReferralNameText(source[key], { medicalCenter: true })
+        : key === "referralDate" || key === "dischargeDate"
+          ? normalizeCivilReferralDateText(source[key])
+          : normalizeCivilReferralText(source[key]);
+  });
+  output.sourceFileName = normalizeCivilReferralText(source.sourceFileName || sourceFileName);
+  output.sourceRow = Number.isFinite(Number(source.sourceRow)) ? Math.max(0, Math.trunc(Number(source.sourceRow))) : null;
+  output.id = normalizeCivilReferralText(source.id) || stableCivilReferralHash(output);
+  output.importedAt = normalizeCivilReferralText(source.importedAt);
+  output.updatedAt = normalizeCivilReferralText(source.updatedAt);
+  return output;
+}
+
+function sanitizeCivilReferralRows(rows: unknown, sourceFileName = "") {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  const byId = new Map<string, Record<string, string | number | null>>();
+  rows
+    .map((row) => sanitizeCivilReferralRecord(row, sourceFileName))
+    .filter((row) => row.patientName && row.medicalCenter)
+    .forEach((row) => {
+      const id = String(row.id || "");
+      if (id && !byId.has(id)) {
+        byId.set(id, row);
+      }
+    });
+  return [...byId.values()];
 }
 
 function normalizeNightShiftSubmittedRows(payload: Record<string, unknown> | null) {
@@ -716,6 +873,10 @@ function getTelegramDischargeFormUrl(reportDateTime: string) {
   const params = new URLSearchParams();
   params.set("date", normalizeShiftReportDateTime(reportDateTime));
   return `${getPublicSiteBaseUrl()}/tg-discharge-form.html?${params.toString()}`;
+}
+
+function getTelegramCivilReferralsFormUrl() {
+  return `${getPublicSiteBaseUrl()}/tg-civil-referrals.html`;
 }
 
 function getOcrTemplateBlankImageUrl() {
@@ -2235,6 +2396,100 @@ async function loadShiftDraftByMode(
     loadShiftDraftMeta(supabase, NIGHT_SHIFT_META_KEY)
   ]);
   return { mode, rows, ...meta };
+}
+
+async function listCivilReferrals(
+  supabase: ReturnType<typeof createClient>,
+  options: Record<string, unknown> = {}
+) {
+  const { limit, offset, query } = sanitizeCivilReferralListOptions(options);
+  const pattern = buildCivilReferralIlikePattern(query);
+  const searchFilter = query ? buildCivilReferralSearchFilter(pattern) : "";
+
+  let countRequest = supabase
+    .from("sharsh_departments")
+    .select("department_id", { count: "exact", head: true })
+    .eq("department_group", CIVIL_REFERRAL_GROUP);
+
+  let request = supabase
+    .from("sharsh_departments")
+    .select("department_id, department_name, values, updated_at")
+    .eq("department_group", CIVIL_REFERRAL_GROUP);
+
+  if (searchFilter) {
+    countRequest = countRequest.or(searchFilter);
+    request = request.or(searchFilter);
+  }
+
+  const { count, error: countError } = await countRequest;
+  if (countError) {
+    throw countError;
+  }
+
+  const { data, error } = await request
+    .order("updated_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    throw error;
+  }
+
+  const normalizedRows = ((data || []) as Array<Record<string, unknown>>).map((row) => {
+    const values = row.values && typeof row.values === "object"
+      ? row.values as Record<string, unknown>
+      : {};
+    return {
+      ...sanitizeCivilReferralRecord(values),
+      id: String(row.department_id || "").replace(CIVIL_REFERRAL_ROW_PREFIX, ""),
+      patientName: normalizeCivilReferralText(row.department_name) || normalizeCivilReferralText(values.patientName),
+      updatedAt: row.updated_at || ""
+    };
+  });
+
+  return {
+    total: Number.isFinite(Number(count)) ? Math.max(0, Number(count)) : (data || []).length,
+    limit,
+    offset,
+    query,
+    rows: normalizedRows
+  };
+}
+
+async function saveCivilReferrals(
+  supabase: ReturnType<typeof createClient>,
+  rows: unknown,
+  sourceFileName: string,
+  options: Record<string, unknown> = {}
+) {
+  const now = new Date().toISOString();
+  const cleanRows = sanitizeCivilReferralRows(rows, sourceFileName);
+  const updates = cleanRows.map((row) => ({
+    department_id: `${CIVIL_REFERRAL_ROW_PREFIX}${row.id}`,
+    department_name: String(row.patientName || ""),
+    department_group: CIVIL_REFERRAL_GROUP,
+    values: {
+      ...row,
+      sourceFileName: row.sourceFileName || sourceFileName,
+      importedAt: row.importedAt || now,
+      updatedAt: now
+    },
+    updated_at: now
+  }));
+
+  if (updates.length) {
+    const { error } = await supabase
+      .from("sharsh_departments")
+      .upsert(updates as never[]);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  return {
+    ...(await listCivilReferrals(supabase, options)),
+    saved: updates.length
+  };
 }
 
 let armenianPdfFontBytesPromise: Promise<Uint8Array | null> | null = null;
@@ -4097,6 +4352,7 @@ function buildAdminHelpText() {
     "/night — բացել գիշերային հերթափոխի Telegram ձևը։",
     "/day — բացել ցերեկային հերթափոխի Telegram ձևը։",
     "/discharge — բացել առավոտյան դուրսգրման Telegram ձևը։",
+    "/civil — բացել Քաղ. ԲԿ բազայի Telegram ձևը։",
     "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը։",
     "/duty — նշել, որ կոլեգան գիշերային հերթապահ է։",
     "/not_duty — անջատել գիշերային հերթապահության նշումը։",
@@ -4134,6 +4390,7 @@ function buildHelpText() {
     "/night — բացել գիշերային հերթափոխի Telegram Web App ձևը",
     "/day — բացել ցերեկային հերթափոխի Telegram Web App ձևը",
     "/discharge — բացել առավոտյան դուրսգրման Telegram Web App ձևը",
+    "/civil — բացել Քաղ. ԲԿ բազայի Telegram Web App ձևը",
     "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը",
     "/duty — նշել գիշերային հերթապահությունը",
     "/sheet SR-4 — ստանալ հին XLSX ֆայլը",
@@ -4289,6 +4546,19 @@ function buildTelegramDischargeFormReplyMarkup(formUrl: string) {
   };
 }
 
+function buildTelegramCivilReferralsReplyMarkup(formUrl: string) {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "Բացել Քաղ. ԲԿ բազան",
+          web_app: { url: formUrl }
+        }
+      ]
+    ]
+  };
+}
+
 async function sendWorkingSheetForDepartment(
   supabase: ReturnType<typeof createClient>,
   chatId: number,
@@ -4434,6 +4704,19 @@ async function sendTelegramDischargeShiftForm(chatId: number | string) {
       `Ժամանակ: ${reportDateTime}`
     ].join("\n"),
     buildTelegramDischargeFormReplyMarkup(formUrl)
+  );
+}
+
+async function sendTelegramCivilReferralsForm(chatId: number | string) {
+  const formUrl = getTelegramCivilReferralsFormUrl();
+  await sendTelegramMessageWithReplyMarkup(
+    chatId,
+    [
+      "Քաղ. ԲԿ բազայի Telegram ձևը պատրաստ է։",
+      "Այստեղ կարող եք որոնել, դիտել և խմբագրել արդեն պահպանված տողերը հեռախոսից։",
+      "Սա հասանելի է միայն ադմինիստրատորին, որպեսզի անձնական տվյալները պատահաբար չբացվեն։"
+    ].join("\n"),
+    buildTelegramCivilReferralsReplyMarkup(formUrl)
   );
 }
 
@@ -4909,6 +5192,69 @@ async function handleTelegramShiftFormLoad(
       ok: true,
       ...draft,
       filledDepartments: Object.values(draft.rows).filter((row) => getNightShiftRowTotal(row) > 0).length
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      error: sanitizePublicErrorMessage(error)
+    }, 500);
+  }
+}
+
+async function handleTelegramCivilReferralsLoad(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const verifiedUser = await verifyTelegramWebAppInitData(String(payload?.initData || ""));
+    if (!verifiedUser) {
+      return jsonResponse({ ok: false, error: "Telegram Web App authorization failed." }, 403);
+    }
+
+    if (!isTelegramAdminChat(verifiedUser.userId)) {
+      return jsonResponse({
+        ok: false,
+        error: "Այս բաժինը հասանելի է միայն ադմինիստրատորին։"
+      }, 403);
+    }
+
+    const supabase = createSupabaseAdmin();
+    return jsonResponse({
+      ok: true,
+      ...(await listCivilReferrals(supabase as ReturnType<typeof createClient>, payload || {}))
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      error: sanitizePublicErrorMessage(error)
+    }, 500);
+  }
+}
+
+async function handleTelegramCivilReferralsSave(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const verifiedUser = await verifyTelegramWebAppInitData(String(payload?.initData || ""));
+    if (!verifiedUser) {
+      return jsonResponse({ ok: false, error: "Telegram Web App authorization failed." }, 403);
+    }
+
+    if (!isTelegramAdminChat(verifiedUser.userId)) {
+      return jsonResponse({
+        ok: false,
+        error: "Այս բաժինը հասանելի է միայն ադմինիստրատորին։"
+      }, 403);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const result = await saveCivilReferrals(
+      supabase as ReturnType<typeof createClient>,
+      payload?.rows,
+      "telegram-civil-referrals",
+      payload || {}
+    );
+    return jsonResponse({
+      ok: true,
+      ...result,
+      message: "Փոփոխությունները պահպանված են։"
     });
   } catch (error) {
     return jsonResponse({
@@ -5974,6 +6320,15 @@ async function handleTelegramCommand(
     return;
   }
 
+  if (command === "/civil" || command === "/civil_referrals") {
+    if (!isTelegramAdminChat(accessChatId)) {
+      await sendTelegramMessage(chatId, TELEGRAM_ADMIN_ONLY_TEXT);
+      return;
+    }
+    await sendTelegramCivilReferralsForm(chatId);
+    return;
+  }
+
   if (command === "/night" || command === "/night_shift") {
     if (message && isTelegramGroupMessage(message) && String(accessChatId) !== String(chatId)) {
       const person = getTelegramPersonFromMessage(message, accessChatId);
@@ -6551,6 +6906,9 @@ Deno.serve(async (request) => {
   if (postUrl.searchParams.get("action") === "discharge-form-load") {
     return await handleTelegramShiftFormLoad(request, "discharge");
   }
+  if (postUrl.searchParams.get("action") === "civil-referrals-load") {
+    return await handleTelegramCivilReferralsLoad(request);
+  }
   if (postUrl.searchParams.get("action") === "night-form-submit") {
     return await handleTelegramNightFormSubmit(request);
   }
@@ -6559,6 +6917,9 @@ Deno.serve(async (request) => {
   }
   if (postUrl.searchParams.get("action") === "discharge-form-submit") {
     return await handleTelegramDischargeFormSubmit(request);
+  }
+  if (postUrl.searchParams.get("action") === "civil-referrals-save") {
+    return await handleTelegramCivilReferralsSave(request);
   }
 
   if (!isTelegramSecretValid(request)) {
