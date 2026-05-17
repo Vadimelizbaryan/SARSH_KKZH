@@ -3493,6 +3493,54 @@ async function markDepartmentPhotoPending(
   }
 }
 
+async function markDepartmentPhotoProcessed(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: DepartmentId,
+  feedbackId: string | number | null,
+  imageName: string | null
+) {
+  const updatePayload: Record<string, unknown> = {
+    photo_workflow_status: "processed",
+    photo_feedback_updated_at: new Date().toISOString()
+  };
+  if (feedbackId !== null && String(feedbackId).trim()) {
+    updatePayload.photo_feedback_id = Number(feedbackId);
+  }
+  if (imageName) {
+    updatePayload.photo_name = imageName;
+  }
+
+  const { error } = await (supabase as any)
+    .from("sharsh_departments")
+    .update(updatePayload)
+    .eq("department_id", departmentId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function hasTelegramWebFormFeedback(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: DepartmentId,
+  reportDate: string
+) {
+  const { data, error } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id")
+    .eq("department_id", departmentId)
+    .eq("report_date", reportDate)
+    .eq("image_name", "telegram-web-app-form")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.id ? String(data.id) : "";
+}
+
 async function insertAcceptedFeedback(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
@@ -5084,6 +5132,46 @@ function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
   ].filter(Boolean).join("\n");
 }
 
+function rowNeedsFreshTelegramUpdate(row: Awaited<ReturnType<typeof loadSnapshot>>["rows"][number]) {
+  const updatedAt = Date.parse(String(row.updatedAt || ""));
+  if (!Number.isFinite(updatedAt)) {
+    return true;
+  }
+  const twoHoursMs = 2 * 60 * 60 * 1000;
+  return Date.now() - updatedAt > twoHoursMs;
+}
+
+function buildMainTableAutoSaveAdminText(
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
+  departmentId: DepartmentId,
+  reportDate: string,
+  source: "telegram-form" | "photo",
+  userName: string
+) {
+  const meta = DEPARTMENTS[departmentId];
+  const pendingRows = snapshot.rows
+    .filter((row) => row.id !== departmentId && rowNeedsFreshTelegramUpdate(row))
+    .map((row) => {
+      const rowMeta = DEPARTMENTS[row.id as DepartmentId];
+      return rowMeta ? `${rowMeta.marker} ${row.department}` : row.department;
+    });
+  const pendingText = pendingRows.length
+    ? pendingRows.map((line) => `- ${line}`).join("\n")
+    : "Все отделения уже свежие.";
+
+  return [
+    source === "telegram-form"
+      ? "Данные Telegram Web App автоматически внесены в основную таблицу."
+      : "Данные фото автоматически внесены в основную таблицу.",
+    `Отделение: ${meta.department} (${meta.marker})`,
+    `Дата отчёта: ${reportDate}`,
+    userName ? `Отправитель: ${userName}` : "",
+    "",
+    "Пока не обновлены:",
+    pendingText
+  ].filter(Boolean).join("\n");
+}
+
 function buildTelegramWebFormValuesText(values: Record<string, number | null>) {
   return PHOTO_FIELD_MAPPINGS
     .map((item) => {
@@ -5302,14 +5390,21 @@ async function handleTelegramWebFormSubmit(request: Request) {
       verifiedUser.userId,
       userName
     );
-    await markDepartmentPhotoPending(supabase as ReturnType<typeof createClient>, departmentId, feedbackId, "telegram-web-app-form");
+    await saveDepartmentSnapshot(supabase as ReturnType<typeof createClient>, departmentId, reportDate, values);
+    await markDepartmentPhotoProcessed(
+      supabase as ReturnType<typeof createClient>,
+      departmentId,
+      feedbackId,
+      "telegram-web-app-form"
+    );
+    const savedSnapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
     const meta = DEPARTMENTS[departmentId];
     const messageText = [
       "Շնորհակալություն։ Գերազանց աշխատանք է։ 🙂",
       "Ձևը ստուգված է. բանաձևը համընկավ։",
       `Բաժանմունք: ${meta.department} (${meta.marker})`,
       `13-22 գումարը = ${validation.actual}.`,
-      "Տվյալները ընդունված են ստուգման։ Ընդհանուր աղյուսակում դեռ ավտոմատ չեն գրանցվել։",
+      "Տվյալները ավտոմատ գրանցվել են ընդհանուր աղյուսակում։",
       "Խնդրում եմ այստեղ ուղարկել այս բաժանմունքի բլանկի լուսանկարը, որ ձևը կարողանանք համեմատել փաստաթղթի հետ։",
       "Կցում եմ PDF բլանկը՝ Telegram ձևից ստացված նոր արժեքներով։"
     ].join("\n");
@@ -5332,20 +5427,21 @@ async function handleTelegramWebFormSubmit(request: Request) {
       }
     }
 
-    const submitterChatId = verifiedUser.userId ? String(verifiedUser.userId) : "";
-    const notifyChatIds = getTelegramNotifyChatIds(null)
-      .filter((chatId) => String(chatId) !== submitterChatId);
+    const notifyChatIds = getTelegramNotifyChatIds(null);
     if (notifyChatIds.length) {
       await sendTelegramMessageToMany(notifyChatIds, [
-        "Получена Telegram Web App форма.",
-        `Отделение: ${meta.department} (${meta.marker})`,
-        `Дата отчёта: ${reportDate}`,
-        `Пользователь: ${userName || verifiedUser.userId || "неизвестно"}`,
+        buildMainTableAutoSaveAdminText(
+          savedSnapshot,
+          departmentId,
+          reportDate,
+          "telegram-form",
+          userName || String(verifiedUser.userId || "")
+        ),
+        "",
         `OCR feedback: ${feedbackId || "без номера"}`,
         `Значения: ${buildTelegramWebFormValuesText(values)}`
       ].join("\n"));
     }
-
     return jsonResponse({
       ok: true,
       feedbackId,
@@ -6871,7 +6967,8 @@ async function handleTelegramPhoto(
   });
   const photoValidation = hasRecognizedValues ? validateDepartmentSheetValues(recognized.values) : null;
   const isPhotoControlPassed = !structureInvalid && hasRecognizedValues && !!photoValidation?.isValid;
-  const shouldSaveSnapshot = isPhotoControlPassed;
+  const telegramWebFormFeedbackId = await hasTelegramWebFormFeedback(supabase, departmentId, reportDate);
+  const shouldSaveSnapshot = isPhotoControlPassed && !telegramWebFormFeedbackId;
   if (shouldSaveSnapshot) {
     await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values);
   }
@@ -6886,7 +6983,11 @@ async function handleTelegramPhoto(
     recognized.recognizedKeys,
     recognized.notes
   );
-  await markDepartmentPhotoPending(supabase, departmentId, feedbackId, fileName);
+  if (telegramWebFormFeedbackId) {
+    await markDepartmentPhotoProcessed(supabase, departmentId, telegramWebFormFeedbackId || feedbackId, "telegram-web-app-form");
+  } else {
+    await markDepartmentPhotoPending(supabase, departmentId, feedbackId, fileName);
+  }
 
   const detailedPhotoSummary = buildPhotoSaveSummary(
     departmentId,
