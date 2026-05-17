@@ -311,8 +311,14 @@ function normalizeCivilReferralCompactSearchText(value: unknown) {
   return normalizeCivilReferralSearchText(value).replace(/\s+/g, "");
 }
 
+function normalizeCivilReferralSmartQueryText(value: unknown) {
+  return normalizeCivilReferralText(value)
+    .replace(/[\s\u00a0]+/g, "")
+    .replace(/[\u2010-\u2015\u2212]/g, "-");
+}
+
 function parseCivilReferralSmartQuery(query: string): CivilReferralSmartQuery | null {
-  const compact = normalizeCivilReferralText(query).replace(/\s+/g, "");
+  const compact = normalizeCivilReferralSmartQueryText(query);
   const match = compact.match(/^SR[-_]?(\d{1,2})(?:-(out)-(.+)|-(.+))?$/i);
   if (!match) {
     return null;
@@ -359,6 +365,9 @@ function normalizeCivilReferralSrText(value: unknown) {
 function rowMatchesCivilReferralSr(row: Record<string, unknown>, srMarker: string) {
   const marker = normalizeCivilReferralSrText(srMarker);
   if (!marker) {
+    return true;
+  }
+  if (marker === "SR21") {
     return true;
   }
   return [

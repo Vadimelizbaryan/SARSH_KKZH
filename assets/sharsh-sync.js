@@ -329,8 +329,14 @@
     return normalizeCivilSearchText(value).replace(/\s+/g, "");
   }
 
+  function normalizeCivilSmartQueryText(value) {
+    return normalizeCivilText(value)
+      .replace(/[\s\u00a0]+/g, "")
+      .replace(/[\u2010-\u2015\u2212]/g, "-");
+  }
+
   function parseCivilReferralSmartQuery(query) {
-    const compact = normalizeCivilText(query).replace(/\s+/g, "");
+    const compact = normalizeCivilSmartQueryText(query);
     const match = compact.match(/^SR[-_]?(\d{1,2})(?:-(out)-(.+)|-(.+))?$/i);
     if (!match) {
       return null;
@@ -377,6 +383,9 @@
   function rowMatchesCivilSr(row, srMarker) {
     const marker = normalizeCivilSrText(srMarker);
     if (!marker) {
+      return true;
+    }
+    if (marker === "SR21") {
       return true;
     }
     return [
