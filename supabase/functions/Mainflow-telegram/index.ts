@@ -3541,6 +3541,80 @@ async function hasTelegramWebFormFeedback(
   return data?.id ? String(data.id) : "";
 }
 
+function extractTelegramUserNameFromFeedbackNotes(notes: unknown) {
+  if (!Array.isArray(notes)) {
+    return "";
+  }
+  for (const note of notes) {
+    const text = String(note || "");
+    const match = text.match(/^Telegram user:\s*(.+)$/i);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  return "";
+}
+
+async function loadLatestTelegramWebFormFeedback(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: DepartmentId,
+  reportDate: string
+) {
+  const { data, error } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id, final_values, notes, created_at")
+    .eq("department_id", departmentId)
+    .eq("report_date", reportDate)
+    .eq("image_name", "telegram-web-app-form")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!data?.id) {
+    return null;
+  }
+
+  return {
+    id: String(data.id),
+    values: sanitizeDepartmentFormValues(data.final_values),
+    userName: extractTelegramUserNameFromFeedbackNotes(data.notes),
+    createdAt: typeof data.created_at === "string" ? data.created_at : ""
+  };
+}
+
+async function loadLatestDepartmentPhotoFeedback(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: DepartmentId,
+  reportDate: string
+) {
+  const { data, error } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id, image_name, created_at")
+    .eq("department_id", departmentId)
+    .eq("report_date", reportDate)
+    .neq("image_name", "telegram-web-app-form")
+    .not("image_data_url", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!data?.id) {
+    return null;
+  }
+
+  return {
+    id: String(data.id),
+    imageName: typeof data.image_name === "string" ? data.image_name : "",
+    createdAt: typeof data.created_at === "string" ? data.created_at : ""
+  };
+}
+
 async function insertAcceptedFeedback(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
@@ -5390,24 +5464,40 @@ async function handleTelegramWebFormSubmit(request: Request) {
       verifiedUser.userId,
       userName
     );
-    await saveDepartmentSnapshot(supabase as ReturnType<typeof createClient>, departmentId, reportDate, values);
-    await markDepartmentPhotoProcessed(
+    const pairedPhotoFeedback = await loadLatestDepartmentPhotoFeedback(
       supabase as ReturnType<typeof createClient>,
       departmentId,
-      feedbackId,
-      "telegram-web-app-form"
+      reportDate
     );
-    const savedSnapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
+    let didAutoSave = false;
+    let savedSnapshot = snapshot;
+    if (pairedPhotoFeedback) {
+      await saveDepartmentSnapshot(supabase as ReturnType<typeof createClient>, departmentId, reportDate, values);
+      await markDepartmentPhotoProcessed(
+        supabase as ReturnType<typeof createClient>,
+        departmentId,
+        pairedPhotoFeedback.id,
+        pairedPhotoFeedback.imageName || "telegram-photo"
+      );
+      savedSnapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
+      didAutoSave = true;
+    }
     const meta = DEPARTMENTS[departmentId];
-    const messageText = [
-      "Շնորհակալություն։ Գերազանց աշխատանք է։ 🙂",
-      "Ձևը ստուգված է. բանաձևը համընկավ։",
-      `Բաժանմունք: ${meta.department} (${meta.marker})`,
-      `13-22 գումարը = ${validation.actual}.`,
-      "Տվյալները ավտոմատ գրանցվել են ընդհանուր աղյուսակում։",
-      "Խնդրում եմ այստեղ ուղարկել այս բաժանմունքի բլանկի լուսանկարը, որ ձևը կարողանանք համեմատել փաստաթղթի հետ։",
-      "Կցում եմ PDF բլանկը՝ Telegram ձևից ստացված նոր արժեքներով։"
-    ].join("\n");
+    const messageText = didAutoSave
+      ? [
+        "Ձևը և լուսանկարը ստացվել են։ Շնորհակալություն, գերազանց աշխատանք է։ 🙂",
+        `Բաժանմունք: ${meta.department} (${meta.marker})`,
+        `13-22 գումարը = ${validation.actual}.`,
+        "Տվյալները ավտոմատ գրանցվել են ընդհանուր աղյուսակում։",
+        "Կցում եմ PDF բլանկը՝ Telegram ձևից ստացված նոր արժեքներով։"
+      ].join("\n")
+      : [
+        "Ձևը ստացվել և ստուգվել է։ Շնորհակալություն։ 🙂",
+        `Բաժանմունք: ${meta.department} (${meta.marker})`,
+        `13-22 գումարը = ${validation.actual}.`,
+        "Ընդհանուր աղյուսակը դեռ չի թարմացվել․ ավտոմատ գրանցման համար պետք է նաև նույն բաժանմունքի բլանկի լուսանկարը։",
+        "Կցում եմ PDF բլանկը՝ Telegram ձևից ստացված արժեքներով։"
+      ].join("\n");
 
     if (verifiedUser.userId) {
       try {
@@ -5429,21 +5519,32 @@ async function handleTelegramWebFormSubmit(request: Request) {
 
     const notifyChatIds = getTelegramNotifyChatIds(null);
     if (notifyChatIds.length) {
-      await sendTelegramMessageToMany(notifyChatIds, [
-        buildMainTableAutoSaveAdminText(
+      const adminIntro = didAutoSave
+        ? buildMainTableAutoSaveAdminText(
           savedSnapshot,
           departmentId,
           reportDate,
           "telegram-form",
           userName || String(verifiedUser.userId || "")
-        ),
+        )
+        : [
+          "Получена Telegram Web App форма.",
+          `Отделение: ${meta.department} (${meta.marker})`,
+          `Дата отчёта: ${reportDate}`,
+          userName ? `Пользователь: ${userName}` : "",
+          "Основная таблица пока не обновлена: ждем фото бланка этого же отделения."
+        ].filter(Boolean).join("\n");
+
+      await sendTelegramMessageToMany(notifyChatIds, [
+        adminIntro,
         "",
         `OCR feedback: ${feedbackId || "без номера"}`,
-        `Значения: ${buildTelegramWebFormValuesText(values)}`
+        `Значения Web App: ${buildTelegramWebFormValuesText(values)}`
       ].join("\n"));
     }
     return jsonResponse({
       ok: true,
+      autoSaved: didAutoSave,
       feedbackId,
       validation,
       message: messageText
@@ -5888,7 +5989,8 @@ function buildPhotoSaveSummary(
   departmentSource: string,
   feedbackId: string,
   didSaveSnapshot: boolean,
-  validation?: { isValid: boolean; actual: number; expected: number } | null
+  validation?: { isValid: boolean; actual: number; expected: number } | null,
+  savedFromWebApp = false
 ) {
   const meta = DEPARTMENTS[departmentId];
   const cellSummaries = PHOTO_FIELD_MAPPINGS
@@ -5901,8 +6003,10 @@ function buildPhotoSaveSummary(
 
   return [
     didSaveSnapshot
-      ? "Фото обработано и сохранено."
-      : "Фото обработано. Значения не сохранены: контроль отделения не пройден.",
+      ? (savedFromWebApp
+        ? "Фото обработано. Данные Telegram Web App автоматически внесены в основную таблицу."
+        : "Фото обработано и сохранено.")
+      : "Фото обработано. Значения фото автоматически не сохранены: для автосохранения нужны данные Telegram Web App и фото бланка одного отделения.",
     `Отделение: ${meta.department} (${departmentId})`,
     `Источник отделения: ${departmentSource}`,
     `Дата отчёта: ${reportDate}`,
@@ -6967,11 +7071,7 @@ async function handleTelegramPhoto(
   });
   const photoValidation = hasRecognizedValues ? validateDepartmentSheetValues(recognized.values) : null;
   const isPhotoControlPassed = !structureInvalid && hasRecognizedValues && !!photoValidation?.isValid;
-  const telegramWebFormFeedbackId = await hasTelegramWebFormFeedback(supabase, departmentId, reportDate);
-  const shouldSaveSnapshot = isPhotoControlPassed && !telegramWebFormFeedbackId;
-  if (shouldSaveSnapshot) {
-    await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values);
-  }
+  const telegramWebFormFeedback = await loadLatestTelegramWebFormFeedback(supabase, departmentId, reportDate);
   const feedbackId = await insertAcceptedFeedback(
     supabase,
     departmentId,
@@ -6983,8 +7083,13 @@ async function handleTelegramPhoto(
     recognized.recognizedKeys,
     recognized.notes
   );
-  if (telegramWebFormFeedbackId) {
-    await markDepartmentPhotoProcessed(supabase, departmentId, telegramWebFormFeedbackId || feedbackId, "telegram-web-app-form");
+  let shouldSaveSnapshot = false;
+  let savedSnapshot: Awaited<ReturnType<typeof loadSnapshot>> | null = null;
+  if (telegramWebFormFeedback) {
+    await saveDepartmentSnapshot(supabase, departmentId, reportDate, telegramWebFormFeedback.values);
+    await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, fileName);
+    shouldSaveSnapshot = true;
+    savedSnapshot = await loadSnapshot(supabase);
   } else {
     await markDepartmentPhotoPending(supabase, departmentId, feedbackId, fileName);
   }
@@ -6996,22 +7101,44 @@ async function handleTelegramPhoto(
     departmentSource,
     feedbackId,
     shouldSaveSnapshot,
-    photoValidation
+    photoValidation,
+    shouldSaveSnapshot
   );
   const notifyChatIds = getTelegramNotifyChatIds(chatId);
   if (notifyChatIds.length) {
-    await sendTelegramMessageToMany(notifyChatIds, detailedPhotoSummary);
+    const adminMessages = [detailedPhotoSummary];
+    if (shouldSaveSnapshot && savedSnapshot && telegramWebFormFeedback) {
+      adminMessages.unshift(buildMainTableAutoSaveAdminText(
+        savedSnapshot,
+        departmentId,
+        reportDate,
+        "telegram-form",
+        telegramWebFormFeedback.userName || senderFirstName
+      ));
+      adminMessages.push(`Значения Web App: ${buildTelegramWebFormValuesText(telegramWebFormFeedback.values)}`);
+    }
+    await sendTelegramMessageToMany(notifyChatIds, adminMessages.join("\n\n"));
   } else {
     console.warn("Telegram photo OCR summary was not sent: TELEGRAM_NOTIFY_CHAT_IDS is not configured.");
   }
 
-  await sendTelegramWebFormPromptAfterPhoto(
-    supabase,
-    chatId,
-    departmentId,
-    reportDate,
-    buildPhotoSenderResponse(isPhotoControlPassed, photoValidation, structureInvalid, hasRecognizedValues, senderFirstName)
-  );
+  if (shouldSaveSnapshot) {
+    await sendTelegramMessage(
+      chatId,
+      [
+        `${senderFirstName}, լուսանկարը և Telegram ձևը ստացվել են։ Շնորհակալություն, շատ լավ աշխատանք է։ 🙂`,
+        "Տվյալները վերցրել եմ Telegram ձևից և ավտոմատ գրանցել հիմնական աղյուսակում։"
+      ].join("\n")
+    );
+  } else {
+    await sendTelegramWebFormPromptAfterPhoto(
+      supabase,
+      chatId,
+      departmentId,
+      reportDate,
+      buildPhotoSenderResponse(isPhotoControlPassed, photoValidation, structureInvalid, hasRecognizedValues, senderFirstName)
+    );
+  }
 }
 
 async function handleTelegramSheetDocument(
