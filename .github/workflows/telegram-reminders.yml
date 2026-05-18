@@ -2,11 +2,13 @@ name: Telegram reminders
 
 on:
   schedule:
-    - cron: "0 3 * * *"
-    - cron: "30 3 * * *"
-    - cron: "0 4 * * *"
-    - cron: "0 8 * * *"
-    - cron: "0 13 * * *"
+    # GitHub schedules are UTC. Armenia/Yerevan is UTC+4.
+    # Avoid minute 00 because GitHub scheduled workflows are often delayed there.
+    - cron: "1 3 * * *"   # 07:01 Yerevan: night-shift summary
+    - cron: "31 3 * * *"  # 07:31 Yerevan: night-duty reminder
+    - cron: "1 4 * * *"   # 08:01 Yerevan: morning PDFs
+    - cron: "1 8 * * *"   # 12:01 Yerevan: midday reminder
+    - cron: "1 13 * * *"  # 17:01 Yerevan: evening reminder
   workflow_dispatch:
     inputs:
       slot:
@@ -42,22 +44,22 @@ jobs:
 
           if [ -z "$slot" ]; then
             case "${{ github.event.schedule }}" in
-              "0 3 * * *")
+              "1 3 * * *")
                 slot="night-summary"
                 action="night-shift-summary"
                 ;;
-              "30 3 * * *")
+              "31 3 * * *")
                 slot="night-duty"
                 action="night-duty-reminder"
                 ;;
-              "0 4 * * *")
+              "1 4 * * *")
                 slot="morning-pdfs"
                 action="send-main-pdfs"
                 ;;
-              "0 8 * * *")
+              "1 8 * * *")
                 slot="midday"
                 ;;
-              "0 13 * * *")
+              "1 13 * * *")
                 slot="evening"
                 ;;
               *)

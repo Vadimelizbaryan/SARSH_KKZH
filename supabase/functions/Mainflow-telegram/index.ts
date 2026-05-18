@@ -6982,7 +6982,7 @@ async function handleTelegramCallbackQuery(
 
 async function handleTelegramCommand(
   supabase: ReturnType<typeof createClient>,
-  chatId: number,
+  chatId: number | string,
   text: string,
   message?: Record<string, unknown>,
   accessChatId: number | string = chatId
@@ -7429,6 +7429,61 @@ async function handleTelegramCommand(
   await sendTelegramMessage(chatId, "Հրամանը չճանաչվեց։ Օգտագործեք /start կամ SR-?՝ բաժանմունքների ցանկը տեսնելու համար։");
 }
 
+async function processTelegramGroupCommand(
+  supabase: ReturnType<typeof createClient>,
+  message: Record<string, unknown>,
+  accessChatId: number | string
+) {
+  const text = getMessageText(message);
+  if (!text) {
+    return;
+  }
+
+  if (!await isTelegramUserAllowedByRuntimeState(supabase, accessChatId)) {
+    return;
+  }
+
+  const civilReferralSearchQuery = getCivilReferralTelegramSearchQuery(text);
+  if (civilReferralSearchQuery) {
+    await sendCivilReferralSearchWordDocument(
+      supabase as ReturnType<typeof createClient>,
+      accessChatId,
+      civilReferralSearchQuery
+    );
+    return;
+  }
+
+  if (text.startsWith("/")) {
+    await handleTelegramCommand(supabase, accessChatId, text, message, accessChatId);
+    return;
+  }
+
+  if (isTelegramNightShiftButtonRequest(text)) {
+    await handleTelegramCommand(supabase, accessChatId, "/night", message, accessChatId);
+    return;
+  }
+
+  if (isTelegramDayShiftButtonRequest(text)) {
+    await handleTelegramCommand(supabase, accessChatId, "/day", message, accessChatId);
+    return;
+  }
+
+  if (isTelegramDischargeShiftButtonRequest(text)) {
+    await handleTelegramCommand(supabase, accessChatId, "/discharge", message, accessChatId);
+    return;
+  }
+
+  if (isSrDepartmentsListRequest(text)) {
+    await sendTelegramMessage(accessChatId, buildSrDepartmentsText());
+    return;
+  }
+
+  const requestedDepartmentId = detectDepartmentFromHint(text);
+  if (requestedDepartmentId && !extractPhotoFileId(message)) {
+    await sendTelegramWebFormForDepartment(supabase, accessChatId, requestedDepartmentId, text);
+  }
+}
+
 async function requestTelegramPhotoApproval(
   supabase: ReturnType<typeof createClient>,
   chatId: number,
@@ -7703,14 +7758,17 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
     return;
   }
 
-  // The bot must stay silent in shared groups: no approvals, no OCR, no hints.
-  if (isTelegramGroupMessage(message)) {
-    return;
-  }
-
   const supabase = createSupabaseAdmin();
   const safeChatId = chatId as number;
   const accessChatId = getTelegramAccessChatId(message, safeChatId);
+
+  // The bot must stay silent in shared groups. Allowed commands are handled by
+  // sending the result to the sender's private chat, without replying in-group.
+  if (isTelegramGroupMessage(message)) {
+    await processTelegramGroupCommand(supabase, message, accessChatId);
+    return;
+  }
+
   if (!await isTelegramUserAllowedByRuntimeState(supabase, accessChatId)) {
     await requestTelegramColleagueApproval(supabase, message, accessChatId, safeChatId);
     return;
@@ -7732,10 +7790,6 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
 
   const civilReferralSearchQuery = getCivilReferralTelegramSearchQuery(text);
   if (civilReferralSearchQuery) {
-    if (!isTelegramAdminChat(accessChatId)) {
-      await sendTelegramMessage(safeChatId, TELEGRAM_ADMIN_ONLY_TEXT);
-      return;
-    }
     await sendCivilReferralSearchWordDocument(
       supabase as ReturnType<typeof createClient>,
       safeChatId,
