@@ -5055,6 +5055,7 @@ function buildColleagueStartText(firstName = "") {
 
 function buildAdminHelpText() {
   return [
+    "/allcurrent կամ SR-all — մեկ PDF ֆայլով ուղարկել բոլոր բաժանմունքների ընթացիկ տվյալները։",
     "Mainflow Telegram բոտի հրամանները",
     "",
     "Կոլեգաների հասանելիություն.",
@@ -5100,6 +5101,7 @@ function buildAdminHelpText() {
 
 function buildHelpText() {
   return [
+    "/allcurrent կամ SR-all — մեկ PDF ֆայլով ուղարկել բոլոր բաժանմունքների ընթացիկ տվյալները։",
     "SARSH_KKZH Telegram bot",
     "",
     "Ուղարկեք բլանկի լուսանկարը, և բոտը կփորձի.",
@@ -5218,6 +5220,71 @@ function buildDepartmentPdfFileName(departmentId: DepartmentId, reportDate: stri
   const safeMarker = sanitizeSheetFileNamePart(meta.marker);
   const safeDate = sanitizeSheetFileNamePart(reportDate.replaceAll(".", ",").replaceAll("/", ","));
   return `${safeMarker}_${safeDate || DEFAULT_DATE}_${suffix}.pdf`;
+}
+
+function isAllCurrentDepartmentsPdfRequest(text: string) {
+  const normalized = String(text || "")
+    .trim()
+    .toLowerCase()
+    .replace(/@[\w_]+(?=\s|$)/g, "")
+    .replace(/\s+/g, " ");
+  return [
+    "/allcurrent",
+    "/all_current",
+    "/allforms",
+    "/current_all",
+    "/departments_pdf",
+    "allcurrent",
+    "all current",
+    "sr-all",
+    "sr all",
+    "all-sr",
+    "all sr"
+  ].includes(normalized);
+}
+
+async function buildAllCurrentDepartmentsPdfBytes(
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
+  reportDate: string
+) {
+  const output = await PDFDocument.create();
+  const rowsById = new Map(snapshot.rows.map((row) => [String(row.id), row]));
+  const departmentIds = Object.keys(DEPARTMENTS) as DepartmentId[];
+  const sourcePdfs = await Promise.all(departmentIds.map(async (departmentId) => {
+    const row = rowsById.get(departmentId);
+    const values = row ? row.values : sanitizeValues(null);
+    return await buildFilledDepartmentPdfBytes(departmentId, values, reportDate);
+  }));
+
+  for (const bytes of sourcePdfs) {
+    const source = await PDFDocument.load(bytes);
+    const pages = await output.copyPages(source, source.getPageIndices());
+    pages.forEach((page) => output.addPage(page));
+  }
+
+  return await output.save();
+}
+
+async function sendAllCurrentDepartmentsPdf(
+  supabase: unknown,
+  chatId: number | string,
+  text: string
+) {
+  const snapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
+  const reportDate = detectReportDateFromHint(text) || getYerevanReportDateText();
+  const pdfBytes = await buildAllCurrentDepartmentsPdfBytes(snapshot, reportDate);
+  const safeDate = sanitizeSheetFileNamePart(reportDate.replaceAll(".", ",").replaceAll("/", ","));
+  await sendTelegramDocument(
+    chatId,
+    `All_departments_current_${safeDate || DEFAULT_DATE}.pdf`,
+    pdfBytes,
+    [
+      "Բոլոր բաժանմունքների ընթացիկ տվյալներ",
+      `Հաշվետվության ամսաթիվ: ${buildDepartmentSheetMessageDateTimeText(reportDate)}`,
+      "Յուրաքանչյուր բաժանմունք PDF ֆայլում առանձին էջ է։"
+    ].join("\n"),
+    "application/pdf"
+  );
 }
 
 function buildTelegramFormReplyMarkup(formUrl: string) {
@@ -7407,6 +7474,11 @@ async function handleTelegramCommand(
     return;
   }
 
+  if (isAllCurrentDepartmentsPdfRequest(command)) {
+    await sendAllCurrentDepartmentsPdf(supabase, chatId, text);
+    return;
+  }
+
   if (command === "/status") {
     const snapshot = await loadSnapshot(supabase);
     await sendTelegramMessage(chatId, buildStatusText(snapshot));
@@ -7475,6 +7547,11 @@ async function processTelegramGroupCommand(
 
   if (isSrDepartmentsListRequest(text)) {
     await sendTelegramMessage(accessChatId, buildSrDepartmentsText());
+    return;
+  }
+
+  if (isAllCurrentDepartmentsPdfRequest(text)) {
+    await sendAllCurrentDepartmentsPdf(supabase, accessChatId, text);
     return;
   }
 
@@ -7826,6 +7903,11 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
 
   if (isSrDepartmentsListRequest(text)) {
     await sendTelegramMessage(safeChatId, buildSrDepartmentsText());
+    return;
+  }
+
+  if (isAllCurrentDepartmentsPdfRequest(text)) {
+    await sendAllCurrentDepartmentsPdf(supabase, safeChatId, text);
     return;
   }
 
