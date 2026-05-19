@@ -5448,10 +5448,8 @@ async function buildFilledDepartmentPdfBytes(
     color: rgb(0, 0, 0)
   });
 
-  if (departmentPatientNotesHaveData(sanitizedPatientNotes)) {
-    const noteFonts = await buildPdfFonts(pdf);
-    drawDepartmentPatientNotes(page, noteFonts, sanitizedPatientNotes);
-  }
+  const noteFonts = await buildPdfFonts(pdf);
+  drawDepartmentPatientNotes(page, noteFonts, sanitizedPatientNotes);
 
   return await pdf.save();
 }
