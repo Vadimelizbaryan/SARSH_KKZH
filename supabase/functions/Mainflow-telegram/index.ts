@@ -169,6 +169,96 @@ const DEPARTMENT_PDF_VALUE_Y = 367;
 const DEPARTMENT_PDF_DATE_X = 82;
 const DEPARTMENT_PDF_DATE_Y = 72;
 const DEPARTMENT_PDF_DATE_FONT_SIZE = 11;
+const DEPARTMENT_PDF_NOTE_FONT_SIZE = 7.4;
+const DEPARTMENT_PDF_NOTE_MIN_FONT_SIZE = 5.4;
+const DEPARTMENT_PATIENT_NOTE_SECTIONS = [
+  { key: "admitted", title: "Ընդունված հիվանդներ", rows: 6 },
+  { key: "discharged", title: "Դուրս գրված հիվանդներ", rows: 6 },
+  { key: "transferred", title: "Տեղափոխված հիվանդներ", rows: 5 },
+  { key: "dischargedNotTaken", title: "Դուրսգրված-չտարված", rows: 5 },
+  { key: "returnedFromLeave", title: "Վերադարձել են արձակուրդից", rows: 5 },
+  { key: "wentOnLeave", title: "Գնացել են արձակուրդ", rows: 5 }
+] as const;
+type DepartmentPatientNoteKey = typeof DEPARTMENT_PATIENT_NOTE_SECTIONS[number]["key"];
+type DepartmentPatientNotes = Record<DepartmentPatientNoteKey, string[]>;
+const DEPARTMENT_PDF_NOTE_LAYOUT: Record<DepartmentPatientNoteKey, {
+  x: number;
+  y: number;
+  width: number;
+  lineHeight: number;
+  clearX: number;
+  clearY: number;
+  clearWidth: number;
+  clearHeight: number;
+  titleY: number;
+}> = {
+  admitted: {
+    x: 56,
+    y: 314,
+    width: 350,
+    lineHeight: 9.6,
+    clearX: 30,
+    clearY: 258,
+    clearWidth: 385,
+    clearHeight: 82,
+    titleY: 329
+  },
+  transferred: {
+    x: 56,
+    y: 236,
+    width: 350,
+    lineHeight: 10.2,
+    clearX: 30,
+    clearY: 186,
+    clearWidth: 385,
+    clearHeight: 75,
+    titleY: 250
+  },
+  dischargedNotTaken: {
+    x: 56,
+    y: 166,
+    width: 350,
+    lineHeight: 10.2,
+    clearX: 30,
+    clearY: 116,
+    clearWidth: 385,
+    clearHeight: 75,
+    titleY: 180
+  },
+  discharged: {
+    x: 432,
+    y: 314,
+    width: 350,
+    lineHeight: 9.6,
+    clearX: 410,
+    clearY: 258,
+    clearWidth: 385,
+    clearHeight: 82,
+    titleY: 329
+  },
+  returnedFromLeave: {
+    x: 432,
+    y: 236,
+    width: 350,
+    lineHeight: 10.2,
+    clearX: 410,
+    clearY: 186,
+    clearWidth: 385,
+    clearHeight: 75,
+    titleY: 250
+  },
+  wentOnLeave: {
+    x: 432,
+    y: 166,
+    width: 350,
+    lineHeight: 10.2,
+    clearX: 410,
+    clearY: 116,
+    clearWidth: 385,
+    clearHeight: 75,
+    titleY: 180
+  }
+};
 
 const DEPARTMENT_SHEET_ROW_BY_ID: Record<keyof typeof DEPARTMENTS, number> = {
   r4: 4,
@@ -879,6 +969,63 @@ function sanitizeReportDate(value: unknown) {
   }
 
   return /^\d{2}\.\d{2}\.\d{2,4}$/.test(normalized) ? normalized : null;
+}
+
+function sanitizePatientNoteText(value: unknown) {
+  if (typeof value !== "string" && typeof value !== "number") {
+    return "";
+  }
+  return String(value)
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
+function createEmptyDepartmentPatientNotes(): DepartmentPatientNotes {
+  return DEPARTMENT_PATIENT_NOTE_SECTIONS.reduce((notes, section) => {
+    notes[section.key] = Array.from({ length: section.rows }, () => "");
+    return notes;
+  }, {} as DepartmentPatientNotes);
+}
+
+function sanitizeDepartmentPatientNotes(source: unknown): DepartmentPatientNotes {
+  const notes = createEmptyDepartmentPatientNotes();
+  if (!source || typeof source !== "object") {
+    return notes;
+  }
+
+  DEPARTMENT_PATIENT_NOTE_SECTIONS.forEach((section) => {
+    const values = Array.isArray((source as Record<string, unknown>)[section.key])
+      ? (source as Record<string, unknown[]>)[section.key]
+      : [];
+    notes[section.key] = Array.from({ length: section.rows }, (_item, index) => sanitizePatientNoteText(values[index]));
+  });
+  return notes;
+}
+
+function departmentPatientNotesHaveData(notes: DepartmentPatientNotes) {
+  return DEPARTMENT_PATIENT_NOTE_SECTIONS.some((section) => (
+    notes[section.key].some((value) => value.trim())
+  ));
+}
+
+function getPatientNoteDisplayText(value: string) {
+  return value.trim().replace(/^\d+\s*[\).\-\:]\s*/, "").trim();
+}
+
+function buildDepartmentPatientNotesTextLines(notes: DepartmentPatientNotes) {
+  const lines: string[] = [];
+  DEPARTMENT_PATIENT_NOTE_SECTIONS.forEach((section) => {
+    const filled = notes[section.key]
+      .map((value, index) => ({ value: getPatientNoteDisplayText(value), index }))
+      .filter((item) => item.value)
+      .map((item) => `${item.index + 1}. ${item.value}`);
+    if (filled.length) {
+      lines.push(`${section.title}: ${filled.join("; ")}`);
+    }
+  });
+  return lines;
 }
 
 function getOpenAiApiKey() {
@@ -3150,6 +3297,91 @@ function getPdfText(text: string, fonts: { hasArmenian: boolean }, fallback = ""
   return ascii || fallback;
 }
 
+function getFittedDepartmentNoteText(
+  rawText: string,
+  font: any,
+  fonts: { hasArmenian: boolean },
+  maxWidth: number
+) {
+  const ellipsis = fonts.hasArmenian ? "…" : "...";
+  const text = getPdfText(rawText, fonts, "").trim();
+  if (!text) {
+    return null;
+  }
+
+  let size = DEPARTMENT_PDF_NOTE_FONT_SIZE;
+  while (size > DEPARTMENT_PDF_NOTE_MIN_FONT_SIZE && font.widthOfTextAtSize(text, size) > maxWidth) {
+    size -= 0.25;
+  }
+
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) {
+    return { text, size };
+  }
+
+  let clipped = text;
+  while (clipped.length > 1 && font.widthOfTextAtSize(`${clipped}${ellipsis}`, size) > maxWidth) {
+    clipped = clipped.slice(0, -1);
+  }
+
+  return {
+    text: `${clipped.trimEnd()}${ellipsis}`,
+    size
+  };
+}
+
+function drawDepartmentPatientNotes(
+  page: any,
+  fonts: { regular: any; bold: any; hasArmenian: boolean },
+  notes: DepartmentPatientNotes
+) {
+  const font = fonts.regular;
+  const boldFont = fonts.bold;
+  const color = rgb(0.07, 0.08, 0.38);
+  const titleColor = rgb(0, 0, 0);
+  const white = rgb(1, 1, 1);
+
+  page.drawRectangle({
+    x: 18,
+    y: 96,
+    width: 800,
+    height: 262,
+    color: white
+  });
+
+  DEPARTMENT_PATIENT_NOTE_SECTIONS.forEach((section) => {
+    const layout = DEPARTMENT_PDF_NOTE_LAYOUT[section.key];
+    const title = getPdfText(section.title, fonts, "");
+    if (title) {
+      page.drawText(title, {
+        x: layout.x,
+        y: layout.titleY,
+        size: 9,
+        font: boldFont,
+        color: titleColor
+      });
+    }
+
+    const values = notes[section.key] || [];
+    Array.from({ length: section.rows }).forEach((_item, index) => {
+      const value = getPatientNoteDisplayText(String(values[index] || ""));
+      if (!value) {
+        return;
+      }
+      const fitted = getFittedDepartmentNoteText(`${index + 1}. ${value}`, font, fonts, layout.width);
+      if (!fitted) {
+        return;
+      }
+      page.drawText(fitted.text, {
+        x: layout.x,
+        y: layout.y - (index * layout.lineHeight),
+        size: fitted.size,
+        font,
+        color
+      });
+    });
+  });
+}
+
 function getRowPdfValue(row: { values: Record<string, number | null> }, key: string) {
   if (key === "presentTotal") {
     return DEPARTMENT_SHEET_PRESENT_SUM_KEYS.reduce((sum, itemKey) => sum + getSheetNumber(row.values, itemKey), 0);
@@ -3944,12 +4176,14 @@ async function insertTelegramWebFormFeedback(
   reportDate: string,
   values: Record<string, number | null>,
   userId: number | null,
-  userName: string
+  userName: string,
+  patientNotes?: DepartmentPatientNotes
 ) {
   const notes = [
     "Telegram Web App form submission.",
     userId ? `Telegram user id: ${userId}` : "",
-    userName ? `Telegram user: ${userName}` : ""
+    userName ? `Telegram user: ${userName}` : "",
+    ...(patientNotes ? buildDepartmentPatientNotesTextLines(patientNotes) : []).map((line) => `Patient note: ${line}`)
   ].filter(Boolean);
 
   return await insertAcceptedFeedback(
@@ -5181,7 +5415,8 @@ function buildDepartmentPdfValues(values: Record<string, number | null>) {
 async function buildFilledDepartmentPdfBytes(
   departmentId: DepartmentId,
   values: Record<string, number | null>,
-  reportDate: string
+  reportDate: string,
+  patientNotes?: unknown
 ) {
   const blankBytes = await fetchDepartmentBlankPdfBytes(departmentId);
   const pdf = await PDFDocument.load(blankBytes);
@@ -5191,6 +5426,7 @@ async function buildFilledDepartmentPdfBytes(
   const fontSize = 15;
   const valueColor = rgb(0.07, 0.08, 0.38);
   const pdfValues = buildDepartmentPdfValues(values);
+  const sanitizedPatientNotes = sanitizeDepartmentPatientNotes(patientNotes);
 
   pdfValues.forEach((value, index) => {
     const text = String(value ?? 0);
@@ -5211,6 +5447,11 @@ async function buildFilledDepartmentPdfBytes(
     font: dateFont,
     color: rgb(0, 0, 0)
   });
+
+  if (departmentPatientNotesHaveData(sanitizedPatientNotes)) {
+    const noteFonts = await buildPdfFonts(pdf);
+    drawDepartmentPatientNotes(page, noteFonts, sanitizedPatientNotes);
+  }
 
   return await pdf.save();
 }
@@ -5811,6 +6052,7 @@ async function handleTelegramWebFormSubmit(request: Request) {
       sanitizeDepartmentFormValues(payload?.values),
       getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId)
     );
+    const patientNotes = sanitizeDepartmentPatientNotes(payload?.patientNotes);
     const validation = validateDepartmentSheetValues(values);
     if (!validation.isValid) {
       return jsonResponse({
@@ -5831,7 +6073,8 @@ async function handleTelegramWebFormSubmit(request: Request) {
       reportDate,
       values,
       verifiedUser.userId,
-      userName
+      userName,
+      patientNotes
     );
     const pairedPhotoFeedback = await loadLatestDepartmentPhotoFeedback(
       supabase as ReturnType<typeof createClient>,
@@ -5870,7 +6113,7 @@ async function handleTelegramWebFormSubmit(request: Request) {
 
     if (verifiedUser.userId) {
       try {
-        const pdfBytes = await buildFilledDepartmentPdfBytes(departmentId, values, reportDate);
+        const pdfBytes = await buildFilledDepartmentPdfBytes(departmentId, values, reportDate, patientNotes);
         await sendTelegramDocument(
           verifiedUser.userId,
           buildDepartmentPdfFileName(departmentId, reportDate, "telegram-form"),

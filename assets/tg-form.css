@@ -176,6 +176,137 @@ input {
   color: var(--tg-muted);
 }
 
+.tg-patient-notes {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(15, 139, 76, 0.16);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(255, 222, 139, 0.22), rgba(255, 255, 255, 0.92)),
+    #fffdf8;
+}
+
+.tg-patient-notes-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tg-patient-notes h2 {
+  margin: 0;
+  font-size: clamp(18px, 4vw, 24px);
+  line-height: 1.1;
+}
+
+.tg-patient-notes-badge {
+  border: 1px solid rgba(15, 139, 76, 0.22);
+  border-radius: 999px;
+  background: rgba(15, 139, 76, 0.08);
+  color: var(--tg-accent);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-patient-notes-help {
+  margin: 8px 0 12px;
+  color: var(--tg-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tg-patient-notes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tg-patient-note-section {
+  border: 1px solid rgba(216, 203, 179, 0.9);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 10px;
+}
+
+.tg-patient-note-section h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.tg-patient-note-lines {
+  display: grid;
+  gap: 6px;
+}
+
+.tg-patient-note-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.tg-patient-note-row span {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.tg-patient-note-input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(31, 42, 36, 0.16);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.tg-patient-note-input:focus {
+  outline: 3px solid rgba(15, 139, 76, 0.18);
+  border-color: var(--tg-accent);
+}
+
+.tg-patient-notes-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tg-patient-notes-actions button {
+  min-height: 36px;
+  border: 1px solid rgba(31, 42, 36, 0.14);
+  border-radius: 999px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-patient-notes-save {
+  background: #eaf6ef;
+  color: var(--tg-accent);
+}
+
+.tg-patient-notes-clear {
+  background: #fff0ed;
+  color: var(--tg-danger);
+}
+
+.tg-patient-notes-actions span {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .tg-form-status {
   display: grid;
   gap: 8px;
@@ -639,6 +770,19 @@ input {
   .tg-form-control-value {
     min-width: 44px;
     min-height: 32px;
+    font-size: 13px;
+  }
+
+  .tg-patient-notes {
+    padding: 10px;
+  }
+
+  .tg-patient-notes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tg-patient-note-input {
+    min-height: 34px;
     font-size: 13px;
   }
 

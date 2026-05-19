@@ -57,6 +57,15 @@
     { title: "Արձակուրդ", span: 3 }
   ];
 
+  const patientNoteSections = [
+    { key: "admitted", title: "Ընդունված հիվանդներ", rows: 6 },
+    { key: "discharged", title: "Դուրս գրված հիվանդներ", rows: 6 },
+    { key: "transferred", title: "Տեղափոխված հիվանդներ", rows: 5 },
+    { key: "dischargedNotTaken", title: "Դուրսգրված-չտարված", rows: 5 },
+    { key: "returnedFromLeave", title: "Վերադարձել են արձակուրդից", rows: 5 },
+    { key: "wentOnLeave", title: "Գնացել են արձակուրդ", rows: 5 }
+  ];
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -96,6 +105,144 @@
   function toNumber(value) {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 0;
+  }
+
+  function getPatientNotesStorageKey(department, reportDate) {
+    const departmentId = department && department.id ? department.id : "unknown";
+    return `sharsh:tg-form:patient-notes:${departmentId}:${reportDate || ""}`;
+  }
+
+  function createEmptyPatientNotes() {
+    const notes = {};
+    patientNoteSections.forEach((section) => {
+      notes[section.key] = Array.from({ length: section.rows }, () => "");
+    });
+    return notes;
+  }
+
+  function normalizePatientNotes(source) {
+    const notes = createEmptyPatientNotes();
+    if (!source || typeof source !== "object") {
+      return notes;
+    }
+    patientNoteSections.forEach((section) => {
+      const values = Array.isArray(source[section.key]) ? source[section.key] : [];
+      notes[section.key] = notes[section.key].map((_, index) => String(values[index] || ""));
+    });
+    return notes;
+  }
+
+  function loadPatientNotes(department, reportDate) {
+    try {
+      const raw = window.localStorage.getItem(getPatientNotesStorageKey(department, reportDate));
+      return normalizePatientNotes(raw ? JSON.parse(raw) : null);
+    } catch (error) {
+      return createEmptyPatientNotes();
+    }
+  }
+
+  function savePatientNotes(department, reportDate, notes) {
+    try {
+      window.localStorage.setItem(
+        getPatientNotesStorageKey(department, reportDate),
+        JSON.stringify(normalizePatientNotes(notes))
+      );
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function clearPatientNotes(department, reportDate) {
+    try {
+      window.localStorage.removeItem(getPatientNotesStorageKey(department, reportDate));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function countPatientNotes(notes) {
+    return patientNoteSections.reduce((total, section) => (
+      total + (notes[section.key] || []).filter((value) => String(value).trim()).length
+    ), 0);
+  }
+
+  function readPatientNotes() {
+    const notes = createEmptyPatientNotes();
+    root.querySelectorAll("[data-patient-note-input]").forEach((input) => {
+      const sectionKey = input.getAttribute("data-note-section");
+      const index = Number(input.getAttribute("data-note-index"));
+      if (sectionKey && Number.isInteger(index) && notes[sectionKey] && index >= 0 && index < notes[sectionKey].length) {
+        notes[sectionKey][index] = input.value.trim();
+      }
+    });
+    return notes;
+  }
+
+  function updatePatientNotesUi(notes, message) {
+    const badge = root.querySelector("[data-patient-notes-badge]");
+    const status = root.querySelector("[data-patient-notes-status]");
+    const count = countPatientNotes(notes);
+    if (badge) {
+      badge.textContent = count ? `Լրացված է ${count}` : "Տեղային գրառում չկա";
+    }
+    if (status) {
+      status.textContent = message || "Պահվում է այս սարքում եւ ուղարկվելիս կտեղադրվի PDF բլանկում։";
+    }
+  }
+
+  function renderPatientNotesBlock(department, reportDate) {
+    const notes = loadPatientNotes(department, reportDate);
+    const filledCount = countPatientNotes(notes);
+    const sections = patientNoteSections.map((section) => {
+      const rows = notes[section.key] || [];
+      const inputs = Array.from({ length: section.rows }, (_, index) => `
+        <label class="tg-patient-note-row">
+          <span>${index + 1}.</span>
+          <input
+            class="tg-patient-note-input"
+            data-patient-note-input
+            data-note-section="${escapeHtml(section.key)}"
+            data-note-index="${index}"
+            type="text"
+            autocomplete="off"
+            placeholder="Ա.Ա.Հ."
+            value="${escapeHtml(rows[index] || "")}"
+          >
+        </label>
+      `).join("");
+
+      return `
+        <section class="tg-patient-note-section">
+          <h3>${escapeHtml(section.title)}</h3>
+          <div class="tg-patient-note-lines">${inputs}</div>
+        </section>
+      `;
+    }).join("");
+
+    return `
+      <section class="tg-patient-notes" data-patient-notes>
+        <header class="tg-patient-notes-head">
+          <div>
+            <p class="tg-form-kicker">ՏԵՂԱՅԻՆ ԳՐԱՌՈՒՄՆԵՐ</p>
+            <h2>Հիվանդների գրառումներ</h2>
+          </div>
+          <span class="tg-patient-notes-badge" data-patient-notes-badge>
+            ${filledCount ? `Լրացված է ${filledCount}` : "Տեղային գրառում չկա"}
+          </span>
+        </header>
+        <p class="tg-patient-notes-help">
+          Այս մասը պահվում է այս սարքում եւ ուղարկվելիս կտեղադրվի PDF բլանկում։
+        </p>
+        <div class="tg-patient-notes-grid">${sections}</div>
+        <div class="tg-patient-notes-actions">
+          <button type="button" class="tg-patient-notes-save" data-save-patient-notes>Պահպանել տեղում</button>
+          <button type="button" class="tg-patient-notes-clear" data-clear-patient-notes>Մաքրել գրառումները</button>
+          <span data-patient-notes-status>Պահվում է այս սարքում եւ ուղարկվելիս կտեղադրվի PDF բլանկում։</span>
+        </div>
+      </section>
+    `;
   }
 
   function readValues() {
@@ -182,7 +329,8 @@
           initData: getInitData(),
           departmentId: department.id,
           reportDate: getReportDate(),
-          values
+          values,
+          patientNotes: readPatientNotes()
         })
       });
       const payload = await response.json().catch(() => null);
@@ -287,6 +435,8 @@
             </table>
           </div>
 
+          ${renderPatientNotesBlock(department, reportDate)}
+
           <div class="tg-form-status" data-status></div>
           <div class="tg-form-actions">
             <button class="tg-form-submit" data-submit type="submit">Отправить на проверку</button>
@@ -308,6 +458,35 @@
       });
       input.addEventListener("focus", () => input.select());
     });
+    root.querySelectorAll("[data-patient-note-input]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const notes = readPatientNotes();
+        const saved = savePatientNotes(department, reportDate, notes);
+        updatePatientNotesUi(notes, saved ? "Պահված է տեղում։" : "Չհաջողվեց պահել այս սարքում։");
+      });
+    });
+    const patientNotesSave = root.querySelector("[data-save-patient-notes]");
+    if (patientNotesSave) {
+      patientNotesSave.addEventListener("click", () => {
+        const notes = readPatientNotes();
+        const saved = savePatientNotes(department, reportDate, notes);
+        updatePatientNotesUi(notes, saved ? "Պահված է տեղում։" : "Չհաջողվեց պահել այս սարքում։");
+      });
+    }
+    const patientNotesClear = root.querySelector("[data-clear-patient-notes]");
+    if (patientNotesClear) {
+      patientNotesClear.addEventListener("click", () => {
+        const confirmed = window.confirm("Մաքրե՞լ այս բաժանմունքի տեղային գրառումները։");
+        if (!confirmed) {
+          return;
+        }
+        clearPatientNotes(department, reportDate);
+        root.querySelectorAll("[data-patient-note-input]").forEach((input) => {
+          input.value = "";
+        });
+        updatePatientNotesUi(createEmptyPatientNotes(), "Գրառումները մաքրված են։");
+      });
+    }
     const form = root.querySelector("[data-form]");
     if (form) {
       form.addEventListener("submit", submitForm);
