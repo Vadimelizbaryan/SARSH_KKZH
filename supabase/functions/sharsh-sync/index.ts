@@ -1945,7 +1945,7 @@ async function deleteCivilReferrals(
 }
 
 async function listOcrFeedbackRecords(supabase: ReturnType<typeof createClient>, limit: number) {
-  const safeLimit = Math.min(200, Math.max(1, Math.trunc(limit || 100)));
+  const safeLimit = Math.min(500, Math.max(1, Math.trunc(limit || 100)));
   const { data, error } = await supabase
     .from("sharsh_ocr_feedback")
     .select("id, created_at, department_id, department_name, report_date, photo_report_date, save_status, image_name, image_data_url, recognized_keys, changed_keys, ocr_raw, final_values, notes, cell_reviews")

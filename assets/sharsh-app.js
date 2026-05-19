@@ -23,6 +23,8 @@
   const departmentId = document.body.dataset.departmentId || "";
   const basePath = document.body.dataset.basePath || ".";
   const archiveKeyFromQuery = queryParams.get("archive") || "";
+  const departmentArchiveKeyFromQuery = queryParams.get("departmentArchive") || "";
+  const departmentArchiveDateFromQuery = queryParams.get("departmentArchiveDate") || "";
   const archiveAutoPrint = queryParams.get("autoprint") !== "0";
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
   const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
@@ -32,6 +34,8 @@
   const ARCHIVE_TIMEZONE = "Asia/Yerevan";
   const ARCHIVE_CAPTURE_HOUR = 10;
   const MAX_ARCHIVE_RECORDS = 60;
+  const DEPARTMENT_PDF_ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:department-pdf-archive:v1`;
+  const MAX_DEPARTMENT_PDF_ARCHIVE_RECORDS = 240;
   const DEPARTMENT_UNLOCK_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:department-unlock:`;
   const PHOTO_MAX_DIMENSION = 1800;
   const PHOTO_JPEG_QUALITY = 0.88;
@@ -267,6 +271,11 @@
     updateAttentionBound: false,
     archiveRecords: [],
     selectedArchiveKey: "",
+    departmentPdfArchiveRecords: [],
+    selectedDepartmentPdfArchiveKey: "",
+    selectedDepartmentPdfArchiveDate: "",
+    departmentPdfArchiveRemoteLoaded: false,
+    departmentPdfArchiveRemoteLoading: false,
     morningRolloverInFlight: false,
     morningRolloverCompletedKeys: new Set(),
     initialized: false,
@@ -2235,6 +2244,513 @@
     }
   }
 
+  function getDepartmentDefinitionById(rowId) {
+    return config.departmentDefinitions.find((definition) => definition.id === rowId) || null;
+  }
+
+  function getDepartmentSortIndex(rowId) {
+    const index = config.departmentDefinitions.findIndex((definition) => definition.id === rowId);
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+  }
+
+  function getTimestampSortValue(value) {
+    const parsed = Date.parse(value || "");
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  function normalizeDepartmentPdfArchiveRecord(record) {
+    if (!record || typeof record !== "object" || typeof record.archiveKey !== "string") {
+      return null;
+    }
+
+    const rowId = typeof record.departmentId === "string" ? record.departmentId : "";
+    const definition = getDepartmentDefinitionById(rowId);
+    const fallbackDateKey = record.archiveKey.split("-").slice(0, 3).join("-");
+
+    return {
+      archiveKey: record.archiveKey,
+      archiveDateKey: typeof record.archiveDateKey === "string" && record.archiveDateKey.trim()
+        ? record.archiveDateKey.trim()
+        : fallbackDateKey,
+      archiveLabel: typeof record.archiveLabel === "string" && record.archiveLabel.trim()
+        ? record.archiveLabel.trim()
+        : record.archiveKey,
+      archiveDateLabel: typeof record.archiveDateLabel === "string" && record.archiveDateLabel.trim()
+        ? record.archiveDateLabel.trim()
+        : "",
+      capturedAt: typeof record.capturedAt === "string" ? record.capturedAt : new Date().toISOString(),
+      reportDate: typeof record.reportDate === "string" && record.reportDate.trim()
+        ? record.reportDate.trim()
+        : config.DEFAULT_DATE,
+      source: typeof record.source === "string" ? record.source : "local-only",
+      feedbackId: typeof record.feedbackId === "string" ? record.feedbackId : "",
+      departmentId: rowId,
+      departmentName: typeof record.departmentName === "string" && record.departmentName.trim()
+        ? record.departmentName.trim()
+        : (definition ? definition.department : rowId),
+      departmentMarker: typeof record.departmentMarker === "string" && record.departmentMarker.trim()
+        ? record.departmentMarker.trim()
+        : (definition ? definition.marker : ""),
+      values: config.normalizeRowValues(record.values || {}),
+      updatedAt: typeof record.updatedAt === "string" && record.updatedAt.trim()
+        ? record.updatedAt.trim()
+        : new Date().toISOString()
+    };
+  }
+
+  function sortDepartmentPdfArchiveRecords(records) {
+    return records.sort((left, right) => {
+      const byDate = right.archiveDateKey.localeCompare(left.archiveDateKey);
+      if (byDate) {
+        return byDate;
+      }
+
+      const byTime = getTimestampSortValue(right.capturedAt) - getTimestampSortValue(left.capturedAt);
+      if (byTime) {
+        return byTime;
+      }
+
+      return getDepartmentSortIndex(left.departmentId) - getDepartmentSortIndex(right.departmentId);
+    });
+  }
+
+  function readDepartmentPdfArchiveRecords() {
+    try {
+      const raw = localStorage.getItem(DEPARTMENT_PDF_ARCHIVE_STORAGE_KEY);
+      if (!raw) {
+        return [];
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return sortDepartmentPdfArchiveRecords(parsed.map(normalizeDepartmentPdfArchiveRecord).filter(Boolean))
+        .slice(0, MAX_DEPARTMENT_PDF_ARCHIVE_RECORDS);
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function writeDepartmentPdfArchiveRecords(records) {
+    const normalized = sortDepartmentPdfArchiveRecords(records.map(normalizeDepartmentPdfArchiveRecord).filter(Boolean))
+      .slice(0, MAX_DEPARTMENT_PDF_ARCHIVE_RECORDS);
+    state.departmentPdfArchiveRecords = normalized;
+    localStorage.setItem(DEPARTMENT_PDF_ARCHIVE_STORAGE_KEY, JSON.stringify(normalized));
+    return normalized;
+  }
+
+  function ensureDepartmentPdfArchiveRecordsLoaded() {
+    if (!Array.isArray(state.departmentPdfArchiveRecords) || !state.departmentPdfArchiveRecords.length) {
+      state.departmentPdfArchiveRecords = readDepartmentPdfArchiveRecords();
+    }
+    return state.departmentPdfArchiveRecords;
+  }
+
+  function getDepartmentPdfArchiveRecordByKey(archiveKey) {
+    if (!archiveKey) {
+      return null;
+    }
+    return ensureDepartmentPdfArchiveRecordsLoaded().find((record) => record.archiveKey === archiveKey) || null;
+  }
+
+  function captureDepartmentPdfArchiveFromSave(snapshot, rowId) {
+    void snapshot;
+    void rowId;
+    return null;
+  }
+
+  function normalizeDepartmentPdfArchiveDateKey(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+    }
+
+    const localMatch = raw.match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{2,4})/);
+    if (localMatch) {
+      const day = localMatch[1].padStart(2, "0");
+      const month = localMatch[2].padStart(2, "0");
+      const year = localMatch[3].length === 2 ? `20${localMatch[3]}` : localMatch[3];
+      return `${year}-${month}-${day}`;
+    }
+
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+    return "";
+  }
+
+  function formatDepartmentPdfArchiveDateLabel(dateKey, fallback = "") {
+    const raw = String(dateKey || "").trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return String(fallback || raw).trim();
+    }
+    return `${match[3]}.${match[2]}.${match[1]}`;
+  }
+
+  function normalizeTelegramWebFormArchiveRecord(record) {
+    if (!record || typeof record !== "object") {
+      return null;
+    }
+    const imageName = String(record.imageName || record.image_name || "").trim();
+    if (imageName !== "telegram-web-app-form") {
+      return null;
+    }
+
+    const feedbackId = String(record.id || record.feedbackId || "").trim();
+    const departmentId = String(record.departmentId || record.department_id || "").trim();
+    const definition = getDepartmentDefinitionById(departmentId);
+    if (!feedbackId || !definition) {
+      return null;
+    }
+
+    const reportDate = String(record.reportDate || record.report_date || "").trim();
+    const createdAt = String(record.createdAt || record.created_at || new Date().toISOString()).trim();
+    const archiveDateKey = normalizeDepartmentPdfArchiveDateKey(reportDate || createdAt);
+    if (!archiveDateKey) {
+      return null;
+    }
+
+    const values = record.finalValues || record.final_values || record.recognizedValues || record.recognized_values || {};
+    const archiveDateLabel = formatDepartmentPdfArchiveDateLabel(archiveDateKey, reportDate);
+    const timeLabel = formatTimestamp(createdAt);
+    return normalizeDepartmentPdfArchiveRecord({
+      archiveKey: `${archiveDateKey}-${departmentId}-${feedbackId}`,
+      archiveDateKey,
+      archiveLabel: timeLabel ? `${archiveDateLabel} ${timeLabel}` : archiveDateLabel,
+      archiveDateLabel,
+      capturedAt: createdAt,
+      reportDate,
+      source: "telegram-web-app",
+      feedbackId,
+      departmentId,
+      departmentName: String(record.departmentName || record.department_name || definition.department).trim(),
+      departmentMarker: definition.marker,
+      values,
+      updatedAt: createdAt
+    });
+  }
+
+  function refreshDepartmentPdfArchiveUi() {
+    const records = ensureDepartmentPdfArchiveRecordsLoaded();
+    const summary = document.getElementById("departmentPdfArchiveSummaryText");
+    if (summary) {
+      summary.textContent = getDepartmentPdfArchiveSummaryText(records);
+    }
+    const list = document.getElementById("departmentPdfArchiveList");
+    if (list) {
+      list.innerHTML = buildMainDepartmentPdfArchivePicker(records);
+    }
+    syncDepartmentPdfArchivePickerUi();
+    syncMainDepartmentPdfArchivePickerUi();
+  }
+
+  async function refreshDepartmentPdfArchiveRecordsFromRemote() {
+    if (
+      state.departmentPdfArchiveRemoteLoading ||
+      !sync.hasRemoteSync?.() ||
+      typeof sync.listOcrFeedback !== "function"
+    ) {
+      refreshDepartmentPdfArchiveUi();
+      return;
+    }
+
+    state.departmentPdfArchiveRemoteLoading = true;
+    try {
+      const records = await sync.listOcrFeedback(500);
+      const normalized = sortDepartmentPdfArchiveRecords(
+        (Array.isArray(records) ? records : [])
+          .map(normalizeTelegramWebFormArchiveRecord)
+          .filter(Boolean)
+      ).slice(0, MAX_DEPARTMENT_PDF_ARCHIVE_RECORDS);
+
+      if (normalized.length) {
+        state.departmentPdfArchiveRecords = normalized;
+        state.departmentPdfArchiveRemoteLoaded = true;
+        const selectedKeyExists = normalized.some((record) => record.archiveKey === state.selectedDepartmentPdfArchiveKey);
+        if (!selectedKeyExists) {
+          state.selectedDepartmentPdfArchiveKey = normalized[0].archiveKey;
+        }
+        const selectedDateExists = normalized.some((record) => record.archiveDateKey === state.selectedDepartmentPdfArchiveDate);
+        if (!selectedDateExists) {
+          state.selectedDepartmentPdfArchiveDate = normalized[0].archiveDateKey;
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to load Telegram Web App PDF archive.", error);
+    } finally {
+      state.departmentPdfArchiveRemoteLoading = false;
+      refreshDepartmentPdfArchiveUi();
+    }
+  }
+
+  function getDepartmentPdfArchiveDateGroups(records = ensureDepartmentPdfArchiveRecordsLoaded()) {
+    const groupsByDate = new Map();
+
+    records.forEach((record) => {
+      const dateKey = record.archiveDateKey;
+      if (!groupsByDate.has(dateKey)) {
+        groupsByDate.set(dateKey, {
+          dateKey,
+          label: record.archiveDateLabel || record.archiveLabel || dateKey,
+          count: 0,
+          departmentIds: new Set(),
+          latestCapturedAt: record.capturedAt
+        });
+      }
+
+      const group = groupsByDate.get(dateKey);
+      group.count += 1;
+      group.departmentIds.add(record.departmentId);
+      if (getTimestampSortValue(record.capturedAt) > getTimestampSortValue(group.latestCapturedAt)) {
+        group.latestCapturedAt = record.capturedAt;
+      }
+    });
+
+    return Array.from(groupsByDate.values())
+      .map((group) => ({
+        dateKey: group.dateKey,
+        label: group.label,
+        count: group.count,
+        departmentCount: group.departmentIds.size,
+        latestCapturedAt: group.latestCapturedAt
+      }))
+      .sort((left, right) => right.dateKey.localeCompare(left.dateKey));
+  }
+
+  function getSelectedDepartmentPdfArchiveDateGroup(groups = getDepartmentPdfArchiveDateGroups()) {
+    if (!Array.isArray(groups) || !groups.length) {
+      state.selectedDepartmentPdfArchiveDate = "";
+      return null;
+    }
+
+    const selected = state.selectedDepartmentPdfArchiveDate
+      ? groups.find((group) => group.dateKey === state.selectedDepartmentPdfArchiveDate) || null
+      : null;
+    if (selected) {
+      return selected;
+    }
+
+    state.selectedDepartmentPdfArchiveDate = groups[0].dateKey;
+    return groups[0];
+  }
+
+  function getDepartmentPdfArchiveRecordsForDate(dateKey) {
+    if (!dateKey) {
+      return [];
+    }
+
+    const latestByDepartment = new Map();
+    ensureDepartmentPdfArchiveRecordsLoaded()
+      .filter((record) => record.archiveDateKey === dateKey)
+      .forEach((record) => {
+        const existing = latestByDepartment.get(record.departmentId);
+        if (!existing || getTimestampSortValue(record.capturedAt) > getTimestampSortValue(existing.capturedAt)) {
+          latestByDepartment.set(record.departmentId, record);
+        }
+      });
+
+    return Array.from(latestByDepartment.values())
+      .sort((left, right) => getDepartmentSortIndex(left.departmentId) - getDepartmentSortIndex(right.departmentId));
+  }
+
+  function buildSnapshotFromDepartmentPdfArchiveRecords(records, reportDate) {
+    const recordsByDepartment = new Map(records.map((record) => [record.departmentId, record]));
+    const rows = records.map((record) => ({
+      id: record.departmentId,
+      values: config.normalizeRowValues(record.values),
+      updatedAt: record.updatedAt || record.capturedAt,
+      photoWorkflowStatus: "processed",
+      photoFeedbackId: null,
+      photoFeedbackUpdatedAt: null,
+      photoName: ""
+    }));
+    const snapshot = config.buildSnapshotFromSaved({
+      reportDate: reportDate || (records[0] ? records[0].reportDate : config.DEFAULT_DATE),
+      updatedAt: records[0] ? records[0].capturedAt : null,
+      rows
+    });
+    snapshot.rows = snapshot.rows
+      .filter((row) => recordsByDepartment.has(row.id))
+      .map((row) => {
+        const record = recordsByDepartment.get(row.id);
+        return {
+          ...row,
+          department: record?.departmentName || row.department,
+          marker: record?.departmentMarker || row.marker
+        };
+      });
+    return snapshot;
+  }
+
+  function getDepartmentPdfArchiveRecordsForDepartment(rowId) {
+    return ensureDepartmentPdfArchiveRecordsLoaded()
+      .filter((record) => record.departmentId === rowId)
+      .sort((left, right) => getTimestampSortValue(right.capturedAt) - getTimestampSortValue(left.capturedAt));
+  }
+
+  function getSelectedDepartmentPdfArchiveRecord(rowId) {
+    const records = getDepartmentPdfArchiveRecordsForDepartment(rowId);
+    if (!records.length) {
+      state.selectedDepartmentPdfArchiveKey = "";
+      return null;
+    }
+
+    const selected = state.selectedDepartmentPdfArchiveKey
+      ? records.find((record) => record.archiveKey === state.selectedDepartmentPdfArchiveKey) || null
+      : null;
+    if (selected) {
+      return selected;
+    }
+
+    state.selectedDepartmentPdfArchiveKey = records[0].archiveKey;
+    return records[0];
+  }
+
+  function getDepartmentPdfArchiveSummaryText(records) {
+    if (!Array.isArray(records) || !records.length) {
+      return "PDF-архив отделений пока пуст. Он начнет заполняться после сохранения отделений.";
+    }
+    const groups = getDepartmentPdfArchiveDateGroups(records);
+    const latest = groups[0];
+    return `PDF-бланков: ${records.length}. Дат: ${groups.length}. Последняя дата: ${latest ? latest.label : "-"}.`;
+  }
+
+  function getDepartmentPdfArchiveSelectionText(record) {
+    if (!record) {
+      return "После сохранения отделения здесь появятся PDF-бланки этого отделения.";
+    }
+    const marker = record.departmentMarker ? `${record.departmentMarker} ` : "";
+    return `${marker}${record.departmentName}: ${record.archiveLabel}. Сохранено: ${formatTimestamp(record.capturedAt)}.`;
+  }
+
+  function buildDepartmentPdfArchiveOptions(records, selectedArchiveKey) {
+    return records.map((record) => `
+      <option value="${escapeHtml(record.archiveKey)}"${record.archiveKey === selectedArchiveKey ? " selected" : ""}>
+        ${escapeHtml(`${record.archiveLabel} - ${formatTimestamp(record.capturedAt)}`)}
+      </option>
+    `).join("");
+  }
+
+  function buildDepartmentPdfArchiveDateOptions(groups, selectedDateKey) {
+    return groups.map((group) => `
+      <option value="${escapeHtml(group.dateKey)}"${group.dateKey === selectedDateKey ? " selected" : ""}>
+        ${escapeHtml(`${group.label} - отделений: ${group.departmentCount}`)}
+      </option>
+    `).join("");
+  }
+
+  function renderDepartmentPdfArchivePanel(row) {
+    const records = getDepartmentPdfArchiveRecordsForDepartment(row.id);
+    const selectedRecord = getSelectedDepartmentPdfArchiveRecord(row.id);
+    return `
+      <section class="panel no-print archive-panel department-pdf-archive-panel">
+        <h2>Архив PDF бланков</h2>
+        <p class="hint">Здесь сохраняются PDF-бланки этого отделения после успешного сохранения данных.</p>
+        ${records.length ? `
+          <div class="archive-selector">
+            <div class="archive-selector-row">
+              <label class="archive-picker" for="departmentPdfArchiveSelect">
+                <span>Бланк отделения</span>
+                <select id="departmentPdfArchiveSelect">
+                  ${buildDepartmentPdfArchiveOptions(records, selectedRecord ? selectedRecord.archiveKey : "")}
+                </select>
+              </label>
+              <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchivePdfLink" href="${escapeHtml(getDepartmentPdfArchivePrintPath(selectedRecord.archiveKey))}" target="_blank" rel="noopener">PDF</a>
+            </div>
+            <div class="archive-selected-meta" id="departmentPdfArchiveSelectedMeta">${escapeHtml(getDepartmentPdfArchiveSelectionText(selectedRecord))}</div>
+          </div>
+        ` : '<div class="archive-empty">Пока нет сохраненных PDF-бланков этого отделения.</div>'}
+      </section>
+    `;
+  }
+
+  function buildMainDepartmentPdfArchivePicker(records) {
+    const groups = getDepartmentPdfArchiveDateGroups(records);
+    const selectedGroup = getSelectedDepartmentPdfArchiveDateGroup(groups);
+    if (!selectedGroup) {
+      return '<div class="archive-empty">Пока нет сохраненных PDF-бланков отделений.</div>';
+    }
+
+    return `
+      <div class="archive-selector">
+        <div class="archive-selector-row">
+          <label class="archive-picker" for="departmentPdfArchiveDateSelect">
+            <span>Дата бланков</span>
+            <select id="departmentPdfArchiveDateSelect">
+              ${buildDepartmentPdfArchiveDateOptions(groups, selectedGroup.dateKey)}
+            </select>
+          </label>
+          <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchiveDatePdfLink" href="${escapeHtml(getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey))}" target="_blank" rel="noopener">Общий PDF</a>
+        </div>
+        <div class="archive-selected-meta" id="departmentPdfArchiveDateSelectedMeta">
+          ${escapeHtml(`Дата: ${selectedGroup.label}. Отделений в PDF: ${selectedGroup.departmentCount}. Бланков в архиве: ${selectedGroup.count}.`)}
+        </div>
+      </div>
+    `;
+  }
+
+  function syncDepartmentPdfArchivePickerUi() {
+    const row = getCurrentRow();
+    if (!row) {
+      return;
+    }
+    const selectedRecord = getSelectedDepartmentPdfArchiveRecord(row.id);
+    const select = document.getElementById("departmentPdfArchiveSelect");
+    const link = document.getElementById("departmentPdfArchivePdfLink");
+    const meta = document.getElementById("departmentPdfArchiveSelectedMeta");
+
+    if (select && selectedRecord) {
+      select.value = selectedRecord.archiveKey;
+    }
+    if (link) {
+      if (selectedRecord) {
+        link.href = getDepartmentPdfArchivePrintPath(selectedRecord.archiveKey);
+        link.removeAttribute("aria-disabled");
+      } else {
+        link.removeAttribute("href");
+        link.setAttribute("aria-disabled", "true");
+      }
+    }
+    if (meta) {
+      meta.textContent = getDepartmentPdfArchiveSelectionText(selectedRecord);
+    }
+  }
+
+  function syncMainDepartmentPdfArchivePickerUi() {
+    const groups = getDepartmentPdfArchiveDateGroups();
+    const selectedGroup = getSelectedDepartmentPdfArchiveDateGroup(groups);
+    const select = document.getElementById("departmentPdfArchiveDateSelect");
+    const link = document.getElementById("departmentPdfArchiveDatePdfLink");
+    const meta = document.getElementById("departmentPdfArchiveDateSelectedMeta");
+
+    if (select && selectedGroup) {
+      select.value = selectedGroup.dateKey;
+    }
+    if (link) {
+      if (selectedGroup) {
+        link.href = getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey);
+        link.removeAttribute("aria-disabled");
+      } else {
+        link.removeAttribute("href");
+        link.setAttribute("aria-disabled", "true");
+      }
+    }
+    if (meta) {
+      meta.textContent = selectedGroup
+        ? `Дата: ${selectedGroup.label}. Отделений в PDF: ${selectedGroup.departmentCount}. Бланков в архиве: ${selectedGroup.count}.`
+        : "Выберите дату PDF-архива отделений.";
+    }
+  }
+
   function getCurrentDateTimeParts() {
     const now = new Date();
     const date = now.toLocaleDateString("ru-RU", {
@@ -2894,7 +3410,8 @@
     if (key === "transferFromDepartment" || key === "transferToDepartment") {
       return true;
     }
-    return row.editableKeys.includes(key) || Boolean(getLinkedSource(row, key));
+    const editableKeys = Array.isArray(row?.editableKeys) ? row.editableKeys : [];
+    return editableKeys.includes(key) || Boolean(getLinkedSource(row, key));
   }
 
   function isEditable(row, key) {
@@ -2904,7 +3421,8 @@
     if (getLinkedSource(row, key)) {
       return false;
     }
-    return row.editableKeys.includes(key);
+    const editableKeys = Array.isArray(row?.editableKeys) ? row.editableKeys : [];
+    return editableKeys.includes(key);
   }
 
   function getCellClasses(key, row, type) {
@@ -3186,6 +3704,44 @@
     }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
     return `${prefix}archive-print.html?archive=${encodeURIComponent(archiveKey)}&autoprint=1`;
+  }
+
+  function getDepartmentPdfArchivePrintPath(archiveKey) {
+    const record = getDepartmentPdfArchiveRecordByKey(archiveKey);
+    if (
+      record?.feedbackId &&
+      sync.hasRemoteSync?.() &&
+      typeof sync.buildTelegramFormPdfUrl === "function"
+    ) {
+      const remoteUrl = sync.buildTelegramFormPdfUrl(record.feedbackId, record.departmentId);
+      if (remoteUrl) {
+        return remoteUrl;
+      }
+    }
+
+    if (basePath === "@site") {
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&departmentArchive=${encodeURIComponent(archiveKey)}&autoprint=1`);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return `${prefix}archive-print.html?departmentArchive=${encodeURIComponent(archiveKey)}&autoprint=1`;
+  }
+
+  function getDepartmentPdfArchiveDatePrintPath(dateKey) {
+    if (
+      sync.hasRemoteSync?.() &&
+      typeof sync.buildTelegramFormArchiveDatePdfUrl === "function"
+    ) {
+      const remoteUrl = sync.buildTelegramFormArchiveDatePdfUrl(dateKey);
+      if (remoteUrl) {
+        return remoteUrl;
+      }
+    }
+
+    if (basePath === "@site") {
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&departmentArchiveDate=${encodeURIComponent(dateKey)}&autoprint=1`);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return `${prefix}archive-print.html?departmentArchiveDate=${encodeURIComponent(dateKey)}&autoprint=1`;
   }
 
   function getSetupPath() {
@@ -3615,6 +4171,15 @@
       return row ? `${PRINT_REPORT_TITLE} ${row.department}` : PRINT_REPORT_TITLE;
     }
     if (mode === "archive") {
+      if (departmentArchiveKeyFromQuery) {
+        const record = getDepartmentPdfArchiveRecordByKey(departmentArchiveKeyFromQuery);
+        return record
+          ? `${PRINT_REPORT_TITLE} ${record.departmentMarker || record.departmentName} ${record.archiveLabel}`
+          : PRINT_REPORT_TITLE;
+      }
+      if (departmentArchiveDateFromQuery) {
+        return `${PRINT_REPORT_TITLE} ${departmentArchiveDateFromQuery}`;
+      }
       const record = getArchiveRecordByKey(archiveKeyFromQuery);
       return record ? `${PRINT_REPORT_TITLE} ${record.archiveLabel}` : PRINT_REPORT_TITLE;
     }
@@ -3656,6 +4221,15 @@
       return "Օրվա շարժ․ | SARSH_KKZH";
     }
     if (mode === "archive") {
+      if (departmentArchiveKeyFromQuery) {
+        const record = getDepartmentPdfArchiveRecordByKey(departmentArchiveKeyFromQuery);
+        return record
+          ? `PDF архив ${record.departmentMarker || record.departmentName} ${record.archiveLabel} | SARSH_KKZH`
+          : "PDF архив отделения | SARSH_KKZH";
+      }
+      if (departmentArchiveDateFromQuery) {
+        return `PDF архив отделений ${departmentArchiveDateFromQuery} | SARSH_KKZH`;
+      }
       const record = getArchiveRecordByKey(archiveKeyFromQuery);
       return record ? `Архив ${record.archiveLabel} | SARSH_KKZH` : "Архив | SARSH_KKZH";
     }
@@ -3670,6 +4244,7 @@
     const currentDateTime = getCurrentDateTimeParts();
     const archiveRecords = ensureArchiveRecordsLoaded();
     const latestArchive = archiveRecords[0] || null;
+    const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
     const mainBlankPdfPath = config.getMainBlankPdfPath
       ? config.getMainBlankPdfPath(basePath)
       : null;
@@ -3788,6 +4363,14 @@
                     ? buildArchivePicker(archiveRecords)
                     : '<div class="archive-empty">Пока нет сохранённых дат.</div>'
                 }
+              </div>
+            </section>
+            <section class="panel no-print archive-panel department-pdf-archive-panel">
+              <h2>Архив PDF отделений</h2>
+              <p id="departmentPdfArchiveSummaryText">${escapeHtml(getDepartmentPdfArchiveSummaryText(departmentPdfArchiveRecords))}</p>
+              <p class="hint">После сохранения отделения здесь остается PDF-копия бланка. Можно открыть отдельный бланк на странице отделения или общий PDF за выбранную дату.</p>
+              <div class="archive-list" id="departmentPdfArchiveList">
+                ${buildMainDepartmentPdfArchivePicker(departmentPdfArchiveRecords)}
               </div>
             </section>
           </div>
@@ -4286,6 +4869,7 @@
           ${renderPhotoImportPanel(row)}
           ${renderQhCalcPanel(row)}
           ${renderTelegramFormReviewPanel(row)}
+          ${renderDepartmentPdfArchivePanel(row)}
 
           <div class="zoom-target">
             <div class="sheet-shell">
@@ -4305,7 +4889,121 @@
     `;
   }
 
+  function renderArchiveNotFoundPage(title, message) {
+    const mainPath = appendShareQuery(config.getMainPagePath(basePath));
+    app.innerHTML = `
+      <div class="page">
+        <div class="panel">
+          <h2>${escapeHtml(title)}</h2>
+          <p>${escapeHtml(message)}</p>
+          <p><a href="${escapeHtml(mainPath)}">Вернуться к главному файлу</a></p>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDepartmentPdfArchiveRecordPage() {
+    const record = getDepartmentPdfArchiveRecordByKey(departmentArchiveKeyFromQuery);
+    if (!record) {
+      renderArchiveNotFoundPage("Архив PDF не найден", "Для этого отделения архивная PDF-копия в текущем браузере не найдена.");
+      return;
+    }
+
+    const snapshot = buildSnapshotFromDepartmentPdfArchiveRecords([record], record.reportDate);
+    const headerDateTime = getHeaderDateTimeParts(record.reportDate) || getCurrentDateTimeParts();
+    state.snapshot = deepCopy(snapshot);
+    state.loadedSnapshot = deepCopy(snapshot);
+    state.source = record.source || "local-only";
+    app.innerHTML = `
+      <div class="page">
+        <div class="print-title">
+          <h1>${escapeHtml(PRINT_REPORT_TITLE)}</h1>
+          <p>${escapeHtml(record.departmentName || "")}</p>
+        </div>
+        <div class="toolbar no-print">
+          <div>
+            <h1>PDF ${escapeHtml(record.departmentMarker || record.departmentName)}</h1>
+            <p>${escapeHtml(record.archiveLabel)}. Архивная копия бланка отделения.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button type="button" id="printBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(appendShareQuery(config.getMainPagePath(basePath)))}">К главному</a>
+          </div>
+        </div>
+        <div class="info-stack">
+          <div class="panel no-print">
+            <h2>Данные PDF-архива</h2>
+            <p><strong>Отделение:</strong> ${escapeHtml(record.departmentName || "")}</p>
+            <p><strong>Дата:</strong> ${escapeHtml(record.archiveLabel)}</p>
+            <p><strong>Сохранено:</strong> ${escapeHtml(formatTimestamp(record.capturedAt))}</p>
+          </div>
+          <div class="zoom-target">
+            <div class="sheet-shell">
+              <div class="table-wrap">
+                ${renderTable(snapshot, snapshot.rows, { interactive: false, viewMode: "department", headerDateTime })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDepartmentPdfArchiveDatePage() {
+    const records = getDepartmentPdfArchiveRecordsForDate(departmentArchiveDateFromQuery);
+    if (!records.length) {
+      renderArchiveNotFoundPage("PDF-архив за дату не найден", "За эту дату PDF-копии отделений в текущем браузере не найдены.");
+      return;
+    }
+
+    const snapshot = buildSnapshotFromDepartmentPdfArchiveRecords(records);
+    const headerDateTime = getHeaderDateTimeParts(snapshot.reportDate) || getCurrentDateTimeParts();
+    state.snapshot = deepCopy(snapshot);
+    state.loadedSnapshot = deepCopy(snapshot);
+    state.source = records[0]?.source || "local-only";
+    app.innerHTML = `
+      <div class="page">
+        <div class="print-title">
+          <h1>${escapeHtml(PRINT_REPORT_TITLE)}</h1>
+        </div>
+        <div class="toolbar no-print">
+          <div>
+            <h1>PDF архив ${escapeHtml(departmentArchiveDateFromQuery)}</h1>
+            <p>Общий файл из сохраненных PDF-бланков отделений за выбранную дату.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button type="button" id="printBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(appendShareQuery(config.getMainPagePath(basePath)))}">К главному</a>
+          </div>
+        </div>
+        <div class="info-stack">
+          <div class="panel no-print">
+            <h2>Данные PDF-архива</h2>
+            <p><strong>Дата:</strong> ${escapeHtml(departmentArchiveDateFromQuery)}</p>
+            <p><strong>Отделений:</strong> ${records.length}</p>
+          </div>
+          <div class="zoom-target">
+            <div class="sheet-shell">
+              <div class="table-wrap">
+                ${renderTable(snapshot, snapshot.rows, { interactive: false, viewMode: "main", headerDateTime })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderArchivePage() {
+    if (departmentArchiveKeyFromQuery) {
+      renderDepartmentPdfArchiveRecordPage();
+      return;
+    }
+    if (departmentArchiveDateFromQuery) {
+      renderDepartmentPdfArchiveDatePage();
+      return;
+    }
+
     const record = getArchiveRecordByKey(archiveKeyFromQuery);
 
     if (!record) {
@@ -4550,6 +5248,9 @@
       const archiveSummaryText = document.getElementById("archiveSummaryText");
       const archiveList = document.getElementById("archiveList");
       const archiveRecords = ensureArchiveRecordsLoaded();
+      const departmentPdfArchiveSummaryText = document.getElementById("departmentPdfArchiveSummaryText");
+      const departmentPdfArchiveList = document.getElementById("departmentPdfArchiveList");
+      const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
 
       if (freshCount) {
         freshCount.textContent = String(stats.counts.fresh);
@@ -4597,6 +5298,13 @@
         archiveList.innerHTML = buildArchivePicker(archiveRecords);
       }
       syncArchivePickerUi();
+      if (departmentPdfArchiveSummaryText) {
+        departmentPdfArchiveSummaryText.textContent = getDepartmentPdfArchiveSummaryText(departmentPdfArchiveRecords);
+      }
+      if (departmentPdfArchiveList) {
+        departmentPdfArchiveList.innerHTML = buildMainDepartmentPdfArchivePicker(departmentPdfArchiveRecords);
+      }
+      syncMainDepartmentPdfArchivePickerUi();
 
       state.snapshot.rows.forEach((row) => {
         const meta = getRowFreshnessMeta(row);
@@ -4660,6 +5368,9 @@
       });
     }
 
+    if (mode === "department") {
+      syncDepartmentPdfArchivePickerUi();
+    }
     refreshComputedCells();
     refreshDepartmentSaveState();
   }
@@ -6218,6 +6929,7 @@
     const result = await sync.loadSnapshot();
     applyLoadedSnapshot(result);
     state.archiveRecords = readArchiveRecords();
+    state.departmentPdfArchiveRecords = readDepartmentPdfArchiveRecords();
     state.initialized = true;
     state.info = "";
     state.infoIsError = false;
@@ -6403,6 +7115,7 @@
           if (verification.ok) {
             applyLoadedSnapshot(result);
             setPendingMainSaveNotice("", false);
+            captureDepartmentPdfArchiveFromSave(result.snapshot || state.snapshot, row.id);
 
             if (isQhCalcDepartment(row)) {
               const currentSavedRow = getCurrentRow();
@@ -6875,6 +7588,22 @@
       });
     }
 
+    const departmentPdfArchiveSelect = document.getElementById("departmentPdfArchiveSelect");
+    if (departmentPdfArchiveSelect) {
+      departmentPdfArchiveSelect.addEventListener("change", () => {
+        state.selectedDepartmentPdfArchiveKey = departmentPdfArchiveSelect.value || "";
+        syncDepartmentPdfArchivePickerUi();
+      });
+    }
+
+    const departmentPdfArchiveDateSelect = document.getElementById("departmentPdfArchiveDateSelect");
+    if (departmentPdfArchiveDateSelect) {
+      departmentPdfArchiveDateSelect.addEventListener("change", () => {
+        state.selectedDepartmentPdfArchiveDate = departmentPdfArchiveDateSelect.value || "";
+        syncMainDepartmentPdfArchivePickerUi();
+      });
+    }
+
     if (!app.dataset.archiveDownloadBound) {
       app.addEventListener("click", (event) => {
         const target = event.target;
@@ -7081,10 +7810,18 @@
 
     if (mode === "archive") {
       state.archiveRecords = readArchiveRecords();
+      state.departmentPdfArchiveRecords = readDepartmentPdfArchiveRecords();
+      const hasPrintableArchive = archiveKeyFromQuery
+        ? Boolean(getArchiveRecordByKey(archiveKeyFromQuery))
+        : departmentArchiveKeyFromQuery
+          ? Boolean(getDepartmentPdfArchiveRecordByKey(departmentArchiveKeyFromQuery))
+          : departmentArchiveDateFromQuery
+            ? getDepartmentPdfArchiveRecordsForDate(departmentArchiveDateFromQuery).length > 0
+            : false;
       state.initialized = true;
       state.info = "";
       renderPage();
-      if (archiveAutoPrint && getArchiveRecordByKey(archiveKeyFromQuery)) {
+      if (archiveAutoPrint && hasPrintableArchive) {
         window.setTimeout(() => {
           window.print();
         }, 350);
@@ -7108,6 +7845,7 @@
       await loadFeedbackRecords(true);
     }
     renderPage();
+    void refreshDepartmentPdfArchiveRecordsFromRemote();
     startAutoRefreshIfNeeded();
     startFreshnessTicker();
     startClockTicker();

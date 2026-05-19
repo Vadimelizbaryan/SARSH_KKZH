@@ -1478,6 +1478,33 @@
     return payload && typeof payload.record === "object" ? payload.record : null;
   }
 
+  function buildTelegramFormPdfUrl(feedbackId, departmentId) {
+    const normalizedId = String(feedbackId || "").trim();
+    if (!hasRemoteSync() || !normalizedId) {
+      return "";
+    }
+
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "telegram-form-pdf");
+    url.searchParams.set("id", normalizedId);
+    if (departmentId) {
+      url.searchParams.set("departmentId", String(departmentId));
+    }
+    return url.toString();
+  }
+
+  function buildTelegramFormArchiveDatePdfUrl(dateKey) {
+    const normalizedDate = String(dateKey || "").trim();
+    if (!hasRemoteSync() || !normalizedDate) {
+      return "";
+    }
+
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "telegram-form-archive-pdf");
+    url.searchParams.set("date", normalizedDate);
+    return url.toString();
+  }
+
   function getSourceLabel(source) {
     if (source === "remote") {
       return "Առցանց սինխր.";
@@ -1519,6 +1546,8 @@
     sendMainPdfsToTelegram,
     sendShiftFormToTelegram,
     loadTelegramPhotoFeedback,
+    buildTelegramFormPdfUrl,
+    buildTelegramFormArchiveDatePdfUrl,
     listOcrFeedback,
     verifyDepartmentAccess,
     detectDepartmentPhoto,

@@ -1861,7 +1861,7 @@ async function loadTelegramColleagueChats(supabase: ReturnType<typeof createClie
 }
 
 async function saveTelegramColleagueChats(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   chats: TelegramColleagueChat[]
 ) {
   const uniqueChats = Array.from(new Map(chats.map((item) => [item.chatId, item])).values());
@@ -5461,6 +5461,199 @@ function buildDepartmentPdfFileName(departmentId: DepartmentId, reportDate: stri
   return `${safeMarker}_${safeDate || DEFAULT_DATE}_${suffix}.pdf`;
 }
 
+function parseDepartmentId(value: unknown): DepartmentId | null {
+  const id = String(value || "").trim();
+  return Object.prototype.hasOwnProperty.call(DEPARTMENTS, id) ? id as DepartmentId : null;
+}
+
+function normalizeTelegramFormArchiveDateKey(value: unknown) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const localMatch = raw.match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{2,4})/);
+  if (localMatch) {
+    const day = localMatch[1].padStart(2, "0");
+    const month = localMatch[2].padStart(2, "0");
+    const year = localMatch[3].length === 2 ? `20${localMatch[3]}` : localMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return "";
+}
+
+function formatTelegramFormArchiveDateLabel(dateKey: string) {
+  const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return dateKey;
+  }
+  return `${match[3]}.${match[2]}.${match[1]}`;
+}
+
+function extractDepartmentPatientNotesFromFeedbackNotes(notes: unknown): DepartmentPatientNotes {
+  const output = createEmptyDepartmentPatientNotes();
+  if (!Array.isArray(notes)) {
+    return output;
+  }
+
+  for (const note of notes) {
+    const text = String(note || "").replace(/^Patient note:\s*/i, "").trim();
+    if (!text) {
+      continue;
+    }
+
+    const section = DEPARTMENT_PATIENT_NOTE_SECTIONS.find((candidate) => (
+      text.startsWith(`${candidate.title}:`)
+    ));
+    if (!section) {
+      continue;
+    }
+
+    const body = text.slice(section.title.length + 1).trim();
+    output[section.key] = body
+      .split(";")
+      .map((part) => getPatientNoteDisplayText(part))
+      .filter(Boolean)
+      .slice(0, section.rows);
+  }
+
+  return sanitizeDepartmentPatientNotes(output);
+}
+
+type TelegramWebFormArchiveRecord = {
+  id: string;
+  departmentId: DepartmentId;
+  departmentName: string;
+  reportDate: string;
+  archiveDateKey: string;
+  values: Record<string, number | null>;
+  patientNotes: DepartmentPatientNotes;
+  createdAt: string;
+};
+
+function buildTelegramWebFormArchiveRecord(row: Record<string, unknown> | null | undefined): TelegramWebFormArchiveRecord | null {
+  if (!row || row.image_name !== "telegram-web-app-form") {
+    return null;
+  }
+
+  const departmentId = parseDepartmentId(row.department_id);
+  const id = String(row.id || "").trim();
+  if (!departmentId || !id) {
+    return null;
+  }
+
+  const createdAt = String(row.created_at || new Date().toISOString());
+  const reportDateRaw = String(row.report_date || "").trim();
+  const archiveDateKey = normalizeTelegramFormArchiveDateKey(reportDateRaw || createdAt);
+  if (!archiveDateKey) {
+    return null;
+  }
+
+  return {
+    id,
+    departmentId,
+    departmentName: String(row.department_name || DEPARTMENTS[departmentId].department),
+    reportDate: reportDateRaw || formatTelegramFormArchiveDateLabel(archiveDateKey),
+    archiveDateKey,
+    values: sanitizeValues((row.final_values || row.recognized_values || {}) as Record<string, unknown>),
+    patientNotes: extractDepartmentPatientNotesFromFeedbackNotes(row.notes),
+    createdAt
+  };
+}
+
+async function loadTelegramWebFormArchiveRecord(
+  supabase: any,
+  feedbackId: string,
+  departmentId?: DepartmentId
+) {
+  const normalizedId = String(feedbackId || "").trim();
+  if (!normalizedId) {
+    return null;
+  }
+
+  let query = (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id, created_at, department_id, department_name, report_date, image_name, final_values, recognized_values, notes")
+    .eq("id", normalizedId)
+    .eq("image_name", "telegram-web-app-form");
+
+  if (departmentId) {
+    query = query.eq("department_id", departmentId);
+  }
+
+  const { data, error } = await query.limit(1).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return buildTelegramWebFormArchiveRecord(data as Record<string, unknown> | null);
+}
+
+async function loadTelegramWebFormArchiveRecordsForDate(
+  supabase: any,
+  dateKey: string
+) {
+  const { data, error } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id, created_at, department_id, department_name, report_date, image_name, final_values, recognized_values, notes")
+    .eq("image_name", "telegram-web-app-form")
+    .order("created_at", { ascending: false })
+    .limit(1000);
+
+  if (error) {
+    throw error;
+  }
+
+  const latestByDepartment = new Map<DepartmentId, TelegramWebFormArchiveRecord>();
+  for (const row of data || []) {
+    const record = buildTelegramWebFormArchiveRecord(row as Record<string, unknown>);
+    if (record && record.archiveDateKey === dateKey && !latestByDepartment.has(record.departmentId)) {
+      latestByDepartment.set(record.departmentId, record);
+    }
+  }
+
+  const departmentOrder = Object.keys(DEPARTMENTS) as DepartmentId[];
+  return Array.from(latestByDepartment.values())
+    .sort((left, right) => departmentOrder.indexOf(left.departmentId) - departmentOrder.indexOf(right.departmentId));
+}
+
+async function buildTelegramWebFormArchiveDatePdfBytes(records: TelegramWebFormArchiveRecord[]) {
+  const output = await PDFDocument.create();
+  for (const record of records) {
+    const bytes = await buildFilledDepartmentPdfBytes(
+      record.departmentId,
+      record.values,
+      record.reportDate,
+      record.patientNotes
+    );
+    const source = await PDFDocument.load(bytes);
+    const pages = await output.copyPages(source, source.getPageIndices());
+    pages.forEach((page) => output.addPage(page));
+  }
+  return await output.save();
+}
+
+function buildPdfBytesResponse(bytes: Uint8Array, fileName: string) {
+  const safeFileName = fileName.replace(/["\r\n]/g, "_");
+  const body = new Blob([bytes], { type: "application/pdf" });
+  return new Response(body, {
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="${safeFileName}"`
+    }
+  });
+}
+
 function isAllCurrentDepartmentsPdfRequest(text: string) {
   const normalized = String(text || "")
     .trim()
@@ -8327,6 +8520,70 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "night_shift_summary_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
+    }
+
+    if (action === "telegram-form-pdf") {
+      try {
+        const currentUrl = new URL(request.url);
+        const feedbackId = currentUrl.searchParams.get("id") || "";
+        const departmentId = parseDepartmentId(currentUrl.searchParams.get("departmentId"));
+        const supabase = createSupabaseAdmin();
+        const record = await loadTelegramWebFormArchiveRecord(
+          supabase,
+          feedbackId,
+          departmentId || undefined
+        );
+        if (!record) {
+          return jsonResponse({ ok: false, error: "Telegram Web App form not found." }, 404);
+        }
+
+        const pdfBytes = await buildFilledDepartmentPdfBytes(
+          record.departmentId,
+          record.values,
+          record.reportDate,
+          record.patientNotes
+        );
+        return buildPdfBytesResponse(
+          pdfBytes,
+          buildDepartmentPdfFileName(record.departmentId, record.reportDate, "telegram-form")
+        );
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "telegram_form_pdf_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
+    }
+
+    if (action === "telegram-form-archive-pdf") {
+      try {
+        const currentUrl = new URL(request.url);
+        const dateKey = normalizeTelegramFormArchiveDateKey(currentUrl.searchParams.get("date") || "");
+        if (!dateKey) {
+          return jsonResponse({ ok: false, error: "Archive date is required." }, 400);
+        }
+
+        const supabase = createSupabaseAdmin();
+        const records = await loadTelegramWebFormArchiveRecordsForDate(supabase, dateKey);
+        if (!records.length) {
+          return jsonResponse({ ok: false, error: "Telegram Web App forms not found." }, 404);
+        }
+
+        const pdfBytes = await buildTelegramWebFormArchiveDatePdfBytes(records);
+        return buildPdfBytesResponse(
+          pdfBytes,
+          `Telegram_forms_${dateKey}.pdf`
+        );
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "telegram_form_archive_pdf_failed",
           error: error instanceof Error ? error.message : String(error)
         }, 500);
       }

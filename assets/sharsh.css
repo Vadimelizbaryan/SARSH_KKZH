@@ -1165,6 +1165,24 @@ a {
   background: #fff6e9;
 }
 
+.department-pdf-archive-panel {
+  border-color: rgba(12, 112, 73, 0.18);
+}
+
+.department-pdf-archive-panel .archive-selector {
+  background: rgba(248, 255, 250, 0.92);
+}
+
+.archive-open-link--secondary {
+  background: #f3fff7;
+  color: #0b6b43;
+  border-color: rgba(12, 112, 73, 0.18);
+}
+
+.archive-open-link--secondary:hover {
+  background: #e6fff0;
+}
+
 .archive-selected-meta {
   font-size: 13px;
   color: var(--muted);
