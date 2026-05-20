@@ -37,6 +37,12 @@
   const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
   const MORNING_ROLLOVER_PENDING_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:morning-rollover-pending:v1`;
   const ARCHIVE_TIMEZONE = "Asia/Yerevan";
+  const DATA_UPDATE_SLOT_MINUTES = {
+    morning: 2 * 60,
+    evening: 18 * 60
+  };
+  const DATA_UPDATE_GRACE_MINUTES = 2 * 60;
+  const DATA_UPDATE_EARLY_TOLERANCE_MINUTES = 60;
   const ARCHIVE_CAPTURE_HOUR = 10;
   const MAX_ARCHIVE_RECORDS = 60;
   const DEPARTMENT_PDF_ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:department-pdf-archive:v1`;
@@ -1979,10 +1985,56 @@
     const key = `${parts.year}-${parts.month}-${parts.day}`;
     return {
       key,
+      year: Number(parts.year),
+      month: Number(parts.month),
+      day: Number(parts.day),
       label: `${parts.day}.${parts.month}.${parts.year}`,
       timeLabel: `${parts.hour}:${parts.minute}`,
       totalMinutes: (Number(parts.hour) * 60) + Number(parts.minute)
     };
+  }
+
+  function getArchiveDayNumber(context) {
+    if (!context) {
+      return 0;
+    }
+    return Math.floor(Date.UTC(Number(context.year), Number(context.month) - 1, Number(context.day)) / 86400000);
+  }
+
+  function getCompletedUpdateSlotOrdinal(value = new Date()) {
+    const context = getArchiveContext(value);
+    const dayNumber = getArchiveDayNumber(context);
+    const totalMinutes = Number(context.totalMinutes) || 0;
+
+    if (totalMinutes >= DATA_UPDATE_SLOT_MINUTES.evening + DATA_UPDATE_GRACE_MINUTES) {
+      return (dayNumber * 2) + 1;
+    }
+
+    if (totalMinutes >= DATA_UPDATE_SLOT_MINUTES.morning + DATA_UPDATE_GRACE_MINUTES) {
+      return dayNumber * 2;
+    }
+
+    return ((dayNumber - 1) * 2) + 1;
+  }
+
+  function getUpdateSlotOrdinalForTimestamp(value) {
+    const context = getArchiveContext(value);
+    const dayNumber = getArchiveDayNumber(context);
+    const totalMinutes = Number(context.totalMinutes) || 0;
+
+    if (totalMinutes >= DATA_UPDATE_SLOT_MINUTES.evening - DATA_UPDATE_EARLY_TOLERANCE_MINUTES) {
+      return (dayNumber * 2) + 1;
+    }
+
+    if (totalMinutes >= DATA_UPDATE_SLOT_MINUTES.morning - DATA_UPDATE_EARLY_TOLERANCE_MINUTES) {
+      return dayNumber * 2;
+    }
+
+    return ((dayNumber - 1) * 2) + 1;
+  }
+
+  function getUpdateSlotLabel(ordinal) {
+    return ordinal % 2 === 0 ? "02:00" : "18:00";
   }
 
   function normalizeArchiveRecord(record) {
@@ -2873,11 +2925,11 @@
       };
     }
 
-    const diffMs = Math.max(0, Date.now() - date.getTime());
-    const twoHours = 2 * 60 * 60 * 1000;
-    const twelveHours = 12 * 60 * 60 * 1000;
+    const updatedSlotOrdinal = getUpdateSlotOrdinalForTimestamp(date);
+    const expectedSlotOrdinal = getCompletedUpdateSlotOrdinal();
+    const missedSlots = Math.max(0, expectedSlotOrdinal - updatedSlotOrdinal);
 
-    if (diffMs <= twoHours) {
+    if (missedSlots <= 0) {
       return {
         level: "fresh",
         label: "Свежие",
@@ -2886,12 +2938,12 @@
       };
     }
 
-    if (diffMs <= twelveHours) {
+    if (missedSlots === 1) {
       return {
         level: "warning",
         label: "Проверить",
         timestamp: formatTimestamp(updatedAt),
-        age: `Последнее обновление ${formatAge(updatedAt)}`
+        age: `Последнее обновление ${formatAge(updatedAt)}. Нет данных за окно ${getUpdateSlotLabel(expectedSlotOrdinal)}.`
       };
     }
 
@@ -2899,7 +2951,7 @@
       level: "stale",
       label: "Старые",
       timestamp: formatTimestamp(updatedAt),
-      age: `Данные не обновлялись ${formatAge(updatedAt)}`
+      age: `Данные не обновлялись ${formatAge(updatedAt)}. Пропущено больше одного окна обновления.`
     };
   }
 
@@ -3023,12 +3075,26 @@
     const missingCount = stats && stats.counts ? stats.counts.missing : 0;
     const allUpdated = totalRows > 0 && freshCount === totalRows;
 
+    if (allUpdated) {
+      return {
+        level: "fresh",
+        label: "Все отделения обновлены",
+        detail: `Свежие данные есть у всех ${totalRows} отделений.`
+      };
+    }
+
+    if (staleCount > 0 || missingCount > 0) {
+      return {
+        level: "stale",
+        label: "Есть устаревшие отделения",
+        detail: `Свежие: ${freshCount} из ${totalRows}. Проверить: ${warningCount}, старые: ${staleCount}, нет данных: ${missingCount}.`
+      };
+    }
+
     return {
-      level: allUpdated ? "fresh" : "stale",
-      label: allUpdated ? "Все отделения обновлены" : "Не все отделения обновлены",
-      detail: allUpdated
-        ? `Свежие данные есть у всех ${totalRows} отделений.`
-        : `Свежие: ${freshCount} из ${totalRows}. Проверить: ${warningCount}, старые: ${staleCount}, нет данных: ${missingCount}.`
+      level: "warning",
+      label: "Нужно проверить часть отделений",
+      detail: `Свежие: ${freshCount} из ${totalRows}. Проверить: ${warningCount}, старые: ${staleCount}, нет данных: ${missingCount}.`
     };
   }
 

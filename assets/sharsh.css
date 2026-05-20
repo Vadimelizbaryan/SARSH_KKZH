@@ -918,6 +918,15 @@ a {
   color: var(--fresh);
 }
 
+.update-health-banner--warning {
+  border-color: rgba(169, 106, 0, 0.22);
+  background: rgba(169, 106, 0, 0.1);
+}
+
+.update-health-banner--warning strong {
+  color: var(--warning);
+}
+
 .update-health-banner--stale {
   border-color: rgba(177, 58, 45, 0.22);
   background: rgba(177, 58, 45, 0.08);
