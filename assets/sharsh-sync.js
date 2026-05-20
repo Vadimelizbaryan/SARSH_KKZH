@@ -942,6 +942,7 @@
       return {
         snapshot,
         source: "remote",
+        archiveRecord: payload && typeof payload.archiveRecord === "object" ? payload.archiveRecord : null,
         rolloverApplied: Boolean(payload && payload.rolloverApplied),
         rolloverAlreadyApplied: Boolean(payload && payload.rolloverAlreadyApplied)
       };
@@ -952,6 +953,7 @@
       return {
         snapshot: loadLocalSnapshot(),
         source: "local-only",
+        archiveRecord: null,
         rolloverApplied: false,
         rolloverAlreadyApplied: true
       };
@@ -963,6 +965,7 @@
     return {
       snapshot,
       source: "local-only",
+      archiveRecord: null,
       rolloverApplied: true,
       rolloverAlreadyApplied: false
     };

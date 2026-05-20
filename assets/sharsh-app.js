@@ -2038,6 +2038,15 @@
     return normalized;
   }
 
+  function upsertArchiveRecord(record) {
+    const normalized = normalizeArchiveRecord(record);
+    if (!normalized) {
+      return ensureArchiveRecordsLoaded();
+    }
+    const records = ensureArchiveRecordsLoaded().filter((item) => item.archiveKey !== normalized.archiveKey);
+    return writeArchiveRecords([normalized, ...records]);
+  }
+
   function ensureArchiveRecordsLoaded() {
     if (!Array.isArray(state.archiveRecords) || !state.archiveRecords.length) {
       state.archiveRecords = readArchiveRecords();
@@ -2097,6 +2106,22 @@
       };
     }
 
+    if (sync.hasRemoteSync()) {
+      const pendingRecord = {
+        archiveKey: context.key,
+        archiveLabel: context.label,
+        capturedAt: new Date().toISOString(),
+        reportDate: state.snapshot.reportDate,
+        source: "remote-pending",
+        snapshot: deepCopy(state.snapshot)
+      };
+      setPendingMorningRolloverKey(context.key);
+      return {
+        record: pendingRecord,
+        shouldRollover: true
+      };
+    }
+
     const nextRecord = {
       archiveKey: context.key,
       archiveLabel: context.label,
@@ -2130,6 +2155,9 @@
       const result = await sync.rolloverMainAfterArchive(record.archiveKey, state.snapshot.reportDate);
       state.morningRolloverCompletedKeys.add(record.archiveKey);
       clearPendingMorningRolloverKey(record.archiveKey);
+      if (result && result.archiveRecord) {
+        upsertArchiveRecord(result.archiveRecord);
+      }
       if (result && result.snapshot) {
         applyLoadedSnapshot(result);
       }
@@ -3807,8 +3835,6 @@
 
   function renderDetailRow(snapshot, row, interactive, viewMode) {
     const freshness = viewMode === "main" ? getRowFreshnessMeta(row) : null;
-    const freshnessClass = freshness && freshness.level === "fresh" ? " main-fresh-row" : "";
-    const freshnessAttr = freshness ? ` data-row-freshness="${escapeHtml(freshness.level)}"` : "";
     const validation = viewMode === "main" ? getDepartmentValidationStateForSnapshot(snapshot, row) : null;
     const validationClass = validation && validation.applicable && !validation.isValid ? " main-invalid-row" : "";
     const validationAttr = validation && validation.applicable
@@ -3817,6 +3843,10 @@
     const validationTitle = validation && validation.applicable && !validation.isValid
       ? ` title="${escapeHtml(validation.failedChecks.map((item) => item.failureMessage).join(" "))}"`
       : "";
+    const freshnessClass = freshness && freshness.level === "fresh" && !(validation && validation.applicable && !validation.isValid)
+      ? " main-fresh-row"
+      : "";
+    const freshnessAttr = freshness ? ` data-row-freshness="${escapeHtml(freshness.level)}"` : "";
     return `
       <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}${validationClass}" data-row-id="${row.id}"${freshnessAttr}${validationAttr}${validationTitle}>
         <td class="dept-cell" title="${escapeHtml(row.department)}">${renderResponsiveDepartmentName(row.department)}</td>
@@ -5600,9 +5630,9 @@
         }
         if (sheetRowEl) {
           sheetRowEl.setAttribute("data-row-freshness", meta.level);
-          sheetRowEl.classList.toggle("main-fresh-row", meta.level === "fresh");
           if (mode === "main") {
             const validation = getDepartmentValidationStateForSnapshot(state.snapshot, row);
+            sheetRowEl.classList.toggle("main-fresh-row", meta.level === "fresh" && !(validation.applicable && !validation.isValid));
             if (validation.applicable) {
               sheetRowEl.setAttribute("data-row-validation", validation.isValid ? "valid" : "invalid");
               sheetRowEl.classList.toggle("main-invalid-row", !validation.isValid);
@@ -5614,9 +5644,11 @@
             } else {
               sheetRowEl.removeAttribute("data-row-validation");
               sheetRowEl.classList.remove("main-invalid-row");
+              sheetRowEl.classList.toggle("main-fresh-row", meta.level === "fresh");
               sheetRowEl.removeAttribute("title");
             }
           } else {
+            sheetRowEl.classList.toggle("main-fresh-row", meta.level === "fresh");
             sheetRowEl.removeAttribute("data-row-validation");
             sheetRowEl.classList.remove("main-invalid-row");
             sheetRowEl.removeAttribute("title");

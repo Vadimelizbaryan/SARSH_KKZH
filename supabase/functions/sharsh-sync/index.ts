@@ -86,6 +86,7 @@ const CIVIL_REFERRAL_VALUE_KEYS = [
   "dischargeDate"
 ] as const;
 const CIVIL_REFERRAL_HASH_KEYS = CIVIL_REFERRAL_VALUE_KEYS.filter((key) => key !== "dischargeDate");
+const MAIN_ARCHIVE_SOURCE = "remote";
 
 const PHOTO_FIELD_MAPPINGS = [
   { cell: 1, key: "beenTotal", label: "been / total" },
@@ -178,6 +179,15 @@ function jsonResponse(data: unknown, status = 200) {
     status,
     headers: corsHeaders
   });
+}
+
+function formatMainArchiveLabel(archiveKey: string) {
+  const normalized = String(archiveKey || "").trim();
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return normalized;
+  }
+  return `${match[3]}.${match[2]}.${match[1]}`;
 }
 
 function sanitizeNumber(value: unknown) {
@@ -1604,6 +1614,107 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
   };
 }
 
+function buildSnapshotFromArchivePayload(snapshot: Record<string, unknown> | null | undefined) {
+  const normalized = snapshot && typeof snapshot === "object" ? snapshot : {};
+  const rows = Array.isArray(normalized.rows) ? normalized.rows : [];
+  const rowMap = new Map(rows
+    .filter((row) => row && typeof row === "object" && typeof (row as { id?: unknown }).id === "string")
+    .map((row) => [String((row as { id: string }).id), row as Record<string, unknown>]));
+
+  return {
+    reportDate: typeof normalized.reportDate === "string" && normalized.reportDate.trim()
+      ? normalized.reportDate.trim()
+      : DEFAULT_DATE,
+    updatedAt: typeof normalized.updatedAt === "string" && normalized.updatedAt.trim()
+      ? normalized.updatedAt
+      : new Date().toISOString(),
+    rows: Object.entries(DEPARTMENTS).map(([id]) => {
+      const saved = rowMap.get(id);
+      return {
+        id,
+        values: sanitizeValues(saved?.values as Record<string, unknown> | undefined),
+        updatedAt: typeof saved?.updatedAt === "string" ? saved.updatedAt : null,
+        photoWorkflowStatus: typeof saved?.photoWorkflowStatus === "string" ? saved.photoWorkflowStatus : "idle",
+        photoFeedbackId: typeof saved?.photoFeedbackId === "number" ? saved.photoFeedbackId : null,
+        photoFeedbackUpdatedAt: typeof saved?.photoFeedbackUpdatedAt === "string" ? saved.photoFeedbackUpdatedAt : null,
+        photoName: typeof saved?.photoName === "string" ? saved.photoName : ""
+      };
+    })
+  };
+}
+
+function normalizeMainArchiveRecord(row: Record<string, unknown> | null | undefined) {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const archiveKey = typeof row.archive_key === "string" ? row.archive_key.trim() : "";
+  if (!archiveKey) {
+    return null;
+  }
+
+  return {
+    archiveKey,
+    archiveLabel: typeof row.archive_label === "string" && row.archive_label.trim()
+      ? row.archive_label.trim()
+      : formatMainArchiveLabel(archiveKey),
+    capturedAt: typeof row.captured_at === "string" && row.captured_at.trim()
+      ? row.captured_at
+      : new Date().toISOString(),
+    reportDate: typeof row.report_date === "string" && row.report_date.trim()
+      ? row.report_date.trim()
+      : DEFAULT_DATE,
+    source: typeof row.source === "string" && row.source.trim()
+      ? row.source.trim()
+      : MAIN_ARCHIVE_SOURCE,
+    snapshot: buildSnapshotFromArchivePayload(row.snapshot as Record<string, unknown> | null | undefined)
+  };
+}
+
+async function loadMainArchiveRecord(
+  supabase: ReturnType<typeof createClient>,
+  archiveKey: string
+) {
+  const { data, error } = await supabase
+    .from("sharsh_main_archives")
+    .select("archive_key, archive_label, captured_at, report_date, source, snapshot")
+    .eq("archive_key", archiveKey)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizeMainArchiveRecord(data as Record<string, unknown> | null | undefined);
+}
+
+async function saveMainArchiveRecord(
+  supabase: ReturnType<typeof createClient>,
+  archiveKey: string,
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>
+) {
+  const now = new Date().toISOString();
+  const row = {
+    archive_key: archiveKey,
+    archive_label: formatMainArchiveLabel(archiveKey),
+    captured_at: now,
+    report_date: snapshot.reportDate || DEFAULT_DATE,
+    source: MAIN_ARCHIVE_SOURCE,
+    snapshot,
+    updated_at: now
+  };
+
+  const { error } = await supabase
+    .from("sharsh_main_archives")
+    .upsert([row]);
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizeMainArchiveRecord(row);
+}
+
 async function loadNightShiftDraft(supabase: ReturnType<typeof createClient>) {
   const rowIds = Object.keys(DEPARTMENTS).map(getNightShiftRowId);
   const { data: nightRows, error: rowsError } = await supabase
@@ -2382,15 +2493,19 @@ Deno.serve(async (request) => {
         throw rolloverMetaError;
       }
 
+      const existingArchiveRecord = await loadMainArchiveRecord(supabase, archiveKey);
+
       if (rolloverMeta?.report_date === archiveKey) {
         return jsonResponse({
           ...await loadSnapshot(supabase),
+          archiveRecord: existingArchiveRecord,
           rolloverApplied: false,
           rolloverAlreadyApplied: true
         });
       }
 
       const snapshot = await loadSnapshot(supabase);
+      const archiveRecord = existingArchiveRecord || await saveMainArchiveRecord(supabase, archiveKey, snapshot);
       const now = new Date().toISOString();
       const updates = snapshot.rows.map((row) => {
         const departmentMeta = DEPARTMENTS[row.id as keyof typeof DEPARTMENTS];
@@ -2432,6 +2547,7 @@ Deno.serve(async (request) => {
 
       return jsonResponse({
         ...await loadSnapshot(supabase),
+        archiveRecord,
         rolloverApplied: true,
         rolloverAlreadyApplied: false
       });

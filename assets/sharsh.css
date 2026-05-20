@@ -1789,6 +1789,14 @@ a {
   box-shadow: inset 0 0 0 9999px rgba(185, 45, 32, 0.22);
 }
 
+.sheet tbody tr.main-fresh-row.main-invalid-row td {
+  box-shadow: inset 0 0 0 9999px rgba(185, 45, 32, 0.16);
+}
+
+.sheet tbody tr.main-fresh-row.main-invalid-row:hover td {
+  box-shadow: inset 0 0 0 9999px rgba(185, 45, 32, 0.22);
+}
+
 .sheet tbody tr.main-invalid-row .dept-cell {
   color: #7c1d16;
 }
