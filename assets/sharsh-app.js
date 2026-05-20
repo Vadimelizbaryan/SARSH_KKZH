@@ -28,6 +28,11 @@
   const archiveAutoPrint = queryParams.get("autoprint") !== "0";
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
   const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
+  const SAVE_RULE_NAME = "Контроль 13-22";
+  const SOLDIER_COUNT_RULE_NAME = "Количество срочников";
+  const SOLDIER_COUNT_RULE_TEXT = "(3 + 6) - 9 = 13 + 20";
+  const MILITARY_COUNT_RULE_NAME = "Количество военнослужащих";
+  const MILITARY_COUNT_RULE_TEXT = "(2 + 5) - 8 = 13 + 14 + 15 + 20 + 21 + 22";
   const SAVE_RULE_TEXT_SHORT = "сумма блока АРКА Э = (1 + 4 + 11) - (7 + 10)";
   const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
   const MORNING_ROLLOVER_PENDING_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:morning-rollover-pending:v1`;
@@ -3351,6 +3356,208 @@
     };
   }
 
+  function buildDepartmentValidationChecks(row) {
+    if (!row) {
+      return [];
+    }
+
+    const presentActual = calcPresentTotal(state.snapshot, row);
+    const presentExpected = (
+      getNumber(state.snapshot, row, "beenTotal")
+      + getNumber(state.snapshot, row, "admittedTotal")
+      + getNumber(state.snapshot, row, "transferToDepartment")
+    ) - (
+      getNumber(state.snapshot, row, "dgTotal")
+      + getNumber(state.snapshot, row, "transferFromDepartment")
+    );
+    const checks = [
+      {
+        id: "present-balance",
+        name: SAVE_RULE_NAME,
+        ruleText: row.hasLeaveTotal ? SAVE_RULE_TEXT : SAVE_RULE_TEXT_SHORT,
+        applicable: true,
+        isValid: presentActual === presentExpected,
+        actual: presentActual,
+        expected: presentExpected,
+        suspectKeys: PHOTO_FIELD_DEFINITIONS
+          .filter((item) => item.cell >= 13 && item.cell <= 22)
+          .map((item) => item.key),
+        failureMessage: `сумма 13-22 = ${presentActual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${presentExpected}.`
+      }
+    ];
+
+    const transferFromDepartment = getNumber(state.snapshot, row, "transferFromDepartment");
+    const transferToDepartment = getNumber(state.snapshot, row, "transferToDepartment");
+    if (transferFromDepartment === 0 && transferToDepartment === 0) {
+      const soldierActual = (
+        getNumber(state.snapshot, row, "beenSeries")
+        + getNumber(state.snapshot, row, "admittedSeries")
+      ) - getNumber(state.snapshot, row, "dgSeries");
+      const soldierExpected = (
+        getNumber(state.snapshot, row, "currentShar")
+        + getNumber(state.snapshot, row, "leaveSharq")
+      );
+
+      checks.push({
+        id: "soldier-count",
+        name: SOLDIER_COUNT_RULE_NAME,
+        ruleText: SOLDIER_COUNT_RULE_TEXT,
+        applicable: true,
+        isValid: soldierActual === soldierExpected,
+        actual: soldierActual,
+        expected: soldierExpected,
+        suspectKeys: ["beenSeries", "admittedSeries", "dgSeries", "currentShar", "leaveSharq"],
+        failureMessage: `контрольная сумма «${SOLDIER_COUNT_RULE_NAME}» не сошлась: (${getNumber(state.snapshot, row, "beenSeries")} + ${getNumber(state.snapshot, row, "admittedSeries")}) - ${getNumber(state.snapshot, row, "dgSeries")} = ${soldierActual}, а ${getNumber(state.snapshot, row, "currentShar")} + ${getNumber(state.snapshot, row, "leaveSharq")} = ${soldierExpected}.`
+      });
+
+      const militaryActual = (
+        getNumber(state.snapshot, row, "beenSoldier")
+        + getNumber(state.snapshot, row, "admittedSoldier")
+      ) - getNumber(state.snapshot, row, "dgSoldier");
+      const militaryExpected = (
+        getNumber(state.snapshot, row, "currentShar")
+        + getNumber(state.snapshot, row, "currentSpa")
+        + getNumber(state.snapshot, row, "currentPaym")
+        + getNumber(state.snapshot, row, "leaveSharq")
+        + getNumber(state.snapshot, row, "leaveSpa")
+        + getNumber(state.snapshot, row, "leavePaym")
+      );
+
+      checks.push({
+        id: "military-count",
+        name: MILITARY_COUNT_RULE_NAME,
+        ruleText: MILITARY_COUNT_RULE_TEXT,
+        applicable: true,
+        isValid: militaryActual === militaryExpected,
+        actual: militaryActual,
+        expected: militaryExpected,
+        suspectKeys: [
+          "beenSoldier",
+          "admittedSoldier",
+          "dgSoldier",
+          "currentShar",
+          "currentSpa",
+          "currentPaym",
+          "leaveSharq",
+          "leaveSpa",
+          "leavePaym"
+        ],
+        failureMessage: `контрольная сумма «${MILITARY_COUNT_RULE_NAME}» не сошлась: (${getNumber(state.snapshot, row, "beenSoldier")} + ${getNumber(state.snapshot, row, "admittedSoldier")}) - ${getNumber(state.snapshot, row, "dgSoldier")} = ${militaryActual}, а ${getNumber(state.snapshot, row, "currentShar")} + ${getNumber(state.snapshot, row, "currentSpa")} + ${getNumber(state.snapshot, row, "currentPaym")} + ${getNumber(state.snapshot, row, "leaveSharq")} + ${getNumber(state.snapshot, row, "leaveSpa")} + ${getNumber(state.snapshot, row, "leavePaym")} = ${militaryExpected}.`
+      });
+    }
+
+    return checks;
+  }
+
+  function getDepartmentSaveRuleText(row, checks = []) {
+    if (!row) {
+      return SAVE_RULE_TEXT;
+    }
+    const activeChecks = Array.isArray(checks) && checks.length ? checks : buildDepartmentValidationChecks(row);
+    return activeChecks.map((item) => `${item.name}: ${item.ruleText}`).join("; ");
+  }
+
+  function getDepartmentValidationState() {
+    const row = getCurrentRow();
+    if (mode !== "department" || !hasDepartmentSaveRule(row)) {
+      return {
+        applicable: false,
+        isValid: true,
+        actual: 0,
+        expected: 0,
+        checks: [],
+        failedChecks: [],
+        message: ""
+      };
+    }
+
+    const checks = buildDepartmentValidationChecks(row);
+    const failedChecks = checks.filter((item) => item.applicable && !item.isValid);
+    const primaryCheck = checks[0] || null;
+    const isValid = failedChecks.length === 0;
+    const ruleText = getDepartmentSaveRuleText(row, checks);
+
+    return {
+      applicable: true,
+      isValid,
+      actual: primaryCheck ? primaryCheck.actual : 0,
+      expected: primaryCheck ? primaryCheck.expected : 0,
+      checks,
+      failedChecks,
+      message: isValid
+        ? `Проверка пройдена: ${ruleText}.`
+        : `Сохранение заблокировано: ${failedChecks.map((item) => item.failureMessage).join(" ")}`
+    };
+  }
+
+  function getPhotoImportSuspectDetails(row, recognizedKeys) {
+    if (!row || !hasDepartmentSaveRule(row)) {
+      return {
+        suspectKeys: [],
+        suspectReason: ""
+      };
+    }
+
+    const validation = getDepartmentValidationState();
+    if (!validation.applicable || validation.isValid) {
+      return {
+        suspectKeys: [],
+        suspectReason: ""
+      };
+    }
+
+    const photoBlockFields = PHOTO_FIELD_DEFINITIONS
+      .filter((item) => item.cell >= 13 && item.cell <= 22)
+      .map((item) => item.key);
+    const activeBlockKeys = photoBlockFields.filter((key) => getNumber(state.snapshot, row, key) !== 0);
+    const reviewBlockKeys = Array.isArray(state.photoImport?.cellReviews)
+      ? state.photoImport.cellReviews
+        .filter((item) => item && item.status === "review" && photoBlockFields.includes(item.key))
+        .map((item) => item.key)
+      : [];
+    const recognizedInBlock = photoBlockFields.filter((key) => recognizedKeys.has(key));
+    const fallbackBlockKeys = activeBlockKeys.length
+      ? activeBlockKeys
+      : (reviewBlockKeys.length
+        ? reviewBlockKeys
+        : (recognizedInBlock.length ? recognizedInBlock : photoBlockFields));
+    const suspectKeys = [];
+    const suspectReasonParts = [];
+
+    validation.failedChecks.forEach((check) => {
+      const checkKeys = check.id === "present-balance"
+        ? fallbackBlockKeys
+        : (Array.isArray(check.suspectKeys) ? check.suspectKeys : []);
+      checkKeys.forEach((key) => {
+        if (!suspectKeys.includes(key)) {
+          suspectKeys.push(key);
+        }
+      });
+      const labels = checkKeys
+        .map((key) => getPhotoFieldMetaByKey(key))
+        .filter(Boolean)
+        .map((item) => item.label);
+      if (check.id === "soldier-count" || check.id === "military-count") {
+        suspectReasonParts.push(
+          labels.length
+            ? `Контрольная сумма «${check.name}» не сошлась. Проверьте ячейки ${labels.join(", ")}.`
+            : `Контрольная сумма «${check.name}» не сошлась.`
+        );
+        return;
+      }
+      suspectReasonParts.push(
+        labels.length
+          ? `Формула 13-22 не сошлась. Проверьте ячейки ${labels.join(", ")}.`
+          : "Формула 13-22 не сошлась. Проверьте блок ячеек 13-22."
+      );
+    });
+
+    return {
+      suspectKeys,
+      suspectReason: suspectReasonParts.join(" ")
+    };
+  }
+
   function verifySavedDepartmentResult(expectedValues, resultSnapshot) {
     const savedRow = getDepartmentRow(resultSnapshot, departmentId);
     if (!savedRow) {
@@ -5402,6 +5609,9 @@
     saveBtn.title = validation.isValid
       ? "Формула совпадает, можно сохранять."
       : "Исправь данные: кнопка станет активной, когда сумма 13-22 совпадет с формулой.";
+    saveBtn.title = validation.isValid
+      ? "Контрольные суммы совпадают, можно сохранять."
+      : "Исправь данные: кнопка станет активной, когда контрольные суммы совпадут с формулами.";
     saveBtn.classList.add(validation.isValid ? "save-ready" : "save-blocked");
 
     if (ruleText) {
@@ -5642,6 +5852,9 @@
           : "Значения подставлены локально. Проверьте ячейки и нажмите Сохранить.",
         false
       );
+      if (state.photoImport.suspectReason) {
+        setPhotoImportStatus(`Значения подставлены локально, но контрольные суммы не сошлись. ${state.photoImport.suspectReason}`, false);
+      }
       renderPage();
       refreshTableData();
       setInfo("Распознанные значения подставлены локально. После проверки нажмите Сохранить.", false);
