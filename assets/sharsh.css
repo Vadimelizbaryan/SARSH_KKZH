@@ -1801,6 +1801,14 @@ a {
   color: #991b1b;
 }
 
+.sheet tbody td.transfer-mismatch-cell {
+  box-shadow: inset 0 0 0 9999px rgba(239, 68, 68, 0.24);
+}
+
+.sheet tbody tr:hover td.transfer-mismatch-cell {
+  box-shadow: inset 0 0 0 9999px rgba(239, 68, 68, 0.3);
+}
+
 .sheet tbody tr.subtotal-row:hover td,
 .sheet tbody tr.grand-row:hover td,
 .sheet tbody tr.single-total-row:hover td {

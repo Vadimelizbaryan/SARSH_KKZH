@@ -3660,6 +3660,34 @@
     }, 0);
   }
 
+  function getTransferColumnMismatchMeta(snapshot, rows) {
+    const fromTotal = getSummaryValue(snapshot, rows, "transferFromDepartment");
+    const toTotal = getSummaryValue(snapshot, rows, "transferToDepartment");
+
+    return {
+      fromTotal,
+      toTotal,
+      hasMismatch: fromTotal !== toTotal
+    };
+  }
+
+  function hasActiveMainTransferColumnMismatch() {
+    return mode === "main"
+      && getTransferColumnMismatchMeta(state.snapshot, state.snapshot.rows).hasMismatch;
+  }
+
+  function shouldHighlightTransferMismatchCell(key, options) {
+    if (key !== "transferFromDepartment" && key !== "transferToDepartment") {
+      return false;
+    }
+
+    if (options && options.highlightTransferMismatch) {
+      return Boolean(options.transferMismatch);
+    }
+
+    return hasActiveMainTransferColumnMismatch();
+  }
+
   function supportsValue(row, key) {
     if (key === "presentTotal" || key === "leaveTotal") {
       return true;
@@ -3682,7 +3710,7 @@
     return editableKeys.includes(key);
   }
 
-  function getCellClasses(key, row, type) {
+  function getCellClasses(key, row, type, options = null) {
     const classes = ["data-cell"];
 
     if (key === "beenSeries" || key === "admittedSeries" || key === "dgSeries" || key === "transferToDepartment") {
@@ -3699,6 +3727,9 @@
     }
     if ((type === "summary" || type === "grand") && config.summaryAccentKeys.has(key)) {
       classes.push("accent-total");
+    }
+    if (shouldHighlightTransferMismatchCell(key, options)) {
+      classes.push("transfer-mismatch-cell");
     }
 
     return classes.join(" ");
@@ -3787,40 +3818,40 @@
     `;
   }
 
-  function renderDetailCell(snapshot, row, key, interactive) {
+  function renderDetailCell(snapshot, row, key, interactive, options = null) {
     const classes = [
-      getCellClasses(key, row, "detail"),
+      getCellClasses(key, row, "detail", options),
       getPhotoFieldReviewStatus(key)
     ]
       .filter(Boolean)
       .join(" ");
 
     if (key === "presentTotal") {
-      return `<td class="${classes}"><span data-output="presentTotal" data-row="${row.id}"></span></td>`;
+      return `<td class="${classes}" data-column-key="${key}"><span data-output="presentTotal" data-row="${row.id}"></span></td>`;
     }
 
     if (key === "leaveTotal") {
       if (!row.hasLeaveTotal) {
-        return `<td class="${classes} blank-cell"><span></span></td>`;
+        return `<td class="${classes} blank-cell" data-column-key="${key}"><span></span></td>`;
       }
-      return `<td class="${classes}"><span data-output="leaveTotal" data-row="${row.id}"></span></td>`;
+      return `<td class="${classes}" data-column-key="${key}"><span data-output="leaveTotal" data-row="${row.id}"></span></td>`;
     }
 
     const linkedSource = getLinkedSource(row, key);
     if (linkedSource) {
-      return `<td class="${classes}"><span data-linked="${row.id}:${key}"></span></td>`;
+      return `<td class="${classes}" data-column-key="${key}"><span data-linked="${row.id}:${key}"></span></td>`;
     }
 
     if (!supportsValue(row, key)) {
-      return `<td class="${classes} blank-cell"><span></span></td>`;
+      return `<td class="${classes} blank-cell" data-column-key="${key}"><span></span></td>`;
     }
 
     if (!interactive || !isEditable(row, key)) {
-      return `<td class="${classes}"><span data-value="${row.id}:${key}">${escapeHtml(getDisplayValue(getEffectiveValue(snapshot, row, key)))}</span></td>`;
+      return `<td class="${classes}" data-column-key="${key}"><span data-value="${row.id}:${key}">${escapeHtml(getDisplayValue(getEffectiveValue(snapshot, row, key)))}</span></td>`;
     }
 
     return `
-      <td class="${classes}">
+      <td class="${classes}" data-column-key="${key}">
         <input
           type="text"
           inputmode="numeric"
@@ -3833,7 +3864,7 @@
     `;
   }
 
-  function renderDetailRow(snapshot, row, interactive, viewMode) {
+  function renderDetailRow(snapshot, row, interactive, viewMode, options = null) {
     const freshness = viewMode === "main" ? getRowFreshnessMeta(row) : null;
     const validation = viewMode === "main" ? getDepartmentValidationStateForSnapshot(snapshot, row) : null;
     const validationClass = validation && validation.applicable && !validation.isValid ? " main-invalid-row" : "";
@@ -3850,17 +3881,17 @@
     return `
       <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}${validationClass}" data-row-id="${row.id}"${freshnessAttr}${validationAttr}${validationTitle}>
         <td class="dept-cell" title="${escapeHtml(row.department)}">${renderResponsiveDepartmentName(row.department)}</td>
-        ${config.columns.map((key) => renderDetailCell(snapshot, row, key, interactive)).join("")}
+        ${config.columns.map((key) => renderDetailCell(snapshot, row, key, interactive, options)).join("")}
       </tr>
     `;
   }
 
-  function renderSummaryRow(summaryId, label, rowClass, snapshot, rows) {
+  function renderSummaryRow(summaryId, label, rowClass, snapshot, rows, options = null) {
     return `
       <tr class="${rowClass}">
         <td class="dept-cell">${escapeHtml(label)}</td>
         ${config.columns.map((key) => `
-          <td class="${getCellClasses(key, null, rowClass === "grand-row" ? "grand" : "summary")}">
+          <td class="${getCellClasses(key, null, rowClass === "grand-row" ? "grand" : "summary", options)}" data-column-key="${key}">
             <span data-summary="${summaryId}" data-key="${key}">${escapeHtml(String(getSummaryValue(snapshot, rows, key)))}</span>
           </td>
         `).join("")}
@@ -3871,20 +3902,27 @@
   function renderTable(snapshot, rows, options) {
     const interactive = Boolean(options.interactive);
     const headerDateTime = options.headerDateTime || getCurrentDateTimeParts();
+    const renderOptions = {
+      highlightTransferMismatch: Boolean(options.highlightTransferMismatch || (options.viewMode === "main" && mode === "main")),
+      transferMismatch: Boolean(
+        (options.highlightTransferMismatch || (options.viewMode === "main" && mode === "main"))
+        && getTransferColumnMismatchMeta(snapshot, rows).hasMismatch
+      )
+    };
     let bodyHtml = "";
 
     if (options.viewMode === "main") {
       const primaryRows = rows.filter((row) => row.group === "primary");
       const extraRows = rows.filter((row) => row.group === "extra");
       bodyHtml = [
-        ...primaryRows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode)),
+        ...primaryRows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode, renderOptions)),
         renderSummaryRow("subtotal", "Ընդամենը", "subtotal-row", snapshot, primaryRows),
-        ...extraRows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode)),
+        ...extraRows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode, renderOptions)),
         renderSummaryRow("grand", "Ընդամենը", "grand-row", snapshot, rows)
       ].join("");
     } else {
       bodyHtml = [
-        ...rows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode)),
+        ...rows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode, renderOptions)),
         renderSummaryRow("single", "Итог отделения", "single-total-row", snapshot, rows)
       ].join("");
     }
@@ -5417,6 +5455,7 @@
     if (mode === "main") {
       refreshSummary("subtotal", state.snapshot.rows.filter((row) => row.group === "primary"));
       refreshSummary("grand", state.snapshot.rows);
+      syncMainTransferMismatchUi();
     } else {
       const row = getCurrentRow();
       if (row) {
@@ -5435,6 +5474,23 @@
       if (el) {
         el.textContent = String(getSummaryValue(state.snapshot, rows, key));
       }
+    });
+  }
+
+  function syncMainTransferMismatchUi() {
+    const body = document.getElementById("sheetBody");
+    if (!body || mode !== "main") {
+      return;
+    }
+
+    const hasMismatch = hasActiveMainTransferColumnMismatch();
+    [
+      "transferFromDepartment",
+      "transferToDepartment"
+    ].forEach((key) => {
+      body.querySelectorAll(`[data-column-key="${key}"]`).forEach((cell) => {
+        cell.classList.toggle("transfer-mismatch-cell", hasMismatch);
+      });
     });
   }
 
@@ -5498,6 +5554,7 @@
     }
 
     if (mode === "main") {
+      syncMainTransferMismatchUi();
       const archiveCapture = maybeCaptureDailyArchive();
       if (archiveCapture && archiveCapture.shouldRollover) {
         void maybeApplyMorningRolloverAfterArchive(archiveCapture.record);
