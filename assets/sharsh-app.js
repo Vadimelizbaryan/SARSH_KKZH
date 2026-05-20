@@ -34,6 +34,8 @@
   const MILITARY_COUNT_RULE_NAME = "Количество военнослужащих";
   const MILITARY_COUNT_RULE_TEXT = "(2 + 5) - 8 = 13 + 14 + 15 + 20 + 21 + 22";
   const SAVE_RULE_TEXT_SHORT = "сумма блока АРКА Э = (1 + 4 + 11) - (7 + 10)";
+  const DEPARTMENT_MORNING_CONTROL_KEYS = ["beenTotal", "beenSoldier", "beenSeries"];
+  const DEPARTMENT_MORNING_CONTROL_KEY_SET = new Set(DEPARTMENT_MORNING_CONTROL_KEYS);
   const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
   const MORNING_ROLLOVER_PENDING_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:morning-rollover-pending:v1`;
   const ARCHIVE_TIMEZONE = "Asia/Yerevan";
@@ -312,7 +314,8 @@
     mainPhotoSaveDirectoryHandle: null,
     mainPhotoSaveDirectoryName: "",
     mainPhotoRoute: buildInitialMainPhotoRouteState(),
-    feedback: buildInitialFeedbackState()
+    feedback: buildInitialFeedbackState(),
+    departmentTopCellsUnlocked: false
   };
   let printLinkHrefBackups = [];
 
@@ -647,6 +650,52 @@
     ]);
 
     return PHOTO_FIELD_DEFINITIONS.filter((item) => allowedKeys.has(item.key));
+  }
+
+  function isDepartmentMorningControlledKey(key) {
+    return DEPARTMENT_MORNING_CONTROL_KEY_SET.has(key);
+  }
+
+  function areDepartmentMorningCellsUnlocked() {
+    return mode !== "department" || Boolean(state.departmentTopCellsUnlocked);
+  }
+
+  function getDepartmentSourceTransferKeys(keys) {
+    if (!Array.isArray(keys)) {
+      return [];
+    }
+
+    return keys.filter((key) => {
+      if (typeof key !== "string") {
+        return false;
+      }
+      if (areDepartmentMorningCellsUnlocked()) {
+        return true;
+      }
+      return !isDepartmentMorningControlledKey(key);
+    });
+  }
+
+  function hasLockedDepartmentMorningSourceValues(previewValues) {
+    if (areDepartmentMorningCellsUnlocked() || !previewValues || typeof previewValues !== "object") {
+      return false;
+    }
+
+    return DEPARTMENT_MORNING_CONTROL_KEYS.some((key) => (
+      Object.prototype.hasOwnProperty.call(previewValues, key)
+      && config.normalizeCellValue(previewValues[key]) !== null
+    ));
+  }
+
+  function getDepartmentMorningLockMeta() {
+    const unlocked = areDepartmentMorningCellsUnlocked();
+    return {
+      unlocked,
+      statusLabel: unlocked ? "1-3 editable" : "1-3 read only",
+      hint: unlocked
+        ? "Open: OCR, Telegram form and manual input may change cells 1, 2 and 3."
+        : "Closed: cells 1, 2 and 3 stay on the morning main-table values and are not copied from OCR or Telegram form."
+    };
   }
 
   function getPhotoFieldMetaByKey(key) {
@@ -3938,6 +3987,9 @@
     if (key === "transferFromDepartment" || key === "transferToDepartment") {
       return true;
     }
+    if (mode === "department" && isDepartmentMorningControlledKey(key) && !areDepartmentMorningCellsUnlocked()) {
+      return false;
+    }
     if (getLinkedSource(row, key)) {
       return false;
     }
@@ -3965,6 +4017,9 @@
     }
     if (shouldHighlightTransferMismatchCell(key, options)) {
       classes.push("transfer-mismatch-cell");
+    }
+    if (mode === "department" && isDepartmentMorningControlledKey(key) && !areDepartmentMorningCellsUnlocked()) {
+      classes.push("department-locked-top-cell");
     }
 
     return classes.join(" ");
@@ -5373,6 +5428,7 @@
     const sourceLabel = sync.getSourceLabel(state.source);
     const rowFreshness = getRowFreshnessMeta(row);
     const currentDateTime = getCurrentDateTimeParts();
+    const morningLock = getDepartmentMorningLockMeta();
 
     if (!row) {
       app.innerHTML = `
@@ -5444,6 +5500,17 @@
             <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Изменения сохраняются локально. В общий файл они отправятся только после нажатия Сохранить.")}</p>
             <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
             <p class="hint save-rule-note" id="saveRuleText"></p>
+            <div class="department-top-lock-panel no-print">
+              <label class="department-top-lock-switch" for="departmentTopCellsToggle">
+                <input type="checkbox" id="departmentTopCellsToggle" ${morningLock.unlocked ? "checked" : ""}>
+                <span class="department-top-lock-slider" aria-hidden="true"></span>
+                <span class="department-top-lock-copy">
+                  <strong>Cells 1-3</strong>
+                  <small>${escapeHtml(morningLock.statusLabel)}</small>
+                </span>
+              </label>
+              <p class="hint">${escapeHtml(morningLock.hint)}</p>
+            </div>
           </div>
 
           ${renderPhotoImportPanel(row)}
@@ -6334,6 +6401,53 @@
     renderPage();
   }
 
+  function syncDepartmentMorningDraftState(sourceState, referenceStatus, selectedStatus) {
+    if (!sourceState || !Array.isArray(sourceState.lastAppliedKeys)) {
+      return;
+    }
+
+    const nextAppliedKeys = getDepartmentSourceTransferKeys(sourceState.lastAppliedKeys);
+    const changed = nextAppliedKeys.length !== sourceState.lastAppliedKeys.length;
+    sourceState.lastAppliedKeys = nextAppliedKeys;
+    if (!changed) {
+      return;
+    }
+
+    if (!nextAppliedKeys.length) {
+      sourceState.draftMode = false;
+      sourceState.workflowStatus = sourceState.feedbackId || sourceState.imageDataUrl ? "processed" : "idle";
+      sourceState.status = referenceStatus;
+    } else if (sourceState.draftMode) {
+      sourceState.status = selectedStatus;
+    }
+    sourceState.isError = false;
+  }
+
+  function lockDepartmentMorningCells() {
+    resetDepartmentRowValuesFromLoaded(DEPARTMENT_MORNING_CONTROL_KEYS);
+    syncDepartmentMorningDraftState(
+      state.photoImport,
+      "Photo kept only for reference. Cells 1-3 now come from the saved row again.",
+      "Photo source stays selected, but cells 1-3 were restored from the saved row."
+    );
+    syncDepartmentMorningDraftState(
+      state.telegramFormReview,
+      "Telegram form kept only for reference. Cells 1-3 now come from the saved row again.",
+      "Telegram source stays selected, but cells 1-3 were restored from the saved row."
+    );
+  }
+
+  function handleDepartmentMorningLockToggle(unlocked) {
+    state.departmentTopCellsUnlocked = Boolean(unlocked);
+    if (!state.departmentTopCellsUnlocked) {
+      lockDepartmentMorningCells();
+      setInfo("Cells 1-3 are locked again. OCR, Telegram form and manual input no longer change them.", false);
+    } else {
+      setInfo("Cells 1-3 are unlocked. OCR, Telegram form and manual input can change them again.", false);
+    }
+    renderPage();
+  }
+
   function resetDepartmentRowValuesFromLoaded(keys) {
     const currentRow = getCurrentRow();
     const loadedRow = getCurrentLoadedRow();
@@ -6402,24 +6516,38 @@
       : null;
     const recognizedKeys = Array.isArray(photoState.lastAppliedKeys) ? photoState.lastAppliedKeys : [];
     if (!row || !previewValues) {
-      setInfo("Сначала загрузите или откройте фото бланка.", true);
+      setInfo("Open or load a photo first.", true);
       return;
     }
 
-    resetDepartmentRowValuesFromLoaded(getRecognizablePhotoFields(row).map((field) => field.key));
-    const appliedKeys = applyPreviewValuesToDepartmentRow(row, previewValues, recognizedKeys);
+    const transferableKeys = getDepartmentSourceTransferKeys(getRecognizablePhotoFields(row).map((field) => field.key));
+    const allowedRecognizedKeys = getDepartmentSourceTransferKeys(recognizedKeys);
+    const skippedMorningCells = hasLockedDepartmentMorningSourceValues(previewValues);
+    resetDepartmentRowValuesFromLoaded(transferableKeys);
+    const appliedKeys = applyPreviewValuesToDepartmentRow(row, previewValues, allowedRecognizedKeys);
     if (!appliedKeys.length) {
-      setInfo("В фото нет данных, которые можно перенести в таблицу отделения.", true);
+      if (skippedMorningCells) {
+        setInfo("Cells 1-3 are locked, so photo values for them were not copied.", true);
+        return;
+      }
+      setInfo("No photo values can be copied into this department row.", true);
       return;
     }
 
     state.photoImport.draftMode = true;
     state.photoImport.workflowStatus = "selected";
     state.photoImport.lastAppliedKeys = appliedKeys;
-    state.photoImport.status = "Данные из фото выбраны как источник обновления. После проверки нажмите «Сохранить».";
+    state.photoImport.status = skippedMorningCells
+      ? "Photo source selected. Cells 1-3 stayed on the saved row because the lock is closed."
+      : "Photo source selected. Review the row and click Save.";
     state.photoImport.isError = false;
     setTelegramSourceReferenceStatus();
-    setInfo("Данные из фото подставлены локально. После проверки нажмите «Сохранить».", false);
+    setInfo(
+      skippedMorningCells
+        ? "Photo values copied locally. Cells 1-3 stayed unchanged because the lock is closed."
+        : "Photo values copied locally. Review the row and click Save.",
+      false
+    );
     renderPage();
   }
 
@@ -6431,24 +6559,38 @@
       : null;
     const recognizedKeys = Array.isArray(reviewState.lastAppliedKeys) ? reviewState.lastAppliedKeys : [];
     if (!row || !previewValues) {
-      setInfo("Сначала откройте данные из Telegram формы.", true);
+      setInfo("Open Telegram form data first.", true);
       return;
     }
 
-    resetDepartmentRowValuesFromLoaded(getRecognizablePhotoFields(row).map((field) => field.key));
-    const appliedKeys = applyTelegramFormValuesToDepartmentRow(row, previewValues, recognizedKeys);
+    const transferableKeys = getDepartmentSourceTransferKeys(getRecognizablePhotoFields(row).map((field) => field.key));
+    const allowedRecognizedKeys = getDepartmentSourceTransferKeys(recognizedKeys);
+    const skippedMorningCells = hasLockedDepartmentMorningSourceValues(previewValues);
+    resetDepartmentRowValuesFromLoaded(transferableKeys);
+    const appliedKeys = applyTelegramFormValuesToDepartmentRow(row, previewValues, allowedRecognizedKeys);
     if (!appliedKeys.length) {
-      setInfo("В Telegram форме нет данных, которые можно перенести в таблицу отделения.", true);
+      if (skippedMorningCells) {
+        setInfo("Cells 1-3 are locked, so Telegram values for them were not copied.", true);
+        return;
+      }
+      setInfo("No Telegram form values can be copied into this department row.", true);
       return;
     }
 
     state.telegramFormReview.draftMode = true;
     state.telegramFormReview.workflowStatus = "selected";
     state.telegramFormReview.lastAppliedKeys = appliedKeys;
-    state.telegramFormReview.status = "Данные из Telegram формы выбраны как источник обновления. После проверки нажмите «Сохранить».";
+    state.telegramFormReview.status = skippedMorningCells
+      ? "Telegram source selected. Cells 1-3 stayed on the saved row because the lock is closed."
+      : "Telegram source selected. Review the row and click Save.";
     state.telegramFormReview.isError = false;
     setPhotoSourceReferenceStatus();
-    setInfo("Данные из Telegram формы подставлены локально. После проверки нажмите «Сохранить».", false);
+    setInfo(
+      skippedMorningCells
+        ? "Telegram values copied locally. Cells 1-3 stayed unchanged because the lock is closed."
+        : "Telegram values copied locally. Review the row and click Save.",
+      false
+    );
     renderPage();
   }
   function buildMainPhotoRouteBatchItem(file, index) {
@@ -8037,9 +8179,15 @@
     }
 
     currentRow.values = deepCopy(config.zeroValues());
+    if (!areDepartmentMorningCellsUnlocked()) {
+      resetDepartmentRowValuesFromLoaded(DEPARTMENT_MORNING_CONTROL_KEYS);
+    }
     state.photoImport = buildInitialPhotoImportState();
     renderPage();
-    setInfo("Поля сброшены в 0. Нажми Сохранить для отправки.", false);
+    setInfo("Fields reset to 0. Save to send the update.", false);
+    if (!areDepartmentMorningCellsUnlocked()) {
+      setInfo("Fields reset to 0, and cells 1-3 stayed on the saved morning values.", false);
+    }
     return;
   }
 
@@ -8305,6 +8453,13 @@
       });
     }
 
+    const departmentTopCellsToggle = document.getElementById("departmentTopCellsToggle");
+    if (departmentTopCellsToggle instanceof HTMLInputElement) {
+      departmentTopCellsToggle.addEventListener("change", () => {
+        handleDepartmentMorningLockToggle(departmentTopCellsToggle.checked);
+      });
+    }
+
     const photoZoomBtn = document.getElementById("photoZoomBtn");
     if (photoZoomBtn) {
       photoZoomBtn.addEventListener("click", () => {
@@ -8452,6 +8607,10 @@
 
       const row = getDepartmentRow(state.snapshot, rowId);
       if (!row) {
+        return;
+      }
+      if (isDepartmentMorningControlledKey(key) && !areDepartmentMorningCellsUnlocked()) {
+        input.value = getDisplayValue(getEffectiveValue(state.snapshot, row, key)) || "0";
         return;
       }
 
@@ -8632,6 +8791,3 @@
     `;
   });
 })();
-
-
-

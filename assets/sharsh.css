@@ -1480,6 +1480,85 @@ a {
   color: var(--ink);
 }
 
+.department-top-lock-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
+}
+
+.department-top-lock-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  cursor: pointer;
+}
+
+.department-top-lock-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.department-top-lock-slider {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(101, 77, 54, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.1);
+  transition: background 0.18s ease;
+}
+
+.department-top-lock-slider::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(17, 17, 17, 0.18);
+  transition: transform 0.18s ease;
+}
+
+.department-top-lock-switch input:checked + .department-top-lock-slider {
+  background: rgba(33, 136, 79, 0.78);
+}
+
+.department-top-lock-switch input:checked + .department-top-lock-slider::after {
+  transform: translateX(20px);
+}
+
+.department-top-lock-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.department-top-lock-copy strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.department-top-lock-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.department-locked-top-cell {
+  background: rgba(101, 77, 54, 0.08) !important;
+}
+
+.department-locked-top-cell span {
+  color: rgba(17, 17, 17, 0.72);
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;
