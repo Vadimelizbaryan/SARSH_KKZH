@@ -1575,6 +1575,36 @@ async function authorizeOwner(request: Request, supabase: ReturnType<typeof crea
   return null;
 }
 
+function buildDepartmentFeedbackSourceMap(feedbackRows: Array<Record<string, unknown>>) {
+  const feedbackMap = new Map<string, {
+    hasTelegramFormFeedback: boolean;
+    hasPhotoFeedback: boolean;
+  }>();
+
+  feedbackRows.forEach((row) => {
+    const departmentId = typeof row.department_id === "string" ? row.department_id : "";
+    if (!departmentId) {
+      return;
+    }
+
+    const entry = feedbackMap.get(departmentId) || {
+      hasTelegramFormFeedback: false,
+      hasPhotoFeedback: false
+    };
+    const imageName = typeof row.image_name === "string" ? row.image_name : "";
+
+    if (imageName === "telegram-web-app-form") {
+      entry.hasTelegramFormFeedback = true;
+    } else {
+      entry.hasPhotoFeedback = true;
+    }
+
+    feedbackMap.set(departmentId, entry);
+  });
+
+  return feedbackMap;
+}
+
 async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
   const { data: departmentRows, error: departmentsError } = await supabase
     .from("sharsh_departments")
@@ -1594,13 +1624,28 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
     throw metaError;
   }
 
+  const reportDate = metaRow?.report_date || DEFAULT_DATE;
+  const { data: feedbackRows, error: feedbackError } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("department_id, image_name, created_at")
+    .eq("report_date", reportDate)
+    .order("created_at", { ascending: false });
+
+  if (feedbackError) {
+    throw feedbackError;
+  }
+
+  const feedbackMap = buildDepartmentFeedbackSourceMap(
+    Array.isArray(feedbackRows) ? feedbackRows as Array<Record<string, unknown>> : []
+  );
   const map = new Map((departmentRows || []).map((row) => [row.department_id, row]));
 
   return {
-    reportDate: metaRow?.report_date || DEFAULT_DATE,
+    reportDate,
     updatedAt: metaRow?.updated_at || new Date().toISOString(),
     rows: Object.entries(DEPARTMENTS).map(([id]) => {
       const saved = map.get(id);
+      const feedback = feedbackMap.get(id);
       return {
         id,
         values: sanitizeValues(saved?.values as Record<string, unknown> | undefined),
@@ -1608,7 +1653,9 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
         photoWorkflowStatus: typeof saved?.photo_workflow_status === "string" ? saved.photo_workflow_status : "idle",
         photoFeedbackId: typeof saved?.photo_feedback_id === "number" ? saved.photo_feedback_id : null,
         photoFeedbackUpdatedAt: saved?.photo_feedback_updated_at || null,
-        photoName: typeof saved?.photo_name === "string" ? saved.photo_name : ""
+        photoName: typeof saved?.photo_name === "string" ? saved.photo_name : "",
+        hasTelegramFormFeedback: Boolean(feedback?.hasTelegramFormFeedback),
+        hasPhotoFeedback: Boolean(feedback?.hasPhotoFeedback)
       };
     })
   };

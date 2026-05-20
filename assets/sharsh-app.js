@@ -2937,6 +2937,37 @@
     };
   }
 
+  function getDepartmentFeedbackSourceMeta(row) {
+    const hasTelegramFormFeedback = Boolean(row && row.hasTelegramFormFeedback);
+    const hasPhotoFeedback = Boolean(row && row.hasPhotoFeedback);
+
+    if (hasTelegramFormFeedback && hasPhotoFeedback) {
+      return {
+        label: "Фото + Telegram",
+        tone: "both"
+      };
+    }
+
+    if (hasPhotoFeedback) {
+      return {
+        label: "Фото бланка",
+        tone: "photo"
+      };
+    }
+
+    if (hasTelegramFormFeedback) {
+      return {
+        label: "Telegram форма",
+        tone: "form"
+      };
+    }
+
+    return {
+      label: "",
+      tone: "none"
+    };
+  }
+
   function buildFreshnessStats(rows) {
     const counts = {
       fresh: 0,
@@ -3962,6 +3993,7 @@
     const row = getDepartmentRow(state.snapshot, definition.id);
     const freshness = getRowFreshnessMeta(row);
     const photoWorkflow = getDepartmentPhotoWorkflowMeta(row);
+    const feedbackSource = getDepartmentFeedbackSourceMeta(row);
     const relativePath = appendShareQuery(config.getDepartmentPagePath(basePath, definition.id));
     const feedbackPath = row && row.photoFeedbackId
       ? appendQueryParams(config.getDepartmentPagePath(basePath, definition.id), { tgFeedback: row.photoFeedbackId })
@@ -3975,8 +4007,8 @@
         </div>
         <p class="link-card-subtext" data-department-age="${definition.id}">${escapeHtml(freshness.age)}</p>
         <div class="link-card-actions">
-          <a href="${escapeHtml(relativePath)}" target="_blank" rel="noopener">Открыть</a>
           <a href="${escapeHtml(feedbackPath || relativePath)}" target="_blank" rel="noopener" data-department-feedback-link="${definition.id}"${feedbackPath ? "" : " hidden"}>Открыть отправленное</a>
+          <span class="link-card-feedback-kind" data-department-feedback-source="${definition.id}" data-feedback-source-tone="${escapeHtml(feedbackSource.tone)}"${feedbackSource.label ? "" : " hidden"}>${escapeHtml(feedbackSource.label)}</span>
           <button type="button" data-delete-feedback="${definition.id}" data-feedback-id="${row && row.photoFeedbackId ? row.photoFeedbackId : ""}"${feedbackPath ? "" : " hidden"}>Удалить отправленное</button>
           <button type="button" data-copy-link="${escapeHtml(relativePath)}">Копировать ссылку</button>
         </div>
@@ -5633,11 +5665,13 @@
       state.snapshot.rows.forEach((row) => {
         const meta = getRowFreshnessMeta(row);
         const photoWorkflow = getDepartmentPhotoWorkflowMeta(row);
+        const feedbackSource = getDepartmentFeedbackSourceMeta(row);
         const statusEl = document.querySelector(`[data-department-status="${row.id}"]`);
         const updatedEl = document.querySelector(`[data-department-updated="${row.id}"]`);
         const ageEl = document.querySelector(`[data-department-age="${row.id}"]`);
         const openCardEl = document.querySelector(`[data-department-open-card="${row.id}"]`);
         const feedbackLinkEl = document.querySelector(`[data-department-feedback-link="${row.id}"]`);
+        const feedbackSourceEl = document.querySelector(`[data-department-feedback-source="${row.id}"]`);
         const deleteFeedbackBtn = document.querySelector(`[data-delete-feedback="${row.id}"]`);
         const listStatusEl = document.querySelector(`[data-update-status="${row.id}"]`);
         const listTimeEl = document.querySelector(`[data-update-time="${row.id}"]`);
@@ -5664,6 +5698,17 @@
             feedbackLinkEl.setAttribute("href", appendQueryParams(config.getDepartmentPagePath(basePath, row.id), { tgFeedback: row.photoFeedbackId }));
           } else {
             feedbackLinkEl.setAttribute("hidden", "");
+          }
+        }
+        if (feedbackSourceEl) {
+          if (feedbackSource.label) {
+            feedbackSourceEl.removeAttribute("hidden");
+            feedbackSourceEl.textContent = feedbackSource.label;
+            feedbackSourceEl.setAttribute("data-feedback-source-tone", feedbackSource.tone);
+          } else {
+            feedbackSourceEl.setAttribute("hidden", "");
+            feedbackSourceEl.textContent = "";
+            feedbackSourceEl.setAttribute("data-feedback-source-tone", "none");
           }
         }
         if (deleteFeedbackBtn) {

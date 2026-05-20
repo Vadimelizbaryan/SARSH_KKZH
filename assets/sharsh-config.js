@@ -407,7 +407,9 @@
       photoFeedbackUpdatedAt: sourceRow && sourceRow.photoFeedbackUpdatedAt
         ? String(sourceRow.photoFeedbackUpdatedAt)
         : null,
-      photoName: sourceRow && sourceRow.photoName ? String(sourceRow.photoName) : ""
+      photoName: sourceRow && sourceRow.photoName ? String(sourceRow.photoName) : "",
+      hasTelegramFormFeedback: Boolean(sourceRow && sourceRow.hasTelegramFormFeedback),
+      hasPhotoFeedback: Boolean(sourceRow && sourceRow.hasPhotoFeedback)
     };
   }
 
@@ -443,7 +445,9 @@
             photoWorkflowStatus: item.photoWorkflowStatus,
             photoFeedbackId: item.photoFeedbackId,
             photoFeedbackUpdatedAt: item.photoFeedbackUpdatedAt,
-            photoName: item.photoName
+            photoName: item.photoName,
+            hasTelegramFormFeedback: item.hasTelegramFormFeedback,
+            hasPhotoFeedback: item.hasPhotoFeedback
           }))
         : []);
 
