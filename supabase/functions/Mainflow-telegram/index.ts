@@ -1184,6 +1184,15 @@ function getTelegramWebFormUrl(
     params.set("c1", String(carryoverValues.beenTotal ?? 0));
     params.set("c2", String(carryoverValues.beenSoldier ?? 0));
     params.set("c3", String(carryoverValues.beenSeries ?? 0));
+    params.set("c4", String(carryoverValues.admittedTotal ?? 0));
+    params.set("c5", String(carryoverValues.admittedSoldier ?? 0));
+    params.set("c6", String(carryoverValues.admittedSeries ?? 0));
+    params.set("c7", String(carryoverValues.dgTotal ?? 0));
+    params.set("c8", String(carryoverValues.dgSoldier ?? 0));
+    params.set("c9", String(carryoverValues.dgSeries ?? 0));
+    params.set("c10", String(carryoverValues.transferFromDepartment ?? 0));
+    params.set("c11", String(carryoverValues.transferToDepartment ?? 0));
+    params.set("c12", String(carryoverValues.presentTotal ?? 0));
     params.set("c13", String(carryoverValues.currentShar ?? 0));
     params.set("c14", String(carryoverValues.currentSpa ?? 0));
     params.set("c15", String(carryoverValues.currentPaym ?? 0));
@@ -5013,9 +5022,18 @@ function getTelegramWebFormCarryoverValues(values: Record<string, number | null>
     .reduce((sum, key) => sum + getSheetNumber(values, key), 0);
 
   return {
-    beenTotal: presentTotal,
-    beenSoldier: currentShar + currentSpa + currentPaym + leaveSharq + leaveSpa + leavePaym,
-    beenSeries: currentShar + leaveSharq,
+    beenTotal: getSheetNumber(values, "beenTotal"),
+    beenSoldier: getSheetNumber(values, "beenSoldier"),
+    beenSeries: getSheetNumber(values, "beenSeries"),
+    admittedTotal: getSheetNumber(values, "admittedTotal"),
+    admittedSoldier: getSheetNumber(values, "admittedSoldier"),
+    admittedSeries: getSheetNumber(values, "admittedSeries"),
+    dgTotal: getSheetNumber(values, "dgTotal"),
+    dgSoldier: getSheetNumber(values, "dgSoldier"),
+    dgSeries: getSheetNumber(values, "dgSeries"),
+    transferFromDepartment: getSheetNumber(values, "transferFromDepartment"),
+    transferToDepartment: getSheetNumber(values, "transferToDepartment"),
+    presentTotal,
     currentShar,
     currentSpa,
     currentPaym,

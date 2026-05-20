@@ -37,6 +37,15 @@
     beenTotal: "c1",
     beenSoldier: "c2",
     beenSeries: "c3",
+    admittedTotal: "c4",
+    admittedSoldier: "c5",
+    admittedSeries: "c6",
+    dgTotal: "c7",
+    dgSoldier: "c8",
+    dgSeries: "c9",
+    transferFromDepartment: "c10",
+    transferToDepartment: "c11",
+    presentTotal: "c12",
     currentShar: "c13",
     currentSpa: "c14",
     currentPaym: "c15",
@@ -338,26 +347,39 @@
       : `- ${check.name}: ${check.actual}, должно быть ${check.expected} (${check.ruleText})`;
   }
 
+  function isUsingCopiedValues(values) {
+    return editableKeys.every((key) => toNumber(values[key]) === getInitialValue(key));
+  }
+
   function updateControl() {
     const values = readValues();
     const validation = getValidationResult(values);
     const primaryCheck = validation.checks[0];
+    const copiedState = isUsingCopiedValues(values);
     const control = root.querySelector("[data-control-total]");
     const status = root.querySelector("[data-status]");
     const submit = root.querySelector("[data-submit]");
 
-    if (control && primaryCheck) {
-      control.textContent = String(primaryCheck.expected);
+    if (control) {
+      control.textContent = String(copiedState || !primaryCheck
+        ? getInitialValue("presentTotal")
+        : primaryCheck.expected);
     }
     if (status) {
       status.classList.toggle("bad", !validation.isValid);
-      status.innerHTML = [
-        `<div>${validation.isValid ? "Контрольные суммы совпали." : "Контрольные суммы не совпали."}</div>`,
-        ...validation.checks.map((check) => `<div>${escapeHtml(formatValidationLine(check))}</div>`),
-        !shouldCheckExtraControls(values)
-          ? `<div>${escapeHtml("Проверки «Количество срочников» и «Количество военнослужащих» включаются, когда в ячейках 10 и 11 стоит 0.")}</div>`
-          : ""
-      ].filter(Boolean).join("");
+      status.innerHTML = getInitData()
+        ? [
+          `<div>${escapeHtml("Ячейки 1-22 скопированы из основной таблицы.")}</div>`,
+          `<div>${escapeHtml(copiedState
+            ? "Ячейка 12 сейчас показывает скопированное значение из сайта."
+            : "Ячейка 12 сейчас показывает расчётный контроль по текущему вводу.")}</div>`,
+          `<div>${validation.isValid ? "Контрольные суммы совпали." : "Контрольные суммы не совпали."}</div>`,
+          ...validation.checks.map((check) => `<div>${escapeHtml(formatValidationLine(check))}</div>`),
+          !shouldCheckExtraControls(values)
+            ? `<div>${escapeHtml("Проверки «Количество срочников» и «Количество военнослужащих» включаются, когда в ячейках 10 и 11 стоит 0.")}</div>`
+            : ""
+        ].filter(Boolean).join("")
+        : `<div>${escapeHtml("Откройте форму через кнопку бота в Telegram.")}</div>`;
     }
     if (submit) {
       submit.disabled = !validation.isValid || !getInitData();
@@ -518,7 +540,7 @@
           <div class="tg-form-actions">
             <button class="tg-form-submit" data-submit type="submit">Отправить на проверку</button>
             <div class="tg-form-message${getInitData() ? "" : " error"}" data-message>
-              ${getInitData() ? "Ячейки 1-3 заполнены из основной таблицы и закрыты. Форма проверяет 3 контрольные суммы, а дополнительные 2 проверки включаются, когда в ячейках 10 и 11 стоит 0." : "Откройте форму через кнопку бота в Telegram."}
+              ${getInitData() ? "Ячейки 1-22 скопированы из основной таблицы. Автопроверка включена. При изменении данных ячейка 12 становится расчетной." : "Откройте форму через кнопку бота в Telegram."}
             </div>
           </div>
         </form>
@@ -527,7 +549,7 @@
 
     const initialMessage = root.querySelector("[data-message]");
     if (initialMessage && getInitData()) {
-      initialMessage.textContent = "Ячейки 1-3 заполнены из основной таблицы и закрыты. Ячейки 13-22 подставлены текущими значениями из основной таблицы, при необходимости их можно исправить. Форма проверяет 3 контрольные суммы, а проверки по срочникам и военнослужащим включаются, когда в ячейках 10 и 11 стоит 0.";
+      initialMessage.textContent = "Ячейки 1-22 скопированы из основной таблицы. Автопроверка включена. Пока данные не меняли, ячейка 12 показывает копию из сайта. После изменения ввода ячейка 12 становится расчетной.";
     }
 
     root.querySelectorAll(".tg-form-input").forEach((input) => {
