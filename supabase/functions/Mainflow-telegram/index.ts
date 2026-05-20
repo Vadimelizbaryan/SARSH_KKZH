@@ -7138,7 +7138,7 @@ function buildPhotoSaveSummary(
   feedbackId: string,
   didSaveSnapshot: boolean,
   validation?: DepartmentValidationResult | null,
-  savedFromWebApp = false
+  saveSource: "telegram-form" | "photo" | null = null
 ) {
   const meta = DEPARTMENTS[departmentId];
   const cellSummaries = PHOTO_FIELD_MAPPINGS
@@ -7151,11 +7151,6 @@ function buildPhotoSaveSummary(
   const validationLinesRu = formatDepartmentValidationLinesRu(validation);
 
   return [
-    didSaveSnapshot
-      ? (savedFromWebApp
-        ? "Фото обработано. Данные Telegram Web App автоматически внесены в основную таблицу."
-        : "Фото обработано и сохранено.")
-      : "Фото обработано. Значения фото автоматически не сохранены: для автосохранения нужны данные Telegram Web App и фото бланка одного отделения.",
     `Отделение: ${meta.department} (${departmentId})`,
     `Источник отделения: ${departmentSource}`,
     `Дата отчёта: ${reportDate}`,
@@ -7166,7 +7161,10 @@ function buildPhotoSaveSummary(
       ? `Структура строки не подтверждена: ${recognized.structure.gridCellCount}/22 ячеек.`
       : (cellSummaries ? `Распознано: ${cellSummaries}` : "Распознанных ячеек не найдено."),
     ...(validationLinesRu.length ? ["Контрольные суммы:", ...validationLinesRu] : []),
-    recognized.notes.length ? `Заметки OCR: ${recognized.notes.join("; ")}` : ""
+    recognized.notes.length ? `Заметки OCR: ${recognized.notes.join("; ")}` : "",
+    didSaveSnapshot
+      ? `Данные сохранены в общую таблицу.${saveSource === "telegram-form" ? " Источник сохранения: Telegram Web App." : (saveSource === "photo" ? " Источник сохранения: фото." : "")}`
+      : "Данные не сохранены."
   ].filter(Boolean).join("\n");
 }
 
@@ -7182,7 +7180,8 @@ function buildPhotoSenderResponse(
     const address = firstName ? `${firstName}, ` : "";
     return [
       `${address}շնորհակալություն, բաժանմունքի վերահսկումը անցավ։ Գերազանց աշխատանք է։ 🙂`,
-      ...(validationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...validationLinesHy] : [])
+      ...(validationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...validationLinesHy] : []),
+      "Տվյալները պահպանված չեն հիմնական աղյուսակում։ Սպասվում է Telegram ձևը կամ ավտոսահմանումը այլ աղբյուրից։"
     ].join("\n");
   }
 
@@ -7194,7 +7193,9 @@ function buildPhotoSenderResponse(
 
   return [
     buildPhotoRetakeResponse(reason, firstName),
-    ...(validationLinesHy.length ? ["", "Վերահսկիչ գումարներ:", ...validationLinesHy] : [])
+    ...(validationLinesHy.length ? ["", "Վերահսկիչ գումարներ:", ...validationLinesHy] : []),
+    "",
+    "Տվյալները չեն պահպանվել հիմնական աղյուսակում։"
   ].join("\n");
 }
 
@@ -8498,10 +8499,18 @@ async function handleTelegramPhoto(
   );
   let shouldSaveSnapshot = false;
   let savedSnapshot: Awaited<ReturnType<typeof loadSnapshot>> | null = null;
+  let autoSaveSource: "telegram-form" | "photo" | null = null;
   if (telegramWebFormFeedback) {
     await saveDepartmentSnapshot(supabase, departmentId, reportDate, telegramWebFormFeedback.values);
     await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, fileName);
     shouldSaveSnapshot = true;
+    autoSaveSource = "telegram-form";
+    savedSnapshot = await loadSnapshot(supabase);
+  } else if (isPhotoControlPassed) {
+    await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values);
+    await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, fileName);
+    shouldSaveSnapshot = true;
+    autoSaveSource = "photo";
     savedSnapshot = await loadSnapshot(supabase);
   } else {
     await markDepartmentPhotoPending(supabase, departmentId, feedbackId, fileName);
@@ -8515,20 +8524,22 @@ async function handleTelegramPhoto(
     feedbackId,
     shouldSaveSnapshot,
     photoValidation,
-    shouldSaveSnapshot
+    autoSaveSource
   );
   const notifyChatIds = getTelegramNotifyChatIds(chatId);
   if (notifyChatIds.length) {
     const adminMessages = [detailedPhotoSummary];
-    if (shouldSaveSnapshot && savedSnapshot && telegramWebFormFeedback) {
+    if (shouldSaveSnapshot && savedSnapshot && autoSaveSource) {
       adminMessages.unshift(buildMainTableAutoSaveAdminText(
         savedSnapshot,
         departmentId,
         reportDate,
-        "telegram-form",
-        telegramWebFormFeedback.userName || senderFirstName
+        autoSaveSource,
+        (autoSaveSource === "telegram-form" ? (telegramWebFormFeedback?.userName || senderFirstName) : senderFirstName)
       ));
-      adminMessages.push(`Значения Web App: ${buildTelegramWebFormValuesText(telegramWebFormFeedback.values)}`);
+      if (autoSaveSource === "telegram-form" && telegramWebFormFeedback) {
+        adminMessages.push(`Значения Web App: ${buildTelegramWebFormValuesText(telegramWebFormFeedback.values)}`);
+      }
     }
     await sendTelegramMessageToMany(notifyChatIds, adminMessages.join("\n\n"));
   } else {
@@ -8538,14 +8549,24 @@ async function handleTelegramPhoto(
   if (shouldSaveSnapshot) {
     await sendTelegramMessage(
       chatId,
-      [
-        photoValidation?.isValid === false
-          ? `${senderFirstName}, լուսանկարը և Telegram ձևը ստացվել են, բայց OCR վերահսկումը նկատել է անհամապատասխանություն։`
-          : `${senderFirstName}, լուսանկարը և Telegram ձևը ստացվել են։ Շնորհակալություն, շատ լավ աշխատանք է։ 🙂`,
-        "Տվյալները վերցրել եմ Telegram ձևից և ավտոմատ գրանցել հիմնական աղյուսակում։",
-        ...(photoValidation?.isValid === false ? ["Ուշադրություն. ստուգիր «Վերահսկիչ գումարներ» բաժնի նշումները։"] : []),
-        ...(photoValidationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...photoValidationLinesHy] : [])
-      ].join("\n")
+      (
+        autoSaveSource === "telegram-form"
+          ? [
+            photoValidation?.isValid === false
+              ? `${senderFirstName}, լուսանկարը և Telegram ձևը ստացվել են, բայց OCR վերահսկումը նկատել է անհամապատասխանություն։`
+              : `${senderFirstName}, լուսանկարը և Telegram ձևը ստացվել են։ Շնորհակալություն, շատ լավ աշխատանք է։ 🙂`,
+            "Տվյալները վերցրել եմ Telegram ձևից և ավտոմատ գրանցել հիմնական աղյուսակում։",
+            ...(photoValidation?.isValid === false ? ["Ուշադրություն. ստուգիր «Վերահսկիչ գումարներ» բաժնի նշումները։"] : []),
+            ...(photoValidationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...photoValidationLinesHy] : []),
+            "Տվյալները պահպանվել են հիմնական աղյուսակում։"
+          ]
+          : [
+            `${senderFirstName}, լուսանկարը ստացվել է և OCR վերահսկումը անցել է։ Շնորհակալություն։ 🙂`,
+            "Տվյալները վերցրել եմ լուսանկարից և ավտոմատ գրանցել հիմնական աղյուսակում։",
+            ...(photoValidationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...photoValidationLinesHy] : []),
+            "Տվյալները պահպանվել են հիմնական աղյուսակում։"
+          ]
+      ).join("\n")
     );
   } else {
     await sendTelegramWebFormPromptAfterPhoto(
