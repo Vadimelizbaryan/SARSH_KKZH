@@ -5187,6 +5187,10 @@ type DepartmentValidationCheck = {
   actual: number;
   expected: number;
   difference: number;
+  successTextRu?: string;
+  failureTextRu?: string;
+  successTextHy?: string;
+  failureTextHy?: string;
 };
 
 type DepartmentValidationResult = {
@@ -5196,6 +5200,92 @@ type DepartmentValidationResult = {
   checks: DepartmentValidationCheck[];
   failedChecks: DepartmentValidationCheck[];
 };
+
+const DEPARTMENT_OCR_TOP_CELLS_RULE_NAME = "Контроль OCR 1-3";
+const DEPARTMENT_OCR_TOP_CELLS_RULE_TEXT = "OCR 1 = таблица 1; OCR 2 = таблица 2; OCR 3 = таблица 3";
+const DEPARTMENT_OCR_TOP_CELLS_KEYS = ["beenTotal", "beenSoldier", "beenSeries"] as const;
+
+function getDepartmentPhotoCellLabel(key: string) {
+  const field = PHOTO_FIELD_MAPPINGS.find((item) => item.key === key);
+  return field ? String(field.cell) : key;
+}
+
+function buildDepartmentOcrTopCellsValidationCheck(
+  recognizedValues: Record<string, number | null>,
+  currentValues: Record<string, number | null> | null | undefined
+): DepartmentValidationCheck | null {
+  if (!currentValues) {
+    return null;
+  }
+
+  const mismatches: Array<{ key: string; ocrValue: number; tableValue: number }> = [];
+  let comparedCount = 0;
+
+  DEPARTMENT_OCR_TOP_CELLS_KEYS.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(recognizedValues, key)) {
+      return;
+    }
+    const ocrValue = recognizedValues[key];
+    if (typeof ocrValue !== "number" || !Number.isFinite(ocrValue)) {
+      return;
+    }
+
+    comparedCount += 1;
+    const tableValue = getSheetNumber(currentValues, key);
+    if (ocrValue !== tableValue) {
+      mismatches.push({ key, ocrValue, tableValue });
+    }
+  });
+
+  if (!comparedCount) {
+    return null;
+  }
+
+  const matchedCount = comparedCount - mismatches.length;
+  const mismatchTextRu = mismatches
+    .map((item) => {
+      const cellLabel = getDepartmentPhotoCellLabel(item.key);
+      return `OCR ${cellLabel} = ${item.ocrValue}, а в таблице ${cellLabel} = ${item.tableValue}`;
+    })
+    .join("; ");
+  const mismatchTextHy = mismatches
+    .map((item) => {
+      const cellLabel = getDepartmentPhotoCellLabel(item.key);
+      return `OCR ${cellLabel} = ${item.ocrValue}, իսկ աղյուսակում ${cellLabel} = ${item.tableValue}`;
+    })
+    .join("; ");
+
+  return {
+    id: "ocr-top-cells",
+    name: DEPARTMENT_OCR_TOP_CELLS_RULE_NAME,
+    ruleText: DEPARTMENT_OCR_TOP_CELLS_RULE_TEXT,
+    isValid: mismatches.length === 0,
+    actual: matchedCount,
+    expected: comparedCount,
+    difference: mismatches.length,
+    successTextRu: "OCR 1-3 совпадают с таблицей отделения",
+    failureTextRu: mismatchTextRu,
+    successTextHy: "OCR 1-3-ը համընկնում են բաժանմունքի աղյուսակի հետ",
+    failureTextHy: mismatchTextHy
+  };
+}
+
+function appendDepartmentValidationCheck(
+  validation: DepartmentValidationResult,
+  extraCheck: DepartmentValidationCheck | null
+) {
+  if (!extraCheck) {
+    return validation;
+  }
+  const checks = [...validation.checks, extraCheck];
+  const failedChecks = checks.filter((check) => !check.isValid);
+  return {
+    ...validation,
+    isValid: failedChecks.length === 0,
+    checks,
+    failedChecks
+  };
+}
 
 function validateDepartmentSheetValues(values: Record<string, number | null>) {
   const presentActual = DEPARTMENT_SHEET_PRESENT_SUM_KEYS
@@ -5281,8 +5371,8 @@ function formatDepartmentValidationLinesRu(validation: DepartmentValidationResul
   }
   return validation.checks.map((check) => (
     check.isValid
-      ? `- ${check.name}: ${check.actual} = ${check.expected} (${check.ruleText})`
-      : `- ${check.name}: ${check.actual}, должно быть ${check.expected} (${check.ruleText})`
+      ? `- ${check.name}: ${check.successTextRu || `${check.actual} = ${check.expected}`} (${check.ruleText})`
+      : `- ${check.name}: ${check.failureTextRu || `${check.actual}, должно быть ${check.expected}`} (${check.ruleText})`
   ));
 }
 
@@ -5292,8 +5382,8 @@ function formatDepartmentValidationLinesHy(validation: DepartmentValidationResul
   }
   return validation.checks.map((check) => (
     check.isValid
-      ? `- ${check.name}: ${check.actual} = ${check.expected} (${check.ruleText})`
-      : `- ${check.name}: ${check.actual}, պետք է լինի ${check.expected} (${check.ruleText})`
+      ? `- ${check.name}: ${check.successTextHy || `${check.actual} = ${check.expected}`} (${check.ruleText})`
+      : `- ${check.name}: ${check.failureTextHy || `${check.actual}, պետք է լինի ${check.expected}`} (${check.ruleText})`
   ));
 }
 
@@ -8383,7 +8473,15 @@ async function handleTelegramPhoto(
   const hasRecognizedValues = recognized.recognizedKeys.some((key) => {
     return VALUE_KEYS.includes(key as (typeof VALUE_KEYS)[number]);
   });
-  const photoValidation = hasRecognizedValues ? validateDepartmentSheetValues(recognized.values) : null;
+  const currentSnapshot = hasRecognizedValues ? await loadSnapshot(supabase) : null;
+  const currentDepartmentRow = currentSnapshot?.rows.find((item) => item.id === departmentId) || null;
+  let photoValidation = hasRecognizedValues ? validateDepartmentSheetValues(recognized.values) : null;
+  if (photoValidation) {
+    photoValidation = appendDepartmentValidationCheck(
+      photoValidation,
+      buildDepartmentOcrTopCellsValidationCheck(recognized.values, currentDepartmentRow?.values)
+    );
+  }
   const photoValidationLinesHy = formatDepartmentValidationLinesHy(photoValidation);
   const isPhotoControlPassed = !structureInvalid && hasRecognizedValues && !!photoValidation?.isValid;
   const telegramWebFormFeedback = await loadLatestTelegramWebFormFeedback(supabase, departmentId, reportDate);
@@ -8441,8 +8539,11 @@ async function handleTelegramPhoto(
     await sendTelegramMessage(
       chatId,
       [
-        `${senderFirstName}, լուսանկարը և Telegram ձևը ստացվել են։ Շնորհակալություն, շատ լավ աշխատանք է։ 🙂`,
+        photoValidation?.isValid === false
+          ? `${senderFirstName}, լուսանկարը և Telegram ձևը ստացվել են, բայց OCR վերահսկումը նկատել է անհամապատասխանություն։`
+          : `${senderFirstName}, լուսանկարը և Telegram ձևը ստացվել են։ Շնորհակալություն, շատ լավ աշխատանք է։ 🙂`,
         "Տվյալները վերցրել եմ Telegram ձևից և ավտոմատ գրանցել հիմնական աղյուսակում։",
+        ...(photoValidation?.isValid === false ? ["Ուշադրություն. ստուգիր «Վերահսկիչ գումարներ» բաժնի նշումները։"] : []),
         ...(photoValidationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...photoValidationLinesHy] : [])
       ].join("\n")
     );

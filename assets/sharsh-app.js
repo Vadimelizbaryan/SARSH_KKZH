@@ -33,6 +33,8 @@
   const SOLDIER_COUNT_RULE_TEXT = "(3 + 6) - 9 = 13 + 20";
   const MILITARY_COUNT_RULE_NAME = "Количество военнослужащих";
   const MILITARY_COUNT_RULE_TEXT = "(2 + 5) - 8 = 13 + 14 + 15 + 20 + 21 + 22";
+  const OCR_TOP_CELLS_RULE_NAME = "Контроль OCR 1-3";
+  const OCR_TOP_CELLS_RULE_TEXT = "OCR 1 = таблица 1; OCR 2 = таблица 2; OCR 3 = таблица 3";
   const SAVE_RULE_TEXT_SHORT = "сумма блока АРКА Э = (1 + 4 + 11) - (7 + 10)";
   const DEPARTMENT_MORNING_CONTROL_KEYS = ["beenTotal", "beenSoldier", "beenSeries"];
   const DEPARTMENT_MORNING_CONTROL_KEY_SET = new Set(DEPARTMENT_MORNING_CONTROL_KEYS);
@@ -3637,7 +3639,11 @@
     }
 
     const validation = getDepartmentValidationState();
-    if (!validation.applicable || validation.isValid) {
+    const photoTopCellsCheck = buildDepartmentOcrTopCellsCheck(row, previewValues);
+    if (
+      (!validation.applicable || validation.isValid)
+      && (!photoTopCellsCheck.applicable || photoTopCellsCheck.isValid)
+    ) {
       return {
         suspectKeys: [],
         suspectReason: ""
@@ -3768,6 +3774,93 @@
     return buildDepartmentValidationChecksForSnapshot(state.snapshot, row);
   }
 
+  function buildDepartmentOcrTopCellsCheck(row, previewValues = null) {
+    const values = previewValues && typeof previewValues === "object"
+      ? previewValues
+      : (state.photoImport?.recognizedValues && typeof state.photoImport.recognizedValues === "object"
+        ? state.photoImport.recognizedValues
+        : null);
+
+    if (mode !== "department" || !row || !values) {
+      return {
+        id: "ocr-top-cells",
+        name: OCR_TOP_CELLS_RULE_NAME,
+        ruleText: OCR_TOP_CELLS_RULE_TEXT,
+        applicable: false,
+        isValid: true,
+        actual: 0,
+        expected: 0,
+        suspectKeys: [],
+        failureMessage: ""
+      };
+    }
+
+    const mismatches = [];
+    const comparedKeys = [];
+
+    DEPARTMENT_MORNING_CONTROL_KEYS.forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(values, key)) {
+        return;
+      }
+
+      const ocrValue = config.normalizeCellValue(values[key]);
+      if (ocrValue === null) {
+        return;
+      }
+
+      comparedKeys.push(key);
+      const tableValue = getNumber(state.snapshot, row, key);
+      if (ocrValue !== tableValue) {
+        mismatches.push({ key, ocrValue, tableValue });
+      }
+    });
+
+    if (!comparedKeys.length) {
+      return {
+        id: "ocr-top-cells",
+        name: OCR_TOP_CELLS_RULE_NAME,
+        ruleText: OCR_TOP_CELLS_RULE_TEXT,
+        applicable: false,
+        isValid: true,
+        actual: 0,
+        expected: 0,
+        suspectKeys: [],
+        failureMessage: ""
+      };
+    }
+
+    const mismatchMessage = mismatches
+      .map((item) => {
+        const fieldMeta = getPhotoFieldMetaByKey(item.key);
+        const cellLabel = fieldMeta?.label || item.key;
+        return `OCR ${cellLabel} = ${item.ocrValue}, а в таблице ${cellLabel} = ${item.tableValue}`;
+      })
+      .join("; ");
+
+    return {
+      id: "ocr-top-cells",
+      name: OCR_TOP_CELLS_RULE_NAME,
+      ruleText: OCR_TOP_CELLS_RULE_TEXT,
+      applicable: true,
+      isValid: mismatches.length === 0,
+      actual: mismatches.length,
+      expected: 0,
+      suspectKeys: mismatches.map((item) => item.key),
+      failureMessage: mismatches.length
+        ? `данные OCR 1-3 не совпадают с таблицей отделения: ${mismatchMessage}.`
+        : ""
+    };
+  }
+
+  function buildDepartmentValidationChecksWithLiveSources(row) {
+    const checks = buildDepartmentValidationChecksForSnapshot(state.snapshot, row);
+    const ocrTopCellsCheck = buildDepartmentOcrTopCellsCheck(row);
+    if (ocrTopCellsCheck.applicable) {
+      checks.push(ocrTopCellsCheck);
+    }
+    return checks;
+  }
+
   function getDepartmentSaveRuleText(row, checks = []) {
     if (!row) {
       return SAVE_RULE_TEXT;
@@ -3821,10 +3914,39 @@
         message: ""
       };
     }
-    return getDepartmentValidationStateForSnapshot(state.snapshot, row);
+
+    if (!hasDepartmentSaveRule(row)) {
+      return {
+        applicable: false,
+        isValid: true,
+        actual: 0,
+        expected: 0,
+        checks: [],
+        failedChecks: [],
+        message: ""
+      };
+    }
+
+    const checks = buildDepartmentValidationChecksWithLiveSources(row);
+    const failedChecks = checks.filter((item) => item.applicable && !item.isValid);
+    const primaryCheck = checks[0] || null;
+    const isValid = failedChecks.length === 0;
+    const ruleText = getDepartmentSaveRuleText(row, checks);
+
+    return {
+      applicable: true,
+      isValid,
+      actual: primaryCheck ? primaryCheck.actual : 0,
+      expected: primaryCheck ? primaryCheck.expected : 0,
+      checks,
+      failedChecks,
+      message: isValid
+        ? `Проверка пройдена: ${ruleText}.`
+        : `Сохранение заблокировано: ${failedChecks.map((item) => item.failureMessage).join(" ")}`
+    };
   }
 
-  function getPhotoImportSuspectDetails(row, recognizedKeys) {
+  function getPhotoImportSuspectDetails(row, recognizedKeys, previewValues = null) {
     if (!row || !hasDepartmentSaveRule(row)) {
       return {
         suspectKeys: [],
@@ -3859,6 +3981,9 @@
     const suspectReasonParts = [];
 
     validation.failedChecks.forEach((check) => {
+      if (check.id === "ocr-top-cells") {
+        return;
+      }
       const checkKeys = check.id === "present-balance"
         ? fallbackBlockKeys
         : (Array.isArray(check.suspectKeys) ? check.suspectKeys : []);
@@ -3885,6 +4010,24 @@
           : "Формула 13-22 не сошлась. Проверьте блок ячеек 13-22."
       );
     });
+
+    if (photoTopCellsCheck.applicable && !photoTopCellsCheck.isValid) {
+      const checkKeys = Array.isArray(photoTopCellsCheck.suspectKeys) ? photoTopCellsCheck.suspectKeys : [];
+      checkKeys.forEach((key) => {
+        if (!suspectKeys.includes(key)) {
+          suspectKeys.push(key);
+        }
+      });
+      const labels = checkKeys
+        .map((key) => getPhotoFieldMetaByKey(key))
+        .filter(Boolean)
+        .map((item) => item.label);
+      suspectReasonParts.push(
+        labels.length
+          ? `Данные OCR 1-3 не совпадают с таблицей отделения. Проверьте ячейки ${labels.join(", ")}.`
+          : "Данные OCR 1-3 не совпадают с таблицей отделения."
+      );
+    }
 
     return {
       suspectKeys,
@@ -6165,7 +6308,7 @@
       });
     }
 
-    const suspectDetails = getPhotoImportSuspectDetails(row, recognizedKeys);
+    const suspectDetails = getPhotoImportSuspectDetails(row, recognizedKeys, values);
 
     state.photoImport.recognizedValues = {};
     PHOTO_FIELD_DEFINITIONS.forEach((field) => {
