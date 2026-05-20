@@ -896,14 +896,17 @@
       const currentShar = getLocalRowNumber(values, "currentShar");
       const currentSpa = getLocalRowNumber(values, "currentSpa");
       const currentPaym = getLocalRowNumber(values, "currentPaym");
+      const leaveSharq = getLocalRowNumber(values, "leaveSharq");
+      const leaveSpa = getLocalRowNumber(values, "leaveSpa");
+      const leavePaym = getLocalRowNumber(values, "leavePaym");
       const presentKeys = Array.isArray(row.presentKeys) && row.presentKeys.length
         ? row.presentKeys
         : MORNING_ROLLOVER_PRESENT_KEYS;
       const presentTotal = presentKeys.reduce((sum, key) => sum + getLocalRowNumber(values, key), 0);
 
       values.beenTotal = presentTotal;
-      values.beenSoldier = currentShar + currentSpa + currentPaym;
-      values.beenSeries = currentShar;
+      values.beenSoldier = currentShar + currentSpa + currentPaym + leaveSharq + leaveSpa + leavePaym;
+      values.beenSeries = currentShar + leaveSharq;
       MORNING_ROLLOVER_ZERO_KEYS.forEach((key) => {
         values[key] = 0;
       });

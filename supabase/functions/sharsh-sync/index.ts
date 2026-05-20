@@ -652,12 +652,15 @@ function applyMorningRolloverValues(
   const currentShar = safeNumber(output.currentShar);
   const currentSpa = safeNumber(output.currentSpa);
   const currentPaym = safeNumber(output.currentPaym);
+  const leaveSharq = safeNumber(output.leaveSharq);
+  const leaveSpa = safeNumber(output.leaveSpa);
+  const leavePaym = safeNumber(output.leavePaym);
   const presentTotal = MORNING_ROLLOVER_PRESENT_KEYS
     .reduce((sum, key) => sum + safeNumber(output[key]), 0);
 
   output.beenTotal = presentTotal;
-  output.beenSoldier = currentShar + currentSpa + currentPaym;
-  output.beenSeries = currentShar;
+  output.beenSoldier = currentShar + currentSpa + currentPaym + leaveSharq + leaveSpa + leavePaym;
+  output.beenSeries = currentShar + leaveSharq;
   MORNING_ROLLOVER_ZERO_KEYS.forEach((key) => {
     output[key] = 0;
   });

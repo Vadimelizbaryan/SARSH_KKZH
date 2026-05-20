@@ -2136,7 +2136,7 @@
       const archiveLabel = record.archiveLabel || record.archiveKey;
       setInfo(result && result.rolloverAlreadyApplied
         ? `Архив ${archiveLabel} уже сохранён, утренний перенос уже был выполнен.`
-        : `Архив ${archiveLabel} сохранён. Утренний перенос выполнен: 12→1, 13→3, 13+14+15→2, 4–11 обнулены.`,
+        : `Архив ${archiveLabel} сохранён. Утренний перенос выполнен: 12→1, 13+20→3, 13+14+15+20+21+22→2, 4–11 обнулены.`,
       false);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "неизвестная ошибка");
@@ -3261,6 +3261,11 @@
       + getNumber(snapshot, row, "leavePaym");
   }
 
+  function shouldApplyExtendedDepartmentChecks(snapshot, row) {
+    return getNumber(snapshot, row, "transferFromDepartment") === 0
+      && getNumber(snapshot, row, "transferToDepartment") === 0;
+  }
+
   function hasDepartmentSaveRule(row) {
     return Boolean(
       row
@@ -3356,19 +3361,19 @@
     };
   }
 
-  function buildDepartmentValidationChecks(row) {
+  function buildDepartmentValidationChecksForSnapshot(snapshot, row) {
     if (!row) {
       return [];
     }
 
-    const presentActual = calcPresentTotal(state.snapshot, row);
+    const presentActual = calcPresentTotal(snapshot, row);
     const presentExpected = (
-      getNumber(state.snapshot, row, "beenTotal")
-      + getNumber(state.snapshot, row, "admittedTotal")
-      + getNumber(state.snapshot, row, "transferToDepartment")
+      getNumber(snapshot, row, "beenTotal")
+      + getNumber(snapshot, row, "admittedTotal")
+      + getNumber(snapshot, row, "transferToDepartment")
     ) - (
-      getNumber(state.snapshot, row, "dgTotal")
-      + getNumber(state.snapshot, row, "transferFromDepartment")
+      getNumber(snapshot, row, "dgTotal")
+      + getNumber(snapshot, row, "transferFromDepartment")
     );
     const checks = [
       {
@@ -3386,16 +3391,14 @@
       }
     ];
 
-    const transferFromDepartment = getNumber(state.snapshot, row, "transferFromDepartment");
-    const transferToDepartment = getNumber(state.snapshot, row, "transferToDepartment");
-    if (transferFromDepartment === 0 && transferToDepartment === 0) {
+    if (shouldApplyExtendedDepartmentChecks(snapshot, row)) {
       const soldierActual = (
-        getNumber(state.snapshot, row, "beenSeries")
-        + getNumber(state.snapshot, row, "admittedSeries")
-      ) - getNumber(state.snapshot, row, "dgSeries");
+        getNumber(snapshot, row, "beenSeries")
+        + getNumber(snapshot, row, "admittedSeries")
+      ) - getNumber(snapshot, row, "dgSeries");
       const soldierExpected = (
-        getNumber(state.snapshot, row, "currentShar")
-        + getNumber(state.snapshot, row, "leaveSharq")
+        getNumber(snapshot, row, "currentShar")
+        + getNumber(snapshot, row, "leaveSharq")
       );
 
       checks.push({
@@ -3407,20 +3410,20 @@
         actual: soldierActual,
         expected: soldierExpected,
         suspectKeys: ["beenSeries", "admittedSeries", "dgSeries", "currentShar", "leaveSharq"],
-        failureMessage: `контрольная сумма «${SOLDIER_COUNT_RULE_NAME}» не сошлась: (${getNumber(state.snapshot, row, "beenSeries")} + ${getNumber(state.snapshot, row, "admittedSeries")}) - ${getNumber(state.snapshot, row, "dgSeries")} = ${soldierActual}, а ${getNumber(state.snapshot, row, "currentShar")} + ${getNumber(state.snapshot, row, "leaveSharq")} = ${soldierExpected}.`
+        failureMessage: `контрольная сумма «${SOLDIER_COUNT_RULE_NAME}» не сошлась: (${getNumber(snapshot, row, "beenSeries")} + ${getNumber(snapshot, row, "admittedSeries")}) - ${getNumber(snapshot, row, "dgSeries")} = ${soldierActual}, а ${getNumber(snapshot, row, "currentShar")} + ${getNumber(snapshot, row, "leaveSharq")} = ${soldierExpected}.`
       });
 
       const militaryActual = (
-        getNumber(state.snapshot, row, "beenSoldier")
-        + getNumber(state.snapshot, row, "admittedSoldier")
-      ) - getNumber(state.snapshot, row, "dgSoldier");
+        getNumber(snapshot, row, "beenSoldier")
+        + getNumber(snapshot, row, "admittedSoldier")
+      ) - getNumber(snapshot, row, "dgSoldier");
       const militaryExpected = (
-        getNumber(state.snapshot, row, "currentShar")
-        + getNumber(state.snapshot, row, "currentSpa")
-        + getNumber(state.snapshot, row, "currentPaym")
-        + getNumber(state.snapshot, row, "leaveSharq")
-        + getNumber(state.snapshot, row, "leaveSpa")
-        + getNumber(state.snapshot, row, "leavePaym")
+        getNumber(snapshot, row, "currentShar")
+        + getNumber(snapshot, row, "currentSpa")
+        + getNumber(snapshot, row, "currentPaym")
+        + getNumber(snapshot, row, "leaveSharq")
+        + getNumber(snapshot, row, "leaveSpa")
+        + getNumber(snapshot, row, "leavePaym")
       );
 
       checks.push({
@@ -3442,11 +3445,15 @@
           "leaveSpa",
           "leavePaym"
         ],
-        failureMessage: `контрольная сумма «${MILITARY_COUNT_RULE_NAME}» не сошлась: (${getNumber(state.snapshot, row, "beenSoldier")} + ${getNumber(state.snapshot, row, "admittedSoldier")}) - ${getNumber(state.snapshot, row, "dgSoldier")} = ${militaryActual}, а ${getNumber(state.snapshot, row, "currentShar")} + ${getNumber(state.snapshot, row, "currentSpa")} + ${getNumber(state.snapshot, row, "currentPaym")} + ${getNumber(state.snapshot, row, "leaveSharq")} + ${getNumber(state.snapshot, row, "leaveSpa")} + ${getNumber(state.snapshot, row, "leavePaym")} = ${militaryExpected}.`
+        failureMessage: `контрольная сумма «${MILITARY_COUNT_RULE_NAME}» не сошлась: (${getNumber(snapshot, row, "beenSoldier")} + ${getNumber(snapshot, row, "admittedSoldier")}) - ${getNumber(snapshot, row, "dgSoldier")} = ${militaryActual}, а ${getNumber(snapshot, row, "currentShar")} + ${getNumber(snapshot, row, "currentSpa")} + ${getNumber(snapshot, row, "currentPaym")} + ${getNumber(snapshot, row, "leaveSharq")} + ${getNumber(snapshot, row, "leaveSpa")} + ${getNumber(snapshot, row, "leavePaym")} = ${militaryExpected}.`
       });
     }
 
     return checks;
+  }
+
+  function buildDepartmentValidationChecks(row) {
+    return buildDepartmentValidationChecksForSnapshot(state.snapshot, row);
   }
 
   function getDepartmentSaveRuleText(row, checks = []) {
@@ -3457,9 +3464,8 @@
     return activeChecks.map((item) => `${item.name}: ${item.ruleText}`).join("; ");
   }
 
-  function getDepartmentValidationState() {
-    const row = getCurrentRow();
-    if (mode !== "department" || !hasDepartmentSaveRule(row)) {
+  function getDepartmentValidationStateForSnapshot(snapshot, row) {
+    if (!hasDepartmentSaveRule(row)) {
       return {
         applicable: false,
         isValid: true,
@@ -3471,7 +3477,7 @@
       };
     }
 
-    const checks = buildDepartmentValidationChecks(row);
+    const checks = buildDepartmentValidationChecksForSnapshot(snapshot, row);
     const failedChecks = checks.filter((item) => item.applicable && !item.isValid);
     const primaryCheck = checks[0] || null;
     const isValid = failedChecks.length === 0;
@@ -3488,6 +3494,22 @@
         ? `Проверка пройдена: ${ruleText}.`
         : `Сохранение заблокировано: ${failedChecks.map((item) => item.failureMessage).join(" ")}`
     };
+  }
+
+  function getDepartmentValidationState() {
+    const row = getCurrentRow();
+    if (mode !== "department") {
+      return {
+        applicable: false,
+        isValid: true,
+        actual: 0,
+        expected: 0,
+        checks: [],
+        failedChecks: [],
+        message: ""
+      };
+    }
+    return getDepartmentValidationStateForSnapshot(state.snapshot, row);
   }
 
   function getPhotoImportSuspectDetails(row, recognizedKeys) {
@@ -3787,8 +3809,16 @@
     const freshness = viewMode === "main" ? getRowFreshnessMeta(row) : null;
     const freshnessClass = freshness && freshness.level === "fresh" ? " main-fresh-row" : "";
     const freshnessAttr = freshness ? ` data-row-freshness="${escapeHtml(freshness.level)}"` : "";
+    const validation = viewMode === "main" ? getDepartmentValidationStateForSnapshot(snapshot, row) : null;
+    const validationClass = validation && validation.applicable && !validation.isValid ? " main-invalid-row" : "";
+    const validationAttr = validation && validation.applicable
+      ? ` data-row-validation="${validation.isValid ? "valid" : "invalid"}"`
+      : "";
+    const validationTitle = validation && validation.applicable && !validation.isValid
+      ? ` title="${escapeHtml(validation.failedChecks.map((item) => item.failureMessage).join(" "))}"`
+      : "";
     return `
-      <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}" data-row-id="${row.id}"${freshnessAttr}>
+      <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}${validationClass}" data-row-id="${row.id}"${freshnessAttr}${validationAttr}${validationTitle}>
         <td class="dept-cell" title="${escapeHtml(row.department)}">${renderResponsiveDepartmentName(row.department)}</td>
         ${config.columns.map((key) => renderDetailCell(snapshot, row, key, interactive)).join("")}
       </tr>
@@ -5571,6 +5601,26 @@
         if (sheetRowEl) {
           sheetRowEl.setAttribute("data-row-freshness", meta.level);
           sheetRowEl.classList.toggle("main-fresh-row", meta.level === "fresh");
+          if (mode === "main") {
+            const validation = getDepartmentValidationStateForSnapshot(state.snapshot, row);
+            if (validation.applicable) {
+              sheetRowEl.setAttribute("data-row-validation", validation.isValid ? "valid" : "invalid");
+              sheetRowEl.classList.toggle("main-invalid-row", !validation.isValid);
+              if (!validation.isValid) {
+                sheetRowEl.setAttribute("title", validation.failedChecks.map((item) => item.failureMessage).join(" "));
+              } else {
+                sheetRowEl.removeAttribute("title");
+              }
+            } else {
+              sheetRowEl.removeAttribute("data-row-validation");
+              sheetRowEl.classList.remove("main-invalid-row");
+              sheetRowEl.removeAttribute("title");
+            }
+          } else {
+            sheetRowEl.removeAttribute("data-row-validation");
+            sheetRowEl.classList.remove("main-invalid-row");
+            sheetRowEl.removeAttribute("title");
+          }
         }
       });
     }
