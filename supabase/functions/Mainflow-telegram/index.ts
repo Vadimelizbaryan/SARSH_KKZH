@@ -4088,9 +4088,19 @@ async function saveDepartmentSnapshot(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
   reportDate: string,
-  values: Record<string, number | null>
+  values: Record<string, number | null>,
+  source: "telegram-form" | "photo" | "site" | "rollover" | "night-shift" | "day-shift" = "telegram-form"
 ) {
   const departmentMeta = DEPARTMENTS[departmentId];
+  const workflowStatus = source === "telegram-form"
+    ? "processed_telegram"
+    : (source === "photo"
+      ? "processed_photo"
+      : (source === "night-shift"
+        ? "processed_night_shift"
+        : (source === "day-shift"
+          ? "processed_day_shift"
+          : (source === "rollover" ? "processed_rollover" : "processed_site"))));
 
   const { error: rowError } = await supabase
     .from("sharsh_departments")
@@ -4099,7 +4109,8 @@ async function saveDepartmentSnapshot(
       department_name: departmentMeta.department,
       department_group: departmentMeta.group,
       values: sanitizeValues(values),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      photo_workflow_status: workflowStatus
     });
 
   if (rowError) {
@@ -4144,10 +4155,11 @@ async function markDepartmentPhotoProcessed(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
   feedbackId: string | number | null,
-  imageName: string | null
+  imageName: string | null,
+  workflowStatus = "processed"
 ) {
   const updatePayload: Record<string, unknown> = {
-    photo_workflow_status: "processed",
+    photo_workflow_status: workflowStatus,
     photo_feedback_updated_at: new Date().toISOString()
   };
   if (feedbackId !== null && String(feedbackId).trim()) {
@@ -6621,12 +6633,13 @@ async function handleTelegramWebFormSubmit(request: Request) {
       departmentId,
       reportDate
     );
-    await saveDepartmentSnapshot(supabase as ReturnType<typeof createClient>, departmentId, reportDate, values);
+    await saveDepartmentSnapshot(supabase as ReturnType<typeof createClient>, departmentId, reportDate, values, "telegram-form");
     await markDepartmentPhotoProcessed(
       supabase as ReturnType<typeof createClient>,
       departmentId,
       pairedPhotoFeedback ? pairedPhotoFeedback.id : feedbackId,
-      pairedPhotoFeedback ? (pairedPhotoFeedback.imageName || "telegram-photo") : "telegram-web-app-form"
+      pairedPhotoFeedback ? (pairedPhotoFeedback.imageName || "telegram-photo") : "telegram-web-app-form",
+      "processed_telegram"
     );
     const didAutoSave = true;
     const savedSnapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
@@ -8501,14 +8514,14 @@ async function handleTelegramPhoto(
   let savedSnapshot: Awaited<ReturnType<typeof loadSnapshot>> | null = null;
   let autoSaveSource: "telegram-form" | "photo" | null = null;
   if (telegramWebFormFeedback) {
-    await saveDepartmentSnapshot(supabase, departmentId, reportDate, telegramWebFormFeedback.values);
-    await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, fileName);
+    await saveDepartmentSnapshot(supabase, departmentId, reportDate, telegramWebFormFeedback.values, "telegram-form");
+    await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, fileName, "processed_telegram");
     shouldSaveSnapshot = true;
     autoSaveSource = "telegram-form";
     savedSnapshot = await loadSnapshot(supabase);
   } else if (isPhotoControlPassed) {
-    await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values);
-    await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, fileName);
+    await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values, "photo");
+    await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, fileName, "processed_photo");
     shouldSaveSnapshot = true;
     autoSaveSource = "photo";
     savedSnapshot = await loadSnapshot(supabase);

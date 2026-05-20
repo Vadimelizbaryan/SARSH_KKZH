@@ -2727,7 +2727,8 @@
       photoWorkflowStatus: "processed",
       photoFeedbackId: null,
       photoFeedbackUpdatedAt: null,
-      photoName: ""
+      photoName: "",
+      lastUpdateSource: ""
     }));
     const snapshot = config.buildSnapshotFromSaved({
       reportDate: reportDate || (records[0] ? records[0].reportDate : config.DEFAULT_DATE),
@@ -3038,7 +3039,7 @@
       };
     }
 
-    if (row.photoWorkflowStatus === "pending" && row.photoFeedbackId) {
+    if (String(row.photoWorkflowStatus || "").startsWith("pending") && row.photoFeedbackId) {
       const isTelegramForm = row.photoName === "telegram-web-app-form";
       return {
         tone: "pending",
@@ -3047,7 +3048,7 @@
     }
 
     const freshness = getRowFreshnessMeta(row);
-    if (row.photoWorkflowStatus === "processed" && row.photoFeedbackId && freshness.level !== "stale" && freshness.level !== "missing") {
+    if (String(row.photoWorkflowStatus || "").startsWith("processed") && row.photoFeedbackId && freshness.level !== "stale" && freshness.level !== "missing") {
       return {
         tone: "processed",
         label: "Проверено"
@@ -3082,6 +3083,45 @@
       return {
         label: "Telegram форма",
         tone: "form"
+      };
+    }
+
+    return {
+      label: "",
+      tone: "none"
+    };
+  }
+
+  function getDepartmentLastUpdateSourceMeta(row) {
+    const source = row && typeof row.lastUpdateSource === "string" && row.lastUpdateSource.trim()
+      ? row.lastUpdateSource.trim()
+      : (row && typeof row.photoWorkflowStatus === "string" ? row.photoWorkflowStatus.trim() : "");
+
+    if (source === "telegram-form" || source === "processed_telegram") {
+      return {
+        label: "Telegram",
+        tone: "form"
+      };
+    }
+
+    if (source === "photo" || source === "processed_photo") {
+      return {
+        label: "Фото",
+        tone: "photo"
+      };
+    }
+
+    if (source === "site" || source === "processed_site") {
+      return {
+        label: "",
+        tone: "none"
+      };
+    }
+
+    if (source === "processed_rollover" || source === "processed_night_shift" || source === "processed_day_shift") {
+      return {
+        label: "",
+        tone: "none"
       };
     }
 
@@ -4396,6 +4436,7 @@
     const freshness = getRowFreshnessMeta(row);
     const photoWorkflow = getDepartmentPhotoWorkflowMeta(row);
     const feedbackSource = getDepartmentFeedbackSourceMeta(row);
+    const lastUpdateSource = getDepartmentLastUpdateSourceMeta(row);
     const relativePath = appendShareQuery(config.getDepartmentPagePath(basePath, definition.id));
     const openFeedbackId = getDepartmentOpenFeedbackId(row);
     const feedbackPath = openFeedbackId
@@ -4405,7 +4446,10 @@
     const openLabel = feedbackPath ? "Открыть отправленное" : "Открыть отделение";
     return `
       <div class="link-card" data-department-open-card="${definition.id}" data-workflow-tone="${photoWorkflow.tone}" title="${escapeHtml(photoWorkflow.label)}">
-        <strong>${escapeHtml(definition.department)}</strong>
+        <div class="link-card-heading">
+          <strong>${escapeHtml(definition.department)}</strong>
+          <span class="link-card-update-source" data-department-last-source="${definition.id}" data-update-source-tone="${escapeHtml(lastUpdateSource.tone)}"${lastUpdateSource.label ? "" : " hidden"}>${escapeHtml(lastUpdateSource.label)}</span>
+        </div>
         <div class="link-card-meta">
           <span class="status-chip status-chip--${freshness.level}" data-department-status="${definition.id}">${escapeHtml(freshness.label)}</span>
           <span class="link-card-time" data-department-updated="${definition.id}">${escapeHtml(freshness.timestamp)}</span>
@@ -6119,12 +6163,14 @@
         const meta = getRowFreshnessMeta(row);
         const photoWorkflow = getDepartmentPhotoWorkflowMeta(row);
         const feedbackSource = getDepartmentFeedbackSourceMeta(row);
+        const lastUpdateSource = getDepartmentLastUpdateSourceMeta(row);
         const statusEl = document.querySelector(`[data-department-status="${row.id}"]`);
         const updatedEl = document.querySelector(`[data-department-updated="${row.id}"]`);
         const ageEl = document.querySelector(`[data-department-age="${row.id}"]`);
         const openCardEl = document.querySelector(`[data-department-open-card="${row.id}"]`);
         const feedbackLinkEl = document.querySelector(`[data-department-feedback-link="${row.id}"]`);
         const feedbackSourceEl = document.querySelector(`[data-department-feedback-source="${row.id}"]`);
+        const lastUpdateSourceEl = document.querySelector(`[data-department-last-source="${row.id}"]`);
         const deleteFeedbackBtn = document.querySelector(`[data-delete-feedback="${row.id}"]`);
         const listStatusEl = document.querySelector(`[data-update-status="${row.id}"]`);
         const listTimeEl = document.querySelector(`[data-update-time="${row.id}"]`);
@@ -6166,6 +6212,17 @@
             feedbackSourceEl.setAttribute("hidden", "");
             feedbackSourceEl.textContent = "";
             feedbackSourceEl.setAttribute("data-feedback-source-tone", "none");
+          }
+        }
+        if (lastUpdateSourceEl) {
+          if (lastUpdateSource.label) {
+            lastUpdateSourceEl.removeAttribute("hidden");
+            lastUpdateSourceEl.textContent = lastUpdateSource.label;
+            lastUpdateSourceEl.setAttribute("data-update-source-tone", lastUpdateSource.tone);
+          } else {
+            lastUpdateSourceEl.setAttribute("hidden", "");
+            lastUpdateSourceEl.textContent = "";
+            lastUpdateSourceEl.setAttribute("data-update-source-tone", "none");
           }
         }
         if (deleteFeedbackBtn) {

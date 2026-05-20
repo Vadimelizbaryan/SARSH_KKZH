@@ -414,6 +414,9 @@
         ? String(sourceRow.photoFeedbackUpdatedAt)
         : null,
       photoName: sourceRow && sourceRow.photoName ? String(sourceRow.photoName) : "",
+      lastUpdateSource: sourceRow && (sourceRow.lastUpdateSource || sourceRow.photoWorkflowStatus)
+        ? String(sourceRow.lastUpdateSource || sourceRow.photoWorkflowStatus)
+        : "",
       hasTelegramFormFeedback: Boolean(sourceRow && sourceRow.hasTelegramFormFeedback),
       hasPhotoFeedback: Boolean(sourceRow && sourceRow.hasPhotoFeedback)
     };
@@ -454,6 +457,7 @@
             latestTelegramFormFeedbackId: item.latestTelegramFormFeedbackId,
             photoFeedbackUpdatedAt: item.photoFeedbackUpdatedAt,
             photoName: item.photoName,
+            lastUpdateSource: item.lastUpdateSource,
             hasTelegramFormFeedback: item.hasTelegramFormFeedback,
             hasPhotoFeedback: item.hasPhotoFeedback
           }))

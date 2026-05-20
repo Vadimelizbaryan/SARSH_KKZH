@@ -1666,6 +1666,7 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
         latestTelegramFormFeedbackId: typeof feedback?.latestTelegramFormFeedbackId === "number" ? feedback.latestTelegramFormFeedbackId : null,
         photoFeedbackUpdatedAt: saved?.photo_feedback_updated_at || null,
         photoName: typeof saved?.photo_name === "string" ? saved.photo_name : "",
+        lastUpdateSource: typeof saved?.photo_workflow_status === "string" ? saved.photo_workflow_status : "",
         hasTelegramFormFeedback: Boolean(feedback?.hasTelegramFormFeedback),
         hasPhotoFeedback: Boolean(feedback?.hasPhotoFeedback)
       };
@@ -1699,6 +1700,9 @@ function buildSnapshotFromArchivePayload(snapshot: Record<string, unknown> | nul
         latestTelegramFormFeedbackId: typeof saved?.latestTelegramFormFeedbackId === "number" ? saved.latestTelegramFormFeedbackId : null,
         photoFeedbackUpdatedAt: typeof saved?.photoFeedbackUpdatedAt === "string" ? saved.photoFeedbackUpdatedAt : null,
         photoName: typeof saved?.photoName === "string" ? saved.photoName : "",
+        lastUpdateSource: typeof (saved?.lastUpdateSource || saved?.photoWorkflowStatus) === "string"
+          ? String(saved.lastUpdateSource || saved.photoWorkflowStatus)
+          : "",
         hasTelegramFormFeedback: Boolean(saved?.hasTelegramFormFeedback),
         hasPhotoFeedback: Boolean(saved?.hasPhotoFeedback)
       };
@@ -2577,7 +2581,8 @@ Deno.serve(async (request) => {
           department_name: departmentMeta.department,
           department_group: departmentMeta.group,
           values: applyMorningRolloverValues(row.id, row.values),
-          updated_at: now
+          updated_at: now,
+          photo_workflow_status: "processed_rollover"
         };
       });
 
@@ -2634,7 +2639,8 @@ Deno.serve(async (request) => {
           department_name: departmentMeta.department,
           department_group: departmentMeta.group,
           values,
-          updated_at: now
+          updated_at: now,
+          photo_workflow_status: "processed_night_shift"
         }];
       });
 
@@ -2682,7 +2688,8 @@ Deno.serve(async (request) => {
           department_name: departmentMeta.department,
           department_group: departmentMeta.group,
           values,
-          updated_at: now
+          updated_at: now,
+          photo_workflow_status: "processed_day_shift"
         }];
       });
 
@@ -2738,7 +2745,8 @@ Deno.serve(async (request) => {
         department_name: departmentMeta.department,
         department_group: departmentMeta.group,
         values: sanitizeValues(payload.values as Record<string, unknown> | undefined),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        photo_workflow_status: "processed_site"
       });
 
     if (rowError) {
@@ -2748,7 +2756,7 @@ Deno.serve(async (request) => {
     const { error: workflowError } = await supabase
       .from("sharsh_departments")
       .update({
-        photo_workflow_status: "processed",
+        photo_workflow_status: "processed_site",
         photo_feedback_updated_at: new Date().toISOString()
       })
       .eq("department_id", departmentId)
