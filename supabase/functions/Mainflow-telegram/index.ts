@@ -2,10 +2,13 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import JSZip from "npm:jszip@3.10.1";
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
+import { Jimp } from "npm:jimp";
+import { Buffer } from "node:buffer";
 
 // deploy-touch: 2026-05-10
 const DEFAULT_DATE = "05,05,26";
 const PHOTO_RECOGNITION_MODEL = (Deno.env.get("OPENAI_PHOTO_MODEL") || "gpt-5.4-mini").trim();
+const PHOTO_ORIENTATION_ANALYSIS_MAX_DIMENSION = 1600;
 const DEFAULT_SITE_BASE_URL = "https://vadimelizbaryan.github.io/SARSH_KKZH";
 const OCR_TEMPLATE_BLANK_IMAGE_PATH = "/assets/ocr-template-blank.jpg";
 const DEPARTMENT_SHEET_TEMPLATE_PATH = "/assets/templates/SHARSH_KKZH_template.xlsx";
@@ -1253,6 +1256,40 @@ function bytesToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
+function base64ToBytes(base64: string) {
+  const normalized = base64.replace(/\s+/g, "");
+  const binary = atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function parseImageDataUrl(dataUrl: string) {
+  const match = /^data:([^;,]+);base64,(.+)$/i.exec(dataUrl);
+  if (!match) {
+    throw new Error("Invalid image data URL.");
+  }
+
+  return {
+    mimeType: match[1].trim().toLowerCase(),
+    bytes: base64ToBytes(match[2])
+  };
+}
+
+function buildImageDataUrl(mimeType: string, bytes: Uint8Array) {
+  return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+}
+
+function normalizeTelegramPhotoFileName(fileName: string, mimeType: string) {
+  const fallbackName = "telegram-image";
+  const safeName = typeof fileName === "string" && fileName.trim() ? fileName.trim() : fallbackName;
+  const baseName = safeName.replace(/\.[a-z0-9]+$/i, "") || fallbackName;
+  const extension = mimeType === "image/png" ? "png" : "jpg";
+  return `${baseName}.${extension}`;
+}
+
 async function fetchImageAsDataUrl(url: string) {
   const response = await fetch(url, {
     headers: {
@@ -1276,6 +1313,23 @@ async function requestOpenAiStructuredVision(
   schema: Record<string, unknown>,
   referenceImageUrls: string[] = []
 ) {
+  return await requestOpenAiStructuredVisionWithImages(
+    prompt,
+    [imageDataUrl],
+    schemaName,
+    schema,
+    referenceImageUrls
+  );
+}
+
+async function requestOpenAiStructuredVisionWithImages(
+  prompt: string,
+  imageDataUrls: string[],
+  schemaName: string,
+  schema: Record<string, unknown>,
+  referenceImageUrls: string[] = [],
+  detail: "low" | "high" | "auto" = "high"
+) {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured on the server.");
@@ -1295,13 +1349,15 @@ async function requestOpenAiStructuredVision(
     ...referenceImageDataUrls.map((dataUrl) => ({
         type: "input_image",
         image_url: dataUrl,
-        detail: "high"
+        detail
       })),
-    {
-      type: "input_image",
-      image_url: imageDataUrl,
-      detail: "high"
-    }
+    ...imageDataUrls
+      .filter((dataUrl) => typeof dataUrl === "string" && dataUrl.startsWith("data:image/"))
+      .map((dataUrl) => ({
+        type: "input_image",
+        image_url: dataUrl,
+        detail
+      }))
   ];
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -1469,6 +1525,161 @@ function buildDepartmentDetectionSchema() {
     },
     required: ["departmentId", "notes"]
   };
+}
+
+function buildPhotoOrientationSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      rotationDegrees: {
+        type: "integer",
+        enum: [0, 90, 180, 270]
+      },
+      notes: {
+        type: "array",
+        items: { type: "string" }
+      }
+    },
+    required: ["rotationDegrees", "notes"]
+  };
+}
+
+function sanitizePhotoOrientationDecision(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return { rotationDegrees: 0, notes: [] as string[] };
+  }
+
+  const payload = value as Record<string, unknown>;
+  const rotationCandidate = Number(payload.rotationDegrees);
+  const rotationDegrees = [0, 90, 180, 270].includes(rotationCandidate)
+    ? rotationCandidate
+    : 0;
+  const notes = Array.isArray(payload.notes)
+    ? payload.notes
+      .filter((item) => typeof item === "string" && item.trim())
+      .map((item) => String(item).trim())
+    : [];
+
+  return {
+    rotationDegrees,
+    notes
+  };
+}
+
+async function buildJimpRotatedImageBytes(
+  sourceBytes: Uint8Array,
+  rotationDegrees: number,
+  options: { maxDimension?: number | null; mimeType?: string } = {}
+) {
+  const image = await Jimp.read(Buffer.from(sourceBytes));
+  if (rotationDegrees) {
+    image.rotate(rotationDegrees);
+  }
+
+  const maxDimension = Number(options.maxDimension);
+  if (Number.isFinite(maxDimension) && maxDimension > 0) {
+    const longestSide = Math.max(image.bitmap.width, image.bitmap.height);
+    if (longestSide > maxDimension) {
+      image.scale(maxDimension / longestSide);
+    }
+  }
+
+  const targetMimeType = options.mimeType === "image/png" ? "image/png" : "image/jpeg";
+  const buffer = await image.getBuffer(targetMimeType);
+  return new Uint8Array(buffer);
+}
+
+async function detectTelegramPhotoOrientation(dataUrl: string) {
+  const { bytes } = parseImageDataUrl(dataUrl);
+  const candidateRotations = [0, 90, 180, 270] as const;
+  const candidateDataUrls = await Promise.all(candidateRotations.map(async (rotationDegrees) => {
+    const rotatedBytes = await buildJimpRotatedImageBytes(
+      bytes,
+      rotationDegrees,
+      { maxDimension: PHOTO_ORIENTATION_ANALYSIS_MAX_DIMENSION, mimeType: "image/jpeg" }
+    );
+    return buildImageDataUrl("image/jpeg", rotatedBytes);
+  }));
+
+  const prompt = [
+    "You determine the correct upright orientation of an Armenian hospital department form photo.",
+    "You will receive five images in order.",
+    "Image 1 is a blank reference template of the same form.",
+    "Images 2-5 are the same filled form rotated as follows:",
+    "- image 2: original rotation 0 degrees",
+    "- image 3: rotated 90 degrees clockwise",
+    "- image 4: rotated 180 degrees",
+    "- image 5: rotated 270 degrees clockwise",
+    "Choose the rotation where the form is upright and naturally readable.",
+    "Use only the printed template cues: the header, the SR marker area, the top numeric table, and the overall blank layout.",
+    "Prefer the version where the top numeric table is at the top, the lower descriptive text stays below it, and the page aligns best with the blank reference.",
+    "Return the selected rotationDegrees relative to the original image."
+  ].join("\n");
+
+  const parsed = await requestOpenAiStructuredVisionWithImages(
+    prompt,
+    candidateDataUrls,
+    "telegram_department_photo_orientation",
+    buildPhotoOrientationSchema(),
+    [getOcrTemplateBlankImageUrl()],
+    "low"
+  );
+
+  return sanitizePhotoOrientationDecision(parsed);
+}
+
+async function normalizeTelegramPhotoForOcr(dataUrl: string, fileName: string) {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+    return {
+      dataUrl,
+      fileName,
+      rotationDegrees: 0,
+      wasRotated: false,
+      notes: [] as string[]
+    };
+  }
+
+  try {
+    const orientation = await detectTelegramPhotoOrientation(dataUrl);
+    if (!orientation.rotationDegrees) {
+      return {
+        dataUrl,
+        fileName,
+        rotationDegrees: 0,
+        wasRotated: false,
+        notes: orientation.notes
+      };
+    }
+
+    const { bytes } = parseImageDataUrl(dataUrl);
+    const rotatedBytes = await buildJimpRotatedImageBytes(
+      bytes,
+      orientation.rotationDegrees,
+      { mimeType: "image/jpeg" }
+    );
+    const normalizedMimeType = "image/jpeg";
+
+    return {
+      dataUrl: buildImageDataUrl(normalizedMimeType, rotatedBytes),
+      fileName: normalizeTelegramPhotoFileName(fileName, normalizedMimeType),
+      rotationDegrees: orientation.rotationDegrees,
+      wasRotated: true,
+      notes: [
+        `Фото автоматически повернуто на ${orientation.rotationDegrees}° по эталонному бланку перед OCR.`,
+        ...orientation.notes
+      ]
+    };
+  } catch (error) {
+    console.warn("Telegram photo orientation normalization failed:", sanitizePublicErrorMessage(error));
+    return {
+      dataUrl,
+      fileName,
+      rotationDegrees: 0,
+      wasRotated: false,
+      notes: [] as string[]
+    };
+  }
 }
 
 async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl: string) {
@@ -8225,7 +8436,11 @@ async function handleTelegramPhoto(
     console.warn("Telegram photo copy was not sent: original message_id is missing.");
   }
 
-  const { dataUrl, fileName } = await downloadTelegramImageAsDataUrl(fileId);
+  const downloadedPhoto = await downloadTelegramImageAsDataUrl(fileId);
+  const normalizedPhoto = await normalizeTelegramPhotoForOcr(downloadedPhoto.dataUrl, downloadedPhoto.fileName);
+  const dataUrl = normalizedPhoto.dataUrl;
+  const fileName = normalizedPhoto.fileName;
+  const normalizationNotes = normalizedPhoto.notes;
 
   let departmentId = hintedDepartmentId;
   const departmentSource = hintedDepartmentId ? "подсказка в сообщении" : "автоопределение по фото";
@@ -8237,6 +8452,7 @@ async function handleTelegramPhoto(
       const detectionSummary = [
         "Фото обработано. Отделение не определено.",
         "Источник отделения: автоопределение по фото",
+        normalizationNotes.length ? `Нормализация фото: ${normalizationNotes.join("; ")}` : "",
         detection.notes.length ? `Заметки OCR: ${detection.notes.join("; ")}` : ""
       ].filter(Boolean).join("\n");
       const notifyChatIds = getTelegramNotifyChatIds(chatId);
@@ -8254,6 +8470,7 @@ async function handleTelegramPhoto(
   }
 
   const recognized = await recognizeDepartmentPhoto(departmentId, dataUrl);
+  const recognizedNotes = [...normalizationNotes, ...recognized.notes];
   const reportDate = hintedReportDate || getYerevanReportDateText();
 
   const structureInvalid = !!recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22);
@@ -8273,7 +8490,7 @@ async function handleTelegramPhoto(
     dataUrl,
     recognized.values,
     recognized.recognizedKeys,
-    recognized.notes
+    recognizedNotes
   );
   let shouldSaveSnapshot = false;
   let savedSnapshot: Awaited<ReturnType<typeof loadSnapshot>> | null = null;
@@ -8289,7 +8506,7 @@ async function handleTelegramPhoto(
   const detailedPhotoSummary = buildPhotoSaveSummary(
     departmentId,
     reportDate,
-    recognized,
+    { ...recognized, notes: recognizedNotes },
     departmentSource,
     feedbackId,
     shouldSaveSnapshot,
