@@ -1580,6 +1580,7 @@ function buildDepartmentFeedbackSourceMap(feedbackRows: Array<Record<string, unk
     hasTelegramFormFeedback: boolean;
     hasPhotoFeedback: boolean;
     latestFeedbackId: number | null;
+    latestTelegramFormFeedbackId: number | null;
   }>();
 
   feedbackRows.forEach((row) => {
@@ -1591,7 +1592,8 @@ function buildDepartmentFeedbackSourceMap(feedbackRows: Array<Record<string, unk
     const entry = feedbackMap.get(departmentId) || {
       hasTelegramFormFeedback: false,
       hasPhotoFeedback: false,
-      latestFeedbackId: null
+      latestFeedbackId: null,
+      latestTelegramFormFeedbackId: null
     };
     const imageName = typeof row.image_name === "string" ? row.image_name : "";
     if (entry.latestFeedbackId === null && typeof row.id === "number") {
@@ -1600,6 +1602,9 @@ function buildDepartmentFeedbackSourceMap(feedbackRows: Array<Record<string, unk
 
     if (imageName === "telegram-web-app-form") {
       entry.hasTelegramFormFeedback = true;
+      if (entry.latestTelegramFormFeedbackId === null && typeof row.id === "number") {
+        entry.latestTelegramFormFeedbackId = row.id;
+      }
     } else {
       entry.hasPhotoFeedback = true;
     }
@@ -1658,6 +1663,7 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
         photoWorkflowStatus: typeof saved?.photo_workflow_status === "string" ? saved.photo_workflow_status : "idle",
         photoFeedbackId: typeof saved?.photo_feedback_id === "number" ? saved.photo_feedback_id : null,
         latestFeedbackId: typeof feedback?.latestFeedbackId === "number" ? feedback.latestFeedbackId : null,
+        latestTelegramFormFeedbackId: typeof feedback?.latestTelegramFormFeedbackId === "number" ? feedback.latestTelegramFormFeedbackId : null,
         photoFeedbackUpdatedAt: saved?.photo_feedback_updated_at || null,
         photoName: typeof saved?.photo_name === "string" ? saved.photo_name : "",
         hasTelegramFormFeedback: Boolean(feedback?.hasTelegramFormFeedback),
@@ -1690,6 +1696,7 @@ function buildSnapshotFromArchivePayload(snapshot: Record<string, unknown> | nul
         photoWorkflowStatus: typeof saved?.photoWorkflowStatus === "string" ? saved.photoWorkflowStatus : "idle",
         photoFeedbackId: typeof saved?.photoFeedbackId === "number" ? saved.photoFeedbackId : null,
         latestFeedbackId: typeof saved?.latestFeedbackId === "number" ? saved.latestFeedbackId : null,
+        latestTelegramFormFeedbackId: typeof saved?.latestTelegramFormFeedbackId === "number" ? saved.latestTelegramFormFeedbackId : null,
         photoFeedbackUpdatedAt: typeof saved?.photoFeedbackUpdatedAt === "string" ? saved.photoFeedbackUpdatedAt : null,
         photoName: typeof saved?.photoName === "string" ? saved.photoName : "",
         hasTelegramFormFeedback: Boolean(saved?.hasTelegramFormFeedback),

@@ -227,6 +227,22 @@
     };
   }
 
+  function buildInitialTelegramFormReviewState() {
+    return {
+      feedbackId: "",
+      workflowStatus: "idle",
+      imageName: "telegram-web-app-form",
+      recognizedValues: {},
+      notes: [],
+      cellReviews: [],
+      lastReportDate: "",
+      lastAppliedKeys: [],
+      draftMode: false,
+      isError: false,
+      status: ""
+    };
+  }
+
   function buildInitialMainPhotoRouteState() {
     return {
       imageName: "",
@@ -291,6 +307,7 @@
     morningRolloverCompletedKeys: new Set(),
     initialized: false,
     photoImport: buildInitialPhotoImportState(),
+    telegramFormReview: buildInitialTelegramFormReviewState(),
     photoLightbox: buildInitialPhotoLightboxState(),
     mainPhotoSaveDirectoryHandle: null,
     mainPhotoSaveDirectoryName: "",
@@ -705,7 +722,10 @@
   }
 
   function hasPhotoImportDraft() {
-    return mode === "department" && Boolean(state.photoImport && state.photoImport.draftMode);
+    return mode === "department" && Boolean(
+      (state.photoImport && state.photoImport.draftMode)
+      || (state.telegramFormReview && state.telegramFormReview.draftMode)
+    );
   }
 
   function blockPhotoImportDraftAction(message) {
@@ -714,7 +734,7 @@
     }
 
     setInfo(
-      message || "Распознанные значения пока сохранены только локально. Сначала проверьте их и нажмите Сохранить.",
+      message || "Подставленные значения пока сохранены только локально. Сначала проверьте их и нажмите Сохранить.",
       false
     );
     return true;
@@ -3386,6 +3406,78 @@
     return output;
   }
 
+  function applyTelegramFormValuesToDepartmentRow(row, previewValues, recognizedKeys) {
+    if (!row || !previewValues || typeof previewValues !== "object") {
+      return [];
+    }
+
+    const allowedKeys = new Set(
+      Array.isArray(recognizedKeys)
+        ? recognizedKeys.filter((item) => typeof item === "string")
+        : []
+    );
+    const appliedKeys = [];
+
+    getRecognizablePhotoFields(row).forEach((field) => {
+      if (!allowedKeys.has(field.key) || !Object.prototype.hasOwnProperty.call(previewValues, field.key)) {
+        return;
+      }
+
+      const normalized = config.normalizeCellValue(previewValues[field.key]);
+      row.values[field.key] = normalized;
+      if (normalized !== null) {
+        appliedKeys.push(field.key);
+      }
+    });
+
+    return appliedKeys;
+  }
+
+  function buildTelegramFormReviewStateFromRecord(record, row, options = {}) {
+    const next = buildInitialTelegramFormReviewState();
+    const previewValues = buildPhotoPreviewValuesFromRecord(record);
+    const recognizedKeys = Array.isArray(record?.recognizedKeys) && record.recognizedKeys.length
+      ? record.recognizedKeys.map((item) => String(item))
+      : Object.keys(previewValues);
+    const hasValues = recognizedKeys.some((key) => Object.prototype.hasOwnProperty.call(previewValues, key));
+
+    next.feedbackId = String(record?.id || options.feedbackId || "").trim();
+    next.workflowStatus = typeof options.workflowStatus === "string" && options.workflowStatus.trim()
+      ? options.workflowStatus.trim()
+      : "processed";
+    next.imageName = typeof record?.imageName === "string" && record.imageName.trim()
+      ? record.imageName.trim()
+      : "telegram-web-app-form";
+    next.lastReportDate = typeof record?.reportDate === "string" && record.reportDate.trim()
+      ? record.reportDate.trim()
+      : "";
+    next.recognizedValues = previewValues;
+    next.notes = normalizeOcrNotes(record?.notes);
+    next.cellReviews = Array.isArray(record?.cellReviews) ? record.cellReviews : [];
+
+    if (!hasValues) {
+      next.isError = true;
+      next.status = "Telegram форма найдена, но в ней нет значений для показа.";
+      return next;
+    }
+
+    if (Boolean(options.applyToDepartment) && row) {
+      const appliedKeys = applyTelegramFormValuesToDepartmentRow(row, previewValues, recognizedKeys);
+      next.lastAppliedKeys = appliedKeys;
+      next.draftMode = appliedKeys.length > 0;
+      next.workflowStatus = "pending";
+      next.status = appliedKeys.length > 0
+        ? "Открыта отправленная Telegram форма. Значения подставлены в таблицу отделения. Проверьте их и нажмите Сохранить."
+        : "Открыта отправленная Telegram форма. Значения доступны для проверки.";
+      return next;
+    }
+
+    next.lastAppliedKeys = recognizedKeys.filter((key) => Object.prototype.hasOwnProperty.call(previewValues, key));
+    next.draftMode = false;
+    next.status = "Показана последняя отправленная Telegram форма для этого отделения.";
+    return next;
+  }
+
   function calcPresentTotal(snapshot, row) {
     return row.presentKeys.reduce((sum, key) => sum + getNumber(snapshot, row, key), 0);
   }
@@ -4942,30 +5034,20 @@
   }
 
   function renderTelegramFormReviewPanel(row) {
-    const photoState = state.photoImport || buildInitialPhotoImportState();
-    const values = photoState.recognizedValues && typeof photoState.recognizedValues === "object"
-      ? photoState.recognizedValues
+    const reviewState = state.telegramFormReview || buildInitialTelegramFormReviewState();
+    const values = reviewState.recognizedValues && typeof reviewState.recognizedValues === "object"
+      ? reviewState.recognizedValues
       : null;
-    const feedbackId = String(photoState.feedbackId || queryParams.get("tgFeedback") || "").trim();
-    const imageName = String(photoState.imageName || "");
-    const statusTextRaw = String(photoState.status || "");
-    const isTelegramForm = !photoState.imageDataUrl
-      && feedbackId
-      && (
-        queryParams.has("tgFeedback")
-        || imageName === "telegram-web-app-form"
-        || imageName.toLowerCase().includes("telegram")
-        || statusTextRaw.includes("Telegram")
-      );
+    const feedbackId = String(reviewState.feedbackId || "").trim();
 
-    if (!row || !isTelegramForm) {
+    if (!row || !feedbackId) {
       return "";
     }
 
-    const status = photoState.workflowStatus === "processed" ? "processed" : "pending";
-    const statusText = status === "processed"
-      ? "Данные уже сохранены в общую таблицу"
-      : "Ждёт проверки и сохранения";
+    const status = reviewState.draftMode ? "pending" : "processed";
+    const statusText = reviewState.draftMode
+      ? "Значения подставлены в таблицу отделения"
+      : "Последняя Telegram форма показана для сверки";
     const cells = PHOTO_FIELD_DEFINITIONS.map((field) => {
       const displayValue = getTelegramFormReviewValue(values, field.key);
       return `
@@ -4975,23 +5057,23 @@
         </td>
       `;
     }).join("");
-    const note = photoState.isError
-      ? (photoState.status || "Не удалось загрузить значения Telegram формы.")
-      : "Проверьте эту таблицу. Если всё правильно, нажмите Сохранить, чтобы внести данные в общую таблицу.";
+    const note = reviewState.isError
+      ? (reviewState.status || "Не удалось загрузить значения Telegram формы.")
+      : (reviewState.status || "Проверьте эту таблицу. Если всё правильно, нажмите Сохранить, чтобы внести данные в общую таблицу.");
 
     return `
       <section class="panel no-print telegram-form-review-panel telegram-form-review-panel--${status}">
         <div class="telegram-form-review-head">
           <div>
             <h2>Данные из Telegram формы</h2>
-            <p class="hint${photoState.isError ? " warning-note" : ""}">${escapeHtml(note)}</p>
+            <p class="hint${reviewState.isError ? " warning-note" : ""}">${escapeHtml(note)}</p>
           </div>
           <span class="status-chip status-chip--${status === "processed" ? "fresh" : "stale"}">${escapeHtml(statusText)}</span>
         </div>
         <div class="telegram-form-review-meta">
           <span>Feedback: ${escapeHtml(feedbackId)}</span>
           <span>Отделение: ${escapeHtml(row.department)}</span>
-          ${photoState.lastReportDate ? `<span>Дата: ${escapeHtml(photoState.lastReportDate)}</span>` : ""}
+          ${reviewState.lastReportDate ? `<span>Дата: ${escapeHtml(reviewState.lastReportDate)}</span>` : ""}
         </div>
         <div class="telegram-form-review-table-wrap">
           <table class="telegram-form-review-table">
@@ -7071,84 +7153,59 @@
       return;
     }
 
-    const feedbackId = queryParams.get("tgFeedback") || "";
-    if (!feedbackId || !sync.hasRemoteSync() || typeof sync.loadTelegramPhotoFeedback !== "function") {
+    const row = getCurrentRow();
+    const feedbackQueryId = queryParams.get("tgFeedback") || "";
+    const fallbackTelegramFormId = row && row.latestTelegramFormFeedbackId
+      ? String(row.latestTelegramFormFeedbackId)
+      : "";
+    const candidateIds = [];
+
+    if (feedbackQueryId) {
+      candidateIds.push(feedbackQueryId);
+    }
+    if (fallbackTelegramFormId && !candidateIds.includes(fallbackTelegramFormId)) {
+      candidateIds.push(fallbackTelegramFormId);
+    }
+
+    if (!candidateIds.length || !sync.hasRemoteSync() || typeof sync.loadTelegramPhotoFeedback !== "function") {
       return;
     }
 
-    try {
-      const record = await sync.loadTelegramPhotoFeedback(feedbackId, departmentId);
-      if (!record) {
-        state.photoImport = buildInitialPhotoImportState();
-        state.photoImport.feedbackId = String(feedbackId);
-        state.photoImport.workflowStatus = "pending";
-        state.photoImport.imageName = "telegram-web-app-form";
-        state.photoImport.status = "Не удалось загрузить данные Telegram формы по этому feedback. Возможно, запись уже удалена или номер не найден.";
-        state.photoImport.isError = true;
-        renderPage();
-        return;
-      }
-
-      const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
-      if (imageDataUrl.startsWith("data:image/")) {
-        return;
-      }
-
-      const previewValues = buildPhotoPreviewValuesFromRecord(record);
-      const recognizedKeys = Array.isArray(record.recognizedKeys) && record.recognizedKeys.length
-        ? record.recognizedKeys.map((item) => String(item))
-        : Object.keys(previewValues);
-      const hasValues = recognizedKeys.some((key) => Object.prototype.hasOwnProperty.call(previewValues, key));
-      if (!hasValues) {
-        state.photoImport = buildInitialPhotoImportState();
-        state.photoImport.feedbackId = String(record.id || feedbackId);
-        state.photoImport.workflowStatus = "pending";
-        state.photoImport.imageName = "telegram-web-app-form";
-        state.photoImport.status = "Telegram форма найдена, но в ней нет значений для показа.";
-        state.photoImport.isError = true;
-        renderPage();
-        return;
-      }
-
-      state.photoImport = buildInitialPhotoImportState();
-      const appliedCount = applyRecognizedDepartmentValues({
-        values: previewValues,
-        recognizedKeys,
-        reportDate: typeof record.reportDate === "string" ? record.reportDate : "",
-        notes: Array.isArray(record.notes) ? record.notes : [],
-        cellReviews: Array.isArray(record.cellReviews) ? record.cellReviews : [],
-        structure: {
-          all22CellsVisible: true,
-          gridCellCount: 22,
-          missingCells: []
+    for (const candidateId of candidateIds) {
+      try {
+        const record = await sync.loadTelegramPhotoFeedback(candidateId, departmentId);
+        if (!record) {
+          continue;
         }
-      });
-      const hasAppliedValues = appliedCount > 0;
 
-      const row = getCurrentRow();
-      state.photoImport.feedbackId = String(record.id || feedbackId);
-      state.photoImport.workflowStatus = row && typeof row.photoWorkflowStatus === "string"
-        ? row.photoWorkflowStatus
-        : "pending";
-      state.photoImport.imageName = typeof record.imageName === "string" && record.imageName.trim()
-        ? record.imageName
-        : "Telegram Web App form";
-      state.photoImport.imageDataUrl = "";
-      state.photoImport.draftMode = hasAppliedValues;
-      state.photoImport.status = "Открыта отправленная Telegram форма. Проверьте значения и нажмите Сохранить, чтобы внести их в общую таблицу.";
-      state.photoImport.isError = false;
-      setInfo("Отправленная Telegram форма подставлена в таблицу отделения. После проверки нажмите Сохранить.", false);
-      renderPage();
-    } catch (error) {
-      state.photoImport = buildInitialPhotoImportState();
-      state.photoImport.feedbackId = String(feedbackId);
-      state.photoImport.workflowStatus = "pending";
-      state.photoImport.imageName = "telegram-web-app-form";
-      state.photoImport.status = error instanceof Error
-        ? `Не удалось загрузить данные Telegram формы: ${error.message}`
-        : "Не удалось загрузить данные Telegram формы.";
-      state.photoImport.isError = true;
-      renderPage();
+        const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
+        if (imageDataUrl.startsWith("data:image/")) {
+          continue;
+        }
+
+        const applyToDepartment = Boolean(feedbackQueryId) && String(candidateId) === feedbackQueryId;
+        state.telegramFormReview = buildTelegramFormReviewStateFromRecord(record, row, {
+          applyToDepartment,
+          feedbackId: candidateId
+        });
+        if (applyToDepartment && state.telegramFormReview.draftMode) {
+          setInfo("Отправленная Telegram форма подставлена в таблицу отделения. После проверки нажмите Сохранить.", false);
+        }
+        renderPage();
+        return;
+      } catch (error) {
+        if (String(candidateId) === feedbackQueryId) {
+          state.telegramFormReview = buildInitialTelegramFormReviewState();
+          state.telegramFormReview.feedbackId = String(candidateId);
+          state.telegramFormReview.workflowStatus = "pending";
+          state.telegramFormReview.status = error instanceof Error
+            ? `Не удалось загрузить данные Telegram формы: ${error.message}`
+            : "Не удалось загрузить данные Telegram формы.";
+          state.telegramFormReview.isError = true;
+          renderPage();
+          return;
+        }
+      }
     }
   }
 
@@ -7158,7 +7215,7 @@
     }
 
     const feedbackQueryId = queryParams.get("tgFeedback") || "";
-    if (feedbackQueryId && !forceReplace) {
+    if (feedbackQueryId && !forceReplace && state.photoImport && state.photoImport.imageDataUrl) {
       return;
     }
 
@@ -7627,6 +7684,12 @@
                 state.photoImport.isError = false;
               }
             }
+            if (state.telegramFormReview && state.telegramFormReview.feedbackId && state.telegramFormReview.draftMode) {
+              state.telegramFormReview.draftMode = false;
+              state.telegramFormReview.workflowStatus = "processed";
+              state.telegramFormReview.status = "Telegram форма проверена и сохранена в общую таблицу.";
+              state.telegramFormReview.isError = false;
+            }
 
             if (ocrFeedback && typeof sync.saveOcrFeedback === "function") {
               try {
@@ -7752,6 +7815,7 @@
     const result = await sync.loadSnapshot();
     applyLoadedSnapshot(result);
     state.photoImport = buildInitialPhotoImportState();
+    state.telegramFormReview = buildInitialTelegramFormReviewState();
     if (mode === "feedback") {
       await loadFeedbackRecords(false);
       renderPage();
@@ -7763,6 +7827,10 @@
       setInfo("Данные обновлены.", false);
     }
     renderPage();
+    if (mode === "department") {
+      await maybeLoadTelegramFeedbackValues();
+      await maybeLoadStoredDepartmentPhotoAdjusted();
+    }
   }
 
   function handleResetDepartment() {
@@ -8262,6 +8330,7 @@
         restorePendingMainSaveNotice();
         refreshTableData();
         if (mode === "department") {
+          await maybeLoadTelegramFeedbackValues();
           await maybeLoadStoredDepartmentPhotoAdjusted();
           await maybeAutoRecognizeLoadedTelegramPhoto();
         }
