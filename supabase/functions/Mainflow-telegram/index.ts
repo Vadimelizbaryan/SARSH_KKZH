@@ -1184,6 +1184,16 @@ function getTelegramWebFormUrl(
     params.set("c1", String(carryoverValues.beenTotal ?? 0));
     params.set("c2", String(carryoverValues.beenSoldier ?? 0));
     params.set("c3", String(carryoverValues.beenSeries ?? 0));
+    params.set("c13", String(carryoverValues.currentShar ?? 0));
+    params.set("c14", String(carryoverValues.currentSpa ?? 0));
+    params.set("c15", String(carryoverValues.currentPaym ?? 0));
+    params.set("c16", String(carryoverValues.currentZh ?? 0));
+    params.set("c17", String(carryoverValues.family ?? 0));
+    params.set("c18", String(carryoverValues.officer ?? 0));
+    params.set("c19", String(carryoverValues.civil ?? 0));
+    params.set("c20", String(carryoverValues.leaveSharq ?? 0));
+    params.set("c21", String(carryoverValues.leaveSpa ?? 0));
+    params.set("c22", String(carryoverValues.leavePaym ?? 0));
   }
   return `${getPublicSiteBaseUrl()}/tg-form.html?${params.toString()}`;
 }
@@ -4992,13 +5002,30 @@ function getTelegramWebFormCarryoverValues(values: Record<string, number | null>
   const currentShar = getSheetNumber(values, "currentShar");
   const currentSpa = getSheetNumber(values, "currentSpa");
   const currentPaym = getSheetNumber(values, "currentPaym");
+  const currentZh = getSheetNumber(values, "currentZh");
+  const family = getSheetNumber(values, "family");
+  const officer = getSheetNumber(values, "officer");
+  const civil = getSheetNumber(values, "civil");
+  const leaveSharq = getSheetNumber(values, "leaveSharq");
+  const leaveSpa = getSheetNumber(values, "leaveSpa");
+  const leavePaym = getSheetNumber(values, "leavePaym");
   const presentTotal = DEPARTMENT_SHEET_PRESENT_SUM_KEYS
     .reduce((sum, key) => sum + getSheetNumber(values, key), 0);
 
   return {
     beenTotal: presentTotal,
-    beenSoldier: currentShar + currentSpa + currentPaym,
-    beenSeries: currentShar
+    beenSoldier: currentShar + currentSpa + currentPaym + leaveSharq + leaveSpa + leavePaym,
+    beenSeries: currentShar + leaveSharq,
+    currentShar,
+    currentSpa,
+    currentPaym,
+    currentZh,
+    family,
+    officer,
+    civil,
+    leaveSharq,
+    leaveSpa,
+    leavePaym
   };
 }
 

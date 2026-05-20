@@ -33,6 +33,21 @@
     .filter((field) => field.key !== "presentTotal")
     .map((field) => field.key);
   const readOnlyKeys = new Set(["beenTotal", "beenSoldier", "beenSeries"]);
+  const carryoverQueryParamByKey = {
+    beenTotal: "c1",
+    beenSoldier: "c2",
+    beenSeries: "c3",
+    currentShar: "c13",
+    currentSpa: "c14",
+    currentPaym: "c15",
+    currentZh: "c16",
+    family: "c17",
+    officer: "c18",
+    civil: "c19",
+    leaveSharq: "c20",
+    leaveSpa: "c21",
+    leavePaym: "c22"
+  };
 
   const presentKeys = [
     "currentShar",
@@ -90,16 +105,13 @@
 
   function getCarryoverValue(key) {
     const query = getQuery();
-    const paramByKey = {
-      beenTotal: "c1",
-      beenSoldier: "c2",
-      beenSeries: "c3"
-    };
-    return toNumber(query.get(paramByKey[key] || ""));
+    return toNumber(query.get(carryoverQueryParamByKey[key] || ""));
   }
 
   function getInitialValue(key) {
-    return readOnlyKeys.has(key) ? getCarryoverValue(key) : 0;
+    return Object.prototype.hasOwnProperty.call(carryoverQueryParamByKey, key)
+      ? getCarryoverValue(key)
+      : 0;
   }
 
   function toNumber(value) {
@@ -447,6 +459,11 @@
         </form>
       </section>
     `;
+
+    const initialMessage = root.querySelector("[data-message]");
+    if (initialMessage && getInitData()) {
+      initialMessage.textContent = "Ячейки 1-3 заполнены из основной таблицы и закрыты. Ячейки 13-22 подставлены текущими значениями из основной таблицы, при необходимости их можно исправить.";
+    }
 
     root.querySelectorAll(".tg-form-input").forEach((input) => {
       input.addEventListener("input", () => {
