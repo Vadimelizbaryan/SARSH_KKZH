@@ -275,26 +275,92 @@
     return presentKeys.reduce((sum, key) => sum + toNumber(values[key]), 0);
   }
 
-  function updateControl() {
-    const values = readValues();
+  function shouldCheckExtraControls(values) {
+    return toNumber(values.transferFromDepartment) === 0 && toNumber(values.transferToDepartment) === 0;
+  }
+
+  function getValidationChecks(values) {
+    const checks = [];
     const actual = getActual(values);
     const expected = getExpected(values);
-    const isValid = actual === expected;
+    checks.push({
+      id: "present-balance",
+      name: "Контроль 13-22",
+      ruleText: "13-22 = (1 + 4 + 11) - (7 + 10)",
+      actual,
+      expected,
+      isValid: actual === expected
+    });
+
+    if (shouldCheckExtraControls(values)) {
+      const soldierActual = (values.beenSeries + values.admittedSeries) - values.dgSeries;
+      const soldierExpected = values.currentShar + values.leaveSharq;
+      checks.push({
+        id: "soldier-count",
+        name: "Количество срочников",
+        ruleText: "(3 + 6) - 9 = 13 + 20",
+        actual: soldierActual,
+        expected: soldierExpected,
+        isValid: soldierActual === soldierExpected
+      });
+
+      const militaryActual = (values.beenSoldier + values.admittedSoldier) - values.dgSoldier;
+      const militaryExpected = values.currentShar
+        + values.currentSpa
+        + values.currentPaym
+        + values.leaveSharq
+        + values.leaveSpa
+        + values.leavePaym;
+      checks.push({
+        id: "military-count",
+        name: "Количество военнослужащих",
+        ruleText: "(2 + 5) - 8 = 13 + 14 + 15 + 20 + 21 + 22",
+        actual: militaryActual,
+        expected: militaryExpected,
+        isValid: militaryActual === militaryExpected
+      });
+    }
+
+    return checks;
+  }
+
+  function getValidationResult(values) {
+    const checks = getValidationChecks(values);
+    return {
+      checks,
+      isValid: checks.every((check) => check.isValid)
+    };
+  }
+
+  function formatValidationLine(check) {
+    return check.isValid
+      ? `- ${check.name}: ${check.actual} = ${check.expected} (${check.ruleText})`
+      : `- ${check.name}: ${check.actual}, должно быть ${check.expected} (${check.ruleText})`;
+  }
+
+  function updateControl() {
+    const values = readValues();
+    const validation = getValidationResult(values);
+    const primaryCheck = validation.checks[0];
     const control = root.querySelector("[data-control-total]");
     const status = root.querySelector("[data-status]");
     const submit = root.querySelector("[data-submit]");
 
-    if (control) {
-      control.textContent = String(expected);
+    if (control && primaryCheck) {
+      control.textContent = String(primaryCheck.expected);
     }
     if (status) {
-      status.classList.toggle("bad", !isValid);
-      status.innerHTML = isValid
-        ? `Контроль пройден: сумма 13-22 = ${actual}.`
-        : `Контроль не пройден: сумма 13-22 = ${actual}, должно быть ${expected}.`;
+      status.classList.toggle("bad", !validation.isValid);
+      status.innerHTML = [
+        `<div>${validation.isValid ? "Контрольные суммы совпали." : "Контрольные суммы не совпали."}</div>`,
+        ...validation.checks.map((check) => `<div>${escapeHtml(formatValidationLine(check))}</div>`),
+        !shouldCheckExtraControls(values)
+          ? `<div>${escapeHtml("Проверки «Количество срочников» и «Количество военнослужащих» включаются, когда в ячейках 10 и 11 стоит 0.")}</div>`
+          : ""
+      ].filter(Boolean).join("");
     }
     if (submit) {
-      submit.disabled = !isValid || !getInitData();
+      submit.disabled = !validation.isValid || !getInitData();
     }
   }
 
@@ -317,9 +383,8 @@
     }
 
     const values = readValues();
-    const actual = getActual(values);
-    const expected = getExpected(values);
-    if (actual !== expected) {
+    const validation = getValidationResult(values);
+    if (!validation.isValid) {
       updateControl();
       return;
     }
@@ -453,7 +518,7 @@
           <div class="tg-form-actions">
             <button class="tg-form-submit" data-submit type="submit">Отправить на проверку</button>
             <div class="tg-form-message${getInitData() ? "" : " error"}" data-message>
-              ${getInitData() ? "Ячейки 1-3 заполнены из основной таблицы и закрыты. Остальные пустые значения оставьте 0." : "Откройте форму через кнопку бота в Telegram."}
+              ${getInitData() ? "Ячейки 1-3 заполнены из основной таблицы и закрыты. Форма проверяет 3 контрольные суммы, а дополнительные 2 проверки включаются, когда в ячейках 10 и 11 стоит 0." : "Откройте форму через кнопку бота в Telegram."}
             </div>
           </div>
         </form>
@@ -462,7 +527,7 @@
 
     const initialMessage = root.querySelector("[data-message]");
     if (initialMessage && getInitData()) {
-      initialMessage.textContent = "Ячейки 1-3 заполнены из основной таблицы и закрыты. Ячейки 13-22 подставлены текущими значениями из основной таблицы, при необходимости их можно исправить.";
+      initialMessage.textContent = "Ячейки 1-3 заполнены из основной таблицы и закрыты. Ячейки 13-22 подставлены текущими значениями из основной таблицы, при необходимости их можно исправить. Форма проверяет 3 контрольные суммы, а проверки по срочникам и военнослужащим включаются, когда в ячейках 10 и 11 стоит 0.";
     }
 
     root.querySelectorAll(".tg-form-input").forEach((input) => {

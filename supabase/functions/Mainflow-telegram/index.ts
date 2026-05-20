@@ -5047,10 +5047,28 @@ function applyTelegramWebFormCarryoverValues(
   return values;
 }
 
+type DepartmentValidationCheck = {
+  id: string;
+  name: string;
+  ruleText: string;
+  isValid: boolean;
+  actual: number;
+  expected: number;
+  difference: number;
+};
+
+type DepartmentValidationResult = {
+  isValid: boolean;
+  actual: number;
+  expected: number;
+  checks: DepartmentValidationCheck[];
+  failedChecks: DepartmentValidationCheck[];
+};
+
 function validateDepartmentSheetValues(values: Record<string, number | null>) {
-  const actual = DEPARTMENT_SHEET_PRESENT_SUM_KEYS
+  const presentActual = DEPARTMENT_SHEET_PRESENT_SUM_KEYS
     .reduce((sum, key) => sum + getSheetNumber(values, key), 0);
-  const expected = (
+  const presentExpected = (
     getSheetNumber(values, "beenTotal")
     + getSheetNumber(values, "admittedTotal")
     + getSheetNumber(values, "transferToDepartment")
@@ -5058,12 +5076,93 @@ function validateDepartmentSheetValues(values: Record<string, number | null>) {
     getSheetNumber(values, "dgTotal")
     + getSheetNumber(values, "transferFromDepartment")
   );
+  const checks: DepartmentValidationCheck[] = [
+    {
+      id: "present-balance",
+      name: "Контроль 13-22",
+      ruleText: "13-22 = (1 + 4 + 11) - (7 + 10)",
+      isValid: presentActual === presentExpected,
+      actual: presentActual,
+      expected: presentExpected,
+      difference: presentActual - presentExpected
+    }
+  ];
 
+  const transferFromDepartment = getSheetNumber(values, "transferFromDepartment");
+  const transferToDepartment = getSheetNumber(values, "transferToDepartment");
+  if (transferFromDepartment === 0 && transferToDepartment === 0) {
+    const soldierActual = (
+      getSheetNumber(values, "beenSeries")
+      + getSheetNumber(values, "admittedSeries")
+    ) - getSheetNumber(values, "dgSeries");
+    const soldierExpected = (
+      getSheetNumber(values, "currentShar")
+      + getSheetNumber(values, "leaveSharq")
+    );
+    checks.push({
+      id: "soldier-count",
+      name: "Количество срочников",
+      ruleText: "(3 + 6) - 9 = 13 + 20",
+      isValid: soldierActual === soldierExpected,
+      actual: soldierActual,
+      expected: soldierExpected,
+      difference: soldierActual - soldierExpected
+    });
+
+    const militaryActual = (
+      getSheetNumber(values, "beenSoldier")
+      + getSheetNumber(values, "admittedSoldier")
+    ) - getSheetNumber(values, "dgSoldier");
+    const militaryExpected = (
+      getSheetNumber(values, "currentShar")
+      + getSheetNumber(values, "currentSpa")
+      + getSheetNumber(values, "currentPaym")
+      + getSheetNumber(values, "leaveSharq")
+      + getSheetNumber(values, "leaveSpa")
+      + getSheetNumber(values, "leavePaym")
+    );
+    checks.push({
+      id: "military-count",
+      name: "Количество военнослужащих",
+      ruleText: "(2 + 5) - 8 = 13 + 14 + 15 + 20 + 21 + 22",
+      isValid: militaryActual === militaryExpected,
+      actual: militaryActual,
+      expected: militaryExpected,
+      difference: militaryActual - militaryExpected
+    });
+  }
+
+  const failedChecks = checks.filter((check) => !check.isValid);
+  const primaryCheck = checks[0];
   return {
-    isValid: actual === expected,
-    actual,
-    expected
+    isValid: failedChecks.length === 0,
+    actual: primaryCheck ? primaryCheck.actual : 0,
+    expected: primaryCheck ? primaryCheck.expected : 0,
+    checks,
+    failedChecks
   };
+}
+
+function formatDepartmentValidationLinesRu(validation: DepartmentValidationResult | null | undefined) {
+  if (!validation || !Array.isArray(validation.checks) || !validation.checks.length) {
+    return [];
+  }
+  return validation.checks.map((check) => (
+    check.isValid
+      ? `- ${check.name}: ${check.actual} = ${check.expected} (${check.ruleText})`
+      : `- ${check.name}: ${check.actual}, должно быть ${check.expected} (${check.ruleText})`
+  ));
+}
+
+function formatDepartmentValidationLinesHy(validation: DepartmentValidationResult | null | undefined) {
+  if (!validation || !Array.isArray(validation.checks) || !validation.checks.length) {
+    return [];
+  }
+  return validation.checks.map((check) => (
+    check.isValid
+      ? `- ${check.name}: ${check.actual} = ${check.expected} (${check.ruleText})`
+      : `- ${check.name}: ${check.actual}, պետք է լինի ${check.expected} (${check.ruleText})`
+  ));
 }
 
 async function parseReturnedDepartmentSheet(bytes: Uint8Array, fileName: string) {
@@ -6272,6 +6371,7 @@ async function handleTelegramWebFormSubmit(request: Request) {
     );
     const patientNotes = sanitizeDepartmentPatientNotes(payload?.patientNotes);
     const validation = validateDepartmentSheetValues(values);
+    const validationLinesHy = formatDepartmentValidationLinesHy(validation);
     if (!validation.isValid) {
       return jsonResponse({
         ok: false,
@@ -6317,14 +6417,14 @@ async function handleTelegramWebFormSubmit(request: Request) {
       ? [
         "Ձևը և լուսանկարը ստացվել են։ Շնորհակալություն, գերազանց աշխատանք է։ 🙂",
         `Բաժանմունք: ${meta.department} (${meta.marker})`,
-        `13-22 գումարը = ${validation.actual}.`,
+        ...(validationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...validationLinesHy] : []),
         "Տվյալները ավտոմատ գրանցվել են ընդհանուր աղյուսակում։",
         "Կցում եմ PDF բլանկը՝ Telegram ձևից ստացված նոր արժեքներով։"
       ].join("\n")
       : [
         "Ձևը ստացվել և ստուգվել է։ Շնորհակալություն։ 🙂",
         `Բաժանմունք: ${meta.department} (${meta.marker})`,
-        `13-22 գումարը = ${validation.actual}.`,
+        ...(validationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...validationLinesHy] : []),
         "Ընդհանուր աղյուսակը դեռ չի թարմացվել․ ավտոմատ գրանցման համար պետք է նաև նույն բաժանմունքի բլանկի լուսանկարը։",
         "Կցում եմ PDF բլանկը՝ Telegram ձևից ստացված արժեքներով։"
       ].join("\n");
@@ -6819,7 +6919,7 @@ function buildPhotoSaveSummary(
   departmentSource: string,
   feedbackId: string,
   didSaveSnapshot: boolean,
-  validation?: { isValid: boolean; actual: number; expected: number } | null,
+  validation?: DepartmentValidationResult | null,
   savedFromWebApp = false
 ) {
   const meta = DEPARTMENTS[departmentId];
@@ -6830,6 +6930,7 @@ function buildPhotoSaveSummary(
     })
     .filter(Boolean)
     .join(", ");
+  const validationLinesRu = formatDepartmentValidationLinesRu(validation);
 
   return [
     didSaveSnapshot
@@ -6846,25 +6947,25 @@ function buildPhotoSaveSummary(
     recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22)
       ? `Структура строки не подтверждена: ${recognized.structure.gridCellCount}/22 ячеек.`
       : (cellSummaries ? `Распознано: ${cellSummaries}` : "Распознанных ячеек не найдено."),
-    validation
-      ? (validation.isValid
-        ? `Контроль формулы: пройден, сумма 13-22 = ${validation.actual}.`
-        : `Контроль формулы: не пройден, сумма 13-22 = ${validation.actual}, должно быть ${validation.expected}.`)
-      : "",
+    ...(validationLinesRu.length ? ["Контрольные суммы:", ...validationLinesRu] : []),
     recognized.notes.length ? `Заметки OCR: ${recognized.notes.join("; ")}` : ""
   ].filter(Boolean).join("\n");
 }
 
 function buildPhotoSenderResponse(
   isControlPassed: boolean,
-  validation: { isValid: boolean; actual: number; expected: number } | null,
+  validation: DepartmentValidationResult | null,
   structureInvalid: boolean,
   hasRecognizedValues: boolean,
   firstName = ""
 ) {
+  const validationLinesHy = formatDepartmentValidationLinesHy(validation);
   if (isControlPassed) {
     const address = firstName ? `${firstName}, ` : "";
-    return `${address}շնորհակալություն, բաժանմունքի վերահսկումը անցավ։ Գերազանց աշխատանք է։ 🙂`;
+    return [
+      `${address}շնորհակալություն, բաժանմունքի վերահսկումը անցավ։ Գերազանց աշխատանք է։ 🙂`,
+      ...(validationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...validationLinesHy] : [])
+    ].join("\n");
   }
 
   const reason = !hasRecognizedValues
@@ -6873,7 +6974,10 @@ function buildPhotoSenderResponse(
       ? "բլանկի վերին տողը վստահ չի ճանաչվել"
       : (validation && !validation.isValid ? "բաժանմունքի բանաձևը չի համընկել" : "վերահսկումը չի անցել"));
 
-  return buildPhotoRetakeResponse(reason, firstName);
+  return [
+    buildPhotoRetakeResponse(reason, firstName),
+    ...(validationLinesHy.length ? ["", "Վերահսկիչ գումարներ:", ...validationLinesHy] : [])
+  ].join("\n");
 }
 
 function buildPhotoRetakeResponse(reason: string, firstName = "") {
@@ -8143,6 +8247,7 @@ async function handleTelegramPhoto(
     return VALUE_KEYS.includes(key as (typeof VALUE_KEYS)[number]);
   });
   const photoValidation = hasRecognizedValues ? validateDepartmentSheetValues(recognized.values) : null;
+  const photoValidationLinesHy = formatDepartmentValidationLinesHy(photoValidation);
   const isPhotoControlPassed = !structureInvalid && hasRecognizedValues && !!photoValidation?.isValid;
   const telegramWebFormFeedback = await loadLatestTelegramWebFormFeedback(supabase, departmentId, reportDate);
   const feedbackId = await insertAcceptedFeedback(
@@ -8200,7 +8305,8 @@ async function handleTelegramPhoto(
       chatId,
       [
         `${senderFirstName}, լուսանկարը և Telegram ձևը ստացվել են։ Շնորհակալություն, շատ լավ աշխատանք է։ 🙂`,
-        "Տվյալները վերցրել եմ Telegram ձևից և ավտոմատ գրանցել հիմնական աղյուսակում։"
+        "Տվյալները վերցրել եմ Telegram ձևից և ավտոմատ գրանցել հիմնական աղյուսակում։",
+        ...(photoValidationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...photoValidationLinesHy] : [])
       ].join("\n")
     );
   } else {
@@ -8245,8 +8351,7 @@ async function handleTelegramSheetDocument(
   }
 
   if (!result.validation.isValid) {
-    const difference = result.validation.actual - result.validation.expected;
-    const differenceText = difference > 0 ? `+${difference}` : String(difference);
+    const validationLinesHy = formatDepartmentValidationLinesHy(result.validation);
     await sendTelegramDocument(
       chatId,
       fileName,
@@ -8256,23 +8361,22 @@ async function handleTelegramSheetDocument(
         "Ֆայլը վերադարձնում եմ. պետք է մի փոքր ուղղել տվյալները եւ կրկին ուղարկել։",
         "",
         `Բաժանմունք: ${meta.department} (${meta.marker})`,
-        `Հիմա 13-22 գումարը՝ ${result.validation.actual}`,
-        `Բանաձևով պետք է լինի՝ ${result.validation.expected}`,
-        `Տարբերությունը՝ ${differenceText}`,
+        ...(validationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...validationLinesHy] : []),
         "",
-        "Խնդրում եմ ստուգել մուտքագրման բջիջները, հատկապես 13-22 բլոկը, ինչպես նաեւ 1, 4, 7, 10, 11։"
+        "Խնդրում եմ ստուգել մուտքագրման բջիջները եւ վերահսկիչ գումարների հետ կապված թվերը։"
       ].join("\n")
     );
     return;
   }
 
+  const validationLinesHy = formatDepartmentValidationLinesHy(result.validation);
   await sendTelegramMessage(
     chatId,
     [
       "Շնորհակալություն։ Գերազանց աշխատանք է։ 🙂",
       "Ֆայլը ստուգված է. բանաձևը համընկավ։",
       `Բաժանմունք: ${meta.department} (${meta.marker})`,
-      `13-22 գումարը = ${result.validation.actual}.`,
+      ...(validationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...validationLinesHy] : []),
       "Տվյալները ընդունված են ստուգման։ Ընդհանուր աղյուսակում դեռ ավտոմատ չեն գրանցվել։"
     ].join("\n")
   );
