@@ -1471,6 +1471,120 @@ function buildDepartmentDetectionSchema() {
   };
 }
 
+function buildPhotoOrientationAdviceSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      rotationDegrees: {
+        type: "integer",
+        enum: [0, 90, 180, 270]
+      },
+      confidence: {
+        type: "string",
+        enum: ["low", "medium", "high"]
+      },
+      notes: {
+        type: "array",
+        items: { type: "string" }
+      }
+    },
+    required: ["rotationDegrees", "confidence", "notes"]
+  };
+}
+
+function sanitizePhotoOrientationAdvice(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return {
+      rotationDegrees: 0,
+      confidence: "low" as "low" | "medium" | "high",
+      notes: [] as string[]
+    };
+  }
+
+  const payload = value as Record<string, unknown>;
+  const rawRotation = Number(payload.rotationDegrees);
+  const rotationDegrees = [0, 90, 180, 270].includes(rawRotation)
+    ? rawRotation
+    : 0;
+  const confidence = payload.confidence === "high" || payload.confidence === "medium" || payload.confidence === "low"
+    ? payload.confidence
+    : "low";
+  const notes = Array.isArray(payload.notes)
+    ? payload.notes
+      .filter((item) => typeof item === "string" && item.trim())
+      .map((item) => String(item).trim())
+    : [];
+
+  return {
+    rotationDegrees,
+    confidence,
+    notes
+  };
+}
+
+async function detectTelegramPhotoOrientationAdvice(imageDataUrl: string) {
+  const prompt = [
+    "You determine the correct upright orientation of an Armenian hospital department form photo.",
+    "You will receive two images in order: first a blank template reference of the same form, then the filled form photo.",
+    "Use only the printed page structure to judge orientation: the top header, the SR marker area, the top numeric table, the lower descriptive section, and the overall blank layout.",
+    "Return rotationDegrees as how much the original filled photo should be rotated clockwise to become upright.",
+    "Allowed values are exactly 0, 90, 180, or 270.",
+    "If the current image is already upright, return 0.",
+    "Set confidence to high only when the orientation is obvious from the template cues."
+  ].join("\n");
+
+  const parsed = await requestOpenAiStructuredVision(
+    prompt,
+    imageDataUrl,
+    "telegram_department_photo_orientation_advice",
+    buildPhotoOrientationAdviceSchema(),
+    [getOcrTemplateBlankImageUrl()]
+  );
+
+  return sanitizePhotoOrientationAdvice(parsed);
+}
+
+function shouldSendTelegramPhotoOrientationAdvice(chatId: number | string, hintText: string) {
+  if (isTelegramAdminChat(chatId)) {
+    return true;
+  }
+
+  const normalizedHint = String(hintText || "").trim().toLowerCase();
+  return normalizedHint.includes("#orientation-test") || normalizedHint.includes("#ocr-test");
+}
+
+async function sendTelegramPhotoOrientationAdvice(
+  chatId: number | string,
+  imageDataUrl: string,
+  options: {
+    departmentId?: DepartmentId | null;
+    reportDate?: string | null;
+  } = {}
+) {
+  const advice = await detectTelegramPhotoOrientationAdvice(imageDataUrl);
+  const departmentMeta = options.departmentId ? DEPARTMENTS[options.departmentId] : null;
+  const confidenceLabel = advice.confidence === "high"
+    ? "высокая"
+    : (advice.confidence === "medium" ? "средняя" : "низкая");
+  const rotationLabel = advice.rotationDegrees === 0
+    ? "0° (фото уже выглядит правильно)"
+    : `${advice.rotationDegrees}° по часовой стрелке`;
+
+  await sendTelegramMessage(
+    chatId,
+    [
+      "Тест ориентации фото",
+      "Это только подсказка. OCR и сохранённые данные сейчас не менялись.",
+      departmentMeta ? `Отделение: ${departmentMeta.department} (${departmentMeta.marker})` : "",
+      options.reportDate ? `Дата отчёта: ${options.reportDate}` : "",
+      `Рекомендуемый поворот: ${rotationLabel}`,
+      `Уверенность: ${confidenceLabel}`,
+      ...(advice.notes.length ? ["Заметки:", ...advice.notes] : [])
+    ].filter(Boolean).join("\n")
+  );
+}
+
 async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl: string) {
   const departmentMeta = DEPARTMENTS[departmentId];
   const fieldInstructions = PHOTO_FIELD_MAPPINGS
@@ -8200,6 +8314,7 @@ async function handleTelegramPhoto(
   const hintedReportDate = detectReportDateFromHint(hintText);
   const senderPerson = getTelegramPersonFromMessage(message, chatId);
   const senderFirstName = getTelegramColleagueFirstName(senderPerson);
+  const shouldSendOrientationAdvice = shouldSendTelegramPhotoOrientationAdvice(chatId, hintText);
 
   if (!options.approved && !isTelegramAdminChat(chatId)) {
     await requestTelegramPhotoApproval(supabase, chatId, message, fileId, hintText, senderPerson);
@@ -8249,6 +8364,14 @@ async function handleTelegramPhoto(
         chatId,
         buildPhotoRetakeResponse("լուսանկարով բաժանմունքը վստահ որոշել չհաջողվեց", senderFirstName)
       );
+      if (shouldSendOrientationAdvice) {
+        runTelegramBackgroundTask(
+          sendTelegramPhotoOrientationAdvice(chatId, dataUrl, {
+            reportDate: hintedReportDate || getYerevanReportDateText()
+          }),
+          "Telegram photo orientation advice"
+        );
+      }
       return;
     }
   }
@@ -8330,6 +8453,13 @@ async function handleTelegramPhoto(
       departmentId,
       reportDate,
       buildPhotoSenderResponse(isPhotoControlPassed, photoValidation, structureInvalid, hasRecognizedValues, senderFirstName)
+    );
+  }
+
+  if (shouldSendOrientationAdvice) {
+    runTelegramBackgroundTask(
+      sendTelegramPhotoOrientationAdvice(chatId, dataUrl, { departmentId, reportDate }),
+      "Telegram photo orientation advice"
     );
   }
 }
