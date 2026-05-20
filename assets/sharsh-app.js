@@ -4012,6 +4012,8 @@
     const feedbackPath = openFeedbackId
       ? appendQueryParams(config.getDepartmentPagePath(basePath, definition.id), { tgFeedback: openFeedbackId })
       : "";
+    const openPath = feedbackPath || relativePath;
+    const openLabel = feedbackPath ? "Открыть отправленное" : "Открыть отделение";
     return `
       <div class="link-card" data-department-open-card="${definition.id}" data-workflow-tone="${photoWorkflow.tone}" title="${escapeHtml(photoWorkflow.label)}">
         <strong>${escapeHtml(definition.department)}</strong>
@@ -4021,7 +4023,7 @@
         </div>
         <p class="link-card-subtext" data-department-age="${definition.id}">${escapeHtml(freshness.age)}</p>
         <div class="link-card-actions">
-          <a href="${escapeHtml(feedbackPath || relativePath)}" target="_blank" rel="noopener" data-department-feedback-link="${definition.id}"${feedbackPath ? "" : " hidden"}>Открыть отправленное</a>
+          <a href="${escapeHtml(openPath)}" target="_blank" rel="noopener" data-department-feedback-link="${definition.id}" data-open-mode="${feedbackPath ? "feedback" : "department"}">${escapeHtml(openLabel)}</a>
           <span class="link-card-feedback-kind" data-department-feedback-source="${definition.id}" data-feedback-source-tone="${escapeHtml(feedbackSource.tone)}"${feedbackSource.label ? "" : " hidden"}>${escapeHtml(feedbackSource.label)}</span>
           <button type="button" data-delete-feedback="${definition.id}" data-feedback-id="${row && row.photoFeedbackId ? row.photoFeedbackId : ""}"${feedbackPath ? "" : " hidden"}>Удалить отправленное</button>
           <button type="button" data-copy-link="${escapeHtml(relativePath)}">Копировать ссылку</button>
@@ -5709,10 +5711,13 @@
         if (feedbackLinkEl) {
           const openFeedbackId = getDepartmentOpenFeedbackId(row);
           if (openFeedbackId) {
-            feedbackLinkEl.removeAttribute("hidden");
             feedbackLinkEl.setAttribute("href", appendQueryParams(config.getDepartmentPagePath(basePath, row.id), { tgFeedback: openFeedbackId }));
+            feedbackLinkEl.textContent = "Открыть отправленное";
+            feedbackLinkEl.setAttribute("data-open-mode", "feedback");
           } else {
-            feedbackLinkEl.setAttribute("hidden", "");
+            feedbackLinkEl.setAttribute("href", appendShareQuery(config.getDepartmentPagePath(basePath, row.id)));
+            feedbackLinkEl.textContent = "Открыть отделение";
+            feedbackLinkEl.setAttribute("data-open-mode", "department");
           }
         }
         if (feedbackSourceEl) {
