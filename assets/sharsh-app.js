@@ -3437,6 +3437,35 @@
     return applyPreviewValuesToDepartmentRow(row, previewValues, recognizedKeys);
   }
 
+  function doesDepartmentRowMatchPreviewValues(snapshot, row, previewValues, recognizedKeys) {
+    if (!snapshot || !row || !previewValues || typeof previewValues !== "object") {
+      return false;
+    }
+
+    const keys = Array.isArray(recognizedKeys) && recognizedKeys.length
+      ? recognizedKeys.filter((item) => typeof item === "string")
+      : Object.keys(previewValues);
+    let hasComparableValues = false;
+
+    return keys.every((key) => {
+      if (!Object.prototype.hasOwnProperty.call(previewValues, key)) {
+        return true;
+      }
+
+      const expected = config.normalizeCellValue(previewValues[key]);
+      if (expected === null) {
+        return true;
+      }
+
+      hasComparableValues = true;
+      if (key === "presentTotal") {
+        return config.normalizeCellValue(calcPresentTotal(snapshot, row)) === expected;
+      }
+
+      return config.normalizeCellValue(getEffectiveValue(snapshot, row, key)) === expected;
+    }) && hasComparableValues;
+  }
+
   function buildTelegramFormReviewStateFromRecord(record, row, options = {}) {
     const next = buildInitialTelegramFormReviewState();
     const previewValues = buildPhotoPreviewValuesFromRecord(record);
@@ -5055,9 +5084,17 @@
       && reviewState.lastAppliedKeys.length
       && !reviewState.isError
     );
+    const savedToMain = Boolean(
+      !reviewState.draftMode
+      && values
+      && doesDepartmentRowMatchPreviewValues(state.snapshot, row, values, reviewState.lastAppliedKeys)
+    );
     const statusText = reviewState.draftMode
       ? "Значения подставлены в таблицу отделения"
       : "Последняя Telegram форма показана для сверки";
+    const effectiveStatusText = savedToMain
+      ? "Уже сохранено в основную таблицу"
+      : statusText;
     const cells = PHOTO_FIELD_DEFINITIONS.map((field) => {
       const displayValue = getTelegramFormReviewValue(values, field.key);
       return `
@@ -5071,14 +5108,18 @@
       ? (reviewState.status || "Не удалось загрузить значения Telegram формы.")
       : (reviewState.status || "Проверьте эту таблицу. Если всё правильно, нажмите Сохранить, чтобы внести данные в общую таблицу.");
 
+    const effectiveNote = savedToMain && !reviewState.isError
+      ? "Эта Telegram форма уже автоматически записана в основную таблицу. Ниже можно сверить отправленные значения."
+      : note;
+
     return `
       <section class="panel no-print telegram-form-review-panel telegram-form-review-panel--${status}">
         <div class="telegram-form-review-head">
           <div>
             <h2>Данные из Telegram формы</h2>
-            <p class="hint${reviewState.isError ? " warning-note" : ""}">${escapeHtml(note)}</p>
+            <p class="hint${reviewState.isError ? " warning-note" : ""}">${escapeHtml(effectiveNote)}</p>
           </div>
-          <span class="status-chip status-chip--${status === "processed" ? "fresh" : "stale"}">${escapeHtml(statusText)}</span>
+          <span class="status-chip status-chip--${status === "processed" ? "fresh" : "stale"}">${escapeHtml(effectiveStatusText)}</span>
         </div>
         <div class="telegram-form-review-meta">
           <span>Feedback: ${escapeHtml(feedbackId)}</span>
@@ -5095,6 +5136,7 @@
             ? "Сейчас в таблице выбран источник Telegram формы."
             : "Источник попадет в таблицу только после вашего выбора и сохранения."}</span>
         </div>
+        ${savedToMain ? `<p class="hint">Эти значения уже автоматически записаны в основную таблицу из Telegram App.</p>` : ""}
         <div class="telegram-form-review-table-wrap">
           <table class="telegram-form-review-table">
             <tbody>
