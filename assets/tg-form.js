@@ -438,7 +438,7 @@
       }
       if (message) {
         message.className = "tg-form-message success";
-        message.textContent = "Спасибо. Отличная работа. Данные отправлены на проверку.";
+        message.textContent = "Спасибо. Данные проверены и сохранены в общую таблицу.";
       }
       if (telegram) {
         telegram.HapticFeedback && telegram.HapticFeedback.notificationOccurred("success");

@@ -6417,19 +6417,15 @@ async function handleTelegramWebFormSubmit(request: Request) {
       departmentId,
       reportDate
     );
-    let didAutoSave = false;
-    let savedSnapshot = snapshot;
-    if (pairedPhotoFeedback) {
-      await saveDepartmentSnapshot(supabase as ReturnType<typeof createClient>, departmentId, reportDate, values);
-      await markDepartmentPhotoProcessed(
-        supabase as ReturnType<typeof createClient>,
-        departmentId,
-        pairedPhotoFeedback.id,
-        pairedPhotoFeedback.imageName || "telegram-photo"
-      );
-      savedSnapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
-      didAutoSave = true;
-    }
+    await saveDepartmentSnapshot(supabase as ReturnType<typeof createClient>, departmentId, reportDate, values);
+    await markDepartmentPhotoProcessed(
+      supabase as ReturnType<typeof createClient>,
+      departmentId,
+      pairedPhotoFeedback ? pairedPhotoFeedback.id : feedbackId,
+      pairedPhotoFeedback ? (pairedPhotoFeedback.imageName || "telegram-photo") : "telegram-web-app-form"
+    );
+    const didAutoSave = true;
+    const savedSnapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
     const meta = DEPARTMENTS[departmentId];
     const messageText = didAutoSave
       ? [
