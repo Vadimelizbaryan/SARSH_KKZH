@@ -404,6 +404,9 @@
       photoFeedbackId: sourceRow && sourceRow.photoFeedbackId !== null && typeof sourceRow.photoFeedbackId !== "undefined"
         ? Number(sourceRow.photoFeedbackId)
         : null,
+      latestFeedbackId: sourceRow && sourceRow.latestFeedbackId !== null && typeof sourceRow.latestFeedbackId !== "undefined"
+        ? Number(sourceRow.latestFeedbackId)
+        : null,
       photoFeedbackUpdatedAt: sourceRow && sourceRow.photoFeedbackUpdatedAt
         ? String(sourceRow.photoFeedbackUpdatedAt)
         : null,
@@ -444,6 +447,7 @@
             updatedAt: item.updatedAt,
             photoWorkflowStatus: item.photoWorkflowStatus,
             photoFeedbackId: item.photoFeedbackId,
+            latestFeedbackId: item.latestFeedbackId,
             photoFeedbackUpdatedAt: item.photoFeedbackUpdatedAt,
             photoName: item.photoName,
             hasTelegramFormFeedback: item.hasTelegramFormFeedback,

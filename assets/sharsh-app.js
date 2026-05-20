@@ -2968,6 +2968,19 @@
     };
   }
 
+  function getDepartmentOpenFeedbackId(row) {
+    if (!row) {
+      return null;
+    }
+    if (row.photoFeedbackId !== null && typeof row.photoFeedbackId !== "undefined") {
+      return row.photoFeedbackId;
+    }
+    if (row.latestFeedbackId !== null && typeof row.latestFeedbackId !== "undefined") {
+      return row.latestFeedbackId;
+    }
+    return null;
+  }
+
   function buildFreshnessStats(rows) {
     const counts = {
       fresh: 0,
@@ -3995,8 +4008,9 @@
     const photoWorkflow = getDepartmentPhotoWorkflowMeta(row);
     const feedbackSource = getDepartmentFeedbackSourceMeta(row);
     const relativePath = appendShareQuery(config.getDepartmentPagePath(basePath, definition.id));
-    const feedbackPath = row && row.photoFeedbackId
-      ? appendQueryParams(config.getDepartmentPagePath(basePath, definition.id), { tgFeedback: row.photoFeedbackId })
+    const openFeedbackId = getDepartmentOpenFeedbackId(row);
+    const feedbackPath = openFeedbackId
+      ? appendQueryParams(config.getDepartmentPagePath(basePath, definition.id), { tgFeedback: openFeedbackId })
       : "";
     return `
       <div class="link-card" data-department-open-card="${definition.id}" data-workflow-tone="${photoWorkflow.tone}" title="${escapeHtml(photoWorkflow.label)}">
@@ -5693,9 +5707,10 @@
           openCardEl.setAttribute("title", photoWorkflow.label);
         }
         if (feedbackLinkEl) {
-          if (row.photoFeedbackId) {
+          const openFeedbackId = getDepartmentOpenFeedbackId(row);
+          if (openFeedbackId) {
             feedbackLinkEl.removeAttribute("hidden");
-            feedbackLinkEl.setAttribute("href", appendQueryParams(config.getDepartmentPagePath(basePath, row.id), { tgFeedback: row.photoFeedbackId }));
+            feedbackLinkEl.setAttribute("href", appendQueryParams(config.getDepartmentPagePath(basePath, row.id), { tgFeedback: openFeedbackId }));
           } else {
             feedbackLinkEl.setAttribute("hidden", "");
           }
