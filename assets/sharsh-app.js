@@ -3406,15 +3406,15 @@
     return output;
   }
 
-  function applyTelegramFormValuesToDepartmentRow(row, previewValues, recognizedKeys) {
+  function applyPreviewValuesToDepartmentRow(row, previewValues, recognizedKeys) {
     if (!row || !previewValues || typeof previewValues !== "object") {
       return [];
     }
 
     const allowedKeys = new Set(
-      Array.isArray(recognizedKeys)
+      Array.isArray(recognizedKeys) && recognizedKeys.length
         ? recognizedKeys.filter((item) => typeof item === "string")
-        : []
+        : getRecognizablePhotoFields(row).map((field) => field.key)
     );
     const appliedKeys = [];
 
@@ -3431,6 +3431,10 @@
     });
 
     return appliedKeys;
+  }
+
+  function applyTelegramFormValuesToDepartmentRow(row, previewValues, recognizedKeys) {
+    return applyPreviewValuesToDepartmentRow(row, previewValues, recognizedKeys);
   }
 
   function buildTelegramFormReviewStateFromRecord(record, row, options = {}) {
@@ -5045,6 +5049,12 @@
     }
 
     const status = reviewState.draftMode ? "pending" : "processed";
+    const canApplyTelegramSource = Boolean(
+      values
+      && Array.isArray(reviewState.lastAppliedKeys)
+      && reviewState.lastAppliedKeys.length
+      && !reviewState.isError
+    );
     const statusText = reviewState.draftMode
       ? "Значения подставлены в таблицу отделения"
       : "Последняя Telegram форма показана для сверки";
@@ -5075,6 +5085,16 @@
           <span>Отделение: ${escapeHtml(row.department)}</span>
           ${reviewState.lastReportDate ? `<span>Дата: ${escapeHtml(reviewState.lastReportDate)}</span>` : ""}
         </div>
+        <div class="telegram-form-review-actions">
+          <button
+            type="button"
+            id="applyTelegramSourceBtn"
+            ${canApplyTelegramSource && !reviewState.draftMode ? "" : "disabled"}
+          >Взять данные из Telegram формы</button>
+          <span>${reviewState.draftMode
+            ? "Сейчас в таблице выбран источник Telegram формы."
+            : "Источник попадет в таблицу только после вашего выбора и сохранения."}</span>
+        </div>
         <div class="telegram-form-review-table-wrap">
           <table class="telegram-form-review-table">
             <tbody>
@@ -5095,6 +5115,13 @@
         ? `Это фото пришло из общей очереди. После сохранения автоматически откроется следующее фото. Осталось после текущего: ${photoState.queueRemainingCount}.${photoState.queueNextDepartmentName ? ` Следующее отделение: ${photoState.queueNextDepartmentName}.` : ""}`
         : "Это последнее фото из общей очереди. После сохранения очередь завершится.")
       : "";
+    const canApplyPhotoSource = Boolean(
+      photoState.recognizedValues
+      && typeof photoState.recognizedValues === "object"
+      && Array.isArray(photoState.lastAppliedKeys)
+      && photoState.lastAppliedKeys.length
+      && photoState.structureOk !== false
+    );
     const recognizedFields = new Set(photoState.lastAppliedKeys || []);
     const suspectFields = new Set(Array.isArray(photoState.suspectKeys) ? photoState.suspectKeys : []);
     const reviewByKey = new Map(
@@ -5157,6 +5184,16 @@
           </button>
           <button type="button" id="photoClearBtn" ${!photoState.imageDataUrl || photoState.isProcessing ? "disabled" : ""}>Очистить</button>
         </div>
+        <div class="photo-import-save-actions">
+          <button
+            type="button"
+            id="applyPhotoSourceBtn"
+            ${canApplyPhotoSource && !photoState.draftMode ? "" : "disabled"}
+          >Взять данные из фото</button>
+          <span>${photoState.draftMode
+            ? "Сейчас в таблице выбран источник фото."
+            : "Источник попадет в таблицу только после вашего выбора и сохранения."}</span>
+        </div>
         <p class="hint${photoState.isError ? " warning-note" : ""}" id="photoImportStatus">${
           escapeHtml(
             photoState.status
@@ -5176,7 +5213,7 @@
               </div>
             ` : ""}
             ${photoState.suspectReason ? `<p class="hint warning-note"><strong>${escapeHtml(photoState.suspectReason)}</strong></p>` : ""}
-            ${photoState.draftMode ? `<p class="hint"><strong>Автоотправка временно приостановлена.</strong> Проверьте ячейки и нажмите Сохранить.</p>` : ""}
+            ${photoState.draftMode ? `<p class="hint"><strong>Для таблицы сейчас выбраны данные из фото.</strong> Проверьте ячейки и нажмите Сохранить.</p>` : ""}
           </div>
         ` : ""}
         ${photoState.imageDataUrl ? `
@@ -6002,7 +6039,7 @@
         : []
     );
     const applicableFields = getRecognizablePhotoFields(row);
-    const appliedKeys = [];
+    const availableKeys = [];
     const previewKeys = [];
 
     if (structureOk) {
@@ -6012,9 +6049,8 @@
         }
 
         const normalized = config.normalizeCellValue(values[field.key]);
-        row.values[field.key] = normalized;
         if (normalized !== null) {
-          appliedKeys.push(field.key);
+          availableKeys.push(field.key);
           previewKeys.push(field.key);
         }
       });
@@ -6039,9 +6075,9 @@
     state.photoImport.structureReason = structureReason;
     state.photoImport.suspectKeys = suspectDetails.suspectKeys;
     state.photoImport.suspectReason = suspectDetails.suspectReason;
-    state.photoImport.draftMode = structureOk && appliedKeys.length > 0;
+    state.photoImport.draftMode = false;
 
-    return appliedKeys.length;
+    return availableKeys.length;
   }
 
   function getPhotoStructureValidationMessage() {
@@ -6237,7 +6273,7 @@
   }
 
   function clearPhotoImportSelection() {
-    const keepDraft = hasPhotoImportDraft();
+    const keepDraft = Boolean(state.photoImport && state.photoImport.draftMode);
     const next = buildInitialPhotoImportState();
     next.draftMode = keepDraft;
     if (keepDraft && state.photoImport) {
@@ -6253,6 +6289,124 @@
       next.status = "Распознанные значения остаются в таблице локально. Проверьте их и нажмите Сохранить.";
     }
     state.photoImport = next;
+    renderPage();
+  }
+
+  function resetDepartmentRowValuesFromLoaded(keys) {
+    const currentRow = getCurrentRow();
+    const loadedRow = getCurrentLoadedRow();
+    if (!currentRow || !loadedRow || !Array.isArray(keys)) {
+      return;
+    }
+
+    keys.forEach((key) => {
+      if (typeof key !== "string") {
+        return;
+      }
+      currentRow.values[key] = Object.prototype.hasOwnProperty.call(loadedRow.values || {}, key)
+        ? loadedRow.values[key]
+        : null;
+    });
+  }
+
+  function cancelAutoAppliedTelegramSelectionIfNeeded() {
+    const feedbackQueryId = queryParams.get("tgFeedback") || "";
+    const reviewState = state.telegramFormReview || buildInitialTelegramFormReviewState();
+    if (
+      mode !== "department"
+      || !feedbackQueryId
+      || !reviewState.draftMode
+      || reviewState.workflowStatus !== "pending"
+      || String(reviewState.feedbackId || "") !== feedbackQueryId
+    ) {
+      return;
+    }
+
+    resetDepartmentRowValuesFromLoaded(reviewState.lastAppliedKeys || []);
+    reviewState.draftMode = false;
+    reviewState.workflowStatus = "processed";
+    reviewState.status = "Открыта отправленная Telegram форма. Выберите источник обновления кнопкой ниже.";
+    reviewState.isError = false;
+    state.telegramFormReview = reviewState;
+    setInfo("Открыта отправленная Telegram форма. Выберите, брать данные из фото или из Telegram формы.", false);
+    renderPage();
+  }
+
+  function setPhotoSourceReferenceStatus() {
+    if (!state.photoImport || (!state.photoImport.feedbackId && !state.photoImport.imageDataUrl)) {
+      return;
+    }
+    state.photoImport.draftMode = false;
+    state.photoImport.workflowStatus = "processed";
+    state.photoImport.status = "Фото оставлено для сверки. Чтобы обновить таблицу по нему, нажмите «Взять данные из фото»." ;
+    state.photoImport.isError = false;
+  }
+
+  function setTelegramSourceReferenceStatus() {
+    if (!state.telegramFormReview || !state.telegramFormReview.feedbackId) {
+      return;
+    }
+    state.telegramFormReview.draftMode = false;
+    state.telegramFormReview.workflowStatus = "processed";
+    state.telegramFormReview.status = "Telegram форма оставлена для сверки. Чтобы обновить таблицу по ней, нажмите «Взять данные из Telegram формы».";
+    state.telegramFormReview.isError = false;
+  }
+
+  function handleApplyPhotoSourceToDepartment() {
+    const row = getCurrentRow();
+    const photoState = state.photoImport || buildInitialPhotoImportState();
+    const previewValues = photoState.recognizedValues && typeof photoState.recognizedValues === "object"
+      ? photoState.recognizedValues
+      : null;
+    const recognizedKeys = Array.isArray(photoState.lastAppliedKeys) ? photoState.lastAppliedKeys : [];
+    if (!row || !previewValues) {
+      setInfo("Сначала загрузите или откройте фото бланка.", true);
+      return;
+    }
+
+    resetDepartmentRowValuesFromLoaded(getRecognizablePhotoFields(row).map((field) => field.key));
+    const appliedKeys = applyPreviewValuesToDepartmentRow(row, previewValues, recognizedKeys);
+    if (!appliedKeys.length) {
+      setInfo("В фото нет данных, которые можно перенести в таблицу отделения.", true);
+      return;
+    }
+
+    state.photoImport.draftMode = true;
+    state.photoImport.workflowStatus = "selected";
+    state.photoImport.lastAppliedKeys = appliedKeys;
+    state.photoImport.status = "Данные из фото выбраны как источник обновления. После проверки нажмите «Сохранить».";
+    state.photoImport.isError = false;
+    setTelegramSourceReferenceStatus();
+    setInfo("Данные из фото подставлены локально. После проверки нажмите «Сохранить».", false);
+    renderPage();
+  }
+
+  function handleApplyTelegramSourceToDepartment() {
+    const row = getCurrentRow();
+    const reviewState = state.telegramFormReview || buildInitialTelegramFormReviewState();
+    const previewValues = reviewState.recognizedValues && typeof reviewState.recognizedValues === "object"
+      ? reviewState.recognizedValues
+      : null;
+    const recognizedKeys = Array.isArray(reviewState.lastAppliedKeys) ? reviewState.lastAppliedKeys : [];
+    if (!row || !previewValues) {
+      setInfo("Сначала откройте данные из Telegram формы.", true);
+      return;
+    }
+
+    resetDepartmentRowValuesFromLoaded(getRecognizablePhotoFields(row).map((field) => field.key));
+    const appliedKeys = applyTelegramFormValuesToDepartmentRow(row, previewValues, recognizedKeys);
+    if (!appliedKeys.length) {
+      setInfo("В Telegram форме нет данных, которые можно перенести в таблицу отделения.", true);
+      return;
+    }
+
+    state.telegramFormReview.draftMode = true;
+    state.telegramFormReview.workflowStatus = "selected";
+    state.telegramFormReview.lastAppliedKeys = appliedKeys;
+    state.telegramFormReview.status = "Данные из Telegram формы выбраны как источник обновления. После проверки нажмите «Сохранить».";
+    state.telegramFormReview.isError = false;
+    setPhotoSourceReferenceStatus();
+    setInfo("Данные из Telegram формы подставлены локально. После проверки нажмите «Сохранить».", false);
     renderPage();
   }
   function buildMainPhotoRouteBatchItem(file, index) {
@@ -7829,6 +7983,7 @@
     renderPage();
     if (mode === "department") {
       await maybeLoadTelegramFeedbackValues();
+      cancelAutoAppliedTelegramSelectionIfNeeded();
       await maybeLoadStoredDepartmentPhotoAdjusted();
     }
   }
@@ -8094,6 +8249,20 @@
       });
     }
 
+    const applyPhotoSourceBtn = document.getElementById("applyPhotoSourceBtn");
+    if (applyPhotoSourceBtn) {
+      applyPhotoSourceBtn.addEventListener("click", () => {
+        handleApplyPhotoSourceToDepartment();
+      });
+    }
+
+    const applyTelegramSourceBtn = document.getElementById("applyTelegramSourceBtn");
+    if (applyTelegramSourceBtn) {
+      applyTelegramSourceBtn.addEventListener("click", () => {
+        handleApplyTelegramSourceToDepartment();
+      });
+    }
+
     const photoZoomBtn = document.getElementById("photoZoomBtn");
     if (photoZoomBtn) {
       photoZoomBtn.addEventListener("click", () => {
@@ -8331,6 +8500,7 @@
         refreshTableData();
         if (mode === "department") {
           await maybeLoadTelegramFeedbackValues();
+          cancelAutoAppliedTelegramSelectionIfNeeded();
           await maybeLoadStoredDepartmentPhotoAdjusted();
           await maybeAutoRecognizeLoadedTelegramPhoto();
         }
@@ -8404,6 +8574,7 @@
     await maybeResumeTransferredPhotoImport();
     await maybeLoadTelegramFeedbackPhotoAdjusted();
     await maybeLoadTelegramFeedbackValues();
+    cancelAutoAppliedTelegramSelectionIfNeeded();
     await maybeLoadStoredDepartmentPhotoAdjusted();
     await maybeAutoRecognizeLoadedTelegramPhoto();
   }

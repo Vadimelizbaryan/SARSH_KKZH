@@ -796,6 +796,50 @@ a {
   font-weight: 700;
 }
 
+.telegram-form-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.telegram-form-review-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  box-shadow: 0 10px 24px rgba(17, 17, 17, 0.08);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.telegram-form-review-actions button:hover {
+  transform: translateY(-1px);
+  background: #ffffff;
+}
+
+.telegram-form-review-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+}
+
+.telegram-form-review-actions span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 .telegram-form-review-table-wrap {
   overflow-x: auto;
   border: 1px solid rgba(17, 17, 17, 0.12);
