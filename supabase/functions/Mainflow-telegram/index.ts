@@ -32,6 +32,7 @@ const TELEGRAM_APPLY_NIGHT_SHIFT_CALLBACK = "apply_night_shift_to_main";
 const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
 const REPORT_PDF_FILE_NAME = "Report.pdf";
 const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarmenian/NotoSansArmenian%5Bwdth,wght%5D.ttf";
+const YEREVAN_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
 const TELEGRAM_DAILY_REMINDERS = {
   midday: {
     label: "12:00",
@@ -698,16 +699,8 @@ function rowMatchesCivilReferralSr(row: Record<string, unknown>, srMarker: strin
 }
 
 function getCivilReferralTodayTime() {
-  const key = getYerevanDateKey();
-  const match = key.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) {
-    return 0;
-  }
-  return Date.UTC(
-    Number(match[1]),
-    Number(match[2]) - 1,
-    Number(match[3])
-  );
+  const parts = getYerevanDateParts();
+  return Date.UTC(parts.year, Number(parts.month) - 1, Number(parts.day));
 }
 
 function rowMatchesCivilReferralSmartQuery(row: Record<string, unknown>, smartQuery: CivilReferralSmartQuery) {
@@ -2371,41 +2364,40 @@ async function rememberTelegramColleagueChat(
   await saveTelegramColleagueChats(supabase, nextChats);
 }
 
+function padYerevanTimePart(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function getShiftedYerevanDate(date = new Date()) {
+  return new Date(date.getTime() + YEREVAN_UTC_OFFSET_MS);
+}
+
+function getYerevanDateParts(date = new Date()) {
+  const shifted = getShiftedYerevanDate(date);
+  const year = shifted.getUTCFullYear();
+  return {
+    year,
+    shortYear: padYerevanTimePart(year % 100),
+    month: padYerevanTimePart(shifted.getUTCMonth() + 1),
+    day: padYerevanTimePart(shifted.getUTCDate()),
+    hour: padYerevanTimePart(shifted.getUTCHours()),
+    minute: padYerevanTimePart(shifted.getUTCMinutes()),
+    weekday: shifted.getUTCDay()
+  };
+}
+
 function getYerevanDateKey(date = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Yerevan",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
+  const parts = getYerevanDateParts(date);
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function getYerevanDateTimeText(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("ru-RU", {
-    timeZone: "Asia/Yerevan",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
-  return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
+  const parts = getYerevanDateParts(date);
+  return `${parts.day}.${parts.month}.${parts.year} ${parts.hour}:${parts.minute}`;
 }
 
 function getYerevanHyDateTimeText(date: Date) {
-  const parts = new Intl.DateTimeFormat("ru-RU", {
-    timeZone: "Asia/Yerevan",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
-  return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
+  return getYerevanDateTimeText(date);
 }
 
 function normalizeShiftReportDateTime(value: unknown, fallback = getYerevanDateTimeText()) {
@@ -2435,23 +2427,12 @@ function normalizeShiftReportDateTime(value: unknown, fallback = getYerevanDateT
 }
 
 function getYerevanReportDateText(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("ru-RU", {
-    timeZone: "Asia/Yerevan",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
-  return `${get("day")}.${get("month")}.${get("year")}`;
+  const parts = getYerevanDateParts(date);
+  return `${parts.day}.${parts.month}.${parts.year}`;
 }
 
 function getYerevanHour(date = new Date()) {
-  const hour = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Yerevan",
-    hour: "2-digit",
-    hourCycle: "h23"
-  }).format(date);
-  const parsed = Number(hour);
+  const parsed = Number(getYerevanDateParts(date).hour);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -3642,35 +3623,14 @@ function getMainPdfPrintedAtText(date = new Date()) {
     Friday: "Ուրբաթ",
     Saturday: "Շաբաթ"
   };
-  const weekdayKey = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Yerevan",
-    weekday: "long"
-  }).format(date);
-  const parts = new Intl.DateTimeFormat("ru-RU", {
-    timeZone: "Asia/Yerevan",
-    year: "2-digit",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(date);
-  const part = (type: string) => parts.find((item) => item.type === type)?.value || "";
-  return `${weekdays[weekdayKey] || weekdayKey} ${part("day")}.${part("month")}.${part("year")},${part("hour")}:${part("minute")}`;
+  const parts = getYerevanDateParts(date);
+  const weekday = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][parts.weekday] || "";
+  return `${weekdays[weekday] || weekday} ${parts.day}.${parts.month}.${parts.shortYear},${parts.hour}:${parts.minute}`;
 }
 
 function getPdfFileTimestampText(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("ru-RU", {
-    timeZone: "Asia/Yerevan",
-    year: "2-digit",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(date);
-  const part = (type: string) => parts.find((item) => item.type === type)?.value || "";
-  return `${part("day")}.${part("month")}.${part("year")},${part("hour")}-${part("minute")}`;
+  const parts = getYerevanDateParts(date);
+  return `${parts.day}.${parts.month}.${parts.shortYear},${parts.hour}-${parts.minute}`;
 }
 
 function buildTimestampedPdfFileName(fileName: string, date = new Date()) {
@@ -4765,15 +4725,8 @@ function normalizeDepartmentSheetReportDate(reportDate: string) {
 }
 
 function getYerevanTimeText(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("ru-RU", {
-    timeZone: "Asia/Yerevan",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(date);
-  const hour = parts.find((part) => part.type === "hour")?.value || "00";
-  const minute = parts.find((part) => part.type === "minute")?.value || "00";
-  return `${hour}:${minute}`;
+  const parts = getYerevanDateParts(date);
+  return `${parts.hour}:${parts.minute}`;
 }
 
 function buildDepartmentSheetDateTimeText(reportDate: string) {
