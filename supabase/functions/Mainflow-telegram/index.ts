@@ -4064,7 +4064,7 @@ async function sendMainPdfsToTelegram(
 function isSnapshotReadyForMainPdfAutoSend(
   snapshot: Awaited<ReturnType<typeof loadSnapshot>>
 ) {
-  const staleRows = snapshot.rows.filter((row) => rowNeedsFreshTelegramUpdate(row));
+  const staleRows = snapshot.rows.filter((row) => rowNeedsFreshTelegramUpdate(snapshot, row));
   if (staleRows.length) {
     return {
       isReady: false,
@@ -6403,33 +6403,100 @@ function getRowEffectiveUpdatedAt(
   return String(row.updatedAt || row.photoFeedbackUpdatedAt || "");
 }
 
+function getStatusTimestampMs(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return Number.NaN;
+  }
+
+  const localMatch = raw.match(/^(\d{2})[.,/](\d{2})[.,/](\d{2,4})\s+(\d{2}):(\d{2})$/);
+  if (localMatch) {
+    const year = localMatch[3].length === 2 ? Number(`20${localMatch[3]}`) : Number(localMatch[3]);
+    const utcMs = Date.UTC(
+      year,
+      Number(localMatch[2]) - 1,
+      Number(localMatch[1]),
+      Number(localMatch[4]),
+      Number(localMatch[5])
+    ) - YEREVAN_UTC_OFFSET_MS;
+    return utcMs;
+  }
+
+  return Date.parse(raw);
+}
+
+function formatStatusDateTime(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "ամսաթիվ չկա";
+  }
+
+  const localMatch = raw.match(/^(\d{2})[.,/](\d{2})[.,/](\d{2,4})\s+(\d{2}):(\d{2})$/);
+  if (localMatch) {
+    const year = localMatch[3].length === 2 ? `20${localMatch[3]}` : localMatch[3];
+    return `${localMatch[1]}.${localMatch[2]}.${year} ${localMatch[4]}:${localMatch[5]}`;
+  }
+
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? getYerevanHyDateTimeText(new Date(parsed)) : raw;
+}
+
+function getSnapshotStatusFallbackUpdatedAt(
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>
+) {
+  const reportDate = String(snapshot.reportDate || "").trim();
+  if (/^\d{2}[.,/]\d{2}[.,/]\d{2,4}\s+\d{2}:\d{2}$/.test(reportDate)) {
+    return reportDate;
+  }
+  return String(snapshot.updatedAt || "");
+}
+
+function getStatusRowUpdatedAt(
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
+  row: Awaited<ReturnType<typeof loadSnapshot>>["rows"][number]
+) {
+  const updatedAt = getRowEffectiveUpdatedAt(row);
+  if (updatedAt) {
+    return updatedAt;
+  }
+
+  if (QH_CALC_DEPARTMENT_IDS.has(row.id as DepartmentId) && rowHasAnyData(row.values)) {
+    return getSnapshotStatusFallbackUpdatedAt(snapshot);
+  }
+
+  return "";
+}
+
 function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
   const rowsWithData = snapshot.rows.filter((row) => rowHasAnyData(row.values));
   const nowText = getYerevanDateTimeText();
   const newestUpdatedAt = rowsWithData
-    .map((row) => getRowEffectiveUpdatedAt(row))
-    .filter((value) => Number.isFinite(Date.parse(value)))
-    .sort((a, b) => Date.parse(b) - Date.parse(a))[0] || "";
+    .map((row) => getStatusRowUpdatedAt(snapshot, row))
+    .filter((value) => Number.isFinite(getStatusTimestampMs(value)))
+    .sort((a, b) => getStatusTimestampMs(b) - getStatusTimestampMs(a))[0] || "";
   const updatedRows = rowsWithData
-    .sort((a, b) => Date.parse(getRowEffectiveUpdatedAt(b)) - Date.parse(getRowEffectiveUpdatedAt(a)))
+    .sort((a, b) => getStatusTimestampMs(getStatusRowUpdatedAt(snapshot, b)) - getStatusTimestampMs(getStatusRowUpdatedAt(snapshot, a)))
     .map((row) => {
-      const updatedAt = getRowEffectiveUpdatedAt(row);
-      return `- ${row.department}: ${updatedAt ? getYerevanHyDateTimeText(new Date(updatedAt)) : "ամսաթիվ չկա"}`;
+      const updatedAt = getStatusRowUpdatedAt(snapshot, row);
+      return `- ${row.department}: ${formatStatusDateTime(updatedAt)}`;
     });
 
   return [
     `Ժամը հիմա: ${nowText}`,
     `Հաշվետվության կազմման ժամը: ${snapshot.reportDate}`,
     `Լրացված բաժանմունքներ: ${rowsWithData.length}/${snapshot.rows.length}`,
-    newestUpdatedAt ? `Վերջին թարմացումը: ${getYerevanHyDateTimeText(new Date(newestUpdatedAt))}` : "",
+    newestUpdatedAt ? `Վերջին թարմացումը: ${formatStatusDateTime(newestUpdatedAt)}` : "",
     updatedRows.length ? "" : null,
     updatedRows.length ? "Վերջին թարմացումներ:" : null,
     ...updatedRows
   ].filter(Boolean).join("\n");
 }
 
-function rowNeedsFreshTelegramUpdate(row: Awaited<ReturnType<typeof loadSnapshot>>["rows"][number]) {
-  const updatedAt = Date.parse(getRowEffectiveUpdatedAt(row));
+function rowNeedsFreshTelegramUpdate(
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
+  row: Awaited<ReturnType<typeof loadSnapshot>>["rows"][number]
+) {
+  const updatedAt = getStatusTimestampMs(getStatusRowUpdatedAt(snapshot, row));
   if (!Number.isFinite(updatedAt)) {
     return true;
   }
