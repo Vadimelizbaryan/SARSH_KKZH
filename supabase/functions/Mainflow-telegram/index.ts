@@ -6452,35 +6452,37 @@ function buildPhotoTableGroupLine(cells: number[], values: Record<string, number
 }
 
 function buildPhotoTableCellLine(cells: number[]) {
-  return cells.map((cell) => String(cell).padStart(3, " ")).join(" ");
+  return cells.map((cell) => String(cell).padStart(2, " ")).join(" ");
 }
 
-function buildPhotoTableTitleLine(title: string, cells: number[]) {
-  const width = (cells.length * 4) - 1;
-  return title.padEnd(width, " ");
+function buildPhotoCompactTableRow(
+  title: string,
+  cells: number[],
+  values: Record<string, number | null>
+) {
+  return `${title.padEnd(7, " ")} ${buildPhotoTableCellLine(cells)} | ${buildPhotoTableGroupLine(cells, values)}`;
 }
 
 function buildPhotoRecognizedTableText(values: Record<string, number | null>) {
   const topGroups = [
     { title: "Было", cells: [1, 2, 3] },
-    { title: "Поступ.", cells: [4, 5, 6] },
+    { title: "Поступ", cells: [4, 5, 6] },
     { title: "Убыло", cells: [7, 8, 9] },
-    { title: "Пер.", cells: [10, 11] },
-    { title: "КС", cells: [12] }
+    { title: "Пер/КС", cells: [10, 11, 12] }
   ] as const;
-  const bottomGroups = [
-    { title: "Наличие", cells: [13, 14, 15, 16, 17, 18, 19] },
-    { title: "Отпуск", cells: [20, 21, 22] }
-  ] as const;
+  const currentCells = [13, 14, 15, 16, 17, 18, 19];
+  const leaveCells = [20, 21, 22];
 
   return [
-    topGroups.map((group) => buildPhotoTableTitleLine(group.title, [...group.cells])).join(" | "),
-    topGroups.map((group) => buildPhotoTableCellLine([...group.cells])).join(" | "),
-    topGroups.map((group) => buildPhotoTableGroupLine([...group.cells], values)).join(" | "),
+    ...topGroups.map((group) => buildPhotoCompactTableRow(group.title, [...group.cells], values)),
     "",
-    bottomGroups.map((group) => buildPhotoTableTitleLine(group.title, [...group.cells])).join(" | "),
-    bottomGroups.map((group) => buildPhotoTableCellLine([...group.cells])).join(" | "),
-    bottomGroups.map((group) => buildPhotoTableGroupLine([...group.cells], values)).join(" | ")
+    "Наличие:",
+    buildPhotoTableCellLine(currentCells),
+    buildPhotoTableGroupLine(currentCells, values),
+    "",
+    "Отпуск:",
+    buildPhotoTableCellLine(leaveCells),
+    buildPhotoTableGroupLine(leaveCells, values)
   ].join("\n");
 }
 
