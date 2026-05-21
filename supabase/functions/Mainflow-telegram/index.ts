@@ -2395,15 +2395,17 @@ function getYerevanDateTimeText(date = new Date()) {
 }
 
 function getYerevanHyDateTimeText(date: Date) {
-  return new Intl.DateTimeFormat("hy-AM", {
+  const parts = new Intl.DateTimeFormat("ru-RU", {
     timeZone: "Asia/Yerevan",
-    year: "numeric",
-    month: "2-digit",
     day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23"
-  }).format(date);
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
 }
 
 function normalizeShiftReportDateTime(value: unknown, fallback = getYerevanDateTimeText()) {

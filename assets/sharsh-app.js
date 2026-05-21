@@ -2910,15 +2910,18 @@
 
   function getCurrentDateTimeParts() {
     const now = new Date();
-    const date = now.toLocaleDateString("ru-RU", {
+    const parts = new Intl.DateTimeFormat("ru-RU", {
+      timeZone: ARCHIVE_TIMEZONE,
       year: "numeric",
       month: "2-digit",
-      day: "2-digit"
-    });
-    const time = now.toLocaleTimeString("ru-RU", {
+      day: "2-digit",
       hour: "2-digit",
-      minute: "2-digit"
-    });
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(now);
+    const get = (type) => parts.find((part) => part.type === type)?.value || "";
+    const date = `${get("day")}.${get("month")}.${get("year")}`;
+    const time = `${get("hour")}:${get("minute")}`;
     return {
       date,
       time,
