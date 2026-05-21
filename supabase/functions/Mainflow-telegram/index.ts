@@ -1404,6 +1404,82 @@ async function inspectTelegramPhotoOrientation(
   }
 }
 
+async function enhanceTelegramPhotoForOcr(
+  dataUrl: string,
+  fileName: string
+) {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+    return {
+      dataUrl,
+      fileName,
+      enhancementApplied: false,
+      enhancementNotes: [] as string[]
+    };
+  }
+
+  try {
+    const { bytes } = parseImageDataUrl(dataUrl);
+    const image = await Jimp.read(Buffer.from(bytes));
+    image.greyscale();
+    image.normalize();
+    image.contrast(0.14);
+
+    const enhancedBytes = await image.getBuffer("image/jpeg");
+    return {
+      dataUrl: buildImageDataUrl("image/jpeg", new Uint8Array(enhancedBytes)),
+      fileName: normalizeTelegramPhotoFileName(fileName, "image/jpeg"),
+      enhancementApplied: true,
+      enhancementNotes: [
+        "Photo enhanced for OCR before recognition (grayscale, normalize, contrast)."
+      ]
+    };
+  } catch (error) {
+    console.warn("Telegram photo OCR enhancement failed:", sanitizePublicErrorMessage(error));
+    return {
+      dataUrl,
+      fileName,
+      enhancementApplied: false,
+      enhancementNotes: [] as string[]
+    };
+  }
+}
+
+function evaluateTelegramPhotoRecognitionCandidate(
+  recognized: Awaited<ReturnType<typeof recognizeDepartmentPhoto>>,
+  currentDepartmentValues?: Record<string, number | null> | null
+) {
+  const structureInvalid = !!recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22);
+  const hasRecognizedValues = recognized.recognizedKeys.some((key) => {
+    return VALUE_KEYS.includes(key as (typeof VALUE_KEYS)[number]);
+  });
+  let validation = hasRecognizedValues ? validateDepartmentSheetValues(recognized.values) : null;
+  if (validation) {
+    validation = appendDepartmentValidationCheck(
+      validation,
+      buildDepartmentOcrTopCellsValidationCheck(recognized.values, currentDepartmentValues)
+    );
+  }
+
+  const recognizedCount = recognized.recognizedKeys.filter((key) => {
+    return VALUE_KEYS.includes(key as (typeof VALUE_KEYS)[number]);
+  }).length;
+  const isControlPassed = !structureInvalid && hasRecognizedValues && !!validation?.isValid;
+  const score = (isControlPassed ? 2000 : 0)
+    + (!structureInvalid ? 400 : 0)
+    + (validation?.isValid ? 300 : 0)
+    + (hasRecognizedValues ? 100 : 0)
+    + recognizedCount;
+
+  return {
+    structureInvalid,
+    hasRecognizedValues,
+    validation,
+    recognizedCount,
+    isControlPassed,
+    score
+  };
+}
+
 async function fetchImageAsDataUrl(url: string) {
   const response = await fetch(url, {
     headers: {
@@ -9004,32 +9080,65 @@ async function handleTelegramPhoto(
     }
   }
 
-  const recognized = await recognizeDepartmentPhoto(departmentId, dataUrl);
   const reportDate = hintedReportDate || getYerevanReportDateText();
-
-  const structureInvalid = !!recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22);
-  const hasRecognizedValues = recognized.recognizedKeys.some((key) => {
-    return VALUE_KEYS.includes(key as (typeof VALUE_KEYS)[number]);
-  });
-  const currentSnapshot = hasRecognizedValues ? await loadSnapshot(supabase) : null;
+  const currentSnapshot = await loadSnapshot(supabase);
   const currentDepartmentRow = currentSnapshot?.rows.find((item) => item.id === departmentId) || null;
-  let photoValidation = hasRecognizedValues ? validateDepartmentSheetValues(recognized.values) : null;
-  if (photoValidation) {
-    photoValidation = appendDepartmentValidationCheck(
-      photoValidation,
-      buildDepartmentOcrTopCellsValidationCheck(recognized.values, currentDepartmentRow?.values)
+
+  const enhancedPhoto = await enhanceTelegramPhotoForOcr(dataUrl, fileName);
+  const primaryPhotoForOcr = enhancedPhoto.enhancementApplied
+    ? enhancedPhoto
+    : {
+      dataUrl,
+      fileName,
+      enhancementApplied: false,
+      enhancementNotes: [] as string[]
+    };
+
+  let selectedPhotoDataUrl = primaryPhotoForOcr.dataUrl;
+  let selectedPhotoFileName = primaryPhotoForOcr.fileName;
+  let selectedPhotoPreparationNotes = [...primaryPhotoForOcr.enhancementNotes];
+  let recognized = await recognizeDepartmentPhoto(departmentId, primaryPhotoForOcr.dataUrl);
+  let recognizedEvaluation = evaluateTelegramPhotoRecognitionCandidate(
+    recognized,
+    currentDepartmentRow?.values
+  );
+
+  if (enhancedPhoto.enhancementApplied && !recognizedEvaluation.isControlPassed) {
+    const fallbackRecognized = await recognizeDepartmentPhoto(departmentId, dataUrl);
+    const fallbackEvaluation = evaluateTelegramPhotoRecognitionCandidate(
+      fallbackRecognized,
+      currentDepartmentRow?.values
     );
+
+    if (fallbackEvaluation.score >= recognizedEvaluation.score) {
+      selectedPhotoDataUrl = dataUrl;
+      selectedPhotoFileName = fileName;
+      selectedPhotoPreparationNotes = [
+        "Enhanced OCR attempt was discarded; original rotated photo produced the final result."
+      ];
+      recognized = fallbackRecognized;
+      recognizedEvaluation = fallbackEvaluation;
+    }
   }
+
+  recognized = {
+    ...recognized,
+    notes: [...selectedPhotoPreparationNotes, ...recognized.notes]
+  };
+
+  const structureInvalid = recognizedEvaluation.structureInvalid;
+  const hasRecognizedValues = recognizedEvaluation.hasRecognizedValues;
+  const photoValidation = recognizedEvaluation.validation;
   const photoValidationLinesHy = formatDepartmentValidationLinesHy(photoValidation);
-  const isPhotoControlPassed = !structureInvalid && hasRecognizedValues && !!photoValidation?.isValid;
+  const isPhotoControlPassed = recognizedEvaluation.isControlPassed;
   const telegramWebFormFeedback = await loadLatestTelegramWebFormFeedback(supabase, departmentId, reportDate);
   const feedbackId = await insertAcceptedFeedback(
     supabase,
     departmentId,
     reportDate,
     recognized.reportDate,
-    fileName,
-    dataUrl,
+    selectedPhotoFileName,
+    selectedPhotoDataUrl,
     recognized.values,
     recognized.recognizedKeys,
     [...orientationNotes, ...recognized.notes]
@@ -9042,18 +9151,18 @@ async function handleTelegramPhoto(
     | null = null;
   if (telegramWebFormFeedback) {
     await saveDepartmentSnapshot(supabase, departmentId, reportDate, telegramWebFormFeedback.values, "telegram-form");
-    await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, fileName, "processed_telegram");
+    await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, selectedPhotoFileName, "processed_telegram");
     shouldSaveSnapshot = true;
     autoSaveSource = "telegram-form";
     savedSnapshot = await loadSnapshot(supabase);
   } else if (isPhotoControlPassed) {
     await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values, "photo");
-    await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, fileName, "processed_photo");
+    await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, selectedPhotoFileName, "processed_photo");
     shouldSaveSnapshot = true;
     autoSaveSource = "photo";
     savedSnapshot = await loadSnapshot(supabase);
   } else {
-    await markDepartmentPhotoPending(supabase, departmentId, feedbackId, fileName);
+    await markDepartmentPhotoPending(supabase, departmentId, feedbackId, selectedPhotoFileName);
   }
 
   if (shouldSaveSnapshot && savedSnapshot) {
