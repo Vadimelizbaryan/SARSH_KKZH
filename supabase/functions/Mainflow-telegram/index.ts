@@ -4487,25 +4487,39 @@ async function callTelegramApi(method: string, body: Record<string, unknown>) {
   }, `Telegram API ${method}`);
 }
 
-async function sendTelegramMessage(chatId: number | string, text: string) {
-  await callTelegramApi("sendMessage", {
+type TelegramMessageOptions = {
+  parseMode?: "HTML" | "MarkdownV2";
+  disableWebPagePreview?: boolean;
+};
+
+async function sendTelegramMessage(chatId: number | string, text: string, options: TelegramMessageOptions = {}) {
+  const body: Record<string, unknown> = {
     chat_id: chatId,
     text,
-    disable_web_page_preview: true
-  });
+    disable_web_page_preview: options.disableWebPagePreview !== false
+  };
+  if (options.parseMode) {
+    body.parse_mode = options.parseMode;
+  }
+  await callTelegramApi("sendMessage", body);
 }
 
 async function sendTelegramMessageWithReplyMarkup(
   chatId: number | string,
   text: string,
-  replyMarkup: Record<string, unknown>
+  replyMarkup: Record<string, unknown>,
+  options: TelegramMessageOptions = {}
 ) {
-  await callTelegramApi("sendMessage", {
+  const body: Record<string, unknown> = {
     chat_id: chatId,
     text,
-    disable_web_page_preview: true,
+    disable_web_page_preview: options.disableWebPagePreview !== false,
     reply_markup: replyMarkup
-  });
+  };
+  if (options.parseMode) {
+    body.parse_mode = options.parseMode;
+  }
+  await callTelegramApi("sendMessage", body);
 }
 
 async function answerTelegramCallbackQuery(callbackQueryId: string, text: string) {
@@ -4526,10 +4540,10 @@ async function clearTelegramInlineKeyboard(chatId: number | string, messageId: n
   });
 }
 
-async function sendTelegramMessageToMany(chatIds: Array<number | string>, text: string) {
+async function sendTelegramMessageToMany(chatIds: Array<number | string>, text: string, options: TelegramMessageOptions = {}) {
   for (const chatId of chatIds) {
     try {
-      await sendTelegramMessage(chatId, text);
+      await sendTelegramMessage(chatId, text, options);
     } catch (error) {
       console.error("Failed to send Telegram notification:", sanitizePublicErrorMessage(error));
     }
@@ -6417,6 +6431,59 @@ function buildTelegramWebFormValuesText(values: Record<string, number | null>) {
     .join(", ");
 }
 
+function escapeTelegramHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function getPhotoCellValueByNumber(values: Record<string, number | null>, cell: number) {
+  const field = PHOTO_FIELD_MAPPINGS.find((item) => item.cell === cell);
+  return field ? getSheetNumber(values, field.key) : 0;
+}
+
+function formatPhotoTableToken(value: number) {
+  return String(Math.max(0, Math.trunc(value))).padStart(3, " ");
+}
+
+function buildPhotoTableGroupLine(cells: number[], values: Record<string, number | null>) {
+  return cells.map((cell) => formatPhotoTableToken(getPhotoCellValueByNumber(values, cell))).join(" ");
+}
+
+function buildPhotoTableCellLine(cells: number[]) {
+  return cells.map((cell) => String(cell).padStart(3, " ")).join(" ");
+}
+
+function buildPhotoTableTitleLine(title: string, cells: number[]) {
+  const width = (cells.length * 4) - 1;
+  return title.padEnd(width, " ");
+}
+
+function buildPhotoRecognizedTableText(values: Record<string, number | null>) {
+  const topGroups = [
+    { title: "Было", cells: [1, 2, 3] },
+    { title: "Поступ.", cells: [4, 5, 6] },
+    { title: "Убыло", cells: [7, 8, 9] },
+    { title: "Пер.", cells: [10, 11] },
+    { title: "КС", cells: [12] }
+  ] as const;
+  const bottomGroups = [
+    { title: "Наличие", cells: [13, 14, 15, 16, 17, 18, 19] },
+    { title: "Отпуск", cells: [20, 21, 22] }
+  ] as const;
+
+  return [
+    topGroups.map((group) => buildPhotoTableTitleLine(group.title, [...group.cells])).join(" | "),
+    topGroups.map((group) => buildPhotoTableCellLine([...group.cells])).join(" | "),
+    topGroups.map((group) => buildPhotoTableGroupLine([...group.cells], values)).join(" | "),
+    "",
+    bottomGroups.map((group) => buildPhotoTableTitleLine(group.title, [...group.cells])).join(" | "),
+    bottomGroups.map((group) => buildPhotoTableCellLine([...group.cells])).join(" | "),
+    bottomGroups.map((group) => buildPhotoTableGroupLine([...group.cells], values)).join(" | ")
+  ].join("\n");
+}
+
 function getNightShiftRowTotal(row: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>) {
   return NIGHT_SHIFT_VALUE_KEYS.reduce((sum, key) => sum + safeNumber(row[key]), 0);
 }
@@ -7154,31 +7221,40 @@ function buildPhotoSaveSummary(
   saveSource: "telegram-form" | "photo" | null = null
 ) {
   const meta = DEPARTMENTS[departmentId];
-  const cellSummaries = PHOTO_FIELD_MAPPINGS
-    .map((item) => {
-      const value = recognized.values[item.key];
-      return value === null ? null : `${item.cell}=${value}`;
-    })
-    .filter(Boolean)
-    .join(", ");
+  const recognizedTableText = buildPhotoRecognizedTableText(recognized.values);
   const validationLinesRu = formatDepartmentValidationLinesRu(validation);
-
-  return [
+  const safeLines = [
     `Отделение: ${meta.department} (${departmentId})`,
     `Источник отделения: ${departmentSource}`,
     `Дата отчёта: ${reportDate}`,
     recognized.reportDate ? `Дата на фото: ${recognized.reportDate}` : "Дата на фото: не распознана",
     `Страница отделения: ${getDepartmentPageUrl(departmentId, feedbackId)}`,
-    `OCR feedback: ${feedbackId || "no id"}`,
-    recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22)
-      ? `Структура строки не подтверждена: ${recognized.structure.gridCellCount}/22 ячеек.`
-      : (cellSummaries ? `Распознано: ${cellSummaries}` : "Распознанных ячеек не найдено."),
-    ...(validationLinesRu.length ? ["Контрольные суммы:", ...validationLinesRu] : []),
-    recognized.notes.length ? `Заметки OCR: ${recognized.notes.join("; ")}` : "",
+    `OCR feedback: ${feedbackId || "no id"}`
+  ].map(escapeTelegramHtml);
+
+  if (recognized.structure && (!recognized.structure.all22CellsVisible || recognized.structure.gridCellCount !== 22)) {
+    safeLines.push(escapeTelegramHtml(`Структура строки не подтверждена: ${recognized.structure.gridCellCount}/22 ячеек.`));
+  } else {
+    safeLines.push("<b>Распознано по ячейкам:</b>");
+    safeLines.push(`<pre>${escapeTelegramHtml(recognizedTableText)}</pre>`);
+  }
+
+  if (validationLinesRu.length) {
+    safeLines.push("<b>Контрольные суммы:</b>");
+    safeLines.push(...validationLinesRu.map(escapeTelegramHtml));
+  }
+
+  if (recognized.notes.length) {
+    safeLines.push(escapeTelegramHtml(`Заметки OCR: ${recognized.notes.join("; ")}`));
+  }
+
+  safeLines.push(escapeTelegramHtml(
     didSaveSnapshot
       ? `Данные сохранены в общую таблицу.${saveSource === "telegram-form" ? " Источник сохранения: Telegram Web App." : (saveSource === "photo" ? " Источник сохранения: фото." : "")}`
       : "Данные не сохранены."
-  ].filter(Boolean).join("\n");
+  ));
+
+  return safeLines.filter(Boolean).join("\n");
 }
 
 function buildPhotoSenderResponse(
@@ -8541,20 +8617,25 @@ async function handleTelegramPhoto(
   );
   const notifyChatIds = getTelegramNotifyChatIds(chatId);
   if (notifyChatIds.length) {
-    const adminMessages = [detailedPhotoSummary];
     if (shouldSaveSnapshot && savedSnapshot && autoSaveSource) {
-      adminMessages.unshift(buildMainTableAutoSaveAdminText(
-        savedSnapshot,
-        departmentId,
-        reportDate,
-        autoSaveSource,
-        (autoSaveSource === "telegram-form" ? (telegramWebFormFeedback?.userName || senderFirstName) : senderFirstName)
-      ));
+      await sendTelegramMessageToMany(
+        notifyChatIds,
+        buildMainTableAutoSaveAdminText(
+          savedSnapshot,
+          departmentId,
+          reportDate,
+          autoSaveSource,
+          (autoSaveSource === "telegram-form" ? (telegramWebFormFeedback?.userName || senderFirstName) : senderFirstName)
+        )
+      );
       if (autoSaveSource === "telegram-form" && telegramWebFormFeedback) {
-        adminMessages.push(`Значения Web App: ${buildTelegramWebFormValuesText(telegramWebFormFeedback.values)}`);
+        await sendTelegramMessageToMany(
+          notifyChatIds,
+          `Значения Web App: ${buildTelegramWebFormValuesText(telegramWebFormFeedback.values)}`
+        );
       }
     }
-    await sendTelegramMessageToMany(notifyChatIds, adminMessages.join("\n\n"));
+    await sendTelegramMessageToMany(notifyChatIds, detailedPhotoSummary, { parseMode: "HTML" });
   } else {
     console.warn("Telegram photo OCR summary was not sent: TELEGRAM_NOTIFY_CHAT_IDS is not configured.");
   }
