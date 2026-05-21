@@ -5208,6 +5208,7 @@ function applyTelegramWebFormCarryoverValues(
 type DepartmentValidationCheck = {
   id: string;
   name: string;
+  nameHy?: string;
   ruleText: string;
   isValid: boolean;
   actual: number;
@@ -5228,6 +5229,7 @@ type DepartmentValidationResult = {
 };
 
 const DEPARTMENT_OCR_TOP_CELLS_RULE_NAME = "Контроль OCR 1-3";
+const DEPARTMENT_OCR_TOP_CELLS_RULE_NAME_HY = "OCR 1-3 հսկիչ";
 const DEPARTMENT_OCR_TOP_CELLS_RULE_TEXT = "OCR 1 = таблица 1; OCR 2 = таблица 2; OCR 3 = таблица 3";
 const DEPARTMENT_OCR_TOP_CELLS_KEYS = ["beenTotal", "beenSoldier", "beenSeries"] as const;
 
@@ -5284,6 +5286,7 @@ function buildDepartmentOcrTopCellsValidationCheck(
   return {
     id: "ocr-top-cells",
     name: DEPARTMENT_OCR_TOP_CELLS_RULE_NAME,
+    nameHy: DEPARTMENT_OCR_TOP_CELLS_RULE_NAME_HY,
     ruleText: DEPARTMENT_OCR_TOP_CELLS_RULE_TEXT,
     isValid: mismatches.length === 0,
     actual: matchedCount,
@@ -5328,6 +5331,7 @@ function validateDepartmentSheetValues(values: Record<string, number | null>) {
     {
       id: "present-balance",
       name: "Контроль 13-22",
+      nameHy: "Հսկիչ 13-22",
       ruleText: "13-22 = (1 + 4 + 11) - (7 + 10)",
       isValid: presentActual === presentExpected,
       actual: presentActual,
@@ -5350,6 +5354,7 @@ function validateDepartmentSheetValues(values: Record<string, number | null>) {
     checks.push({
       id: "soldier-count",
       name: "Количество срочников",
+      nameHy: "Ժամկետայինների քանակ",
       ruleText: "(3 + 6) - 9 = 13 + 20",
       isValid: soldierActual === soldierExpected,
       actual: soldierActual,
@@ -5372,6 +5377,7 @@ function validateDepartmentSheetValues(values: Record<string, number | null>) {
     checks.push({
       id: "military-count",
       name: "Количество военнослужащих",
+      nameHy: "Զինծառայողների քանակ",
       ruleText: "(2 + 5) - 8 = 13 + 14 + 15 + 20 + 21 + 22",
       isValid: militaryActual === militaryExpected,
       actual: militaryActual,
@@ -5408,8 +5414,8 @@ function formatDepartmentValidationLinesHy(validation: DepartmentValidationResul
   }
   return validation.checks.map((check) => (
     check.isValid
-      ? `- ${check.name}: ${check.successTextHy || `${check.actual} = ${check.expected}`} (${check.ruleText})`
-      : `- ${check.name}: ${check.failureTextHy || `${check.actual}, պետք է լինի ${check.expected}`} (${check.ruleText})`
+      ? `- ${check.nameHy || check.name}: ${check.successTextHy || `${check.actual} = ${check.expected}`} (${check.ruleText})`
+      : `- ${check.nameHy || check.name}: ${check.failureTextHy || `${check.actual}, պետք է լինի ${check.expected}`} (${check.ruleText})`
   ));
 }
 
@@ -7306,7 +7312,7 @@ function buildPhotoSaveSummary(
 ) {
   const meta = DEPARTMENTS[departmentId];
   const recognizedTableText = buildPhotoRecognizedTableText(recognized.values);
-  const validationLinesRu = formatDepartmentValidationLinesRu(validation);
+  const validationLinesHy = formatDepartmentValidationLinesHy(validation);
   const safeLines = [
     `Отделение: ${meta.department} (${departmentId})`,
     `Источник отделения: ${departmentSource}`,
@@ -7323,9 +7329,9 @@ function buildPhotoSaveSummary(
     safeLines.push(`<pre>${escapeTelegramHtml(recognizedTableText)}</pre>`);
   }
 
-  if (validationLinesRu.length) {
-    safeLines.push("<b>Контрольные суммы:</b>");
-    safeLines.push(...validationLinesRu.map(escapeTelegramHtml));
+  if (validationLinesHy.length) {
+    safeLines.push("<b>Վերահսկիչ գումարներ:</b>");
+    safeLines.push(...validationLinesHy.map(escapeTelegramHtml));
   }
 
   if (recognized.notes.length) {
@@ -7334,8 +7340,8 @@ function buildPhotoSaveSummary(
 
   safeLines.push(escapeTelegramHtml(
     didSaveSnapshot
-      ? `Данные сохранены в общую таблицу.${saveSource === "telegram-form" ? " Источник сохранения: Telegram Web App." : (saveSource === "photo" ? " Источник сохранения: фото." : "")}`
-      : "Данные не сохранены."
+      ? `Տվյալները պահպանվել են ընդհանուր աղյուսակում։${saveSource === "telegram-form" ? " Պահպանման աղբյուր՝ Telegram Web App։" : (saveSource === "photo" ? " Պահպանման աղբյուր՝ լուսանկար։" : "")}`
+      : "Տվյալները չեն պահպանվել։"
   ));
 
   return safeLines.filter(Boolean).join("\n");
