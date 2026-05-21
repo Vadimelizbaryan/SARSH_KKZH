@@ -8562,7 +8562,7 @@ async function handleTelegramPhoto(
 
   await sendTelegramMessage(
     chatId,
-    `${senderFirstName}, լուսանկարը ստացել եմ։ Հիմա ուշադիր կարդում եմ բլանկը։ Եթե ինչ-որ բան չստացվի, չեմ բարկանա՝ պարզապես կհուշեմ, ինչպես նկարել ավելի լավ։`
+    `${senderFirstName}, լուսանկարը ստացել եմ։ Հիմա ուշադիր կարդում եմ բլանկը։`
   );
 
   const sourceMessageId = getTelegramMessageId(message);
