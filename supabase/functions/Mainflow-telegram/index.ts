@@ -6405,6 +6405,7 @@ function getRowEffectiveUpdatedAt(
 
 function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
   const rowsWithData = snapshot.rows.filter((row) => rowHasAnyData(row.values));
+  const nowText = getYerevanDateTimeText();
   const newestUpdatedAt = rowsWithData
     .map((row) => getRowEffectiveUpdatedAt(row))
     .filter((value) => Number.isFinite(Date.parse(value)))
@@ -6418,9 +6419,10 @@ function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
     });
 
   return [
-    `Հաշվետվության ամսաթիվ: ${snapshot.reportDate}`,
+    `Ժամը հիմա: ${nowText}`,
+    `Հաշվետվության կազմման ժամը: ${snapshot.reportDate}`,
     `Լրացված բաժանմունքներ: ${rowsWithData.length}/${snapshot.rows.length}`,
-    newestUpdatedAt ? `Ամփոփագրի վերջին թարմացում: ${getYerevanHyDateTimeText(new Date(newestUpdatedAt))}` : "",
+    newestUpdatedAt ? `Վերջին թարմացումը: ${getYerevanHyDateTimeText(new Date(newestUpdatedAt))}` : "",
     updatedRows.length ? "" : null,
     updatedRows.length ? "Վերջին թարմացումներ:" : null,
     ...updatedRows
