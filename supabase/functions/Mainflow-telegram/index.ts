@@ -6018,7 +6018,7 @@ function buildTelegramWebFormArchiveRecord(row: Record<string, unknown> | null |
     departmentName: String(row.department_name || DEPARTMENTS[departmentId].department),
     reportDate: reportDateRaw || formatTelegramFormArchiveDateLabel(archiveDateKey),
     archiveDateKey,
-    values: sanitizeValues((row.final_values || row.recognized_values || {}) as Record<string, unknown>),
+    values: sanitizeValues((row.final_values || row.ocr_raw || {}) as Record<string, unknown>),
     patientNotes: extractDepartmentPatientNotesFromFeedbackNotes(row.notes),
     createdAt
   };
@@ -6036,7 +6036,7 @@ async function loadTelegramWebFormArchiveRecord(
 
   let query = (supabase as any)
     .from("sharsh_ocr_feedback")
-    .select("id, created_at, department_id, department_name, report_date, image_name, final_values, recognized_values, notes")
+    .select("id, created_at, department_id, department_name, report_date, image_name, final_values, ocr_raw, notes")
     .eq("id", normalizedId)
     .eq("image_name", "telegram-web-app-form");
 
@@ -6057,7 +6057,7 @@ async function loadTelegramWebFormArchiveRecordsForDate(
 ) {
   const { data, error } = await (supabase as any)
     .from("sharsh_ocr_feedback")
-    .select("id, created_at, department_id, department_name, report_date, image_name, final_values, recognized_values, notes")
+    .select("id, created_at, department_id, department_name, report_date, image_name, final_values, ocr_raw, notes")
     .eq("image_name", "telegram-web-app-form")
     .order("created_at", { ascending: false })
     .limit(1000);
