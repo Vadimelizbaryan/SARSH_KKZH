@@ -6394,34 +6394,21 @@ function rowNeedsFreshTelegramUpdate(row: Awaited<ReturnType<typeof loadSnapshot
   return Date.now() - updatedAt > twoHoursMs;
 }
 
-function buildMainTableAutoSaveAdminText(
-  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
+function buildTelegramWebAutoSaveAdminText(
   departmentId: DepartmentId,
   reportDate: string,
-  source: "telegram-form" | "photo",
-  userName: string
+  userName: string,
+  didAutoSave: boolean
 ) {
   const meta = DEPARTMENTS[departmentId];
-  const pendingRows = snapshot.rows
-    .filter((row) => row.id !== departmentId && rowNeedsFreshTelegramUpdate(row))
-    .map((row) => {
-      const rowMeta = DEPARTMENTS[row.id as DepartmentId];
-      return rowMeta ? `${rowMeta.marker} ${row.department}` : row.department;
-    });
-  const pendingText = pendingRows.length
-    ? pendingRows.map((line) => `- ${line}`).join("\n")
-    : "Все отделения уже свежие.";
-
   return [
-    source === "telegram-form"
-      ? "Данные Telegram Web App автоматически внесены в основную таблицу."
-      : "Данные фото автоматически внесены в основную таблицу.",
+    "Получена Telegram Web App форма.",
     `Отделение: ${meta.department} (${meta.marker})`,
     `Дата отчёта: ${reportDate}`,
-    userName ? `Отправитель: ${userName}` : "",
-    "",
-    "Пока не обновлены:",
-    pendingText
+    userName ? `Пользователь: ${userName}` : "",
+    didAutoSave
+      ? "Данные автоматически внесены в основную таблицу."
+      : "Основная таблица пока не обновлена: ждем фото бланка этого же отделения."
   ].filter(Boolean).join("\n");
 }
 
@@ -6828,21 +6815,12 @@ async function handleTelegramWebFormSubmit(request: Request) {
 
     const notifyChatIds = getTelegramNotifyChatIds(null);
     if (notifyChatIds.length) {
-      const adminIntro = didAutoSave
-        ? buildMainTableAutoSaveAdminText(
-          savedSnapshot,
-          departmentId,
-          reportDate,
-          "telegram-form",
-          userName || String(verifiedUser.userId || "")
-        )
-        : [
-          "Получена Telegram Web App форма.",
-          `Отделение: ${meta.department} (${meta.marker})`,
-          `Дата отчёта: ${reportDate}`,
-          userName ? `Пользователь: ${userName}` : "",
-          "Основная таблица пока не обновлена: ждем фото бланка этого же отделения."
-        ].filter(Boolean).join("\n");
+      const adminIntro = buildTelegramWebAutoSaveAdminText(
+        departmentId,
+        reportDate,
+        userName || String(verifiedUser.userId || ""),
+        didAutoSave
+      );
 
       await sendTelegramMessageToMany(notifyChatIds, [
         adminIntro,
@@ -8698,23 +8676,11 @@ async function handleTelegramPhoto(
   );
   const notifyChatIds = getTelegramNotifyChatIds(chatId);
   if (notifyChatIds.length) {
-    if (shouldSaveSnapshot && savedSnapshot && autoSaveSource) {
+    if (shouldSaveSnapshot && savedSnapshot && autoSaveSource === "telegram-form" && telegramWebFormFeedback) {
       await sendTelegramMessageToMany(
         notifyChatIds,
-        buildMainTableAutoSaveAdminText(
-          savedSnapshot,
-          departmentId,
-          reportDate,
-          autoSaveSource,
-          (autoSaveSource === "telegram-form" ? (telegramWebFormFeedback?.userName || senderFirstName) : senderFirstName)
-        )
+        `Значения Web App: ${buildTelegramWebFormValuesText(telegramWebFormFeedback.values)}`
       );
-      if (autoSaveSource === "telegram-form" && telegramWebFormFeedback) {
-        await sendTelegramMessageToMany(
-          notifyChatIds,
-          `Значения Web App: ${buildTelegramWebFormValuesText(telegramWebFormFeedback.values)}`
-        );
-      }
     }
     await sendTelegramMessageToMany(notifyChatIds, detailedPhotoSummary, { parseMode: "HTML" });
   } else {
