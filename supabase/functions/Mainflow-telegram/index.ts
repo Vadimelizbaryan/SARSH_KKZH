@@ -453,7 +453,6 @@ const CIVIL_REFERRAL_GROUP = "civil_referral";
 const CIVIL_REFERRAL_DEFAULT_LIMIT = 40;
 const CIVIL_REFERRAL_MAX_LIMIT = 1000;
 const CIVIL_REFERRAL_DAY_MS = 24 * 60 * 60 * 1000;
-const ARMENIA_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
 const CIVIL_REFERRAL_VALUE_KEYS = [
   "patientName",
   "medicalCenter",
@@ -699,11 +698,15 @@ function rowMatchesCivilReferralSr(row: Record<string, unknown>, srMarker: strin
 }
 
 function getCivilReferralTodayTime() {
-  const armeniaNow = new Date(Date.now() + ARMENIA_UTC_OFFSET_MS);
+  const key = getYerevanDateKey();
+  const match = key.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return 0;
+  }
   return Date.UTC(
-    armeniaNow.getUTCFullYear(),
-    armeniaNow.getUTCMonth(),
-    armeniaNow.getUTCDate()
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3])
   );
 }
 
@@ -2389,6 +2392,18 @@ function getYerevanDateTimeText(date = new Date()) {
   }).formatToParts(date);
   const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
   return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
+}
+
+function getYerevanHyDateTimeText(date: Date) {
+  return new Intl.DateTimeFormat("hy-AM", {
+    timeZone: "Asia/Yerevan",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).format(date);
 }
 
 function normalizeShiftReportDateTime(value: unknown, fallback = getYerevanDateTimeText()) {
@@ -6444,13 +6459,13 @@ function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
     .slice(0, 5)
     .map((row) => {
       const updatedAt = getRowEffectiveUpdatedAt(row);
-      return `- ${row.department}: ${updatedAt ? new Date(updatedAt).toLocaleString("hy-AM") : "ամսաթիվ չկա"}`;
+      return `- ${row.department}: ${updatedAt ? getYerevanHyDateTimeText(new Date(updatedAt)) : "ամսաթիվ չկա"}`;
     });
 
   return [
     `Հաշվետվության ամսաթիվ: ${snapshot.reportDate}`,
     `Լրացված բաժանմունքներ: ${rowsWithData.length}/${snapshot.rows.length}`,
-    newestUpdatedAt ? `Ամփոփագրի վերջին թարմացում: ${new Date(newestUpdatedAt).toLocaleString("hy-AM")}` : "",
+    newestUpdatedAt ? `Ամփոփագրի վերջին թարմացում: ${getYerevanHyDateTimeText(new Date(newestUpdatedAt))}` : "",
     updatedRows.length ? "" : null,
     updatedRows.length ? "Վերջին թարմացումներ:" : null,
     ...updatedRows
