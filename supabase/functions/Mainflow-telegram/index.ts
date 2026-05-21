@@ -6441,44 +6441,38 @@ function formatStatusDateTime(value: string) {
   return Number.isFinite(parsed) ? getYerevanHyDateTimeText(new Date(parsed)) : raw;
 }
 
-function getSnapshotStatusFallbackUpdatedAt(
-  snapshot: Awaited<ReturnType<typeof loadSnapshot>>
-) {
-  const reportDate = String(snapshot.reportDate || "").trim();
-  if (/^\d{2}[.,/]\d{2}[.,/]\d{2,4}\s+\d{2}:\d{2}$/.test(reportDate)) {
-    return reportDate;
-  }
-  return String(snapshot.updatedAt || "");
-}
-
 function getStatusRowUpdatedAt(
-  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
   row: Awaited<ReturnType<typeof loadSnapshot>>["rows"][number]
 ) {
-  const updatedAt = getRowEffectiveUpdatedAt(row);
+  return getRowEffectiveUpdatedAt(row);
+}
+
+function getStatusRowText(
+  row: Awaited<ReturnType<typeof loadSnapshot>>["rows"][number]
+) {
+  const updatedAt = getStatusRowUpdatedAt(row);
   if (updatedAt) {
-    return updatedAt;
+    return formatStatusDateTime(updatedAt);
   }
 
   if (QH_CALC_DEPARTMENT_IDS.has(row.id as DepartmentId) && rowHasAnyData(row.values)) {
-    return getSnapshotStatusFallbackUpdatedAt(snapshot);
+    return "առանձին չի թարմացվել";
   }
 
-  return "";
+  return "ամսաթիվ չկա";
 }
 
 function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
   const rowsWithData = snapshot.rows.filter((row) => rowHasAnyData(row.values));
   const nowText = getYerevanDateTimeText();
   const newestUpdatedAt = rowsWithData
-    .map((row) => getStatusRowUpdatedAt(snapshot, row))
+    .map((row) => getStatusRowUpdatedAt(row))
     .filter((value) => Number.isFinite(getStatusTimestampMs(value)))
     .sort((a, b) => getStatusTimestampMs(b) - getStatusTimestampMs(a))[0] || "";
   const updatedRows = rowsWithData
-    .sort((a, b) => getStatusTimestampMs(getStatusRowUpdatedAt(snapshot, b)) - getStatusTimestampMs(getStatusRowUpdatedAt(snapshot, a)))
+    .sort((a, b) => getStatusTimestampMs(getStatusRowUpdatedAt(b)) - getStatusTimestampMs(getStatusRowUpdatedAt(a)))
     .map((row) => {
-      const updatedAt = getStatusRowUpdatedAt(snapshot, row);
-      return `- ${row.department}: ${formatStatusDateTime(updatedAt)}`;
+      return `- ${row.department}: ${getStatusRowText(row)}`;
     });
 
   return [
@@ -6496,7 +6490,12 @@ function rowNeedsFreshTelegramUpdate(
   snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
   row: Awaited<ReturnType<typeof loadSnapshot>>["rows"][number]
 ) {
-  const updatedAt = getStatusTimestampMs(getStatusRowUpdatedAt(snapshot, row));
+  const updatedAtText = getStatusRowUpdatedAt(row);
+  if (!updatedAtText && QH_CALC_DEPARTMENT_IDS.has(row.id as DepartmentId) && rowHasAnyData(row.values)) {
+    return false;
+  }
+
+  const updatedAt = getStatusTimestampMs(updatedAtText);
   if (!Number.isFinite(updatedAt)) {
     return true;
   }
