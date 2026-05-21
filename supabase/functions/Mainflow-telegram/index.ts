@@ -6412,7 +6412,6 @@ function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
     .sort((a, b) => Date.parse(b) - Date.parse(a))[0] || "";
   const updatedRows = rowsWithData
     .sort((a, b) => Date.parse(getRowEffectiveUpdatedAt(b)) - Date.parse(getRowEffectiveUpdatedAt(a)))
-    .slice(0, 5)
     .map((row) => {
       const updatedAt = getRowEffectiveUpdatedAt(row);
       return `- ${row.department}: ${updatedAt ? getYerevanHyDateTimeText(new Date(updatedAt)) : "ամսաթիվ չկա"}`;
