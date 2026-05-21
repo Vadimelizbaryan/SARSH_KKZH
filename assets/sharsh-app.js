@@ -2497,6 +2497,16 @@
     return normalized;
   }
 
+  function upsertDepartmentPdfArchiveRecord(record) {
+    const normalized = normalizeDepartmentPdfArchiveRecord(record);
+    if (!normalized) {
+      return ensureDepartmentPdfArchiveRecordsLoaded();
+    }
+    const records = ensureDepartmentPdfArchiveRecordsLoaded()
+      .filter((item) => item.archiveKey !== normalized.archiveKey);
+    return writeDepartmentPdfArchiveRecords([normalized, ...records]);
+  }
+
   function ensureDepartmentPdfArchiveRecordsLoaded() {
     if (!Array.isArray(state.departmentPdfArchiveRecords) || !state.departmentPdfArchiveRecords.length) {
       state.departmentPdfArchiveRecords = readDepartmentPdfArchiveRecords();
@@ -2512,9 +2522,100 @@
   }
 
   function captureDepartmentPdfArchiveFromSave(snapshot, rowId) {
-    void snapshot;
-    void rowId;
-    return null;
+    if (!snapshot || !rowId) {
+      return null;
+    }
+
+    const row = Array.isArray(snapshot.rows)
+      ? snapshot.rows.find((item) => item && item.id === rowId)
+      : null;
+    const definition = getDepartmentDefinitionById(rowId);
+    if (!row || !definition) {
+      return null;
+    }
+
+    const capturedAt = String(row.updatedAt || snapshot.updatedAt || new Date().toISOString()).trim() || new Date().toISOString();
+    const reportDate = String(snapshot.reportDate || config.DEFAULT_DATE).trim() || config.DEFAULT_DATE;
+    const archiveDateKey = normalizeDepartmentPdfArchiveDateKey(reportDate || capturedAt);
+    if (!archiveDateKey) {
+      return null;
+    }
+
+    const archiveDateLabel = formatDepartmentPdfArchiveDateLabel(archiveDateKey, reportDate);
+    const timestampKey = String(getTimestampSortValue(capturedAt) || Date.now());
+    const record = {
+      archiveKey: `${archiveDateKey}-${rowId}-${timestampKey}`,
+      archiveDateKey,
+      archiveLabel: archiveDateLabel,
+      archiveDateLabel,
+      capturedAt,
+      reportDate,
+      source: typeof row.photoWorkflowStatus === "string" && row.photoWorkflowStatus.trim()
+        ? row.photoWorkflowStatus.trim()
+        : "department-save",
+      feedbackId: "",
+      departmentId: rowId,
+      departmentName: definition.department,
+      departmentMarker: definition.marker,
+      values: config.normalizeRowValues(row.values || {}),
+      updatedAt: capturedAt
+    };
+
+    upsertDepartmentPdfArchiveRecord(record);
+    if (!state.selectedDepartmentPdfArchiveKey) {
+      state.selectedDepartmentPdfArchiveKey = record.archiveKey;
+    }
+    if (!state.selectedDepartmentPdfArchiveDate) {
+      state.selectedDepartmentPdfArchiveDate = archiveDateKey;
+    }
+    refreshDepartmentPdfArchiveUi();
+    return record;
+  }
+
+  function backfillDepartmentPdfArchiveFromSnapshot(snapshot) {
+    if (
+      !snapshot
+      || !Array.isArray(snapshot.rows)
+      || ensureDepartmentPdfArchiveRecordsLoaded().length
+    ) {
+      return ensureDepartmentPdfArchiveRecordsLoaded();
+    }
+
+    snapshot.rows.forEach((row) => {
+      const definition = getDepartmentDefinitionById(row && row.id);
+      const capturedAt = String((row && row.updatedAt) || "").trim();
+      if (!definition || !capturedAt) {
+        return;
+      }
+
+      const reportDate = String(snapshot.reportDate || config.DEFAULT_DATE).trim() || config.DEFAULT_DATE;
+      const archiveDateKey = normalizeDepartmentPdfArchiveDateKey(reportDate || capturedAt);
+      if (!archiveDateKey) {
+        return;
+      }
+
+      const timestampKey = String(getTimestampSortValue(capturedAt) || Date.now());
+      upsertDepartmentPdfArchiveRecord({
+        archiveKey: `${archiveDateKey}-${row.id}-${timestampKey}`,
+        archiveDateKey,
+        archiveLabel: formatDepartmentPdfArchiveDateLabel(archiveDateKey, reportDate),
+        archiveDateLabel: formatDepartmentPdfArchiveDateLabel(archiveDateKey, reportDate),
+        capturedAt,
+        reportDate,
+        source: typeof row.photoWorkflowStatus === "string" && row.photoWorkflowStatus.trim()
+          ? row.photoWorkflowStatus.trim()
+          : "snapshot-backfill",
+        feedbackId: "",
+        departmentId: row.id,
+        departmentName: definition.department,
+        departmentMarker: definition.marker,
+        values: config.normalizeRowValues(row.values || {}),
+        updatedAt: capturedAt
+      });
+    });
+
+    refreshDepartmentPdfArchiveUi();
+    return ensureDepartmentPdfArchiveRecordsLoaded();
   }
 
   function normalizeDepartmentPdfArchiveDateKey(value) {
@@ -2629,15 +2730,24 @@
       ).slice(0, MAX_DEPARTMENT_PDF_ARCHIVE_RECORDS);
 
       if (normalized.length) {
-        state.departmentPdfArchiveRecords = normalized;
+        const localRecords = ensureDepartmentPdfArchiveRecordsLoaded();
+        const mergedByKey = new Map();
+        [...normalized, ...localRecords].forEach((record) => {
+          if (record && typeof record.archiveKey === "string" && !mergedByKey.has(record.archiveKey)) {
+            mergedByKey.set(record.archiveKey, record);
+          }
+        });
+        state.departmentPdfArchiveRecords = sortDepartmentPdfArchiveRecords(Array.from(mergedByKey.values()))
+          .slice(0, MAX_DEPARTMENT_PDF_ARCHIVE_RECORDS);
+        localStorage.setItem(DEPARTMENT_PDF_ARCHIVE_STORAGE_KEY, JSON.stringify(state.departmentPdfArchiveRecords));
         state.departmentPdfArchiveRemoteLoaded = true;
-        const selectedKeyExists = normalized.some((record) => record.archiveKey === state.selectedDepartmentPdfArchiveKey);
+        const selectedKeyExists = state.departmentPdfArchiveRecords.some((record) => record.archiveKey === state.selectedDepartmentPdfArchiveKey);
         if (!selectedKeyExists) {
-          state.selectedDepartmentPdfArchiveKey = normalized[0].archiveKey;
+          state.selectedDepartmentPdfArchiveKey = state.departmentPdfArchiveRecords[0].archiveKey;
         }
-        const selectedDateExists = normalized.some((record) => record.archiveDateKey === state.selectedDepartmentPdfArchiveDate);
+        const selectedDateExists = state.departmentPdfArchiveRecords.some((record) => record.archiveDateKey === state.selectedDepartmentPdfArchiveDate);
         if (!selectedDateExists) {
-          state.selectedDepartmentPdfArchiveDate = normalized[0].archiveDateKey;
+          state.selectedDepartmentPdfArchiveDate = state.departmentPdfArchiveRecords[0].archiveDateKey;
         }
       }
     } catch (error) {
@@ -8030,6 +8140,7 @@
     applyLoadedSnapshot(result);
     state.archiveRecords = readArchiveRecords();
     state.departmentPdfArchiveRecords = readDepartmentPdfArchiveRecords();
+    backfillDepartmentPdfArchiveFromSnapshot(state.snapshot);
     state.initialized = true;
     state.info = "";
     state.infoIsError = false;
