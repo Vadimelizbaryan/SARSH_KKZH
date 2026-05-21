@@ -4133,6 +4133,12 @@ async function maybeAutoSendMainPdfsWhenSnapshotReady(
   return await sendMainPdfsToTelegram(supabase, { source: "auto_ready" });
 }
 
+function buildMainPdfsAutoSentNoticeHy(sentCount: number) {
+  return sentCount > 0
+    ? `Բոլոր բաժանմունքները թարմացվել են։ Report.pdf և ԿԿԶՀ-Շարժ․pdf ֆայլերը ավտոմատ ուղարկվել են (${sentCount} հասցեատեր)։`
+    : "";
+}
+
 async function saveDepartmentSnapshot(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
@@ -6827,8 +6833,11 @@ async function handleTelegramWebFormSubmit(request: Request) {
     );
     const didAutoSave = true;
     const savedSnapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
+    let autoPdfResult:
+      | Awaited<ReturnType<typeof maybeAutoSendMainPdfsWhenSnapshotReady>>
+      | null = null;
     try {
-      await maybeAutoSendMainPdfsWhenSnapshotReady(
+      autoPdfResult = await maybeAutoSendMainPdfsWhenSnapshotReady(
         supabase as ReturnType<typeof createClient>,
         savedSnapshot
       );
@@ -6842,6 +6851,7 @@ async function handleTelegramWebFormSubmit(request: Request) {
         `Բաժանմունք: ${meta.department} (${meta.marker})`,
         ...(validationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...validationLinesHy] : []),
         "Տվյալները ավտոմատ գրանցվել են ընդհանուր աղյուսակում։",
+        ...(autoPdfResult?.sent ? [buildMainPdfsAutoSentNoticeHy(autoPdfResult.sent)] : []),
         "Կցում եմ PDF բլանկը՝ Telegram ձևից ստացված նոր արժեքներով։"
       ].join("\n")
       : [
@@ -8705,6 +8715,9 @@ async function handleTelegramPhoto(
   let shouldSaveSnapshot = false;
   let savedSnapshot: Awaited<ReturnType<typeof loadSnapshot>> | null = null;
   let autoSaveSource: "telegram-form" | "photo" | null = null;
+  let autoPdfResult:
+    | Awaited<ReturnType<typeof maybeAutoSendMainPdfsWhenSnapshotReady>>
+    | null = null;
   if (telegramWebFormFeedback) {
     await saveDepartmentSnapshot(supabase, departmentId, reportDate, telegramWebFormFeedback.values, "telegram-form");
     await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, fileName, "processed_telegram");
@@ -8723,7 +8736,7 @@ async function handleTelegramPhoto(
 
   if (shouldSaveSnapshot && savedSnapshot) {
     try {
-      await maybeAutoSendMainPdfsWhenSnapshotReady(supabase, savedSnapshot);
+      autoPdfResult = await maybeAutoSendMainPdfsWhenSnapshotReady(supabase, savedSnapshot);
     } catch (error) {
       console.error("Failed to auto-send main PDFs after Telegram photo save:", sanitizePublicErrorMessage(error));
     }
@@ -8764,12 +8777,14 @@ async function handleTelegramPhoto(
             "Տվյալները վերցրել եմ Telegram ձևից և ավտոմատ գրանցել հիմնական աղյուսակում։",
             ...(photoValidation?.isValid === false ? ["Ուշադրություն. ստուգիր «Վերահսկիչ գումարներ» բաժնի նշումները։"] : []),
             ...(photoValidationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...photoValidationLinesHy] : []),
+            ...(autoPdfResult?.sent ? [buildMainPdfsAutoSentNoticeHy(autoPdfResult.sent)] : []),
             "Տվյալները պահպանվել են հիմնական աղյուսակում։"
           ]
           : [
             `${senderFirstName}, լուսանկարը ստացվել է և OCR վերահսկումը անցել է։ Շնորհակալություն։ 🙂`,
             "Տվյալները վերցրել եմ լուսանկարից և ավտոմատ գրանցել հիմնական աղյուսակում։",
             ...(photoValidationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...photoValidationLinesHy] : []),
+            ...(autoPdfResult?.sent ? [buildMainPdfsAutoSentNoticeHy(autoPdfResult.sent)] : []),
             "Տվյալները պահպանվել են հիմնական աղյուսակում։"
           ]
       ).join("\n")
