@@ -4084,6 +4084,55 @@ async function sendMainPdfsToTelegram(
   };
 }
 
+function isSnapshotReadyForMainPdfAutoSend(
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>
+) {
+  const staleRows = snapshot.rows.filter((row) => rowNeedsFreshTelegramUpdate(row));
+  if (staleRows.length) {
+    return {
+      isReady: false,
+      reason: "stale_rows",
+      markers: staleRows.map((row) => row.marker)
+    };
+  }
+
+  const invalidRows = snapshot.rows.filter((row) => !validateDepartmentSheetValues(row.values).isValid);
+  if (invalidRows.length) {
+    return {
+      isReady: false,
+      reason: "validation_failed",
+      markers: invalidRows.map((row) => row.marker)
+    };
+  }
+
+  return {
+    isReady: true,
+    reason: "",
+    markers: [] as string[]
+  };
+}
+
+async function maybeAutoSendMainPdfsWhenSnapshotReady(
+  supabase: ReturnType<typeof createClient>,
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>> | null | undefined
+) {
+  if (!snapshot) {
+    return { sent: 0, skipped: "no_snapshot", dateKey: getYerevanDateKey() };
+  }
+
+  const readiness = isSnapshotReadyForMainPdfAutoSend(snapshot);
+  if (!readiness.isReady) {
+    return {
+      sent: 0,
+      skipped: readiness.reason,
+      dateKey: getYerevanDateKey(),
+      markers: readiness.markers
+    };
+  }
+
+  return await sendMainPdfsToTelegram(supabase, { source: "auto_ready" });
+}
+
 async function saveDepartmentSnapshot(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
@@ -6778,6 +6827,14 @@ async function handleTelegramWebFormSubmit(request: Request) {
     );
     const didAutoSave = true;
     const savedSnapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
+    try {
+      await maybeAutoSendMainPdfsWhenSnapshotReady(
+        supabase as ReturnType<typeof createClient>,
+        savedSnapshot
+      );
+    } catch (error) {
+      console.error("Failed to auto-send main PDFs after Telegram Web App save:", sanitizePublicErrorMessage(error));
+    }
     const meta = DEPARTMENTS[departmentId];
     const messageText = didAutoSave
       ? [
@@ -8662,6 +8719,14 @@ async function handleTelegramPhoto(
     savedSnapshot = await loadSnapshot(supabase);
   } else {
     await markDepartmentPhotoPending(supabase, departmentId, feedbackId, fileName);
+  }
+
+  if (shouldSaveSnapshot && savedSnapshot) {
+    try {
+      await maybeAutoSendMainPdfsWhenSnapshotReady(supabase, savedSnapshot);
+    } catch (error) {
+      console.error("Failed to auto-send main PDFs after Telegram photo save:", sanitizePublicErrorMessage(error));
+    }
   }
 
   const detailedPhotoSummary = buildPhotoSaveSummary(
