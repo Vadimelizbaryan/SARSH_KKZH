@@ -2977,6 +2977,19 @@
     );
   }
 
+  function getRowEffectiveUpdatedAt(row) {
+    if (!row) {
+      return "";
+    }
+
+    const source = String(row.lastUpdateSource || row.photoWorkflowStatus || "");
+    if (source === "processed_rollover" || source === "processed_night_shift" || source === "processed_day_shift") {
+      return row.photoFeedbackUpdatedAt || "";
+    }
+
+    return row.updatedAt || row.photoFeedbackUpdatedAt || "";
+  }
+
   function getFreshnessMeta(updatedAt, hasData = true) {
     if (!hasData) {
       return {
@@ -3028,7 +3041,7 @@
   }
 
   function getRowFreshnessMeta(row) {
-    return getFreshnessMeta(row && row.updatedAt, rowHasSubmittedData(row));
+    return getFreshnessMeta(getRowEffectiveUpdatedAt(row), rowHasSubmittedData(row));
   }
 
   function getDepartmentPhotoWorkflowMeta(row) {
@@ -3159,15 +3172,16 @@
       const meta = getRowFreshnessMeta(row);
       counts[meta.level] += 1;
 
-      const time = parseTimestamp(row.updatedAt);
+      const effectiveUpdatedAt = getRowEffectiveUpdatedAt(row);
+      const time = parseTimestamp(effectiveUpdatedAt);
       if (!time || !rowHasSubmittedData(row)) {
         return;
       }
 
-      if (!oldestRow || time.getTime() < parseTimestamp(oldestRow.updatedAt).getTime()) {
+      if (!oldestRow || time.getTime() < parseTimestamp(getRowEffectiveUpdatedAt(oldestRow)).getTime()) {
         oldestRow = row;
       }
-      if (!newestRow || time.getTime() > parseTimestamp(newestRow.updatedAt).getTime()) {
+      if (!newestRow || time.getTime() > parseTimestamp(getRowEffectiveUpdatedAt(newestRow)).getTime()) {
         newestRow = row;
       }
     });
@@ -5026,7 +5040,10 @@
     const sourceLabel = sync.getSourceLabel(state.source);
     const freshnessStats = buildFreshnessStats(state.snapshot.rows);
     const overallUpdateStatus = getOverallUpdateStatus(freshnessStats, state.snapshot.rows.length);
-    const summaryFreshness = getFreshnessMeta(state.snapshot.updatedAt);
+    const summaryFreshness = getFreshnessMeta(
+      freshnessStats.newestRow ? getRowEffectiveUpdatedAt(freshnessStats.newestRow) : "",
+      Boolean(freshnessStats.newestRow)
+    );
     const currentDateTime = getCurrentDateTimeParts();
     const archiveRecords = ensureArchiveRecordsLoaded();
     const latestArchive = archiveRecords[0] || null;
@@ -5108,7 +5125,7 @@
               </div>
               <p class="hint" id="freshnessOldestText">${
                 freshnessStats.oldestRow
-                  ? escapeHtml(`Самые старые данные: ${freshnessStats.oldestRow.department} — ${formatTimestamp(freshnessStats.oldestRow.updatedAt)} (${formatAge(freshnessStats.oldestRow.updatedAt)})`)
+                  ? escapeHtml(`Самые старые данные: ${freshnessStats.oldestRow.department} — ${formatTimestamp(getRowEffectiveUpdatedAt(freshnessStats.oldestRow))} (${formatAge(getRowEffectiveUpdatedAt(freshnessStats.oldestRow))})`)
                   : "Нет ни одного отделения с отправленными данными."
               }</p>
             </div>
@@ -5117,11 +5134,11 @@
 
             <div class="zoom-target">
               <div class="sheet-shell">
-                <p class="status-line no-print">
-                  <strong>Последнее обновление сводки:</strong>
-                  <span id="lastUpdatedText">${escapeHtml(formatTimestamp(state.snapshot.updatedAt))}</span>
-                  <span class="status-chip status-chip--${summaryFreshness.level}" id="lastUpdatedBadge">${escapeHtml(summaryFreshness.label)}</span>
-                </p>
+              <p class="status-line no-print">
+                <strong>Последнее обновление сводки:</strong>
+                <span id="lastUpdatedText">${escapeHtml(freshnessStats.newestRow ? formatTimestamp(getRowEffectiveUpdatedAt(freshnessStats.newestRow)) : "еще не отправлялось")}</span>
+                <span class="status-chip status-chip--${summaryFreshness.level}" id="lastUpdatedBadge">${escapeHtml(summaryFreshness.label)}</span>
+              </p>
                 <div class="table-wrap">
                   ${renderTable(state.snapshot, state.snapshot.rows, { interactive: false, viewMode: "main" })}
                 </div>
@@ -5709,7 +5726,7 @@
             <div class="sheet-shell">
               <p class="status-line no-print">
                 <strong>Последняя отправка:</strong>
-                <span id="lastUpdatedText">${escapeHtml(formatTimestamp(row.updatedAt))}</span>
+                <span id="lastUpdatedText">${escapeHtml(rowFreshness.timestamp)}</span>
                 <span class="status-chip status-chip--${rowFreshness.level}" id="lastUpdatedBadge">${escapeHtml(rowFreshness.label)}</span>
               </p>
               <div class="table-wrap">
@@ -6073,9 +6090,11 @@
           lastUpdatedBadge.className = `status-chip status-chip--${meta.level}`;
         }
       } else {
-        lastUpdatedText.textContent = formatTimestamp(state.snapshot.updatedAt);
+        const stats = buildFreshnessStats(state.snapshot.rows);
+        const newestUpdatedAt = stats.newestRow ? getRowEffectiveUpdatedAt(stats.newestRow) : "";
+        lastUpdatedText.textContent = newestUpdatedAt ? formatTimestamp(newestUpdatedAt) : "еще не отправлялось";
         if (lastUpdatedBadge) {
-          const meta = getFreshnessMeta(state.snapshot.updatedAt);
+          const meta = getFreshnessMeta(newestUpdatedAt, Boolean(stats.newestRow));
           lastUpdatedBadge.textContent = meta.label;
           lastUpdatedBadge.className = `status-chip status-chip--${meta.level}`;
         }
@@ -6119,7 +6138,7 @@
       }
       if (oldestText) {
         oldestText.textContent = stats.oldestRow
-          ? `Самые старые данные: ${stats.oldestRow.department} — ${formatTimestamp(stats.oldestRow.updatedAt)} (${formatAge(stats.oldestRow.updatedAt)})`
+          ? `Самые старые данные: ${stats.oldestRow.department} — ${formatTimestamp(getRowEffectiveUpdatedAt(stats.oldestRow))} (${formatAge(getRowEffectiveUpdatedAt(stats.oldestRow))})`
           : "Нет ни одного отделения с отправленными данными.";
       }
       if (overallUpdateBanner) {

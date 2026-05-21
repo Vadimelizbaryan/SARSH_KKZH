@@ -6423,17 +6423,34 @@ function rowHasAnyData(values: Record<string, number | null>) {
   return Object.values(values).some((value) => typeof value === "number" && value > 0);
 }
 
+function getRowEffectiveUpdatedAt(
+  row: Awaited<ReturnType<typeof loadSnapshot>>["rows"][number]
+) {
+  const source = String(row.photoWorkflowStatus || "");
+  if (source === "processed_rollover" || source === "processed_night_shift" || source === "processed_day_shift") {
+    return String(row.photoFeedbackUpdatedAt || "");
+  }
+  return String(row.updatedAt || row.photoFeedbackUpdatedAt || "");
+}
+
 function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
   const rowsWithData = snapshot.rows.filter((row) => rowHasAnyData(row.values));
+  const newestUpdatedAt = rowsWithData
+    .map((row) => getRowEffectiveUpdatedAt(row))
+    .filter((value) => Number.isFinite(Date.parse(value)))
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0] || "";
   const updatedRows = rowsWithData
-    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))
+    .sort((a, b) => Date.parse(getRowEffectiveUpdatedAt(b)) - Date.parse(getRowEffectiveUpdatedAt(a)))
     .slice(0, 5)
-    .map((row) => `- ${row.department}: ${row.updatedAt ? new Date(row.updatedAt).toLocaleString("hy-AM") : "ամսաթիվ չկա"}`);
+    .map((row) => {
+      const updatedAt = getRowEffectiveUpdatedAt(row);
+      return `- ${row.department}: ${updatedAt ? new Date(updatedAt).toLocaleString("hy-AM") : "ամսաթիվ չկա"}`;
+    });
 
   return [
     `Հաշվետվության ամսաթիվ: ${snapshot.reportDate}`,
     `Լրացված բաժանմունքներ: ${rowsWithData.length}/${snapshot.rows.length}`,
-    snapshot.updatedAt ? `Ամփոփագրի վերջին թարմացում: ${new Date(snapshot.updatedAt).toLocaleString("hy-AM")}` : "",
+    newestUpdatedAt ? `Ամփոփագրի վերջին թարմացում: ${new Date(newestUpdatedAt).toLocaleString("hy-AM")}` : "",
     updatedRows.length ? "" : null,
     updatedRows.length ? "Վերջին թարմացումներ:" : null,
     ...updatedRows
@@ -6441,7 +6458,7 @@ function buildStatusText(snapshot: Awaited<ReturnType<typeof loadSnapshot>>) {
 }
 
 function rowNeedsFreshTelegramUpdate(row: Awaited<ReturnType<typeof loadSnapshot>>["rows"][number]) {
-  const updatedAt = Date.parse(String(row.updatedAt || ""));
+  const updatedAt = Date.parse(getRowEffectiveUpdatedAt(row));
   if (!Number.isFinite(updatedAt)) {
     return true;
   }
