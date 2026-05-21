@@ -162,6 +162,27 @@ const DEPARTMENT_PDF_FILES: Record<keyof typeof DEPARTMENTS, { folder: string; f
   r21: { folder: "Ք-Հ", file: "Ք-Հ.pdf" }
 };
 
+const DEPARTMENT_PDF_ROOT_SEGMENT = "%D0%9E%D1%82%D0%B4%D0%B5%D0%BB%D0%B5%D0%BD%D0%B8%D1%8F";
+const DEPARTMENT_PDF_URL_SEGMENTS: Record<keyof typeof DEPARTMENTS, { folder: string; file: string }> = {
+  r4: { folder: "%D5%8E%D5%AB%D6%80%D5%A1%D5%A2%D5%B8%D6%82%D5%AA%D5%A1%D5%AF%D5%A1%D5%B6", file: "%D5%8E%D5%AB%D6%80%D5%A1%D5%A2%D5%B8%D6%82%D5%AA%D5%A1%D5%AF%D5%A1%D5%B6.pdf" },
+  r5: { folder: "%D4%B4%D5%AB%D5%B4%D5%A1%D5%AE%D5%B6%D5%B8%D5%BF%D5%A1%D5%B5%D5%AB%D5%B6%20%D5%BE%D5%AB%D6%80", file: "%D4%B4%D5%AB%D5%B4%D5%A1%D5%AE%D5%B6%D5%B8%D5%BF%D5%A1%D5%B5%D5%AB%D5%B6%20%D5%BE%D5%AB%D6%80.pdf" },
+  r6: { folder: "%D5%94%D5%AB%D5%A9-%D5%AF%D5%B8%D5%AF%D5%B8%D6%80%D5%A4%20%D5%A2-%D6%84", file: "%D5%94%D5%AB%D5%A9-%D5%AF%D5%B8%D5%AF%D5%B8%D6%80%D5%A4%20%D5%A2-%D6%84.pdf" },
+  r7: { folder: "%D4%B1%D5%AF%D5%B6%D5%A1%D5%A2%D5%B8%D6%82%D5%AA%D5%A1%D5%AF%D5%A1%D5%B6", file: "%D4%B1%D5%AF%D5%B6%D5%A1%D5%A2%D5%B8%D6%82%D5%AA%D5%A1%D5%AF%D5%A1%D5%B6.pdf" },
+  r8: { folder: "%D5%8E%D5%B6%D5%A1%D5%BD%D5%BE%D5%A1%D5%AE%D6%84%D5%A1%D5%A2%D5%A1%D5%B6%D5%A1%D5%AF%D5%A1%D5%B6", file: "%D5%8E%D5%B6%D5%A1%D5%BD%D5%BE%D5%A1%D5%AE%D6%84%D5%A1%D5%A2%D5%A1%D5%B6%D5%A1%D5%AF%D5%A1%D5%B6.pdf" },
+  r9: { folder: "%D4%BF%D6%80%D5%AE%D6%84%D5%A1%D5%B5%D5%AB%D5%B6%20%D5%B4-%D5%A2", file: "%D4%BF%D6%80%D5%AE%D6%84%D5%A1%D5%B5%D5%AB%D5%B6%20%D5%B4-%D5%A2.pdf" },
+  r10: { folder: "%D5%88%D6%82%D5%BC%D5%B8%D5%AC%D5%B8%D5%A3%D5%AB%D5%A1%D5%AF%D5%A1%D5%B6", file: "%D5%88%D6%82%D5%BC%D5%B8%D5%AC%D5%B8%D5%A3%D5%AB%D5%A1%D5%AF%D5%A1%D5%B6.pdf" },
+  r11: { folder: "%D5%86%D5%A5%D5%B5%D6%80%D5%B8%D5%BE%D5%AB%D6%80%D5%A1%D5%A2%D5%B8%D6%82%D5%AA%D5%A1%D5%AF%D5%A1%D5%B6", file: "%D5%86%D5%A5%D5%B5%D6%80%D5%B8%D5%BE%D5%AB%D6%80%D5%A1%D5%A2%D5%B8%D6%82%D5%AA%D5%A1%D5%AF%D5%A1%D5%B6.pdf" },
+  r12: { folder: "%D4%B9%D5%BC%D5%AB%D5%B9%D6%84%D5%A1%D5%B5%D5%AB%D5%B6", file: "%D4%B9%D5%BC%D5%AB%D5%B9%D6%84%D5%A1%D5%B5%D5%AB%D5%B6.pdf" },
+  r13: { folder: "%D4%B9%D5%A5%D6%80%D5%A1%D5%BA%D5%AB%D5%A1", file: "%D4%B9%D5%A5%D6%80%D5%A1%D5%BA%D5%AB%D5%A1.pdf" },
+  r14: { folder: "%D5%8E%D5%A5%D6%80%D5%A1%D5%AF%D5%A5%D5%B6%D5%A4%D5%A1%D5%B6%D5%A1%D6%81%D5%B4%D5%A1%D5%B6", file: "%D5%8E%D5%A5%D6%80%D5%A1%D5%AF%D5%A5%D5%B6%D5%A4%D5%A1%D5%B6%D5%A1%D6%81%D5%B4%D5%A1%D5%B6.pdf" },
+  r15: { folder: "%D5%86%D5%B5%D5%A1%D6%80%D5%A4%D5%A1%D5%A2%D5%A1%D5%B6%D5%A1%D5%AF%D5%A1%D5%B6", file: "%D5%86%D5%B5%D5%A1%D6%80%D5%A4%D5%A1%D5%A2%D5%A1%D5%B6%D5%A1%D5%AF%D5%A1%D5%B6.pdf" },
+  r16: { folder: "%D4%B3%D5%AB%D5%B6%D5%A5%D5%AF%D5%B8%D5%AC%D5%B8%D5%A3%D5%AB%D5%A1%D5%AF%D5%A1%D5%B6", file: "%D4%B3%D5%AB%D5%B6%D5%A5%D5%AF%D5%B8%D5%AC%D5%B8%D5%A3%D5%AB%D5%A1%D5%AF%D5%A1%D5%B6.pdf" },
+  r17: { folder: "%D4%B1%D5%86%D5%88%D4%B9%D4%B1%D5%85%D4%BB%D5%86", file: "%D4%B1%D5%86%D5%88%D4%B9%D4%B1%D5%85%D4%BB%D5%86.pdf" },
+  r19: { folder: "%D4%BB%D5%86%D5%96", file: "%D4%BB%D5%86%D5%96.pdf" },
+  r20: { folder: "%D4%B1%D5%8F%D4%B4", file: "%D4%B1%D5%8F%D4%B4.pdf" },
+  r21: { folder: "%D5%94-%D5%80", file: "%D5%94-%D5%80.pdf" }
+};
+
 const DEPARTMENT_PDF_VALUE_X = [
   51, 85, 121, 156, 190, 224, 258, 292, 327, 361, 395,
   443, 477, 511, 545, 579, 614, 648, 682, 717, 752, 786
@@ -497,6 +518,28 @@ function jsonResponse(data: unknown, status = 200) {
     status,
     headers: corsHeaders
   });
+}
+
+function getErrorText(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (error && typeof error === "object") {
+    const details = [
+      typeof (error as { message?: unknown }).message === "string" ? String((error as { message: string }).message) : "",
+      typeof (error as { details?: unknown }).details === "string" ? String((error as { details: string }).details) : "",
+      typeof (error as { hint?: unknown }).hint === "string" ? String((error as { hint: string }).hint) : "",
+      typeof (error as { code?: unknown }).code === "string" ? `code=${String((error as { code: string }).code)}` : ""
+    ].filter(Boolean);
+    if (details.length) {
+      return details.join(" | ");
+    }
+    try {
+      return JSON.stringify(error);
+    } catch (_error) {
+    }
+  }
+  return String(error);
 }
 
 function sanitizeNumber(value: unknown) {
@@ -5789,8 +5832,13 @@ function getDepartmentBlankPdfUrl(departmentId: DepartmentId) {
   return `${getPublicSiteBaseUrl()}/${parts.join("/")}`;
 }
 
+function getDepartmentBlankPdfUrlSafe(departmentId: DepartmentId) {
+  const pdfFile = DEPARTMENT_PDF_URL_SEGMENTS[departmentId];
+  return `${getPublicSiteBaseUrl()}/${DEPARTMENT_PDF_ROOT_SEGMENT}/${pdfFile.folder}/${pdfFile.file}`;
+}
+
 async function fetchDepartmentBlankPdfBytes(departmentId: DepartmentId) {
-  const url = getDepartmentBlankPdfUrl(departmentId);
+  const url = getDepartmentBlankPdfUrlSafe(departmentId);
   const response = await fetch(url, {
     headers: {
       Accept: "application/pdf,application/octet-stream,*/*"
@@ -6034,15 +6082,19 @@ async function loadTelegramWebFormArchiveRecordsForDate(
 async function buildTelegramWebFormArchiveDatePdfBytes(records: TelegramWebFormArchiveRecord[]) {
   const output = await PDFDocument.create();
   for (const record of records) {
-    const bytes = await buildFilledDepartmentPdfBytes(
-      record.departmentId,
-      record.values,
-      record.reportDate,
-      record.patientNotes
-    );
-    const source = await PDFDocument.load(bytes);
-    const pages = await output.copyPages(source, source.getPageIndices());
-    pages.forEach((page) => output.addPage(page));
+    try {
+      const bytes = await buildFilledDepartmentPdfBytes(
+        record.departmentId,
+        record.values,
+        record.reportDate,
+        record.patientNotes
+      );
+      const source = await PDFDocument.load(bytes);
+      const pages = await output.copyPages(source, source.getPageIndices());
+      pages.forEach((page) => output.addPage(page));
+    } catch (error) {
+      throw new Error(`Failed to build archive PDF for ${record.departmentName} (${record.departmentId}) on ${record.reportDate}: ${getErrorText(error)}`);
+    }
   }
   return await output.save();
 }
@@ -9227,7 +9279,7 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "telegram_form_pdf_failed",
-          error: error instanceof Error ? error.message : String(error)
+          error: getErrorText(error)
         }, 500);
       }
     }
@@ -9256,7 +9308,7 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "telegram_form_archive_pdf_failed",
-          error: error instanceof Error ? error.message : String(error)
+          error: getErrorText(error)
         }, 500);
       }
     }
