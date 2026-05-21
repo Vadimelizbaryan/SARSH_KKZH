@@ -6447,43 +6447,102 @@ function formatPhotoTableToken(value: number) {
   return String(Math.max(0, Math.trunc(value))).padStart(3, " ");
 }
 
-function buildPhotoTableGroupLine(cells: number[], values: Record<string, number | null>) {
-  return cells.map((cell) => formatPhotoTableToken(getPhotoCellValueByNumber(values, cell))).join(" ");
-}
+type PhotoTableCellDescriptor = {
+  cell: number;
+  label: string;
+};
 
-function buildPhotoTableCellLine(cells: number[]) {
-  return cells.map((cell) => String(cell).padStart(2, " ")).join(" ");
-}
-
-function buildPhotoCompactTableRow(
-  title: string,
-  cells: number[],
+function buildPhotoTableColumnWidths(
+  items: PhotoTableCellDescriptor[],
   values: Record<string, number | null>
 ) {
-  return `${title.padEnd(7, " ")} ${buildPhotoTableCellLine(cells)} | ${buildPhotoTableGroupLine(cells, values)}`;
+  return items.map((item) => Math.max(
+    3,
+    String(item.cell).length,
+    item.label.length,
+    String(Math.max(0, Math.trunc(getPhotoCellValueByNumber(values, item.cell)))).length
+  ));
+}
+
+function buildPhotoTableCellsLine(items: PhotoTableCellDescriptor[], widths: number[]) {
+  return items
+    .map((item, index) => String(item.cell).padStart(widths[index], " "))
+    .join(" ");
+}
+
+function buildPhotoTableLabelsLine(items: PhotoTableCellDescriptor[], widths: number[]) {
+  return items
+    .map((item, index) => item.label.padEnd(widths[index], " "))
+    .join(" ");
+}
+
+function buildPhotoTableValuesLine(
+  items: PhotoTableCellDescriptor[],
+  widths: number[],
+  values: Record<string, number | null>
+) {
+  return items
+    .map((item, index) => formatPhotoTableToken(getPhotoCellValueByNumber(values, item.cell)).trimStart().padStart(widths[index], " "))
+    .join(" ");
+}
+
+function buildPhotoTableBlock(
+  title: string,
+  items: PhotoTableCellDescriptor[],
+  values: Record<string, number | null>
+) {
+  const widths = buildPhotoTableColumnWidths(items, values);
+  const lines = [
+    buildPhotoTableCellsLine(items, widths),
+    buildPhotoTableLabelsLine(items, widths),
+    buildPhotoTableValuesLine(items, widths, values)
+  ];
+  return (title ? [title, ...lines] : lines).join("\n");
 }
 
 function buildPhotoRecognizedTableText(values: Record<string, number | null>) {
-  const topGroups = [
-    { title: "Было", cells: [1, 2, 3] },
-    { title: "Поступ", cells: [4, 5, 6] },
-    { title: "Убыло", cells: [7, 8, 9] },
-    { title: "Пер/КС", cells: [10, 11, 12] }
-  ] as const;
-  const currentCells = [13, 14, 15, 16, 17, 18, 19];
-  const leaveCells = [20, 21, 22];
-
-  return [
-    ...topGroups.map((group) => buildPhotoCompactTableRow(group.title, [...group.cells], values)),
-    "",
-    "Наличие:",
-    buildPhotoTableCellLine(currentCells),
-    buildPhotoTableGroupLine(currentCells, values),
-    "",
-    "Отпуск:",
-    buildPhotoTableCellLine(leaveCells),
-    buildPhotoTableGroupLine(leaveCells, values)
+  const topBlocks = [
+    buildPhotoTableBlock("ԵՂԵԼ Է", [
+      { cell: 1, label: "ընդ." },
+      { cell: 2, label: "զ/ծ" },
+      { cell: 3, label: "շարք" }
+    ], values),
+    buildPhotoTableBlock("ԸՆԴՈՒՆՎԵԼ Է", [
+      { cell: 4, label: "ընդ." },
+      { cell: 5, label: "զ/ծ" },
+      { cell: 6, label: "շարք" }
+    ], values),
+    buildPhotoTableBlock("Դ/Գ", [
+      { cell: 7, label: "ընդ." },
+      { cell: 8, label: "զ/ծ" },
+      { cell: 9, label: "շարք" }
+    ], values),
+    buildPhotoTableBlock("ՏԵՂԱՓՈԽ / ՀՍԿԻՉ", [
+      { cell: 10, label: "գնաց" },
+      { cell: 11, label: "եկավ" },
+      { cell: 12, label: "հաշվ." }
+    ], values)
+  ];
+  const currentBlock = [
+    buildPhotoTableBlock("ԱՌԿԱ Է", [
+      { cell: 13, label: "շարք" },
+      { cell: 14, label: "սպա" },
+      { cell: 15, label: "պայմ." },
+      { cell: 16, label: "զ/հ" }
+    ], values),
+    buildPhotoTableBlock("", [
+      { cell: 17, label: "զ/ծ ընտ" },
+      { cell: 18, label: "զ/պ" },
+      { cell: 19, label: "քաղ." }
+    ], values)
   ].join("\n");
+  const leaveBlock = buildPhotoTableBlock("ԱՐՁԱԿՈՒՐԴ", [
+    { cell: 20, label: "շարք" },
+    { cell: 21, label: "սպա" },
+    { cell: 22, label: "պայմ." }
+  ], values);
+
+  return [...topBlocks, currentBlock, leaveBlock].join("\n\n");
 }
 
 function getNightShiftRowTotal(row: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>) {
