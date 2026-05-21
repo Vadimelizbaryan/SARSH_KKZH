@@ -2,6 +2,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import JSZip from "npm:jszip@3.10.1";
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
+import { Jimp } from "npm:jimp";
+import { Buffer } from "node:buffer";
 
 // deploy-touch: 2026-05-10
 const DEFAULT_DATE = "05,05,26";
@@ -1292,6 +1294,116 @@ function bytesToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
+function parseImageDataUrl(dataUrl: string) {
+  const normalized = String(dataUrl || "").trim();
+  const match = normalized.match(/^data:([^;,]+);base64,(.+)$/i);
+  if (!match) {
+    throw new Error("Invalid image data URL.");
+  }
+
+  return {
+    mimeType: match[1].toLowerCase(),
+    bytes: Uint8Array.from(atob(match[2]), (char) => char.charCodeAt(0))
+  };
+}
+
+function buildImageDataUrl(mimeType: string, bytes: Uint8Array) {
+  return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+}
+
+function normalizeTelegramPhotoFileName(fileName: string, mimeType: string) {
+  const fallbackBaseName = "telegram-photo";
+  const normalizedName = String(fileName || "").trim();
+  const baseName = normalizedName.replace(/\.[^.]+$/, "") || fallbackBaseName;
+  const extension = mimeType === "image/png" ? ".png" : ".jpg";
+  return `${baseName}${extension}`;
+}
+
+async function buildJimpRotatedImageBytes(
+  sourceBytes: Uint8Array,
+  rotationDegrees: number,
+  options: { mimeType?: string } = {}
+) {
+  const image = await Jimp.read(Buffer.from(sourceBytes));
+  if (rotationDegrees) {
+    image.rotate(rotationDegrees);
+  }
+
+  const targetMimeType = options.mimeType === "image/png" ? "image/png" : "image/jpeg";
+  const buffer = await image.getBuffer(targetMimeType);
+  return new Uint8Array(buffer);
+}
+
+async function inspectTelegramPhotoOrientation(
+  dataUrl: string,
+  fileName: string,
+  options: { requireAdvice?: boolean } = {}
+) {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+    return {
+      dataUrl,
+      fileName,
+      orientationAdvice: null as null | ReturnType<typeof sanitizePhotoOrientationAdvice>,
+      orientationNotes: [] as string[]
+    };
+  }
+
+  try {
+    const { bytes } = parseImageDataUrl(dataUrl);
+    const image = await Jimp.read(Buffer.from(bytes));
+    const width = Number(image.bitmap.width || 0);
+    const height = Number(image.bitmap.height || 0);
+    const isPortrait = height > width;
+    const shouldAnalyze = Boolean(options.requireAdvice || isPortrait);
+
+    if (!shouldAnalyze) {
+      return {
+        dataUrl,
+        fileName,
+        orientationAdvice: null as null | ReturnType<typeof sanitizePhotoOrientationAdvice>,
+        orientationNotes: [] as string[]
+      };
+    }
+
+    const orientationAdvice = await detectTelegramPhotoOrientationAdvice(dataUrl);
+    const orientationNotes = [
+      `Orientation OCR: rotation=${orientationAdvice.rotationDegrees}, confidence=${orientationAdvice.confidence}.`,
+      ...orientationAdvice.notes.map((note) => `Orientation note: ${note}`)
+    ];
+
+    if (orientationAdvice.confidence !== "high" || !orientationAdvice.rotationDegrees) {
+      return {
+        dataUrl,
+        fileName,
+        orientationAdvice,
+        orientationNotes
+      };
+    }
+
+    const rotatedBytes = await buildJimpRotatedImageBytes(bytes, orientationAdvice.rotationDegrees, {
+      mimeType: "image/jpeg"
+    });
+
+    return {
+      dataUrl: buildImageDataUrl("image/jpeg", rotatedBytes),
+      fileName: normalizeTelegramPhotoFileName(fileName, "image/jpeg"),
+      orientationAdvice,
+      orientationNotes: [
+        `Photo auto-rotated by ${orientationAdvice.rotationDegrees}\u00b0 before OCR.`,
+        ...orientationNotes
+      ]
+    };
+  } catch (error) {
+    console.warn("Telegram photo orientation inspection failed:", sanitizePublicErrorMessage(error));
+    return {
+      dataUrl,
+      fileName,
+      orientationAdvice: null as null | ReturnType<typeof sanitizePhotoOrientationAdvice>,
+      orientationNotes: [] as string[]
+    };
+  }
+}
+
 async function fetchImageAsDataUrl(url: string) {
   const response = await fetch(url, {
     headers: {
@@ -1593,6 +1705,46 @@ function shouldSendTelegramPhotoOrientationAdvice(chatId: number | string, hintT
   return normalizedHint.includes("#orientation-test") || normalizedHint.includes("#ocr-test");
 }
 
+function buildTelegramPhotoOrientationAdviceMessage(
+  advice: ReturnType<typeof sanitizePhotoOrientationAdvice>,
+  options: {
+    departmentId?: DepartmentId | null;
+    reportDate?: string | null;
+  } = {}
+) {
+  const departmentMeta = options.departmentId ? DEPARTMENTS[options.departmentId] : null;
+  const confidenceLabel = advice.confidence === "high"
+    ? "Ð²Ñ‹ÑÐ¾ÐºÐ°Ñ"
+    : (advice.confidence === "medium" ? "ÑÑ€ÐµÐ´Ð½ÑÑ" : "Ð½Ð¸Ð·ÐºÐ°Ñ");
+  const rotationLabel = advice.rotationDegrees === 0
+    ? "0Â° (Ñ„Ð¾Ñ‚Ð¾ ÑƒÐ¶Ðµ Ð²Ñ‹Ð³Ð»ÑÐ´Ð¸Ñ‚ Ð¿Ñ€Ð°Ð²Ð¸Ð»ÑŒÐ½Ð¾)"
+    : `${advice.rotationDegrees}Â° Ð¿Ð¾ Ñ‡Ð°ÑÐ¾Ð²Ð¾Ð¹ ÑÑ‚Ñ€ÐµÐ»ÐºÐµ`;
+
+  return [
+    "Ð¢ÐµÑÑ‚ Ð¾Ñ€Ð¸ÐµÐ½Ñ‚Ð°Ñ†Ð¸Ð¸ Ñ„Ð¾Ñ‚Ð¾",
+    "Ð­Ñ‚Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ð¾Ð´ÑÐºÐ°Ð·ÐºÐ°. OCR Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ ÑÐµÐ¹Ñ‡Ð°Ñ Ð½Ðµ Ð¼ÐµÐ½ÑÐ»Ð¸ÑÑŒ.",
+    departmentMeta ? `ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ: ${departmentMeta.department} (${departmentMeta.marker})` : "",
+    options.reportDate ? `Ð”Ð°Ñ‚Ð° Ð¾Ñ‚Ñ‡Ñ‘Ñ‚Ð°: ${options.reportDate}` : "",
+    `Ð ÐµÐºÐ¾Ð¼ÐµÐ½Ð´ÑƒÐµÐ¼Ñ‹Ð¹ Ð¿Ð¾Ð²Ð¾Ñ€Ð¾Ñ‚: ${rotationLabel}`,
+    `Ð£Ð²ÐµÑ€ÐµÐ½Ð½Ð¾ÑÑ‚ÑŒ: ${confidenceLabel}`,
+    ...(advice.notes.length ? ["Ð—Ð°Ð¼ÐµÑ‚ÐºÐ¸:", ...advice.notes] : [])
+  ].filter(Boolean).join("\n");
+}
+
+async function sendTelegramPhotoOrientationAdviceResult(
+  chatId: number | string,
+  advice: ReturnType<typeof sanitizePhotoOrientationAdvice>,
+  options: {
+    departmentId?: DepartmentId | null;
+    reportDate?: string | null;
+  } = {}
+) {
+  await sendTelegramMessage(
+    chatId,
+    buildTelegramPhotoOrientationAdviceMessage(advice, options)
+  );
+}
+
 async function sendTelegramPhotoOrientationAdvice(
   chatId: number | string,
   imageDataUrl: string,
@@ -1622,6 +1774,60 @@ async function sendTelegramPhotoOrientationAdvice(
       ...(advice.notes.length ? ["Заметки:", ...advice.notes] : [])
     ].filter(Boolean).join("\n")
   );
+}
+
+function buildTelegramPhotoOrientationAdviceMessageSafe(
+  advice: ReturnType<typeof sanitizePhotoOrientationAdvice>,
+  options: {
+    departmentId?: DepartmentId | null;
+    reportDate?: string | null;
+  } = {}
+) {
+  const departmentMeta = options.departmentId ? DEPARTMENTS[options.departmentId] : null;
+  const confidenceLabel = advice.confidence === "high"
+    ? "\u0432\u044b\u0441\u043e\u043a\u0430\u044f"
+    : (advice.confidence === "medium"
+      ? "\u0441\u0440\u0435\u0434\u043d\u044f\u044f"
+      : "\u043d\u0438\u0437\u043a\u0430\u044f");
+  const rotationLabel = advice.rotationDegrees === 0
+    ? "0\u00b0 (\u0444\u043e\u0442\u043e \u0443\u0436\u0435 \u0432\u044b\u0433\u043b\u044f\u0434\u0438\u0442 \u043f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u043e)"
+    : `${advice.rotationDegrees}\u00b0 \u043f\u043e \u0447\u0430\u0441\u043e\u0432\u043e\u0439 \u0441\u0442\u0440\u0435\u043b\u043a\u0435`;
+
+  return [
+    "\u0422\u0435\u0441\u0442 \u043e\u0440\u0438\u0435\u043d\u0442\u0430\u0446\u0438\u0438 \u0444\u043e\u0442\u043e",
+    "\u042d\u0442\u043e \u0442\u043e\u043b\u044c\u043a\u043e \u043f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430. OCR \u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435 \u0441\u0435\u0439\u0447\u0430\u0441 \u043d\u0435 \u043c\u0435\u043d\u044f\u043b\u0438\u0441\u044c.",
+    departmentMeta ? `\u041e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435: ${departmentMeta.department} (${departmentMeta.marker})` : "",
+    options.reportDate ? `\u0414\u0430\u0442\u0430 \u043e\u0442\u0447\u0451\u0442\u0430: ${options.reportDate}` : "",
+    `\u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0443\u0435\u043c\u044b\u0439 \u043f\u043e\u0432\u043e\u0440\u043e\u0442: ${rotationLabel}`,
+    `\u0423\u0432\u0435\u0440\u0435\u043d\u043d\u043e\u0441\u0442\u044c: ${confidenceLabel}`,
+    ...(advice.notes.length ? ["\u0417\u0430\u043c\u0435\u0442\u043a\u0438:", ...advice.notes] : [])
+  ].filter(Boolean).join("\n");
+}
+
+async function sendTelegramPhotoOrientationAdvicePrepared(
+  chatId: number | string,
+  advice: ReturnType<typeof sanitizePhotoOrientationAdvice>,
+  options: {
+    departmentId?: DepartmentId | null;
+    reportDate?: string | null;
+  } = {}
+) {
+  await sendTelegramMessage(
+    chatId,
+    buildTelegramPhotoOrientationAdviceMessageSafe(advice, options)
+  );
+}
+
+async function sendTelegramPhotoOrientationAdviceSafe(
+  chatId: number | string,
+  imageDataUrl: string,
+  options: {
+    departmentId?: DepartmentId | null;
+    reportDate?: string | null;
+  } = {}
+) {
+  const advice = await detectTelegramPhotoOrientationAdvice(imageDataUrl);
+  await sendTelegramPhotoOrientationAdvicePrepared(chatId, advice, options);
 }
 
 async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl: string) {
@@ -8752,7 +8958,16 @@ async function handleTelegramPhoto(
     console.warn("Telegram photo copy was not sent: original message_id is missing.");
   }
 
-  const { dataUrl, fileName } = await downloadTelegramImageAsDataUrl(fileId);
+  const downloadedPhoto = await downloadTelegramImageAsDataUrl(fileId);
+  const preparedPhoto = await inspectTelegramPhotoOrientation(
+    downloadedPhoto.dataUrl,
+    downloadedPhoto.fileName,
+    { requireAdvice: shouldSendOrientationAdvice }
+  );
+  const dataUrl = preparedPhoto.dataUrl;
+  const fileName = preparedPhoto.fileName;
+  const orientationAdvice = preparedPhoto.orientationAdvice;
+  const orientationNotes = preparedPhoto.orientationNotes;
 
   let departmentId = hintedDepartmentId;
   const departmentSource = hintedDepartmentId ? "подсказка в сообщении" : "автоопределение по фото";
@@ -8764,6 +8979,7 @@ async function handleTelegramPhoto(
       const detectionSummary = [
         "Фото обработано. Отделение не определено.",
         "Источник отделения: автоопределение по фото",
+        orientationNotes.length ? `Orientation OCR: ${orientationNotes.join("; ")}` : "",
         detection.notes.length ? `Заметки OCR: ${detection.notes.join("; ")}` : ""
       ].filter(Boolean).join("\n");
       const notifyChatIds = getTelegramNotifyChatIds(chatId);
@@ -8776,9 +8992,9 @@ async function handleTelegramPhoto(
         chatId,
         buildPhotoRetakeResponse("լուսանկարով բաժանմունքը վստահ որոշել չհաջողվեց", senderFirstName)
       );
-      if (shouldSendOrientationAdvice) {
+      if (shouldSendOrientationAdvice && orientationAdvice) {
         runTelegramBackgroundTask(
-          sendTelegramPhotoOrientationAdvice(chatId, dataUrl, {
+          sendTelegramPhotoOrientationAdvicePrepared(chatId, orientationAdvice, {
             reportDate: hintedReportDate || getYerevanReportDateText()
           }),
           "Telegram photo orientation advice"
@@ -8816,7 +9032,7 @@ async function handleTelegramPhoto(
     dataUrl,
     recognized.values,
     recognized.recognizedKeys,
-    recognized.notes
+    [...orientationNotes, ...recognized.notes]
   );
   let shouldSaveSnapshot = false;
   let savedSnapshot: Awaited<ReturnType<typeof loadSnapshot>> | null = null;
@@ -8906,10 +9122,17 @@ async function handleTelegramPhoto(
   }
 
   if (shouldSendOrientationAdvice) {
-    runTelegramBackgroundTask(
-      sendTelegramPhotoOrientationAdvice(chatId, dataUrl, { departmentId, reportDate }),
-      "Telegram photo orientation advice"
-    );
+    if (orientationAdvice) {
+      runTelegramBackgroundTask(
+        sendTelegramPhotoOrientationAdvicePrepared(chatId, orientationAdvice, { departmentId, reportDate }),
+        "Telegram photo orientation advice"
+      );
+    } else {
+      runTelegramBackgroundTask(
+        sendTelegramPhotoOrientationAdviceSafe(chatId, dataUrl, { departmentId, reportDate }),
+        "Telegram photo orientation advice"
+      );
+    }
   }
 }
 
