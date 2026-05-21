@@ -6458,16 +6458,9 @@ function buildPhotoTableColumnWidths(
 ) {
   return items.map((item) => Math.max(
     3,
-    String(item.cell).length,
     item.label.length,
     String(Math.max(0, Math.trunc(getPhotoCellValueByNumber(values, item.cell)))).length
   ));
-}
-
-function buildPhotoTableCellsLine(items: PhotoTableCellDescriptor[], widths: number[]) {
-  return items
-    .map((item, index) => String(item.cell).padStart(widths[index], " "))
-    .join(" ");
 }
 
 function buildPhotoTableLabelsLine(items: PhotoTableCellDescriptor[], widths: number[]) {
@@ -6493,7 +6486,6 @@ function buildPhotoTableBlock(
 ) {
   const widths = buildPhotoTableColumnWidths(items, values);
   const lines = [
-    buildPhotoTableCellsLine(items, widths),
     buildPhotoTableLabelsLine(items, widths),
     buildPhotoTableValuesLine(items, widths, values)
   ];
