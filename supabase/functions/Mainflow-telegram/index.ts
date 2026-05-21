@@ -6479,7 +6479,7 @@ function buildPhotoTableValuesLine(
     .join(" ");
 }
 
-function buildPhotoTableBlock(
+function buildPhotoTableBlockLines(
   title: string,
   items: PhotoTableCellDescriptor[],
   values: Record<string, number | null>
@@ -6489,52 +6489,68 @@ function buildPhotoTableBlock(
     buildPhotoTableLabelsLine(items, widths),
     buildPhotoTableValuesLine(items, widths, values)
   ];
-  return (title ? [title, ...lines] : lines).join("\n");
+  return title ? [title, ...lines] : lines;
+}
+
+function buildPhotoTwoColumnBlock(leftLines: string[], rightLines: string[], gap = 4) {
+  const leftWidth = leftLines.reduce((max, line) => Math.max(max, line.length), 0);
+  const lineCount = Math.max(leftLines.length, rightLines.length);
+  const mergedLines: string[] = [];
+
+  for (let index = 0; index < lineCount; index += 1) {
+    const left = leftLines[index] || "";
+    const right = rightLines[index] || "";
+    mergedLines.push(right ? `${left.padEnd(leftWidth, " ")}${" ".repeat(gap)}${right}` : left);
+  }
+
+  return mergedLines.join("\n");
 }
 
 function buildPhotoRecognizedTableText(values: Record<string, number | null>) {
-  const topBlocks = [
-    buildPhotoTableBlock("ԵՂԵԼ Է", [
-      { cell: 1, label: "ընդ." },
-      { cell: 2, label: "զ/ծ" },
-      { cell: 3, label: "շարք" }
-    ], values),
-    buildPhotoTableBlock("ԸՆԴՈՒՆՎԵԼ Է", [
-      { cell: 4, label: "ընդ." },
-      { cell: 5, label: "զ/ծ" },
-      { cell: 6, label: "շարք" }
-    ], values),
-    buildPhotoTableBlock("Դ/Գ", [
-      { cell: 7, label: "ընդ." },
-      { cell: 8, label: "զ/ծ" },
-      { cell: 9, label: "շարք" }
-    ], values),
-    buildPhotoTableBlock("ՏԵՂԱՓՈԽ / ՀՍԿԻՉ", [
-      { cell: 10, label: "գնաց" },
-      { cell: 11, label: "եկավ" },
-      { cell: 12, label: "հաշվ." }
-    ], values)
-  ];
+  const beenBlock = buildPhotoTableBlockLines("ԵՂԵԼ Է", [
+    { cell: 1, label: "ընդ." },
+    { cell: 2, label: "զ/ծ" },
+    { cell: 3, label: "շարք" }
+  ], values);
+  const admittedBlock = buildPhotoTableBlockLines("ԸՆԴՈՒՆՎԵԼ Է", [
+    { cell: 4, label: "ընդ." },
+    { cell: 5, label: "զ/ծ" },
+    { cell: 6, label: "շարք" }
+  ], values);
+  const dischargedBlock = buildPhotoTableBlockLines("Դ/Գ", [
+    { cell: 7, label: "ընդ." },
+    { cell: 8, label: "զ/ծ" },
+    { cell: 9, label: "շարք" }
+  ], values);
+  const transferBlock = buildPhotoTableBlockLines("ՏԵՂԱՓՈԽ / ՀՍԿԻՉ", [
+    { cell: 10, label: "գնաց" },
+    { cell: 11, label: "եկավ" },
+    { cell: 12, label: "հաշվ." }
+  ], values);
   const currentBlock = [
-    buildPhotoTableBlock("ԱՌԿԱ Է", [
+    ...buildPhotoTableBlockLines("ԱՌԿԱ Է", [
       { cell: 13, label: "շարք" },
       { cell: 14, label: "սպա" },
       { cell: 15, label: "պայմ." },
       { cell: 16, label: "զ/հ" }
     ], values),
-    buildPhotoTableBlock("", [
+    ...buildPhotoTableBlockLines("", [
       { cell: 17, label: "զ/ծ ընտ" },
       { cell: 18, label: "զ/պ" },
       { cell: 19, label: "քաղ." }
     ], values)
-  ].join("\n");
-  const leaveBlock = buildPhotoTableBlock("ԱՐՁԱԿՈՒՐԴ", [
+  ];
+  const leaveBlock = buildPhotoTableBlockLines("ԱՐՁԱԿՈՒՐԴ", [
     { cell: 20, label: "շարք" },
     { cell: 21, label: "սպա" },
     { cell: 22, label: "պայմ." }
   ], values);
 
-  return [...topBlocks, currentBlock, leaveBlock].join("\n\n");
+  return [
+    buildPhotoTwoColumnBlock(beenBlock, admittedBlock),
+    buildPhotoTwoColumnBlock(dischargedBlock, transferBlock),
+    buildPhotoTwoColumnBlock(currentBlock, leaveBlock)
+  ].join("\n\n");
 }
 
 function getNightShiftRowTotal(row: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number>) {
