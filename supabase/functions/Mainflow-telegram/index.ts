@@ -6463,43 +6463,57 @@ function buildPhotoTableColumnWidths(
   ));
 }
 
-function buildPhotoTableLabelsLine(items: PhotoTableCellDescriptor[], widths: number[]) {
-  return items
-    .map((item, index) => item.label.padEnd(widths[index], " "))
-    .join(" ");
+function buildPhotoTableBorderLine(
+  widths: number[],
+  left: string,
+  join: string,
+  right: string
+) {
+  return `${left}${widths.map((width) => "─".repeat(width + 2)).join(join)}${right}`;
 }
 
-function buildPhotoTableValuesLine(
+function buildPhotoTableContentLine(
   items: PhotoTableCellDescriptor[],
   widths: number[],
-  values: Record<string, number | null>
+  resolveText: (item: PhotoTableCellDescriptor) => string
 ) {
-  return items
-    .map((item, index) => formatPhotoTableToken(getPhotoCellValueByNumber(values, item.cell)).trimStart().padStart(widths[index], " "))
-    .join(" ");
+  return `│ ${items
+    .map((item, index) => resolveText(item).padEnd(widths[index], " "))
+    .join(" │ ")} │`;
 }
 
-function buildPhotoTableBlockLines(
-  title: string,
+function buildPhotoTableBoxLines(
   items: PhotoTableCellDescriptor[],
   values: Record<string, number | null>
 ) {
   const widths = buildPhotoTableColumnWidths(items, values);
-  const lines = [
-    buildPhotoTableLabelsLine(items, widths),
-    buildPhotoTableValuesLine(items, widths, values)
+  return [
+    buildPhotoTableBorderLine(widths, "┌", "┬", "┐"),
+    buildPhotoTableContentLine(items, widths, (item) => item.label),
+    buildPhotoTableBorderLine(widths, "├", "┼", "┤"),
+    buildPhotoTableContentLine(items, widths, (item) =>
+      formatPhotoTableToken(getPhotoCellValueByNumber(values, item.cell)).trimStart()
+    ),
+    buildPhotoTableBorderLine(widths, "└", "┴", "┘")
   ];
-  return title ? [title, ...lines] : lines;
 }
 
-function buildPhotoTwoColumnBlock(leftLines: string[], rightLines: string[], gap = 4) {
-  const leftWidth = leftLines.reduce((max, line) => Math.max(max, line.length), 0);
-  const lineCount = Math.max(leftLines.length, rightLines.length);
+function buildPhotoTwoColumnBlock(
+  leftTitle: string,
+  leftLines: string[],
+  rightTitle: string,
+  rightLines: string[],
+  gap = 4
+) {
+  const leftAllLines = [leftTitle, ...leftLines];
+  const rightAllLines = [rightTitle, ...rightLines];
+  const leftWidth = leftAllLines.reduce((max, line) => Math.max(max, line.length), 0);
+  const lineCount = Math.max(leftAllLines.length, rightAllLines.length);
   const mergedLines: string[] = [];
 
   for (let index = 0; index < lineCount; index += 1) {
-    const left = leftLines[index] || "";
-    const right = rightLines[index] || "";
+    const left = leftAllLines[index] || "";
+    const right = rightAllLines[index] || "";
     mergedLines.push(right ? `${left.padEnd(leftWidth, " ")}${" ".repeat(gap)}${right}` : left);
   }
 
@@ -6507,49 +6521,50 @@ function buildPhotoTwoColumnBlock(leftLines: string[], rightLines: string[], gap
 }
 
 function buildPhotoRecognizedTableText(values: Record<string, number | null>) {
-  const beenBlock = buildPhotoTableBlockLines("ԵՂԵԼ Է", [
+  const beenBlock = buildPhotoTableBoxLines([
     { cell: 1, label: "ընդ." },
     { cell: 2, label: "զ/ծ" },
     { cell: 3, label: "շարք" }
   ], values);
-  const admittedBlock = buildPhotoTableBlockLines("ԸՆԴՈՒՆՎԵԼ Է", [
+  const admittedBlock = buildPhotoTableBoxLines([
     { cell: 4, label: "ընդ." },
     { cell: 5, label: "զ/ծ" },
     { cell: 6, label: "շարք" }
   ], values);
-  const dischargedBlock = buildPhotoTableBlockLines("Դ/Գ", [
+  const dischargedBlock = buildPhotoTableBoxLines([
     { cell: 7, label: "ընդ." },
     { cell: 8, label: "զ/ծ" },
     { cell: 9, label: "շարք" }
   ], values);
-  const transferBlock = buildPhotoTableBlockLines("ՏԵՂԱՓՈԽ / ՀՍԿԻՉ", [
+  const transferBlock = buildPhotoTableBoxLines([
     { cell: 10, label: "գնաց" },
     { cell: 11, label: "եկավ" },
     { cell: 12, label: "հաշվ." }
   ], values);
-  const currentBlock = [
-    ...buildPhotoTableBlockLines("ԱՌԿԱ Է", [
-      { cell: 13, label: "շարք" },
-      { cell: 14, label: "սպա" },
-      { cell: 15, label: "պայմ." },
-      { cell: 16, label: "զ/հ" }
-    ], values),
-    ...buildPhotoTableBlockLines("", [
-      { cell: 17, label: "զ/ծ ընտ" },
-      { cell: 18, label: "զ/պ" },
-      { cell: 19, label: "քաղ." }
-    ], values)
-  ];
-  const leaveBlock = buildPhotoTableBlockLines("ԱՐՁԱԿՈՒՐԴ", [
+  const currentPrimaryBlock = buildPhotoTableBoxLines([
+    { cell: 13, label: "շարք" },
+    { cell: 14, label: "սպա" },
+    { cell: 15, label: "պայմ." },
+    { cell: 16, label: "զ/հ" }
+  ], values);
+  const currentSecondaryBlock = buildPhotoTableBoxLines([
+    { cell: 17, label: "զ/ծ ընտ" },
+    { cell: 18, label: "զ/պ" },
+    { cell: 19, label: "քաղ." }
+  ], values);
+  const leaveBlock = buildPhotoTableBoxLines([
     { cell: 20, label: "շարք" },
     { cell: 21, label: "սպա" },
     { cell: 22, label: "պայմ." }
   ], values);
 
   return [
-    buildPhotoTwoColumnBlock(beenBlock, admittedBlock),
-    buildPhotoTwoColumnBlock(dischargedBlock, transferBlock),
-    buildPhotoTwoColumnBlock(currentBlock, leaveBlock)
+    buildPhotoTwoColumnBlock("ԵՂԵԼ Է", beenBlock, "ԸՆԴՈՒՆՎԵԼ Է", admittedBlock),
+    buildPhotoTwoColumnBlock("Դ/Գ", dischargedBlock, "ՏԵՂԱՓՈԽ / ՀՍԿԻՉ", transferBlock),
+    [
+      buildPhotoTwoColumnBlock("ԱՌԿԱ Է", currentPrimaryBlock, "ԱՐՁԱԿՈՒՐԴ", leaveBlock),
+      currentSecondaryBlock.join("\n")
+    ].join("\n")
   ].join("\n\n");
 }
 
