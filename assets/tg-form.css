@@ -199,6 +199,21 @@ input {
   background: #fffdf8;
 }
 
+.tg-calc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tg-calc-card {
+  display: grid;
+  gap: 10px;
+}
+
+.tg-calc-apply {
+  margin-top: 10px;
+}
+
 .tg-form-table {
   width: 100%;
   min-width: 1180px;
@@ -1028,7 +1043,8 @@ input {
 
   .tg-sheet-layout,
   .tg-sheet-grid--3,
-  .tg-sheet-grid--4 {
+  .tg-sheet-grid--4,
+  .tg-calc-grid {
     grid-template-columns: 1fr;
   }
 

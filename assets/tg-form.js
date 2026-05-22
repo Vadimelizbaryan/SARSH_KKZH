@@ -116,6 +116,47 @@
     { key: "wentOnLeave", title: "Գնացել են արձակուրդ", rows: 5 }
   ];
 
+  const calculatorColumns = [
+    { type: "soldier", label: "ՇԱՐ", currentKey: "currentShar", incomingKey: "calcIncomingSoldier", dischargedKey: "calcDischargedSoldier", outputKey: "calcRemainingSoldier" },
+    { type: "officer", label: "ՍՊԱ", currentKey: "currentSpa", incomingKey: "calcIncomingOfficer", dischargedKey: "calcDischargedOfficer", outputKey: "calcRemainingOfficer" },
+    { type: "contract", label: "ՊԱՅՄ", currentKey: "currentPaym", incomingKey: "calcIncomingContract", dischargedKey: "calcDischargedContract", outputKey: "calcRemainingContract" },
+    { type: "zh", label: "Զ/Հ", currentKey: "currentZh", incomingKey: "calcIncomingZh", dischargedKey: "calcDischargedZh", outputKey: "calcRemainingZh" },
+    { type: "family", label: "Զ/Ծ ընտ", currentKey: "family", incomingKey: "calcIncomingFamily", dischargedKey: "calcDischargedFamily", outputKey: "calcRemainingFamily" },
+    { type: "reserve", label: "Զ/Պ", currentKey: "officer", incomingKey: "calcIncomingReserve", dischargedKey: "calcDischargedReserve", outputKey: "calcRemainingReserve" },
+    { type: "civil", label: "Ք-ի", currentKey: "civil", incomingKey: "calcIncomingCivil", dischargedKey: "calcDischargedCivil", outputKey: "calcRemainingCivil" }
+  ];
+
+  const calculatorRows = [
+    { label: "Ընդունվել է", cells: calculatorColumns.map((column) => ({ key: column.incomingKey, role: "input" })) },
+    { label: "Դուրս է գրվել", cells: calculatorColumns.map((column) => ({ key: column.dischargedKey, role: "input" })) },
+    { label: "Հաշվարկ", cells: calculatorColumns.map((column) => ({ key: column.outputKey, role: "output" })) }
+  ];
+
+  const leaveCalculatorColumns = [
+    { type: "sharq", label: "ՇԱՐ", presentKey: "currentShar", leaveKey: "leaveSharq", sentKey: "leaveCalcSentSharq", returnedKey: "leaveCalcReturnedSharq" },
+    { type: "spa", label: "ՍՊԱ", presentKey: "currentSpa", leaveKey: "leaveSpa", sentKey: "leaveCalcSentSpa", returnedKey: "leaveCalcReturnedSpa" },
+    { type: "paym", label: "ՊԱՅՄ", presentKey: "currentPaym", leaveKey: "leavePaym", sentKey: "leaveCalcSentPaym", returnedKey: "leaveCalcReturnedPaym" }
+  ];
+
+  const leaveCalculatorRows = [
+    { label: "Ուղարկվել է բուժ. արձակուրդ", cells: leaveCalculatorColumns.map((column) => ({ key: column.sentKey, role: "input" })) },
+    { label: "Վերադարձել է արձակուրդից", cells: leaveCalculatorColumns.map((column) => ({ key: column.returnedKey, role: "input" })) },
+    { label: "Եղել է արձակուրդում", cells: leaveCalculatorColumns.map((column) => ({ key: column.leaveKey, role: "linked" })) },
+    { label: "Հաշվարկ", cells: leaveCalculatorColumns.map((column) => ({ key: column.leaveKey, role: "output" })) }
+  ];
+
+  const calculatorState = calculatorColumns.reduce((accumulator, column) => {
+    accumulator[column.incomingKey] = 0;
+    accumulator[column.dischargedKey] = 0;
+    return accumulator;
+  }, {});
+
+  const leaveCalculatorState = leaveCalculatorColumns.reduce((accumulator, column) => {
+    accumulator[column.sentKey] = 0;
+    accumulator[column.returnedKey] = 0;
+    return accumulator;
+  }, {});
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -299,6 +340,299 @@
       values[key] = toNumber(input ? input.value : 0);
     });
     return values;
+  }
+
+  function getCalculatorResult(values) {
+    const nextValues = { ...values };
+    const originalPresentTotal = getActual(values);
+    const originalMilitary = toNumber(values.currentShar) + toNumber(values.currentSpa) + toNumber(values.currentPaym);
+    const originalSeries = toNumber(values.currentShar);
+
+    const incomingByType = Object.fromEntries(
+      calculatorColumns.map((column) => [column.type, toNumber(calculatorState[column.incomingKey])])
+    );
+    const dischargedByType = Object.fromEntries(
+      calculatorColumns.map((column) => [column.type, toNumber(calculatorState[column.dischargedKey])])
+    );
+    const remainingByType = Object.fromEntries(
+      calculatorColumns.map((column) => [
+        column.type,
+        toNumber(values[column.currentKey]) + incomingByType[column.type] - dischargedByType[column.type]
+      ])
+    );
+
+    nextValues.beenTotal = originalPresentTotal;
+    nextValues.beenSoldier = originalMilitary;
+    nextValues.beenSeries = originalSeries;
+    nextValues.admittedTotal = calculatorColumns.reduce((sum, column) => sum + incomingByType[column.type], 0);
+    nextValues.admittedSoldier = incomingByType.soldier + incomingByType.officer + incomingByType.contract;
+    nextValues.admittedSeries = incomingByType.soldier;
+    nextValues.dgTotal = calculatorColumns.reduce((sum, column) => sum + dischargedByType[column.type], 0);
+    nextValues.dgSoldier = dischargedByType.soldier + dischargedByType.officer + dischargedByType.contract;
+    nextValues.dgSeries = dischargedByType.soldier;
+    nextValues.currentShar = remainingByType.soldier;
+    nextValues.currentSpa = remainingByType.officer;
+    nextValues.currentPaym = remainingByType.contract;
+    nextValues.currentZh = remainingByType.zh;
+    nextValues.family = remainingByType.family;
+    nextValues.officer = remainingByType.reserve;
+    nextValues.civil = remainingByType.civil;
+
+    const leaveRemainingByType = Object.fromEntries(
+      leaveCalculatorColumns.map((column) => [
+        column.type,
+        toNumber(values[column.leaveKey]) + toNumber(leaveCalculatorState[column.sentKey]) - toNumber(leaveCalculatorState[column.returnedKey])
+      ])
+    );
+    const leavePresentByType = Object.fromEntries(
+      leaveCalculatorColumns.map((column) => [
+        column.type,
+        toNumber(nextValues[column.presentKey]) - toNumber(leaveCalculatorState[column.sentKey]) + toNumber(leaveCalculatorState[column.returnedKey])
+      ])
+    );
+
+    nextValues.currentShar = leavePresentByType.sharq;
+    nextValues.currentSpa = leavePresentByType.spa;
+    nextValues.currentPaym = leavePresentByType.paym;
+    nextValues.leaveSharq = leaveRemainingByType.sharq;
+    nextValues.leaveSpa = leaveRemainingByType.spa;
+    nextValues.leavePaym = leaveRemainingByType.paym;
+
+    const invalidCurrentColumns = calculatorColumns.filter((column) => remainingByType[column.type] < 0);
+    const invalidLeaveColumns = leaveCalculatorColumns.filter((column) =>
+      leaveRemainingByType[column.type] < 0 || leavePresentByType[column.type] < 0
+    );
+
+    return {
+      nextValues,
+      remainingByType,
+      leaveRemainingByType,
+      invalidCurrentColumns,
+      invalidLeaveColumns,
+      isValid: invalidCurrentColumns.length === 0 && invalidLeaveColumns.length === 0
+    };
+  }
+
+  function renderCalculatorEditableRow(row) {
+    return `
+      <tr>
+        <th scope="row" class="tg-qh-row-title">${escapeHtml(row.label)}</th>
+        ${row.cells.map((cell) => `
+          <td class="tg-qh-cell">
+            <input
+              class="tg-form-input tg-qh-input"
+              data-calc-key="${escapeHtml(cell.key)}"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              type="text"
+              autocomplete="off"
+              maxlength="4"
+              value="${escapeHtml(calculatorState[cell.key] || 0)}"
+            >
+          </td>
+        `).join("")}
+      </tr>
+    `;
+  }
+
+  function renderCalculatorOutputRow() {
+    return `
+      <tr class="tg-qh-output-row">
+        <th scope="row" class="tg-qh-row-title">Հաշվարկ</th>
+        ${calculatorColumns.map((column) => `
+          <td class="tg-qh-cell tg-qh-cell--output">
+            <span class="tg-form-control-value tg-qh-output" data-calc-output="${escapeHtml(column.outputKey)}">0</span>
+          </td>
+        `).join("")}
+      </tr>
+    `;
+  }
+
+  function renderLeaveCalculatorRow(row) {
+    return `
+      <tr>
+        <th scope="row" class="tg-qh-row-title">${escapeHtml(row.label)}</th>
+        ${row.cells.map((cell) => {
+          if (cell.role === "input") {
+            return `
+              <td class="tg-qh-cell">
+                <input
+                  class="tg-form-input tg-qh-input"
+                  data-leave-calc-key="${escapeHtml(cell.key)}"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  type="text"
+                  autocomplete="off"
+                  maxlength="4"
+                  value="${escapeHtml(leaveCalculatorState[cell.key] || 0)}"
+                >
+              </td>
+            `;
+          }
+          if (cell.role === "linked") {
+            return `
+              <td class="tg-qh-cell tg-qh-cell--output">
+                <span class="tg-form-control-value tg-qh-output" data-leave-base="${escapeHtml(cell.key)}">0</span>
+              </td>
+            `;
+          }
+          return `
+            <td class="tg-qh-cell tg-qh-cell--output">
+              <span class="tg-form-control-value tg-qh-output" data-leave-output="${escapeHtml(cell.key)}">0</span>
+            </td>
+          `;
+        }).join("")}
+      </tr>
+    `;
+  }
+
+  function renderCombinedCalculator() {
+    return `
+      <section class="tg-sheet-section tg-sheet-section--wide">
+        <div class="tg-sheet-section-head">
+          <div>
+            <p class="tg-form-kicker">Հաշվարկային գործիքներ</p>
+            <p class="tg-sheet-section-note">Մուտքագրեք ընդունված, դուրս գրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը։ Սեղմեք «Հաշվել և տեղադրել», և տվյալները կտեղադրվեն ստորև եղած բջիջներում։</p>
+          </div>
+        </div>
+        <div class="tg-calc-grid">
+          <section class="tg-calc-card">
+            <div class="tg-sheet-section-head">
+              <div>
+                <p class="tg-form-kicker">Ընդունում/Դուրսգրում</p>
+              </div>
+            </div>
+            <div class="tg-form-table-wrap tg-qh-table-wrap">
+              <table class="tg-form-table tg-qh-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    ${calculatorColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${calculatorRows.slice(0, 2).map(renderCalculatorEditableRow).join("")}
+                  ${renderCalculatorOutputRow()}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section class="tg-calc-card">
+            <div class="tg-sheet-section-head">
+              <div>
+                <p class="tg-form-kicker">Բուժական արձակուրդ</p>
+              </div>
+            </div>
+            <div class="tg-form-table-wrap tg-qh-table-wrap">
+              <table class="tg-form-table tg-qh-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    ${leaveCalculatorColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${leaveCalculatorRows.map(renderLeaveCalculatorRow).join("")}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+        <div class="tg-form-status" data-calc-status></div>
+        <button class="tg-form-submit tg-calc-apply" data-apply-calculators type="button">Հաշվել և տեղադրել</button>
+      </section>
+    `;
+  }
+
+  function refreshCalculatorUi() {
+    const values = readValues();
+    const calculatorResult = getCalculatorResult(values);
+
+    calculatorColumns.forEach((column) => {
+      const target = root.querySelector(`[data-calc-output="${column.outputKey}"]`);
+      if (target) {
+        target.textContent = String(calculatorResult.remainingByType[column.type] || 0);
+      }
+    });
+
+    leaveCalculatorColumns.forEach((column) => {
+      const baseTarget = root.querySelector(`[data-leave-base="${column.leaveKey}"]`);
+      const outputTarget = root.querySelector(`[data-leave-output="${column.leaveKey}"]`);
+      if (baseTarget) {
+        baseTarget.textContent = String(toNumber(values[column.leaveKey]));
+      }
+      if (outputTarget) {
+        outputTarget.textContent = String(calculatorResult.leaveRemainingByType[column.type] || 0);
+      }
+    });
+
+    const status = root.querySelector("[data-calc-status]");
+    const applyButton = root.querySelector("[data-apply-calculators]");
+    if (status) {
+      const invalidLabels = [
+        ...calculatorResult.invalidCurrentColumns.map((column) => column.label),
+        ...calculatorResult.invalidLeaveColumns.map((column) => column.label)
+      ];
+      status.className = `tg-form-status${calculatorResult.isValid ? "" : " bad"}`;
+      status.innerHTML = calculatorResult.isValid
+        ? `
+          <div class="tg-form-status-head">
+            <strong>Հաշվարկը պատրաստ է</strong>
+            <span>Սեղմեք «Հաշվել և տեղադրել», և տվյալները կտեղադրվեն բաժանմունքի ձևի բջիջներում։</span>
+          </div>
+        `
+        : `
+          <div class="tg-form-status-head">
+            <strong>Ստուգեք հաշվարկը</strong>
+            <span>${escapeHtml(`Բացասական արժեք է ստացվում հետևյալ սյունակներում՝ ${invalidLabels.join(", ")}։`)}</span>
+          </div>
+        `;
+    }
+    if (applyButton) {
+      applyButton.disabled = !calculatorResult.isValid;
+    }
+  }
+
+  function writeValuesToForm(values) {
+    editableKeys.forEach((key) => {
+      const input = root.querySelector(`[data-field="${key}"]`);
+      if (input) {
+        input.value = String(toNumber(values[key]));
+      }
+    });
+  }
+
+  function applyCombinedCalculator() {
+    const values = readValues();
+    const calculatorResult = getCalculatorResult(values);
+    if (!calculatorResult.isValid) {
+      refreshCalculatorUi();
+      return;
+    }
+
+    writeValuesToForm(calculatorResult.nextValues);
+    Object.keys(calculatorState).forEach((key) => {
+      calculatorState[key] = 0;
+      const input = root.querySelector(`[data-calc-key="${key}"]`);
+      if (input) {
+        input.value = "0";
+      }
+    });
+    Object.keys(leaveCalculatorState).forEach((key) => {
+      leaveCalculatorState[key] = 0;
+      const input = root.querySelector(`[data-leave-calc-key="${key}"]`);
+      if (input) {
+        input.value = "0";
+      }
+    });
+    refreshCalculatorUi();
+    updateControl();
+
+    const message = root.querySelector("[data-message]");
+    if (message && getInitData()) {
+      message.className = "tg-form-message";
+      message.textContent = "Հաշվարկային տվյալները տեղադրվել են ձևի բջիջներում։ Ստուգեք և ուղարկեք։";
+    }
   }
 
   function renderPatientNotesMobileBlock(department, reportDate) {
@@ -623,6 +957,7 @@
 
         <form data-form>
           <div class="tg-sheet-layout" aria-label="Բաժանմունքի ձև">
+            ${renderCombinedCalculator()}
             ${sectionDefinitions.map((section) => renderSection(section)).join("")}
           </div>
 
@@ -644,16 +979,51 @@
       initialMessage.textContent = "Բջիջները բերվել են գլխավոր աղյուսակից։ Փոփոխելուց հետո ստուգումը կթարմացվի ավտոմատ։";
     }
 
-    root.querySelectorAll(".tg-form-input").forEach((input) => {
+    root.querySelectorAll("[data-field]").forEach((input) => {
       input.addEventListener("input", () => {
         const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 3);
         if (input.value !== digitsOnly) {
           input.value = digitsOnly;
         }
         updateControl();
+        refreshCalculatorUi();
       });
       input.addEventListener("focus", () => input.select());
     });
+    root.querySelectorAll("[data-calc-key]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const key = input.getAttribute("data-calc-key");
+        if (!key || !Object.prototype.hasOwnProperty.call(calculatorState, key)) {
+          return;
+        }
+        const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
+        calculatorState[key] = toNumber(digitsOnly);
+        if (input.value !== digitsOnly) {
+          input.value = digitsOnly;
+        }
+        refreshCalculatorUi();
+      });
+      input.addEventListener("focus", () => input.select());
+    });
+    root.querySelectorAll("[data-leave-calc-key]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const key = input.getAttribute("data-leave-calc-key");
+        if (!key || !Object.prototype.hasOwnProperty.call(leaveCalculatorState, key)) {
+          return;
+        }
+        const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
+        leaveCalculatorState[key] = toNumber(digitsOnly);
+        if (input.value !== digitsOnly) {
+          input.value = digitsOnly;
+        }
+        refreshCalculatorUi();
+      });
+      input.addEventListener("focus", () => input.select());
+    });
+    const applyCalculators = root.querySelector("[data-apply-calculators]");
+    if (applyCalculators) {
+      applyCalculators.addEventListener("click", applyCombinedCalculator);
+    }
     root.querySelectorAll("[data-patient-note-input]").forEach((input) => {
       input.addEventListener("input", () => {
         const notes = readPatientNotes();
@@ -687,6 +1057,7 @@
     if (form) {
       form.addEventListener("submit", submitForm);
     }
+    refreshCalculatorUi();
     updateControl();
   }
 

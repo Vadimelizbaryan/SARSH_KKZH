@@ -7451,9 +7451,12 @@ async function handleTelegramQhFormSubmit(request: Request) {
     }
 
     const reportDate = sanitizeReportDate(payload?.reportDate) || DEFAULT_DATE;
+    const directValuesPayload = payload?.values && typeof payload.values === "object" && !Array.isArray(payload.values)
+      ? sanitizeValues(payload.values)
+      : null;
     const qhValues = sanitizeQhTelegramFormValues(payload?.qhValues);
     const preservedValues = sanitizeQhTelegramPreservedValues(payload?.preservedValues);
-    const values = buildQhTelegramFormDepartmentValues(qhValues, preservedValues);
+    const values = directValuesPayload || buildQhTelegramFormDepartmentValues(qhValues, preservedValues);
 
     if (
       Number(values.currentShar) < 0

@@ -116,6 +116,19 @@
 
   const outputCells = columns.map((column) => ({ key: column.outputKey, marker: column.outputMarker }));
 
+  const leaveColumns = [
+    { type: "sharq", label: "ՇԱՐ", presentKey: "currentShar", leaveKey: "leaveSharq", sentKey: "leaveCalcSentSharq", returnedKey: "leaveCalcReturnedSharq" },
+    { type: "spa", label: "ՍՊԱ", presentKey: "currentSpa", leaveKey: "leaveSpa", sentKey: "leaveCalcSentSpa", returnedKey: "leaveCalcReturnedSpa" },
+    { type: "paym", label: "ՊԱՅՄ", presentKey: "currentPaym", leaveKey: "leavePaym", sentKey: "leaveCalcSentPaym", returnedKey: "leaveCalcReturnedPaym" }
+  ];
+
+  const leaveRows = [
+    { label: "Ուղարկվել է բուժ. արձակուրդ", cells: leaveColumns.map((column) => ({ key: column.sentKey, role: "input" })) },
+    { label: "Վերադարձել է արձակուրդից", cells: leaveColumns.map((column) => ({ key: column.returnedKey, role: "input" })) },
+    { label: "Եղել է արձակուրդում", cells: leaveColumns.map((column) => ({ key: column.leaveKey, role: "linked" })) },
+    { label: "Հաշվարկ", cells: leaveColumns.map((column) => ({ key: column.leaveKey, role: "output" })) }
+  ];
+
   const preservedQueryMap = {
     transferFromDepartment: "c10",
     transferToDepartment: "c11",
@@ -128,6 +141,12 @@
     accumulator[column.incomingKey] = 0;
     accumulator[column.dischargedKey] = 0;
     accumulator[column.baseKey] = 0;
+    return accumulator;
+  }, {});
+
+  const leaveState = leaveColumns.reduce((accumulator, column) => {
+    accumulator[column.sentKey] = 0;
+    accumulator[column.returnedKey] = 0;
     return accumulator;
   }, {});
 
@@ -201,8 +220,22 @@
     const dischargedTotal = columns.reduce((sum, column) => sum + state[column.dischargedKey], 0);
     const dischargedMilitary = state.qhDischargedSoldier + state.qhDischargedOfficer + state.qhDischargedContract;
 
+    const leaveRemaining = {
+      sharq: preserved.leaveSharq + leaveState.leaveCalcSentSharq - leaveState.leaveCalcReturnedSharq,
+      spa: preserved.leaveSpa + leaveState.leaveCalcSentSpa - leaveState.leaveCalcReturnedSpa,
+      paym: preserved.leavePaym + leaveState.leaveCalcSentPaym - leaveState.leaveCalcReturnedPaym
+    };
+
+    const leaveAdjustedPresent = {
+      sharq: remaining.remainingSoldier - leaveState.leaveCalcSentSharq + leaveState.leaveCalcReturnedSharq,
+      spa: remaining.remainingOfficer - leaveState.leaveCalcSentSpa + leaveState.leaveCalcReturnedSpa,
+      paym: remaining.remainingContract - leaveState.leaveCalcSentPaym + leaveState.leaveCalcReturnedPaym
+    };
+
     return {
       ...remaining,
+      leaveRemaining,
+      leaveAdjustedPresent,
       finalValues: {
         beenTotal: columns.reduce((sum, column) => sum + state[column.baseKey], 0) + preserved.leaveSharq + preserved.leaveSpa + preserved.leavePaym,
         beenSoldier: state.qhBaseSoldier + state.qhBaseOfficer + state.qhBaseContract,
@@ -215,16 +248,16 @@
         dgSeries: state.qhDischargedSoldier,
         transferFromDepartment: preserved.transferFromDepartment,
         transferToDepartment: preserved.transferToDepartment,
-        currentShar: remaining.remainingSoldier,
-        currentSpa: remaining.remainingOfficer,
-        currentPaym: remaining.remainingContract,
+        currentShar: leaveAdjustedPresent.sharq,
+        currentSpa: leaveAdjustedPresent.spa,
+        currentPaym: leaveAdjustedPresent.paym,
         currentZh: remaining.remainingZh,
         family: remaining.remainingFamily,
         officer: remaining.remainingReserve,
         civil: remaining.remainingCivil,
-        leaveSharq: preserved.leaveSharq,
-        leaveSpa: preserved.leaveSpa,
-        leavePaym: preserved.leavePaym
+        leaveSharq: leaveRemaining.sharq,
+        leaveSpa: leaveRemaining.spa,
+        leavePaym: leaveRemaining.paym
       }
     };
   }
@@ -289,7 +322,9 @@
   function getValidationState() {
     const computed = getComputedValues();
     const checks = getValidationChecks(computed.finalValues);
-    const hasNegativeRemaining = outputCells.some((cell) => computed[cell.key] < 0);
+    const hasNegativeRemaining = outputCells.some((cell) => computed[cell.key] < 0)
+      || Object.values(computed.leaveRemaining).some((value) => value < 0)
+      || Object.values(computed.leaveAdjustedPresent).some((value) => value < 0);
     return {
       ...computed,
       checks,
@@ -329,6 +364,44 @@
             <span class="tg-form-control-value tg-qh-output" data-qh-output="${escapeHtml(cell.key)}">0</span>
           </td>
         `).join("")}
+      </tr>
+    `;
+  }
+
+  function renderLeaveRow(row) {
+    return `
+      <tr>
+        <th scope="row" class="tg-qh-row-title">${escapeHtml(row.label)}</th>
+        ${row.cells.map((cell) => {
+          if (cell.role === "input") {
+            return `
+              <td class="tg-qh-cell">
+                <input
+                  class="tg-form-input tg-qh-input"
+                  data-leave-key="${escapeHtml(cell.key)}"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  type="text"
+                  autocomplete="off"
+                  maxlength="4"
+                  value="${escapeHtml(leaveState[cell.key] || 0)}"
+                >
+              </td>
+            `;
+          }
+          if (cell.role === "linked") {
+            return `
+              <td class="tg-qh-cell tg-qh-cell--output">
+                <span class="tg-form-control-value tg-qh-output" data-leave-base="${escapeHtml(cell.key)}">0</span>
+              </td>
+            `;
+          }
+          return `
+            <td class="tg-qh-cell tg-qh-cell--output">
+              <span class="tg-form-control-value tg-qh-output" data-leave-output="${escapeHtml(cell.key)}">0</span>
+            </td>
+          `;
+        }).join("")}
       </tr>
     `;
   }
@@ -407,6 +480,28 @@
             <section class="tg-sheet-section tg-sheet-section--wide">
               <div class="tg-sheet-section-head">
                 <div>
+                  <p class="tg-form-kicker">Բուժական արձակուրդ</p>
+                  <p class="tg-sheet-section-note">Մուտքագրեք արձակուրդ գնացող և վերադարձած հիվանդների քանակը։ 13-15 և 20-22 բջիջների փոփոխությունը կհաշվարկվի ավտոմատ։</p>
+                </div>
+              </div>
+              <div class="tg-form-table-wrap tg-qh-table-wrap">
+                <table class="tg-form-table tg-qh-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      ${leaveColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${leaveRows.map(renderLeaveRow).join("")}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="tg-sheet-section tg-sheet-section--wide">
+              <div class="tg-sheet-section-head">
+                <div>
                   <p class="tg-form-kicker">Կտեղադրվի գլխավոր աղյուսակում</p>
                   <p class="tg-sheet-section-note">Ստուգելու համար այստեղ երևում է, թե ինչ արժեքներ կպահպանվեն բաժանմունքի տողում։</p>
                 </div>
@@ -436,6 +531,11 @@
                     { label: "17", key: "family" },
                     { label: "18", key: "officer" },
                     { label: "19", key: "civil" }
+                  ])}
+                  ${renderPreviewCard("Արձակուրդ (20-22)", [
+                    { label: "20", key: "leaveSharq" },
+                    { label: "21", key: "leaveSpa" },
+                    { label: "22", key: "leavePaym" }
                   ])}
                 </div>
               </div>
@@ -472,6 +572,18 @@
       const target = root.querySelector(`[data-preview-key="${key}"]`);
       if (target) {
         target.textContent = String(value);
+      }
+    });
+
+    const preserved = getPreservedValues();
+    leaveColumns.forEach((column) => {
+      const baseTarget = root.querySelector(`[data-leave-base="${column.leaveKey}"]`);
+      const outputTarget = root.querySelector(`[data-leave-output="${column.leaveKey}"]`);
+      if (baseTarget) {
+        baseTarget.textContent = String(preserved[column.leaveKey] || 0);
+      }
+      if (outputTarget) {
+        outputTarget.textContent = String(validation.finalValues[column.leaveKey] || 0);
       }
     });
 
@@ -524,6 +636,18 @@
         refreshUi();
       });
     });
+
+    root.querySelectorAll("[data-leave-key]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const key = input.getAttribute("data-leave-key");
+        if (!key || !Object.prototype.hasOwnProperty.call(leaveState, key)) {
+          return;
+        }
+        leaveState[key] = toNumber(input.value);
+        input.value = String(leaveState[key]);
+        refreshUi();
+      });
+    });
   }
 
   async function submitForm(event) {
@@ -557,6 +681,7 @@
           initData: getInitData(),
           departmentId: department.id,
           reportDate: getReportDate(),
+          values: validation.finalValues,
           qhValues: { ...state },
           preservedValues: getPreservedValues()
         })
