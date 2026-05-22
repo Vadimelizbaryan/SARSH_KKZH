@@ -3295,6 +3295,40 @@ function addMainTableValue(values: Record<string, number | null>, key: string, a
   values[key] = safeNumber(values[key]) + safeNumber(amount);
 }
 
+function primeQhMorningBaseValues(values: Record<string, number | null>) {
+  const hasBaseValues =
+    safeNumber(values.qhBaseSoldier) !== 0
+    || safeNumber(values.qhBaseOfficer) !== 0
+    || safeNumber(values.qhBaseContract) !== 0;
+  const hasCurrentValues =
+    safeNumber(values.currentShar) !== 0
+    || safeNumber(values.currentSpa) !== 0
+    || safeNumber(values.currentPaym) !== 0;
+
+  if (!hasBaseValues && hasCurrentValues) {
+    values.qhBaseSoldier = safeNumber(values.currentShar);
+    values.qhBaseOfficer = safeNumber(values.currentSpa);
+    values.qhBaseContract = safeNumber(values.currentPaym);
+  }
+}
+
+function syncQhMorningCalculatedValues(departmentId: string, values: Record<string, number | null>) {
+  if (!QH_CALC_DEPARTMENT_IDS.has(departmentId as DepartmentId)) {
+    return;
+  }
+
+  primeQhMorningBaseValues(values);
+  values.currentShar = safeNumber(values.qhBaseSoldier)
+    + safeNumber(values.qhIncomingSoldier)
+    - safeNumber(values.qhDischargedSoldier);
+  values.currentSpa = safeNumber(values.qhBaseOfficer)
+    + safeNumber(values.qhIncomingOfficer)
+    - safeNumber(values.qhDischargedOfficer);
+  values.currentPaym = safeNumber(values.qhBaseContract)
+    + safeNumber(values.qhIncomingContract)
+    - safeNumber(values.qhDischargedContract);
+}
+
 function applyNightShiftDraftValuesToMain(
   departmentId: string,
   values: Record<string, unknown> | null | undefined,
