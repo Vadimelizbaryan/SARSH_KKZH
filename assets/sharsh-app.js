@@ -6455,10 +6455,11 @@
           </div>
 
           ${renderPhotoImportPanel(row)}
-          ${renderQhCalcPanel(row)}
-          ${renderLeaveCalcPanel(row)}
+          <div class="department-calc-grid">
+            ${renderQhCalcPanel(row)}
+            ${renderLeaveCalcPanel(row)}
+          </div>
           ${renderTelegramFormReviewPanel(row)}
-          ${renderDepartmentPdfArchivePanel(row)}
 
           <div class="zoom-target">
             <div class="sheet-shell">
@@ -6472,6 +6473,7 @@
               </div>
             </div>
           </div>
+          ${renderDepartmentPdfArchivePanel(row)}
         </div>
         ${renderPhotoLightbox()}
       </div>
