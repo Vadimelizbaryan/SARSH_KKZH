@@ -554,10 +554,29 @@ a {
   font-weight: 800;
 }
 
-.photo-import-mini-table__cell span {
+.photo-import-mini-table__cell span,
+.photo-import-mini-table__cell input {
   display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
   font-size: 19px;
   line-height: 1.05;
+  font-weight: 800;
+  text-align: center;
+  outline: none;
+  font-family: inherit;
+}
+
+.photo-import-mini-table__cell input::-webkit-outer-spin-button,
+.photo-import-mini-table__cell input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.photo-import-mini-table__cell input[type="number"] {
+  appearance: textfield;
 }
 
 .photo-import-mini-table__cell--recognized {
@@ -581,6 +600,39 @@ a {
 
 .photo-import-mini-table__cell--empty {
   color: #111111;
+}
+
+.photo-import-mini-table__cell--control-valid {
+  background: #dff5e5;
+  color: #166534;
+}
+
+.photo-import-mini-table__cell--control-invalid {
+  background: #fde2e2;
+  color: #991b1b;
+}
+
+.photo-import-mini-table-status {
+  margin-top: 8px;
+  border: 1px solid #111111;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  background: #ffffff;
+  color: #111111;
+}
+
+.photo-import-mini-table-status--valid {
+  background: #dff5e5;
+  color: #166534;
+  border-color: #166534;
+}
+
+.photo-import-mini-table-status--invalid {
+  background: #fde2e2;
+  color: #991b1b;
+  border-color: #991b1b;
 }
 
 .photo-import-result-grid {

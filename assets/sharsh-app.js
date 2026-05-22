@@ -4539,6 +4539,265 @@
     return checks;
   }
 
+  function getPhotoImportPreviewValueNumber(previewValues, key) {
+    if (!previewValues || typeof previewValues !== "object" || !Object.prototype.hasOwnProperty.call(previewValues, key)) {
+      return null;
+    }
+    return config.normalizeCellValue(previewValues[key]);
+  }
+
+  function buildPhotoImportPreviewValidation(row, previewValues = null) {
+    const values = previewValues && typeof previewValues === "object"
+      ? previewValues
+      : (state.photoImport?.recognizedValues && typeof state.photoImport.recognizedValues === "object"
+        ? state.photoImport.recognizedValues
+        : null);
+
+    if (mode !== "department" || !row || !values) {
+      return {
+        applicable: false,
+        checks: [],
+        applicableChecks: [],
+        failedChecks: [],
+        failedKeySet: new Set(),
+        isValid: false,
+        statusTone: "neutral"
+      };
+    }
+
+    const read = (key) => getPhotoImportPreviewValueNumber(values, key);
+    const hasAll = (keys) => keys.every((key) => read(key) !== null);
+    const checks = [];
+    const photoBlockKeys = PHOTO_FIELD_DEFINITIONS
+      .filter((item) => item.cell >= 13 && item.cell <= 22)
+      .map((item) => item.key);
+    const presentKeys = Array.isArray(row.presentKeys) ? row.presentKeys : [];
+    const presentRequiredKeys = [
+      ...presentKeys,
+      "beenTotal",
+      "admittedTotal",
+      "dgTotal",
+      "transferFromDepartment",
+      "transferToDepartment"
+    ];
+
+    if (presentKeys.length && hasAll(presentRequiredKeys)) {
+      const presentActual = presentKeys.reduce((sum, key) => sum + (read(key) || 0), 0);
+      const presentExpected = (
+        (read("beenTotal") || 0)
+        + (read("admittedTotal") || 0)
+        + (read("transferToDepartment") || 0)
+      ) - (
+        (read("dgTotal") || 0)
+        + (read("transferFromDepartment") || 0)
+      );
+
+      checks.push({
+        id: "present-balance",
+        name: SAVE_RULE_NAME,
+        ruleText: row.hasLeaveTotal ? SAVE_RULE_TEXT : SAVE_RULE_TEXT_SHORT,
+        applicable: true,
+        isValid: presentActual === presentExpected,
+        actual: presentActual,
+        expected: presentExpected,
+        suspectKeys: photoBlockKeys,
+        failureMessage: `сумма 13-22 = ${presentActual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${presentExpected}.`
+      });
+    } else {
+      checks.push({
+        id: "present-balance",
+        name: SAVE_RULE_NAME,
+        ruleText: row.hasLeaveTotal ? SAVE_RULE_TEXT : SAVE_RULE_TEXT_SHORT,
+        applicable: false,
+        isValid: true,
+        actual: 0,
+        expected: 0,
+        suspectKeys: photoBlockKeys,
+        failureMessage: ""
+      });
+    }
+
+    const transferFromValue = read("transferFromDepartment");
+    const transferToValue = read("transferToDepartment");
+    const shouldApplyExtendedChecks = transferFromValue === 0 && transferToValue === 0;
+    const soldierRequiredKeys = ["beenSeries", "admittedSeries", "dgSeries", "currentShar", "leaveSharq"];
+    const militaryRequiredKeys = [
+      "beenSoldier",
+      "admittedSoldier",
+      "dgSoldier",
+      "currentShar",
+      "currentSpa",
+      "currentPaym",
+      "leaveSharq",
+      "leaveSpa",
+      "leavePaym"
+    ];
+
+    if (shouldApplyExtendedChecks && hasAll(soldierRequiredKeys)) {
+      const soldierActual = ((read("beenSeries") || 0) + (read("admittedSeries") || 0)) - (read("dgSeries") || 0);
+      const soldierExpected = (read("currentShar") || 0) + (read("leaveSharq") || 0);
+      checks.push({
+        id: "soldier-count",
+        name: SOLDIER_COUNT_RULE_NAME,
+        ruleText: SOLDIER_COUNT_RULE_TEXT,
+        applicable: true,
+        isValid: soldierActual === soldierExpected,
+        actual: soldierActual,
+        expected: soldierExpected,
+        suspectKeys: soldierRequiredKeys,
+        failureMessage: `контрольная сумма «${SOLDIER_COUNT_RULE_NAME}» не сошлась: (${read("beenSeries") || 0} + ${read("admittedSeries") || 0}) - ${read("dgSeries") || 0} = ${soldierActual}, а ${(read("currentShar") || 0)} + ${(read("leaveSharq") || 0)} = ${soldierExpected}.`
+      });
+    } else {
+      checks.push({
+        id: "soldier-count",
+        name: SOLDIER_COUNT_RULE_NAME,
+        ruleText: SOLDIER_COUNT_RULE_TEXT,
+        applicable: false,
+        isValid: true,
+        actual: 0,
+        expected: 0,
+        suspectKeys: soldierRequiredKeys,
+        failureMessage: ""
+      });
+    }
+
+    if (shouldApplyExtendedChecks && hasAll(militaryRequiredKeys)) {
+      const militaryActual = ((read("beenSoldier") || 0) + (read("admittedSoldier") || 0)) - (read("dgSoldier") || 0);
+      const militaryExpected = (
+        (read("currentShar") || 0)
+        + (read("currentSpa") || 0)
+        + (read("currentPaym") || 0)
+        + (read("leaveSharq") || 0)
+        + (read("leaveSpa") || 0)
+        + (read("leavePaym") || 0)
+      );
+
+      checks.push({
+        id: "military-count",
+        name: MILITARY_COUNT_RULE_NAME,
+        ruleText: MILITARY_COUNT_RULE_TEXT,
+        applicable: true,
+        isValid: militaryActual === militaryExpected,
+        actual: militaryActual,
+        expected: militaryExpected,
+        suspectKeys: militaryRequiredKeys,
+        failureMessage: `контрольная сумма «${MILITARY_COUNT_RULE_NAME}» не сошлась: (${read("beenSoldier") || 0} + ${read("admittedSoldier") || 0}) - ${read("dgSoldier") || 0} = ${militaryActual}, а ${(read("currentShar") || 0)} + ${(read("currentSpa") || 0)} + ${(read("currentPaym") || 0)} + ${(read("leaveSharq") || 0)} + ${(read("leaveSpa") || 0)} + ${(read("leavePaym") || 0)} = ${militaryExpected}.`
+      });
+    } else {
+      checks.push({
+        id: "military-count",
+        name: MILITARY_COUNT_RULE_NAME,
+        ruleText: MILITARY_COUNT_RULE_TEXT,
+        applicable: false,
+        isValid: true,
+        actual: 0,
+        expected: 0,
+        suspectKeys: militaryRequiredKeys,
+        failureMessage: ""
+      });
+    }
+
+    const comparedTopKeys = DEPARTMENT_MORNING_CONTROL_KEYS.filter((key) => read(key) !== null);
+    if (comparedTopKeys.length) {
+      const mismatches = comparedTopKeys
+        .map((key) => ({
+          key,
+          ocrValue: read(key),
+          tableValue: getNumber(state.snapshot, row, key)
+        }))
+        .filter((item) => item.ocrValue !== item.tableValue);
+
+      const mismatchMessage = mismatches
+        .map((item) => {
+          const fieldMeta = getPhotoFieldMetaByKey(item.key);
+          const cellLabel = fieldMeta?.label || item.key;
+          return `OCR ${cellLabel} = ${item.ocrValue}, а в таблице ${cellLabel} = ${item.tableValue}`;
+        })
+        .join("; ");
+
+      checks.push({
+        id: "ocr-top-cells",
+        name: OCR_TOP_CELLS_RULE_NAME,
+        ruleText: OCR_TOP_CELLS_RULE_TEXT,
+        applicable: true,
+        isValid: mismatches.length === 0,
+        actual: mismatches.length,
+        expected: 0,
+        suspectKeys: mismatches.map((item) => item.key),
+        failureMessage: mismatches.length
+          ? `данные OCR 1-3 не совпадают с таблицей отделения: ${mismatchMessage}.`
+          : ""
+      });
+    } else {
+      checks.push({
+        id: "ocr-top-cells",
+        name: OCR_TOP_CELLS_RULE_NAME,
+        ruleText: OCR_TOP_CELLS_RULE_TEXT,
+        applicable: false,
+        isValid: true,
+        actual: 0,
+        expected: 0,
+        suspectKeys: [],
+        failureMessage: ""
+      });
+    }
+
+    const applicableChecks = checks.filter((item) => item.applicable);
+    const failedChecks = applicableChecks.filter((item) => !item.isValid);
+    const failedKeySet = new Set(
+      failedChecks.flatMap((item) => Array.isArray(item.suspectKeys) ? item.suspectKeys : [])
+    );
+
+    return {
+      applicable: applicableChecks.length > 0,
+      checks,
+      applicableChecks,
+      failedChecks,
+      failedKeySet,
+      isValid: applicableChecks.length > 0 && failedChecks.length === 0,
+      statusTone: failedChecks.length ? "invalid" : (applicableChecks.length ? "valid" : "neutral")
+    };
+  }
+
+  function buildPhotoImportPreviewValidationStatus(validation) {
+    const applicableCount = validation?.applicableChecks?.length || 0;
+    const failedCount = validation?.failedChecks?.length || 0;
+    const passedCount = Math.max(0, applicableCount - failedCount);
+    const failedNames = validation?.failedChecks?.map((item) => item.name).filter(Boolean) || [];
+
+    if (!applicableCount) {
+      return {
+        tone: "neutral",
+        text: "OCR контроль пока не посчитан."
+      };
+    }
+
+    if (!failedCount) {
+      return {
+        tone: "valid",
+        text: `OCR контроль: ${passedCount}/${applicableCount} проверок пройдено.`
+      };
+    }
+
+    return {
+      tone: "invalid",
+      text: `OCR контроль: ${passedCount}/${applicableCount}. Проверьте: ${failedNames.join(", ")}.`
+    };
+  }
+
+  function getPhotoImportPreviewControlTone(validation, key) {
+    if (!validation) {
+      return "";
+    }
+    if (validation.statusTone === "valid") {
+      return "valid";
+    }
+    if (validation.statusTone === "invalid" && validation.failedKeySet instanceof Set && validation.failedKeySet.has(key)) {
+      return "invalid";
+    }
+    return "";
+  }
+
   function getDepartmentSaveRuleText(row, checks = []) {
     if (!row) {
       return SAVE_RULE_TEXT;
@@ -4632,7 +4891,7 @@
       };
     }
 
-    const validation = getDepartmentValidationState();
+    const validation = buildPhotoImportPreviewValidation(row, previewValues);
     if (!validation.applicable || validation.isValid) {
       return {
         suspectKeys: [],
@@ -4643,7 +4902,7 @@
     const photoBlockFields = PHOTO_FIELD_DEFINITIONS
       .filter((item) => item.cell >= 13 && item.cell <= 22)
       .map((item) => item.key);
-    const activeBlockKeys = photoBlockFields.filter((key) => getNumber(state.snapshot, row, key) !== 0);
+    const activeBlockKeys = photoBlockFields.filter((key) => getPhotoImportPreviewValueNumber(previewValues, key) !== null);
     const reviewBlockKeys = Array.isArray(state.photoImport?.cellReviews)
       ? state.photoImport.cellReviews
         .filter((item) => item && item.status === "review" && photoBlockFields.includes(item.key))
@@ -4688,24 +4947,6 @@
           : "Формула 13-22 не сошлась. Проверьте блок ячеек 13-22."
       );
     });
-
-    if (photoTopCellsCheck.applicable && !photoTopCellsCheck.isValid) {
-      const checkKeys = Array.isArray(photoTopCellsCheck.suspectKeys) ? photoTopCellsCheck.suspectKeys : [];
-      checkKeys.forEach((key) => {
-        if (!suspectKeys.includes(key)) {
-          suspectKeys.push(key);
-        }
-      });
-      const labels = checkKeys
-        .map((key) => getPhotoFieldMetaByKey(key))
-        .filter(Boolean)
-        .map((item) => item.label);
-      suspectReasonParts.push(
-        labels.length
-          ? `Данные OCR 1-3 не совпадают с таблицей отделения. Проверьте ячейки ${labels.join(", ")}.`
-          : "Данные OCR 1-3 не совпадают с таблицей отделения."
-      );
-    }
 
     return {
       suspectKeys,
@@ -6199,6 +6440,137 @@
     return "empty";
   }
 
+  function syncPhotoImportPreviewState(row) {
+    if (mode !== "department" || !row || !state.photoImport) {
+      return buildPhotoImportPreviewValidation(row, null);
+    }
+
+    const recognizedValues = state.photoImport.recognizedValues && typeof state.photoImport.recognizedValues === "object"
+      ? state.photoImport.recognizedValues
+      : {};
+    const previewKeys = PHOTO_FIELD_DEFINITIONS
+      .filter((field) => !field.computed)
+      .filter((field) => Object.prototype.hasOwnProperty.call(recognizedValues, field.key) && recognizedValues[field.key] !== null)
+      .map((field) => field.key);
+
+    state.photoImport.lastAppliedKeys = previewKeys;
+    state.photoImport.draftMode = false;
+
+    const validation = buildPhotoImportPreviewValidation(row, recognizedValues);
+    const suspectDetails = getPhotoImportSuspectDetails(row, new Set(previewKeys), recognizedValues);
+    state.photoImport.suspectKeys = suspectDetails.suspectKeys;
+    state.photoImport.suspectReason = suspectDetails.suspectReason;
+
+    return validation;
+  }
+
+  function refreshPhotoImportPreviewUi(row) {
+    if (mode !== "department" || !row || !state.photoImport) {
+      return;
+    }
+
+    const photoState = state.photoImport;
+    const reviewByKey = new Map(
+      (Array.isArray(photoState.cellReviews) ? photoState.cellReviews : []).map((item) => [item.key, item])
+    );
+    const recognizedFields = new Set(photoState.lastAppliedKeys || []);
+    const suspectFields = new Set(Array.isArray(photoState.suspectKeys) ? photoState.suspectKeys : []);
+    const validation = buildPhotoImportPreviewValidation(row, photoState.recognizedValues);
+    const statusMeta = buildPhotoImportPreviewValidationStatus(validation);
+
+    PHOTO_FIELD_DEFINITIONS.forEach((field) => {
+      const cell = document.querySelector(`[data-photo-preview-cell="${field.key}"]`);
+      if (!(cell instanceof HTMLTableCellElement)) {
+        return;
+      }
+
+      const status = getPhotoImportPreviewStatus(photoState, reviewByKey, recognizedFields, suspectFields, field.key);
+      const controlTone = getPhotoImportPreviewControlTone(validation, field.key);
+      cell.className = [
+        "photo-import-mini-table__cell",
+        `photo-import-mini-table__cell--${status}`,
+        controlTone ? `photo-import-mini-table__cell--control-${controlTone}` : ""
+      ].filter(Boolean).join(" ");
+
+      if (field.computed) {
+        const output = cell.querySelector("[data-photo-preview-output]");
+        if (output) {
+          output.textContent = getDisplayValue(getPhotoPreviewValue(row, field.key)) || "—";
+        }
+        return;
+      }
+
+      const input = cell.querySelector("input[data-photo-preview-key]");
+      if (input instanceof HTMLInputElement) {
+        const value = getPhotoPreviewValue(row, field.key);
+        const expectedText = getDisplayValue(value) || "";
+        if (input.value !== expectedText) {
+          input.value = expectedText;
+        }
+      }
+    });
+
+    const validationStatus = document.getElementById("photoImportPreviewValidationStatus");
+    if (validationStatus) {
+      validationStatus.textContent = statusMeta.text;
+      validationStatus.className = `photo-import-mini-table-status photo-import-mini-table-status--${statusMeta.tone}`;
+    }
+
+    const suspectReason = document.getElementById("photoImportSuspectReason");
+    if (suspectReason) {
+      if (photoState.suspectReason) {
+        suspectReason.textContent = photoState.suspectReason;
+        suspectReason.hidden = false;
+      } else {
+        suspectReason.textContent = "";
+        suspectReason.hidden = true;
+      }
+    }
+
+    const applyPhotoSourceBtn = document.getElementById("applyPhotoSourceBtn");
+    if (applyPhotoSourceBtn instanceof HTMLButtonElement) {
+      const canApplyPhotoSource = Boolean(
+        photoState.recognizedValues
+        && typeof photoState.recognizedValues === "object"
+        && Array.isArray(photoState.lastAppliedKeys)
+        && photoState.lastAppliedKeys.length
+        && photoState.structureOk !== false
+        && !photoState.draftMode
+      );
+      applyPhotoSourceBtn.disabled = !canApplyPhotoSource;
+    }
+
+    const statusLine = document.getElementById("photoImportStatus");
+    if (statusLine) {
+      statusLine.textContent = photoState.status || "";
+      statusLine.className = `hint${photoState.isError ? " warning-note" : ""}`;
+    }
+  }
+
+  function handlePhotoImportPreviewEdit(key, rawValue) {
+    const row = getCurrentRow();
+    const field = getPhotoFieldMetaByKey(key);
+    if (!row || !field || field.computed || !state.photoImport) {
+      return { text: "", value: null };
+    }
+
+    const sanitized = sanitizeNumericInput(rawValue);
+    if (!state.photoImport.recognizedValues || typeof state.photoImport.recognizedValues !== "object") {
+      state.photoImport.recognizedValues = {};
+    }
+
+    if (sanitized.value === null) {
+      delete state.photoImport.recognizedValues[key];
+    } else {
+      state.photoImport.recognizedValues[key] = sanitized.value;
+    }
+
+    syncPhotoImportPreviewState(row);
+    setPhotoImportStatus("OCR данные изменены вручную. Проверьте контроль и нажмите «Взять данные из фото».", false);
+    refreshPhotoImportPreviewUi(row);
+    return sanitized;
+  }
+
   function renderPhotoImportPreviewTable(row, photoState, reviewByKey, recognizedFields, suspectFields) {
     const rawValues = photoState?.recognizedValues && typeof photoState.recognizedValues === "object"
       ? photoState.recognizedValues
@@ -6213,6 +6585,9 @@
     if (!hasPreviewValues) {
       return "";
     }
+
+    const validation = buildPhotoImportPreviewValidation(row, rawValues);
+    const validationStatus = buildPhotoImportPreviewValidationStatus(validation);
 
     const groups = [
       {
@@ -6279,9 +6654,27 @@
       .map((group) => group.keys.map((cell) => {
         const status = getPhotoImportPreviewStatus(photoState, reviewByKey, recognizedFields, suspectFields, cell.key);
         const value = getPhotoPreviewValue(row, cell.key);
+        const fieldMeta = getPhotoFieldMetaByKey(cell.key);
+        const controlTone = getPhotoImportPreviewControlTone(validation, cell.key);
+        const classes = [
+          "photo-import-mini-table__cell",
+          `photo-import-mini-table__cell--${status}`,
+          controlTone ? `photo-import-mini-table__cell--control-${controlTone}` : ""
+        ].filter(Boolean).join(" ");
+        const inputHtml = fieldMeta?.computed
+          ? `<span data-photo-preview-output="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(value) || "—")}</span>`
+          : `<input
+              type="number"
+              min="0"
+              step="1"
+              inputmode="numeric"
+              value="${escapeHtml(getDisplayValue(value) || "")}"
+              data-photo-preview-key="${escapeHtml(cell.key)}"
+              aria-label="${escapeHtml(`OCR ${group.title} ${cell.label}`)}"
+            >`;
         return `
-          <td class="photo-import-mini-table__cell photo-import-mini-table__cell--${status}">
-            <span>${escapeHtml(getDisplayValue(value) || "—")}</span>
+          <td class="${classes}" data-photo-preview-cell="${escapeHtml(cell.key)}">
+            ${inputHtml}
           </td>
         `;
       }).join(""))
@@ -6289,7 +6682,7 @@
 
     return `
       <div class="photo-import-mini-table-wrap">
-        <table class="photo-import-mini-table" aria-label="OCR preview table">
+        <table class="photo-import-mini-table photo-import-mini-table--${escapeHtml(validation.statusTone)}" aria-label="OCR preview table">
           <thead>
             <tr>${groupHeaders}</tr>
             <tr>${subHeaders}</tr>
@@ -6298,6 +6691,7 @@
             <tr>${dataCells}</tr>
           </tbody>
         </table>
+        <div id="photoImportPreviewValidationStatus" class="photo-import-mini-table-status photo-import-mini-table-status--${escapeHtml(validationStatus.tone)}">${escapeHtml(validationStatus.text)}</div>
       </div>
     `;
   }
@@ -6372,7 +6766,7 @@
                 ${photoState.notes.map((note) => `<p class="hint warning-note">${escapeHtml(note)}</p>`).join("")}
               </div>
             ` : ""}
-            ${photoState.suspectReason ? `<p class="hint warning-note"><strong>${escapeHtml(photoState.suspectReason)}</strong></p>` : ""}
+            <p class="hint warning-note" id="photoImportSuspectReason"${photoState.suspectReason ? "" : " hidden"}><strong>${escapeHtml(photoState.suspectReason || "")}</strong></p>
             ${photoState.draftMode ? `<p class="hint"><strong>Для таблицы сейчас выбраны данные из фото.</strong> Проверьте ячейки и нажмите Сохранить.</p>` : ""}
           </div>
         ` : ""}
@@ -9873,6 +10267,21 @@
         handleApplyTelegramSourceToDepartment();
       });
     }
+
+    document.querySelectorAll("[data-photo-preview-key]").forEach((input) => {
+      input.addEventListener("input", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) {
+          return;
+        }
+        const key = target.dataset.photoPreviewKey;
+        if (!key) {
+          return;
+        }
+        const sanitized = handlePhotoImportPreviewEdit(key, target.value);
+        target.value = sanitized.text;
+      });
+    });
 
     const departmentTopCellsToggle = document.getElementById("departmentTopCellsToggle");
     if (departmentTopCellsToggle instanceof HTMLInputElement) {
