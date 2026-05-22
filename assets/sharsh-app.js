@@ -634,8 +634,8 @@
   }
 
   function applyLoadedSnapshot(result) {
-    state.snapshot = syncQhCalculatedTargets(primeQhBaseInputs(resetQhCalcInputs(deepCopy(result.snapshot))));
-    state.loadedSnapshot = syncQhCalculatedTargets(primeQhBaseInputs(resetQhCalcInputs(deepCopy(result.snapshot))));
+    state.snapshot = syncQhCalculatedTargets(primeQhBaseInputs(deepCopy(result.snapshot)));
+    state.loadedSnapshot = syncQhCalculatedTargets(primeQhBaseInputs(deepCopy(result.snapshot)));
     state.source = result.source;
     state.warning = result.warning || "";
   }
