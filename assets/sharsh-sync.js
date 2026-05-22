@@ -839,6 +839,7 @@
   }
 
   const NIGHT_SHIFT_TRANSFER_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"];
+  const QH_CALC_DEPARTMENT_IDS = new Set(["r19", "r20", "r21"]);
   const MORNING_ROLLOVER_DONE_PREFIX = `${config.STORAGE_NAMESPACE || "sarsh-kkzh-v2"}:morning-rollover-done:`;
   const MORNING_ROLLOVER_PRESENT_KEYS = [
     "currentShar",
@@ -885,6 +886,40 @@
 
   function getLocalRowNumber(values, key) {
     return config.normalizeCellValue(values && values[key]) || 0;
+  }
+
+  function primeQhMorningBaseValues(values) {
+    const hasBaseValues =
+      getLocalRowNumber(values, "qhBaseSoldier") !== 0
+      || getLocalRowNumber(values, "qhBaseOfficer") !== 0
+      || getLocalRowNumber(values, "qhBaseContract") !== 0;
+    const hasCurrentValues =
+      getLocalRowNumber(values, "currentShar") !== 0
+      || getLocalRowNumber(values, "currentSpa") !== 0
+      || getLocalRowNumber(values, "currentPaym") !== 0;
+
+    if (!hasBaseValues && hasCurrentValues) {
+      values.qhBaseSoldier = getLocalRowNumber(values, "currentShar");
+      values.qhBaseOfficer = getLocalRowNumber(values, "currentSpa");
+      values.qhBaseContract = getLocalRowNumber(values, "currentPaym");
+    }
+  }
+
+  function syncQhMorningCalculatedValues(departmentId, values) {
+    if (!QH_CALC_DEPARTMENT_IDS.has(departmentId)) {
+      return;
+    }
+
+    primeQhMorningBaseValues(values);
+    values.currentShar = getLocalRowNumber(values, "qhBaseSoldier")
+      + getLocalRowNumber(values, "qhIncomingSoldier")
+      - getLocalRowNumber(values, "qhDischargedSoldier");
+    values.currentSpa = getLocalRowNumber(values, "qhBaseOfficer")
+      + getLocalRowNumber(values, "qhIncomingOfficer")
+      - getLocalRowNumber(values, "qhDischargedOfficer");
+    values.currentPaym = getLocalRowNumber(values, "qhBaseContract")
+      + getLocalRowNumber(values, "qhIncomingContract")
+      - getLocalRowNumber(values, "qhDischargedContract");
   }
 
   function applyMorningRolloverRowsToSnapshot(snapshot, reportDate) {
@@ -984,8 +1019,7 @@
       const n5 = getNightValue(nightRows, row.id, "family");
       const n6 = getNightValue(nightRows, row.id, "zp");
       const n7 = getNightValue(nightRows, row.id, "qi");
-      // Formula from the night-shift workflow: n5 is counted twice, n6 is not included in admittedTotal.
-      const nightTotal = n1 + n2 + n3 + n4 + n5 + n5 + n7;
+      const nightTotal = n1 + n2 + n3 + n4 + n5 + n6 + n7;
       const hasAnyNightValue = n1 + n2 + n3 + n4 + n5 + n6 + n7;
 
       if (!hasAnyNightValue) {
@@ -994,13 +1028,20 @@
 
       const values = config.normalizeRowValues(row.values);
       addCell(values, "admittedSeries", n1);
-      addCell(values, "currentShar", n1);
-      values.currentSpa = n2;
-      values.currentPaym = n3;
-      values.currentZh = n4;
-      values.family = n5;
-      values.officer = n6;
-      values.civil = n7;
+      if (QH_CALC_DEPARTMENT_IDS.has(row.id)) {
+        addCell(values, "qhIncomingSoldier", n1);
+        addCell(values, "qhIncomingOfficer", n2);
+        addCell(values, "qhIncomingContract", n3);
+        syncQhMorningCalculatedValues(row.id, values);
+      } else {
+        addCell(values, "currentShar", n1);
+        addCell(values, "currentSpa", n2);
+        addCell(values, "currentPaym", n3);
+      }
+      addCell(values, "currentZh", n4);
+      addCell(values, "family", n5);
+      addCell(values, "officer", n6);
+      addCell(values, "civil", n7);
       addCell(values, "admittedTotal", nightTotal);
       addCell(values, "admittedSoldier", n1 + n2 + n3);
 
