@@ -228,6 +228,50 @@
     QH_CALC_COLUMNS.flatMap((column) => [column.incomingKey, column.dischargedKey])
   );
   const QH_CALC_OPTIONAL_INPUT_KEYS = new Set(QH_CALC_COLUMNS.map((column) => column.baseKey));
+  const LEAVE_CALC_COLUMNS = [
+    {
+      type: "sharq",
+      label: "ՇԱՐ",
+      presentKey: "currentShar",
+      leaveKey: "leaveSharq",
+      sentKey: "leaveCalcSentSharq",
+      returnedKey: "leaveCalcReturnedSharq",
+      sentMarker: "A",
+      returnedMarker: "D",
+      baseMarker: "G",
+      leaveOutputMarker: "J",
+      presentOutputMarker: "M"
+    },
+    {
+      type: "spa",
+      label: "ՍՊԱ",
+      presentKey: "currentSpa",
+      leaveKey: "leaveSpa",
+      sentKey: "leaveCalcSentSpa",
+      returnedKey: "leaveCalcReturnedSpa",
+      sentMarker: "B",
+      returnedMarker: "E",
+      baseMarker: "H",
+      leaveOutputMarker: "K",
+      presentOutputMarker: "N"
+    },
+    {
+      type: "paym",
+      label: "ՊԱՅՄ",
+      presentKey: "currentPaym",
+      leaveKey: "leavePaym",
+      sentKey: "leaveCalcSentPaym",
+      returnedKey: "leaveCalcReturnedPaym",
+      sentMarker: "C",
+      returnedMarker: "F",
+      baseMarker: "I",
+      leaveOutputMarker: "L",
+      presentOutputMarker: "O"
+    }
+  ];
+  const LEAVE_CALC_INPUT_KEYS = new Set(
+    LEAVE_CALC_COLUMNS.flatMap((column) => [column.sentKey, column.returnedKey])
+  );
   const HOSPITAL_REPORT_PRIMARY_ITEMS = [
     { key: "beenTotal", cell: 1, label: "Հոսպիտալում եղել է" },
     { key: "admittedTotal", cell: 4, label: "Ընդունվել է" },
@@ -3745,6 +3789,16 @@
     return config.normalizeCellValue(getEffectiveValue(snapshot, row, key));
   }
 
+  function getLeaveCalcSourceValue(row, key) {
+    if (!row) {
+      return null;
+    }
+    const value = row.values && typeof row.values === "object"
+      ? row.values[key]
+      : null;
+    return config.normalizeCellValue(value);
+  }
+
   function calcQhRemainingValue(row, type, snapshot = state.snapshot) {
     if (!row) {
       return null;
@@ -3959,6 +4013,51 @@
     refreshTableData();
     queueDepartmentSave();
     setInfo("Հաշվարկային աղյուսակի արժեքները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
+  }
+
+  function applyLeaveCalcToDepartment() {
+    const row = getCurrentRow();
+    if (!row) {
+      return;
+    }
+
+    const invalidColumns = LEAVE_CALC_COLUMNS.filter((column) =>
+      (calcLeaveRemainingValue(row, column.type) || 0) < 0
+      || (calcLeavePresentValue(row, column.type) || 0) < 0
+    );
+    if (invalidColumns.length) {
+      setInfo(`Բուժական արձակուրդի հաշվարկը չի կարող կիրառվել․ ${invalidColumns.map((column) => column.label).join(", ")} սյունակներում ստացվել է բացասական արժեք։`, true);
+      return;
+    }
+
+    LEAVE_CALC_COLUMNS.forEach((column) => {
+      row.values[column.leaveKey] = calcLeaveRemainingValue(row, column.type) || 0;
+      row.values[column.presentKey] = calcLeavePresentValue(row, column.type) || 0;
+      row.values[column.sentKey] = 0;
+      row.values[column.returnedKey] = 0;
+    });
+
+    [
+      ["currentShar", row.values.currentShar],
+      ["currentSpa", row.values.currentSpa],
+      ["currentPaym", row.values.currentPaym],
+      ["leaveSharq", row.values.leaveSharq],
+      ["leaveSpa", row.values.leaveSpa],
+      ["leavePaym", row.values.leavePaym]
+    ].forEach(([key, value]) => {
+      syncDepartmentRowInput(row.id, key, value);
+    });
+
+    if (isQhCalcDepartment(row)) {
+      row.values.qhBaseSoldier = row.values.currentShar || 0;
+      row.values.qhBaseOfficer = row.values.currentSpa || 0;
+      row.values.qhBaseContract = row.values.currentPaym || 0;
+      refreshQhCalcDisplay(row);
+    }
+
+    refreshTableData();
+    queueDepartmentSave();
+    setInfo("Բուժական արձակուրդի հաշվարկը տեղափոխվել է հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
   }
 
   function getPhotoPreviewValue(row, key) {
@@ -4948,6 +5047,56 @@
       const loadedRow = getDepartmentRow(state.loadedSnapshot, row.id);
       return getRowValueSignature(row) !== getRowValueSignature(loadedRow);
     });
+  }
+
+  function calcLeaveRemainingValue(row, type, snapshot = state.snapshot) {
+    const column = LEAVE_CALC_COLUMNS.find((item) => item.type === type);
+    if (!row || !column) {
+      return null;
+    }
+    const baseLeave = getNumber(snapshot, row, column.leaveKey) || 0;
+    const sent = getLeaveCalcSourceValue(row, column.sentKey) || 0;
+    const returned = getLeaveCalcSourceValue(row, column.returnedKey) || 0;
+    return baseLeave + sent - returned;
+  }
+
+  function calcLeavePresentValue(row, type, snapshot = state.snapshot) {
+    const column = LEAVE_CALC_COLUMNS.find((item) => item.type === type);
+    if (!row || !column) {
+      return null;
+    }
+    const basePresent = getNumber(snapshot, row, column.presentKey) || 0;
+    const sent = getLeaveCalcSourceValue(row, column.sentKey) || 0;
+    const returned = getLeaveCalcSourceValue(row, column.returnedKey) || 0;
+    return basePresent - sent + returned;
+  }
+
+  function refreshLeaveCalcDisplay(row) {
+    if (!row) {
+      return;
+    }
+    LEAVE_CALC_COLUMNS.forEach((column) => {
+      document.querySelectorAll(`[data-leave-calc-output="${column.leaveKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(calcLeaveRemainingValue(row, column.type)) || "0";
+      });
+      document.querySelectorAll(`[data-leave-calc-output="${column.presentKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(calcLeavePresentValue(row, column.type)) || "0";
+      });
+    });
+
+    const status = document.getElementById("leaveCalcStatus");
+    if (status) {
+      const invalidColumns = LEAVE_CALC_COLUMNS.filter((column) =>
+        (calcLeaveRemainingValue(row, column.type) || 0) < 0
+        || (calcLeavePresentValue(row, column.type) || 0) < 0
+      );
+      status.className = `qh-calc-status${invalidColumns.length ? " qh-calc-status--bad" : ""}`;
+      status.innerHTML = invalidColumns.length
+        ? invalidColumns.map((column) => (
+          `<div>${escapeHtml(`${column.label}: չի կարող լինել բացասական արժեք`)}</div>`
+        )).join("")
+        : `<div>${escapeHtml("Այս հաշվարկը չի փոխում ընդհանուր քանակը․ փոխվում են միայն 13-15 և 20-22 բջիջները։")}</div>`;
+    }
   }
 
   function hasMainTablePendingLocalChanges() {
@@ -6304,6 +6453,7 @@
 
           ${renderPhotoImportPanel(row)}
           ${renderQhCalcPanel(row)}
+          ${renderLeaveCalcPanel(row)}
           ${renderTelegramFormReviewPanel(row)}
           ${renderDepartmentPdfArchivePanel(row)}
 
@@ -6424,6 +6574,111 @@
                 ${renderTable(snapshot, snapshot.rows, { interactive: false, viewMode: "main", headerDateTime })}
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderLeaveCalcPanel(row) {
+    const bodyRows = [
+      {
+        label: "Ուղարկվել է բուժ․ արձակուրդ",
+        cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.sentKey, marker: column.sentMarker, role: "input" }))
+      },
+      {
+        label: "Վերադարձել է արձակուրդից",
+        cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.returnedKey, marker: column.returnedMarker, role: "input" }))
+      },
+      {
+        label: "Եղել է արձակուրդում",
+        cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.leaveKey, marker: column.baseMarker, role: "linked" }))
+      },
+      {
+        label: "Մնացել է արձակուրդում",
+        cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.leaveKey, marker: column.leaveOutputMarker, role: "leave-output" }))
+      },
+      {
+        label: "Առկա կմնա բաժանմունքում",
+        cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.presentKey, marker: column.presentOutputMarker, role: "present-output" }))
+      }
+    ];
+
+    const bodyHtml = bodyRows.map((definition, rowIndex) => `
+      <tr>
+        <th scope="row">${escapeHtml(definition.label)}</th>
+        ${definition.cells.map((cell, columnIndex) => {
+          if (cell.role === "input") {
+            return `
+              <td class="qh-calc-cell">
+                <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  value="${escapeHtml(getDisplayValue(getLeaveCalcSourceValue(row, cell.key)) || "0")}"
+                  data-leave-calc-key="${escapeHtml(cell.key)}"
+                  data-leave-calc-row="${rowIndex}"
+                  data-leave-calc-col="${columnIndex}"
+                  aria-label="${escapeHtml(`${definition.label} ${cell.marker}`)}"
+                >
+              </td>
+            `;
+          }
+
+          if (cell.role === "linked") {
+            return `
+              <td class="qh-calc-cell qh-calc-cell--linked">
+                <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
+                <strong data-leave-calc-output="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(getNumber(state.snapshot, row, cell.key)) || "0")}</strong>
+              </td>
+            `;
+          }
+
+          return `
+            <td class="qh-calc-cell qh-calc-cell--output">
+              <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
+              <strong data-leave-calc-output="${escapeHtml(cell.key)}">${escapeHtml(
+                getDisplayValue(
+                  cell.role === "leave-output"
+                    ? calcLeaveRemainingValue(row, columnIndex === 0 ? "sharq" : columnIndex === 1 ? "spa" : "paym")
+                    : calcLeavePresentValue(row, columnIndex === 0 ? "sharq" : columnIndex === 1 ? "spa" : "paym")
+                ) || "0"
+              )}</strong>
+            </td>
+          `;
+        }).join("")}
+      </tr>
+    `).join("");
+
+    return `
+      <div class="panel qh-calc-panel">
+        <h2>Բուժական արձակուրդ</h2>
+        <p>Ուղարկվածները ավելանում են 20-22 բջիջներին և նույն պահին պակասում են 13-15 բջիջներից։ Վերադարձածները՝ հակառակը։ Ընդհանուր քանակը չի փոխվում։</p>
+        <div class="qh-calc-wrap" id="leaveCalcPanel">
+          <table class="qh-calc-table">
+            <thead>
+              <tr>
+                <th></th>
+                ${LEAVE_CALC_COLUMNS.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyHtml}
+            </tbody>
+          </table>
+          <div class="qh-calc-formulas">
+            <span>J = G + A - D</span>
+            <span>K = H + B - E</span>
+            <span>L = I + C - F</span>
+            <span>M = 13 - A + D</span>
+            <span>N = 14 - B + E</span>
+            <span>O = 15 - C + F</span>
+          </div>
+          <div id="leaveCalcStatus" class="qh-calc-status"></div>
+          <div class="qh-calc-actions">
+            <button type="button" id="leaveCalcApplyBtn">Հաշվել և տեղադրել</button>
           </div>
         </div>
       </div>
@@ -6630,6 +6885,24 @@
           });
         });
       }
+
+      LEAVE_CALC_INPUT_KEYS.forEach((key) => {
+        document.querySelectorAll(`[data-leave-calc-key="${key}"]`).forEach((element) => {
+          if (element instanceof HTMLInputElement) {
+            element.value = getDisplayValue(getLeaveCalcSourceValue(row, key)) || "0";
+          }
+        });
+      });
+
+      LEAVE_CALC_COLUMNS.forEach((column) => {
+        document.querySelectorAll(`[data-leave-calc-output="${column.leaveKey}"]`).forEach((element) => {
+          element.textContent = getDisplayValue(calcLeaveRemainingValue(row, column.type)) || "0";
+        });
+        document.querySelectorAll(`[data-leave-calc-output="${column.presentKey}"]`).forEach((element) => {
+          element.textContent = getDisplayValue(calcLeavePresentValue(row, column.type)) || "0";
+        });
+      });
+      refreshLeaveCalcDisplay(row);
     });
 
     Object.keys(config.linkedCells).forEach((linkedKey) => {
@@ -9605,9 +9878,42 @@
       });
     }
 
+    const leaveCalcPanel = document.getElementById("leaveCalcPanel");
+    if (mode === "department" && leaveCalcPanel) {
+      leaveCalcPanel.addEventListener("input", (event) => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement)) {
+          return;
+        }
+
+        const key = input.dataset.leaveCalcKey;
+        if (!key) {
+          return;
+        }
+
+        const row = getCurrentRow();
+        if (!row) {
+          return;
+        }
+
+        const sanitized = sanitizeNumericInput(input.value);
+        input.value = sanitized.text;
+        row.values[key] = sanitized.value;
+        refreshLeaveCalcDisplay(row);
+        queueDepartmentSave();
+      });
+    }
+
     if (mode === "department" && qhCalcApplyBtn) {
       qhCalcApplyBtn.addEventListener("click", () => {
         applyQhCalcToDepartment();
+      });
+    }
+
+    const leaveCalcApplyBtn = document.getElementById("leaveCalcApplyBtn");
+    if (mode === "department" && leaveCalcApplyBtn) {
+      leaveCalcApplyBtn.addEventListener("click", () => {
+        applyLeaveCalcToDepartment();
       });
     }
 

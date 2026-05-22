@@ -728,6 +728,24 @@ a {
   transform: translateY(0);
 }
 
+.qh-calc-status {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.qh-calc-status--bad {
+  border-color: rgba(185, 45, 32, 0.24);
+  background: rgba(185, 45, 32, 0.08);
+  color: #7f1d1d;
+}
+
 @media (max-width: 860px) {
   .qh-calc-table {
     display: block;
