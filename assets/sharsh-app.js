@@ -5553,23 +5553,6 @@
               <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
               <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.")}</p>
               <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
-              ${canEditMainTable ? `
-                <div class="main-table-edit-panel">
-                  <label class="department-top-lock-switch" for="mainTableEditToggle">
-                    <input type="checkbox" id="mainTableEditToggle"${state.mainTableUnlocked ? " checked" : ""}>
-                    <span class="department-top-lock-slider" aria-hidden="true"></span>
-                    <span class="department-top-lock-copy">
-                      <strong>Main table editing</strong>
-                      <span>${escapeHtml(state.mainTableUnlocked ? "Editing is enabled." : "Editing is locked.")}</span>
-                    </span>
-                  </label>
-                  <p class="hint main-table-edit-hint">Turn on the switch to edit cells manually.</p>
-                  <div class="photo-import-save-actions main-table-save-actions">
-                    <button type="button" id="mainSaveBtn">Сохранить таблицу</button>
-                    <span id="mainSaveRuleText">Изменений в главной таблице пока нет.</span>
-                  </div>
-                </div>
-              ` : ""}
               <div class="update-health-banner update-health-banner--${overallUpdateStatus.level}" id="overallUpdateBanner">
                 <strong id="overallUpdateLabel">${escapeHtml(overallUpdateStatus.label)}</strong>
                 <span id="overallUpdateDetail">${escapeHtml(overallUpdateStatus.detail)}</span>
@@ -5603,6 +5586,22 @@
 
             <div class="zoom-target">
               <div class="sheet-shell">
+              ${canEditMainTable ? `
+                <div class="main-table-edit-panel main-table-edit-panel--table">
+                  <label class="department-top-lock-switch" for="mainTableEditToggle">
+                    <input type="checkbox" id="mainTableEditToggle"${state.mainTableUnlocked ? " checked" : ""}>
+                    <span class="department-top-lock-slider" aria-hidden="true"></span>
+                    <span class="department-top-lock-copy">
+                      <strong>Редактирование таблицы</strong>
+                      <span>${escapeHtml(state.mainTableUnlocked ? "Редактирование включено." : "Редактирование заблокировано.")}</span>
+                    </span>
+                  </label>
+                  <div class="photo-import-save-actions main-table-save-actions">
+                    <button type="button" id="mainSaveBtn">Сохранить таблицу</button>
+                    <span id="mainSaveRuleText">Изменений в главной таблице пока нет.</span>
+                  </div>
+                </div>
+              ` : ""}
               <p class="status-line no-print">
                 <strong>Последнее обновление сводки:</strong>
                 <span id="lastUpdatedText">${escapeHtml(freshnessStats.newestRow ? formatTimestamp(getRowEffectiveUpdatedAt(freshnessStats.newestRow)) : "еще не отправлялось")}</span>

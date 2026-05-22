@@ -1567,6 +1567,14 @@ a {
   border-top: 1px solid rgba(17, 17, 17, 0.08);
 }
 
+.main-table-edit-panel--table {
+  margin-top: 0;
+  margin-bottom: 10px;
+  padding-top: 0;
+  border-top: 0;
+  justify-items: start;
+}
+
 .main-table-edit-hint {
   margin: 0;
 }
