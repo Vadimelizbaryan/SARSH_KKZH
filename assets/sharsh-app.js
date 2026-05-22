@@ -6600,10 +6600,6 @@
       {
         label: "Մնացել է արձակուրդում",
         cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.leaveKey, marker: column.leaveOutputMarker, role: "leave-output" }))
-      },
-      {
-        label: "Առկա կմնա բաժանմունքում",
-        cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.presentKey, marker: column.presentOutputMarker, role: "present-output" }))
       }
     ];
 
@@ -6675,9 +6671,6 @@
             <span>J = G + A - D</span>
             <span>K = H + B - E</span>
             <span>L = I + C - F</span>
-            <span>M = 13 - A + D</span>
-            <span>N = 14 - B + E</span>
-            <span>O = 15 - C + F</span>
           </div>
           <div id="leaveCalcStatus" class="qh-calc-status"></div>
           <div class="qh-calc-actions">
