@@ -6363,7 +6363,6 @@
           if (cell.role === "output") {
             return `
               <td class="qh-calc-cell qh-calc-cell--output">
-                <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
                 <strong data-qh-output="${escapeHtml(cell.key)}">${escapeHtml(getQhCalcDisplayValue(row, cell.key))}</strong>
               </td>
             `;
@@ -6372,7 +6371,6 @@
           if (cell.role === "linked" || cell.role === "input") {
             return `
               <td class="qh-calc-cell${cell.role === "linked" ? " qh-calc-cell--linked" : ""}">
-                <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
                 <input
                   type="number"
                   min="0"
@@ -6390,7 +6388,6 @@
 
           return `
             <td class="qh-calc-cell">
-              <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
               <input
                 type="number"
                 min="0"
@@ -6430,15 +6427,6 @@
               ${bodyRows}
             </tbody>
           </table>
-          <div class="qh-calc-formulas">
-            <span>V = (O + A) - H</span>
-            <span>W = (P + B) - I</span>
-            <span>X = (Q + C) - J</span>
-            <span>Y = (R + D) - K</span>
-            <span>Z = (S + E) - L</span>
-            <span>AA = (T + F) - M</span>
-            <span>AB = (U + G) - N</span>
-          </div>
           <div class="qh-calc-actions">
             <button type="button" id="qhCalcApplyBtn">Հաշվել և տեղադրել</button>
           </div>
@@ -6700,7 +6688,6 @@
           if (cell.role === "input") {
             return `
               <td class="qh-calc-cell">
-                <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
                 <input
                   type="number"
                   min="0"
@@ -6719,7 +6706,6 @@
       if (cell.role === "linked") {
         return `
               <td class="qh-calc-cell qh-calc-cell--linked">
-                <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
                 <strong data-leave-calc-base="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(getNumber(state.snapshot, row, cell.key)) || "0")}</strong>
               </td>
             `;
@@ -6727,7 +6713,6 @@
 
           return `
             <td class="qh-calc-cell qh-calc-cell--output">
-              <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
               <strong data-leave-calc-output="${escapeHtml(cell.key)}">${escapeHtml(
                 getDisplayValue(
                   cell.role === "leave-output"
@@ -6757,11 +6742,6 @@
               ${bodyHtml}
             </tbody>
           </table>
-          <div class="qh-calc-formulas">
-            <span>J = G + A - D</span>
-            <span>K = H + B - E</span>
-            <span>L = I + C - F</span>
-          </div>
           <div id="leaveCalcStatus" class="qh-calc-status"></div>
           <div class="qh-calc-actions">
             <button type="button" id="leaveCalcApplyBtn">Հաշվել և տեղադրել</button>
