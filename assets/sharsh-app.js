@@ -23,6 +23,7 @@
   const departmentId = document.body.dataset.departmentId || "";
   const basePath = document.body.dataset.basePath || ".";
   const archiveKeyFromQuery = queryParams.get("archive") || "";
+  const savedMainKeyFromQuery = queryParams.get("savedMain") || "";
   const departmentArchiveKeyFromQuery = queryParams.get("departmentArchive") || "";
   const departmentArchiveDateFromQuery = queryParams.get("departmentArchiveDate") || "";
   const archiveAutoPrint = queryParams.get("autoprint") !== "0";
@@ -39,6 +40,7 @@
   const DEPARTMENT_MORNING_CONTROL_KEYS = ["beenTotal", "beenSoldier", "beenSeries"];
   const DEPARTMENT_MORNING_CONTROL_KEY_SET = new Set(DEPARTMENT_MORNING_CONTROL_KEYS);
   const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
+  const MAIN_TABLE_SAVED_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-saved-tables:v1`;
   const MORNING_ROLLOVER_PENDING_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:morning-rollover-pending:v1`;
   const ARCHIVE_TIMEZONE = "Asia/Yerevan";
   const DATA_UPDATE_SLOT_MINUTES = {
@@ -49,6 +51,7 @@
   const DATA_UPDATE_EARLY_TOLERANCE_MINUTES = 60;
   const ARCHIVE_CAPTURE_HOUR = 10;
   const MAX_ARCHIVE_RECORDS = 60;
+  const MAX_MAIN_TABLE_SAVED_RECORDS = 60;
   const DEPARTMENT_PDF_ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:department-pdf-archive:v1`;
   const MAX_DEPARTMENT_PDF_ARCHIVE_RECORDS = 240;
   const DEPARTMENT_UNLOCK_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:department-unlock:`;
@@ -302,6 +305,8 @@
     updateAttentionBound: false,
     archiveRecords: [],
     selectedArchiveKey: "",
+    mainTableSavedRecords: [],
+    selectedMainTableSavedKey: "",
     departmentPdfArchiveRecords: [],
     selectedDepartmentPdfArchiveKey: "",
     selectedDepartmentPdfArchiveDate: "",
@@ -319,7 +324,8 @@
     feedback: buildInitialFeedbackState(),
     departmentTopCellsUnlocked: false,
     mainTableUnlocked: false,
-    mainTableSaveSequence: 0
+    mainTableSaveSequence: 0,
+    mainTableSaveInFlight: false
   };
   let printLinkHrefBackups = [];
 
@@ -2416,6 +2422,255 @@
     if (meta) {
       meta.textContent = getArchiveSelectionText(selectedRecord);
     }
+  }
+
+  function getMainTableSaveSlotContext(value = new Date()) {
+    const context = getArchiveContext(value);
+    const slotLabel = context.totalMinutes < DATA_UPDATE_SLOT_MINUTES.evening ? "02:00" : "18:00";
+    const slotCode = slotLabel === "02:00" ? "02" : "18";
+    return {
+      dateKey: context.key,
+      dateLabel: context.label,
+      slotLabel,
+      slotKey: `${context.key}-${slotCode}`
+    };
+  }
+
+  function normalizeMainTableSavedRecord(record) {
+    if (!record || typeof record !== "object") {
+      return null;
+    }
+
+    const snapshotKey = typeof record.snapshotKey === "string" && record.snapshotKey.trim()
+      ? record.snapshotKey.trim()
+      : (typeof record.slotKey === "string" ? record.slotKey.trim() : "");
+    if (!snapshotKey) {
+      return null;
+    }
+
+    const savedAt = typeof record.savedAt === "string" && record.savedAt.trim()
+      ? record.savedAt.trim()
+      : new Date().toISOString();
+    const slotContext = getMainTableSaveSlotContext(new Date(savedAt));
+
+    return {
+      snapshotKey,
+      slotKey: typeof record.slotKey === "string" && record.slotKey.trim()
+        ? record.slotKey.trim()
+        : snapshotKey,
+      dateKey: typeof record.dateKey === "string" && record.dateKey.trim()
+        ? record.dateKey.trim()
+        : slotContext.dateKey,
+      dateLabel: typeof record.dateLabel === "string" && record.dateLabel.trim()
+        ? record.dateLabel.trim()
+        : slotContext.dateLabel,
+      slotLabel: typeof record.slotLabel === "string" && record.slotLabel.trim()
+        ? record.slotLabel.trim()
+        : slotContext.slotLabel,
+      savedAt,
+      reportDate: typeof record.reportDate === "string" && record.reportDate.trim()
+        ? record.reportDate.trim()
+        : config.DEFAULT_DATE,
+      source: typeof record.source === "string" && record.source.trim()
+        ? record.source.trim()
+        : "local-only",
+      snapshot: config.buildSnapshotFromSaved(record.snapshot)
+    };
+  }
+
+  function sortMainTableSavedRecords(records) {
+    return records.sort((left, right) => {
+      const byTime = getTimestampSortValue(right.savedAt) - getTimestampSortValue(left.savedAt);
+      if (byTime) {
+        return byTime;
+      }
+      return right.snapshotKey.localeCompare(left.snapshotKey);
+    });
+  }
+
+  function readMainTableSavedRecords() {
+    try {
+      const raw = localStorage.getItem(MAIN_TABLE_SAVED_STORAGE_KEY);
+      if (!raw) {
+        return [];
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return sortMainTableSavedRecords(parsed.map(normalizeMainTableSavedRecord).filter(Boolean))
+        .slice(0, MAX_MAIN_TABLE_SAVED_RECORDS);
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function writeMainTableSavedRecords(records) {
+    const normalized = sortMainTableSavedRecords(records.map(normalizeMainTableSavedRecord).filter(Boolean))
+      .slice(0, MAX_MAIN_TABLE_SAVED_RECORDS);
+    state.mainTableSavedRecords = normalized;
+    localStorage.setItem(MAIN_TABLE_SAVED_STORAGE_KEY, JSON.stringify(normalized));
+    return normalized;
+  }
+
+  function ensureMainTableSavedRecordsLoaded() {
+    if (!Array.isArray(state.mainTableSavedRecords) || !state.mainTableSavedRecords.length) {
+      state.mainTableSavedRecords = readMainTableSavedRecords();
+    }
+    return state.mainTableSavedRecords;
+  }
+
+  function getMainTableSavedRecordByKey(snapshotKey) {
+    if (!snapshotKey) {
+      return null;
+    }
+    return ensureMainTableSavedRecordsLoaded().find((record) => record.snapshotKey === snapshotKey) || null;
+  }
+
+  function upsertMainTableSavedRecord(record) {
+    const normalized = normalizeMainTableSavedRecord(record);
+    if (!normalized) {
+      return ensureMainTableSavedRecordsLoaded();
+    }
+    const records = ensureMainTableSavedRecordsLoaded()
+      .filter((item) => item.snapshotKey !== normalized.snapshotKey);
+    return writeMainTableSavedRecords([normalized, ...records]);
+  }
+
+  function captureMainTableSavedSnapshot(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.rows)) {
+      return null;
+    }
+
+    const savedAt = new Date().toISOString();
+    const slotContext = getMainTableSaveSlotContext(new Date(savedAt));
+    const record = {
+      snapshotKey: slotContext.slotKey,
+      slotKey: slotContext.slotKey,
+      dateKey: slotContext.dateKey,
+      dateLabel: slotContext.dateLabel,
+      slotLabel: slotContext.slotLabel,
+      savedAt,
+      reportDate: String(snapshot.reportDate || config.DEFAULT_DATE).trim() || config.DEFAULT_DATE,
+      source: state.source,
+      snapshot: deepCopy(snapshot)
+    };
+
+    upsertMainTableSavedRecord(record);
+    state.selectedMainTableSavedKey = record.snapshotKey;
+    return record;
+  }
+
+  function getSelectedMainTableSavedRecord(records = ensureMainTableSavedRecordsLoaded()) {
+    if (!Array.isArray(records) || !records.length) {
+      state.selectedMainTableSavedKey = "";
+      return null;
+    }
+
+    const selected = state.selectedMainTableSavedKey
+      ? records.find((record) => record.snapshotKey === state.selectedMainTableSavedKey) || null
+      : null;
+    if (selected) {
+      return selected;
+    }
+
+    state.selectedMainTableSavedKey = records[0].snapshotKey;
+    return records[0];
+  }
+
+  function getMainTableSavedSnapshotPath(snapshotKey) {
+    if (basePath === "@site") {
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&savedMain=${encodeURIComponent(snapshotKey)}&autoprint=0`);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return `${prefix}archive-print.html?savedMain=${encodeURIComponent(snapshotKey)}&autoprint=0`;
+  }
+
+  function moveMainTableSavedSelection(direction) {
+    const records = ensureMainTableSavedRecordsLoaded();
+    if (!records.length) {
+      return;
+    }
+
+    const current = getSelectedMainTableSavedRecord(records);
+    const currentIndex = current
+      ? records.findIndex((record) => record.snapshotKey === current.snapshotKey)
+      : 0;
+    const nextIndex = Math.min(records.length - 1, Math.max(0, currentIndex + direction));
+    state.selectedMainTableSavedKey = records[nextIndex].snapshotKey;
+  }
+
+  function buildMainTableSavedSelectionText(record) {
+    if (!record) {
+      return "Сохранённых таблиц пока нет.";
+    }
+    return `${record.dateLabel} ${record.slotLabel} — сохранено ${formatTimestamp(record.savedAt)}`;
+  }
+
+  function buildMainTableSavedMetaText(record) {
+    if (!record) {
+      return "Сохраните главную таблицу, чтобы потом быстро открыть старые данные.";
+    }
+    return `Дата документа: ${record.reportDate}. Это сохранённый снимок главной таблицы для окна ${record.slotLabel}.`;
+  }
+
+  function buildMainTableSavedNavigator(records) {
+    const selectedRecord = getSelectedMainTableSavedRecord(records);
+    if (!selectedRecord) {
+      return '<div class="archive-empty">Сохранённых таблиц пока нет.</div>';
+    }
+
+    return `
+      <div class="archive-selector archive-selector--compact">
+        <div class="archive-selector-row archive-selector-row--nav">
+          <button type="button" class="archive-open-link archive-nav-button" data-main-saved-nav="-1" aria-label="Назад">←</button>
+          <div class="archive-current-stamp" id="mainTableSavedStamp">${escapeHtml(buildMainTableSavedSelectionText(selectedRecord))}</div>
+          <button type="button" class="archive-open-link archive-nav-button" data-main-saved-nav="1" aria-label="Вперёд">→</button>
+          <a class="archive-open-link archive-open-link--secondary" id="mainTableSavedOpenLink" href="${escapeHtml(getMainTableSavedSnapshotPath(selectedRecord.snapshotKey))}" target="_blank" rel="noopener">Открыть</a>
+        </div>
+        <div class="archive-selected-meta" id="mainTableSavedMeta">${escapeHtml(buildMainTableSavedMetaText(selectedRecord))}</div>
+      </div>
+    `;
+  }
+
+  function syncMainTableSavedNavigatorUi() {
+    const records = ensureMainTableSavedRecordsLoaded();
+    const selectedRecord = getSelectedMainTableSavedRecord(records);
+    const stamp = document.getElementById("mainTableSavedStamp");
+    const meta = document.getElementById("mainTableSavedMeta");
+    const link = document.getElementById("mainTableSavedOpenLink");
+    const buttons = Array.from(document.querySelectorAll("[data-main-saved-nav]"));
+
+    if (stamp) {
+      stamp.textContent = buildMainTableSavedSelectionText(selectedRecord);
+    }
+    if (meta) {
+      meta.textContent = buildMainTableSavedMetaText(selectedRecord);
+    }
+    if (link instanceof HTMLAnchorElement) {
+      if (selectedRecord) {
+        link.href = getMainTableSavedSnapshotPath(selectedRecord.snapshotKey);
+        link.removeAttribute("aria-disabled");
+      } else {
+        link.removeAttribute("href");
+        link.setAttribute("aria-disabled", "true");
+      }
+    }
+
+    const selectedIndex = selectedRecord
+      ? records.findIndex((record) => record.snapshotKey === selectedRecord.snapshotKey)
+      : -1;
+    buttons.forEach((button) => {
+      const direction = Number(button.getAttribute("data-main-saved-nav") || "0");
+      const disabled = !selectedRecord
+        || !Number.isFinite(direction)
+        || (direction < 0 && selectedIndex <= 0)
+        || (direction > 0 && selectedIndex >= records.length - 1);
+      button.toggleAttribute("disabled", disabled);
+      button.setAttribute("aria-disabled", String(disabled));
+    });
   }
 
   function getDepartmentDefinitionById(rowId) {
@@ -4587,6 +4842,53 @@
     return getRowValueSignature(currentRow) !== getRowValueSignature(loadedRow);
   }
 
+  function getMainTableDirtyRows() {
+    if (mode !== "main") {
+      return [];
+    }
+
+    return state.snapshot.rows.filter((row) => {
+      const loadedRow = getDepartmentRow(state.loadedSnapshot, row.id);
+      return getRowValueSignature(row) !== getRowValueSignature(loadedRow);
+    });
+  }
+
+  function hasMainTablePendingLocalChanges() {
+    return getMainTableDirtyRows().length > 0;
+  }
+
+  function getMainTableValidationState() {
+    if (mode !== "main") {
+      return {
+        applicable: false,
+        isValid: true,
+        dirtyRows: [],
+        failedRows: [],
+        message: ""
+      };
+    }
+
+    const dirtyRows = getMainTableDirtyRows();
+    const failedRows = state.snapshot.rows
+      .map((row) => ({
+        row,
+        validation: getDepartmentValidationStateForSnapshot(state.snapshot, row)
+      }))
+      .filter((item) => item.validation.applicable && !item.validation.isValid);
+
+    return {
+      applicable: true,
+      isValid: failedRows.length === 0,
+      dirtyRows,
+      failedRows,
+      message: failedRows.length
+        ? `Сохранение заблокировано: ${failedRows.map((item) => `${item.row.department} — ${item.validation.failedChecks.map((check) => check.name).join(", ")}`).join("; ")}.`
+        : (dirtyRows.length
+          ? `Изменено строк: ${dirtyRows.length}. Контрольные суммы в порядке, таблицу можно сохранить.`
+          : "Изменений в главной таблице пока нет.")
+    };
+  }
+
   function buildCopyCard(definition) {
     const row = getDepartmentRow(state.snapshot, definition.id);
     const freshness = getRowFreshnessMeta(row);
@@ -5113,6 +5415,12 @@
       return row ? `${PRINT_REPORT_TITLE} ${row.department}` : PRINT_REPORT_TITLE;
     }
     if (mode === "archive") {
+      if (savedMainKeyFromQuery) {
+        const savedRecord = getMainTableSavedRecordByKey(savedMainKeyFromQuery);
+        return savedRecord
+          ? `Сохранённая таблица ${savedRecord.dateLabel} ${savedRecord.slotLabel} | SARSH_KKZH`
+          : "Сохранённая таблица | SARSH_KKZH";
+      }
       if (departmentArchiveKeyFromQuery) {
         const record = getDepartmentPdfArchiveRecordByKey(departmentArchiveKeyFromQuery);
         return record
@@ -5189,6 +5497,7 @@
     const currentDateTime = getCurrentDateTimeParts();
     const archiveRecords = ensureArchiveRecordsLoaded();
     const latestArchive = archiveRecords[0] || null;
+    const mainTableSavedRecords = ensureMainTableSavedRecordsLoaded();
     const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
     const canEditMainTable = canEditMainTableDirectly();
     const mainBlankPdfPath = config.getMainBlankPdfPath
@@ -5251,10 +5560,14 @@
                     <span class="department-top-lock-slider" aria-hidden="true"></span>
                     <span class="department-top-lock-copy">
                       <strong>Main table editing</strong>
-                      <span>${escapeHtml(state.mainTableUnlocked ? "Cells are unlocked for editing." : "Cells are locked for editing.")}</span>
+                      <span>${escapeHtml(state.mainTableUnlocked ? "Editing is enabled." : "Editing is locked.")}</span>
                     </span>
                   </label>
-                  <p class="hint main-table-edit-hint">Edits are saved automatically after leaving a cell.</p>
+                  <p class="hint main-table-edit-hint">Turn on the switch to edit cells manually.</p>
+                  <div class="photo-import-save-actions main-table-save-actions">
+                    <button type="button" id="mainSaveBtn">Сохранить таблицу</button>
+                    <span id="mainSaveRuleText">Изменений в главной таблице пока нет.</span>
+                  </div>
                 </div>
               ` : ""}
               <div class="update-health-banner update-health-banner--${overallUpdateStatus.level}" id="overallUpdateBanner">
@@ -5306,6 +5619,18 @@
               <p>Точный список по каждому отделению: когда именно пришли последние данные.</p>
               <div class="updates-list" id="departmentUpdatesList">
                 ${state.snapshot.rows.map((row) => buildDepartmentUpdateItem(row)).join("")}
+              </div>
+            </section>
+            <section class="panel no-print archive-panel">
+              <h2>Сохранённые таблицы</h2>
+              <p id="mainTableSavedSummaryText">${
+                mainTableSavedRecords.length
+                  ? escapeHtml(`Сохранённых таблиц: ${mainTableSavedRecords.length}.`)
+                  : "Сохранённых таблиц пока нет. После ручного сохранения здесь появятся две рабочие версии за сутки."
+              }</p>
+              <p class="hint">После сохранения можно быстро открыть старые данные таблицы и перелистывать сохранённые версии назад и вперёд.</p>
+              <div class="archive-list" id="mainTableSavedList">
+                ${buildMainTableSavedNavigator(mainTableSavedRecords)}
               </div>
             </section>
             <section class="panel no-print archive-panel">
@@ -6001,7 +6326,57 @@
     `;
   }
 
+  function renderSavedMainTableArchivePage() {
+    const record = getMainTableSavedRecordByKey(savedMainKeyFromQuery);
+    if (!record) {
+      renderArchiveNotFoundPage("Сохранённая таблица не найдена", "Для этого снимка сохранённой главной таблицы в текущем браузере данных нет.");
+      return;
+    }
+
+    const headerDateTime = getHeaderDateTimeParts(record.reportDate) || getCurrentDateTimeParts();
+    state.snapshot = syncQhCalculatedTargets(primeQhBaseInputs(deepCopy(record.snapshot)));
+    state.loadedSnapshot = syncQhCalculatedTargets(primeQhBaseInputs(deepCopy(record.snapshot)));
+    state.source = record.source || "local-only";
+
+    app.innerHTML = `
+      <div class="page">
+        <div class="print-title">
+          <h1>${escapeHtml(PRINT_REPORT_TITLE)}</h1>
+        </div>
+        <div class="toolbar no-print">
+          <div>
+            <h1>Сохранённая таблица ${escapeHtml(record.dateLabel)} ${escapeHtml(record.slotLabel)}</h1>
+            <p>Сохранённая версия главной таблицы для просмотра старых данных и печати.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button type="button" id="printBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(appendShareQuery(config.getMainPagePath(basePath)))}">К главному</a>
+          </div>
+        </div>
+        <div class="info-stack">
+          <div class="panel no-print">
+            <h2>Данные сохранённой таблицы</h2>
+            <p><strong>Окно:</strong> ${escapeHtml(record.dateLabel)} ${escapeHtml(record.slotLabel)}</p>
+            <p><strong>Сохранено:</strong> ${escapeHtml(formatTimestamp(record.savedAt))}</p>
+            <p><strong>Дата документа:</strong> ${escapeHtml(record.reportDate)}</p>
+          </div>
+          <div class="zoom-target">
+            <div class="sheet-shell">
+              <div class="table-wrap">
+                ${renderTable(state.snapshot, state.snapshot.rows, { interactive: false, viewMode: "main", headerDateTime })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderArchivePage() {
+    if (savedMainKeyFromQuery) {
+      renderSavedMainTableArchivePage();
+      return;
+    }
     if (departmentArchiveKeyFromQuery) {
       renderDepartmentPdfArchiveRecordPage();
       return;
@@ -6276,6 +6651,9 @@
       const archiveSummaryText = document.getElementById("archiveSummaryText");
       const archiveList = document.getElementById("archiveList");
       const archiveRecords = ensureArchiveRecordsLoaded();
+      const savedTablesSummaryText = document.getElementById("mainTableSavedSummaryText");
+      const savedTablesList = document.getElementById("mainTableSavedList");
+      const savedTableRecords = ensureMainTableSavedRecordsLoaded();
       const departmentPdfArchiveSummaryText = document.getElementById("departmentPdfArchiveSummaryText");
       const departmentPdfArchiveList = document.getElementById("departmentPdfArchiveList");
       const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
@@ -6326,6 +6704,16 @@
         archiveList.innerHTML = buildArchivePicker(archiveRecords);
       }
       syncArchivePickerUi();
+      if (savedTablesSummaryText) {
+        savedTablesSummaryText.textContent = savedTableRecords.length
+          ? `Сохранённых таблиц: ${savedTableRecords.length}. Текущий снимок: ${buildMainTableSavedSelectionText(savedTableRecords[0])}.`
+          : "Сохранённых таблиц пока нет. После ручного сохранения здесь появятся две рабочие версии за сутки.";
+      }
+      if (savedTablesList) {
+        savedTablesList.innerHTML = buildMainTableSavedNavigator(savedTableRecords);
+      }
+      syncMainTableSavedNavigatorUi();
+      refreshMainTableSaveState();
       if (departmentPdfArchiveSummaryText) {
         departmentPdfArchiveSummaryText.textContent = getDepartmentPdfArchiveSummaryText(departmentPdfArchiveRecords);
       }
@@ -6490,6 +6878,45 @@
     if (ruleText) {
       ruleText.textContent = validation.message;
       ruleText.className = `hint save-rule-note ${validation.isValid ? "save-rule-note--valid" : "save-rule-note--invalid"}`;
+    }
+  }
+
+  function refreshMainTableSaveState() {
+    const saveBtn = document.getElementById("mainSaveBtn");
+    const ruleText = document.getElementById("mainSaveRuleText");
+
+    if (!saveBtn) {
+      return;
+    }
+
+    const validation = getMainTableValidationState();
+    const canSave = validation.applicable
+      && validation.dirtyRows.length > 0
+      && validation.isValid
+      && !state.mainTableSaveInFlight;
+
+    saveBtn.classList.remove("save-ready", "save-blocked");
+    saveBtn.disabled = !canSave;
+    saveBtn.setAttribute("aria-disabled", String(!canSave));
+    saveBtn.title = state.mainTableSaveInFlight
+      ? "Идёт сохранение главной таблицы."
+      : validation.message;
+    if (canSave) {
+      saveBtn.classList.add("save-ready");
+    } else if (validation.dirtyRows.length > 0 && !validation.isValid) {
+      saveBtn.classList.add("save-blocked");
+    }
+
+    if (ruleText) {
+      ruleText.textContent = state.mainTableSaveInFlight
+        ? "Сохраняю главную таблицу..."
+        : validation.message;
+      const toneClass = canSave
+        ? "save-rule-note--valid"
+        : (validation.dirtyRows.length > 0 && !validation.isValid
+          ? "save-rule-note--invalid"
+          : "");
+      ruleText.className = `hint save-rule-note ${toneClass}`.trim();
     }
   }
 
@@ -8090,8 +8517,8 @@
     renderPage();
     setInfo(
       state.mainTableUnlocked
-        ? "Main table editing is enabled. Changes are saved automatically after leaving a cell."
-        : "Main table editing is disabled again.",
+        ? "Редактирование главной таблицы включено."
+        : "Редактирование главной таблицы снова заблокировано.",
       false
     );
   }
@@ -8496,48 +8923,70 @@
     setInfo("Изменения сохранены локально. Нажми Сохранить для отправки.", false);
   }
 
-  async function persistMainTableRow(rowId) {
-    const row = getDepartmentRow(state.snapshot, rowId);
-    if (!row) {
+  async function persistMainTableChanges() {
+    const validation = getMainTableValidationState();
+    if (!validation.dirtyRows.length) {
+      setInfo("В главной таблице пока нет новых изменений для сохранения.", false);
+      refreshMainTableSaveState();
+      return;
+    }
+    if (!validation.isValid) {
+      setInfo(validation.message, true);
+      refreshMainTableSaveState();
+      return;
+    }
+    if (state.mainTableSaveInFlight) {
       return;
     }
 
-    const loadedRow = getDepartmentRow(state.loadedSnapshot, rowId);
-    if (getRowValueSignature(row) === getRowValueSignature(loadedRow)) {
-      return;
-    }
-
-    syncCurrentReportDate();
-    const expectedValues = config.normalizeRowValues(row.values);
-    if (isQhCalcDepartment(row)) {
-      expectedValues.qhBaseSoldier = expectedValues.currentShar || 0;
-      expectedValues.qhBaseOfficer = expectedValues.currentSpa || 0;
-      expectedValues.qhBaseContract = expectedValues.currentPaym || 0;
-    }
-    const payloadValues = deepCopy(expectedValues);
+    state.mainTableSaveInFlight = true;
+    refreshMainTableSaveState();
     const saveId = ++state.mainTableSaveSequence;
-    setInfo(`Saving row ${row.department}...`, false);
+    syncCurrentReportDate();
+    setInfo(`Сохраняю главную таблицу: строк ${validation.dirtyRows.length}...`, false);
 
     try {
-      const result = await sync.saveDepartmentFromMain(rowId, state.snapshot.reportDate, payloadValues);
-      if (saveId !== state.mainTableSaveSequence) {
+      let lastResult = null;
+
+      for (const row of validation.dirtyRows) {
+        const expectedValues = config.normalizeRowValues(row.values);
+        if (isQhCalcDepartment(row)) {
+          expectedValues.qhBaseSoldier = expectedValues.currentShar || 0;
+          expectedValues.qhBaseOfficer = expectedValues.currentSpa || 0;
+          expectedValues.qhBaseContract = expectedValues.currentPaym || 0;
+        }
+        const payloadValues = deepCopy(expectedValues);
+        const result = await sync.saveDepartmentFromMain(row.id, state.snapshot.reportDate, payloadValues);
+        const verification = verifySavedRowResult(row.id, expectedValues, result.snapshot);
+        if (!verification.ok) {
+          throw new Error(verification.reason);
+        }
+        lastResult = result;
+      }
+
+      if (saveId !== state.mainTableSaveSequence || !lastResult) {
         return;
       }
 
-      const verification = verifySavedRowResult(rowId, expectedValues, result.snapshot);
-      if (!verification.ok) {
-        setInfo(verification.reason, true);
-        return;
-      }
-
-      applyLoadedSnapshot(result);
-      setInfo(`Row ${row.department} saved.`, false);
+      applyLoadedSnapshot(lastResult);
+      const savedRecord = captureMainTableSavedSnapshot(state.snapshot);
+      setInfo(
+        savedRecord
+          ? `Главная таблица сохранена. Снимок: ${savedRecord.dateLabel} ${savedRecord.slotLabel}.`
+          : "Главная таблица сохранена.",
+        false
+      );
       refreshTableData();
     } catch (error) {
       if (saveId !== state.mainTableSaveSequence) {
         return;
       }
-      setInfo(error instanceof Error ? error.message : `Could not save row ${row.department}.`, true);
+      setInfo(error instanceof Error ? error.message : "Не удалось сохранить главную таблицу.", true);
+    } finally {
+      if (saveId === state.mainTableSaveSequence) {
+        state.mainTableSaveInFlight = false;
+        refreshMainTableSaveState();
+      }
     }
   }
 
@@ -8577,6 +9026,10 @@
 
   async function refreshFromSource() {
     if (blockPhotoImportDraftAction("Сначала сохраните распознанные значения, потом обновите данные с сервера.")) {
+      return;
+    }
+    if (mode === "main" && hasMainTablePendingLocalChanges()) {
+      setInfo("Сначала сохраните изменения главной таблицы, потом обновляйте данные с сервера.", true);
       return;
     }
 
@@ -8631,6 +9084,7 @@
     const sendShiftFormButtons = Array.from(document.querySelectorAll("[data-send-shift-form]"));
     const resetBtn = document.getElementById("resetBtn");
     const saveBtn = document.getElementById("saveBtn");
+    const mainSaveBtn = document.getElementById("mainSaveBtn");
     const accessCodeField = document.getElementById("accessCodeField");
     const accessForm = document.getElementById("departmentAccessForm");
     const sheetBody = document.getElementById("sheetBody");
@@ -8737,6 +9191,12 @@
     if (saveBtn) {
       saveBtn.addEventListener("click", () => {
         persistDepartment(true);
+      });
+    }
+
+    if (mainSaveBtn) {
+      mainSaveBtn.addEventListener("click", () => {
+        void persistMainTableChanges();
       });
     }
 
@@ -8944,6 +9404,17 @@
       });
     }
 
+    document.querySelectorAll("[data-main-saved-nav]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const direction = Number(button.getAttribute("data-main-saved-nav") || "0");
+        if (!Number.isFinite(direction) || direction === 0) {
+          return;
+        }
+        moveMainTableSavedSelection(direction);
+        syncMainTableSavedNavigatorUi();
+      });
+    });
+
     const departmentPdfArchiveSelect = document.getElementById("departmentPdfArchiveSelect");
     if (departmentPdfArchiveSelect) {
       departmentPdfArchiveSelect.addEventListener("change", () => {
@@ -8984,7 +9455,7 @@
 
     if (!window.__sharshPhotoDraftGuardBound) {
       window.addEventListener("beforeunload", (event) => {
-        if (!hasPhotoImportDraft()) {
+        if (!hasPhotoImportDraft() && !(mode === "main" && hasMainTablePendingLocalChanges())) {
           return;
         }
 
@@ -9083,24 +9554,7 @@
         input.value = sanitized.text;
         row.values[key] = sanitized.value;
         refreshComputedCells();
-      });
-
-      sheetBody.addEventListener("change", (event) => {
-        if (!state.mainTableUnlocked) {
-          return;
-        }
-
-        const input = event.target;
-        if (!(input instanceof HTMLInputElement)) {
-          return;
-        }
-
-        const rowId = input.dataset.row;
-        if (!rowId) {
-          return;
-        }
-
-        void persistMainTableRow(rowId);
+        refreshMainTableSaveState();
       });
     }
 
@@ -9192,7 +9646,7 @@
       if (mode === "department" && hasDepartmentPendingLocalChanges()) {
         return;
       }
-      if (mode === "main" && state.mainTableUnlocked) {
+      if (mode === "main" && (state.mainTableUnlocked || hasMainTablePendingLocalChanges())) {
         return;
       }
 

@@ -157,22 +157,27 @@ a {
   transform: translateY(0);
 }
 
-#saveBtn.save-ready {
+#saveBtn.save-ready,
+#mainSaveBtn.save-ready {
   background: var(--save-valid);
   border-color: var(--save-valid);
   color: #ffffff;
 }
 
-#saveBtn.save-ready:hover {
+#saveBtn.save-ready:hover,
+#mainSaveBtn.save-ready:hover {
   background: var(--save-valid-hover);
 }
 
-#saveBtn.save-ready:active {
+#saveBtn.save-ready:active,
+#mainSaveBtn.save-ready:active {
   background: var(--save-valid);
 }
 
 #saveBtn.save-blocked,
-#saveBtn.save-blocked:disabled {
+#saveBtn.save-blocked:disabled,
+#mainSaveBtn.save-blocked,
+#mainSaveBtn.save-blocked:disabled {
   background: var(--save-invalid);
   border-color: var(--save-invalid);
   color: #ffffff;
@@ -181,7 +186,9 @@ a {
 }
 
 #saveBtn.save-blocked:hover,
-#saveBtn.save-blocked:disabled:hover {
+#saveBtn.save-blocked:disabled:hover,
+#mainSaveBtn.save-blocked:hover,
+#mainSaveBtn.save-blocked:disabled:hover {
   transform: none;
   background: var(--save-invalid);
 }
@@ -1249,6 +1256,10 @@ a {
   flex-wrap: wrap;
 }
 
+.archive-selector-row--nav {
+  align-items: center;
+}
+
 .archive-picker {
   display: grid;
   gap: 6px;
@@ -1290,6 +1301,11 @@ a {
   background: #fff6e9;
 }
 
+.archive-nav-button {
+  min-width: 44px;
+  padding-inline: 0;
+}
+
 .department-pdf-archive-panel {
   border-color: rgba(12, 112, 73, 0.18);
 }
@@ -1311,6 +1327,24 @@ a {
 .archive-selected-meta {
   font-size: 13px;
   color: var(--muted);
+}
+
+.archive-current-stamp {
+  flex: 1 1 260px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.archive-selector--compact {
+  gap: 8px;
 }
 
 .archive-item,
@@ -1535,6 +1569,14 @@ a {
 
 .main-table-edit-hint {
   margin: 0;
+}
+
+.main-table-save-actions {
+  margin-top: 2px;
+}
+
+.main-table-save-actions span {
+  max-width: 100%;
 }
 
 .department-top-lock-switch {
