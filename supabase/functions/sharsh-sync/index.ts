@@ -2729,7 +2729,7 @@ Deno.serve(async (request) => {
       return jsonResponse(await loadSnapshot(supabase));
     }
 
-    if (type !== "save_department") {
+    if (type !== "save_department" && type !== "save_department_from_main") {
       return jsonResponse({ error: "Unknown request type." }, 400);
     }
 
@@ -2738,9 +2738,11 @@ Deno.serve(async (request) => {
       return jsonResponse({ error: "Unknown department." }, 400);
     }
 
-    const accessError = getDepartmentAccessError(departmentId, payload.accessCode);
-    if (accessError) {
-      return jsonResponse({ error: accessError }, 403);
+    if (type === "save_department") {
+      const accessError = getDepartmentAccessError(departmentId, payload.accessCode);
+      if (accessError) {
+        return jsonResponse({ error: accessError }, 403);
+      }
     }
 
     const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()

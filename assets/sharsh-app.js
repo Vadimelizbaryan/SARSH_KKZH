@@ -317,7 +317,9 @@
     mainPhotoSaveDirectoryName: "",
     mainPhotoRoute: buildInitialMainPhotoRouteState(),
     feedback: buildInitialFeedbackState(),
-    departmentTopCellsUnlocked: false
+    departmentTopCellsUnlocked: false,
+    mainTableUnlocked: false,
+    mainTableSaveSequence: 0
   };
   let printLinkHrefBackups = [];
 
@@ -660,6 +662,22 @@
 
   function areDepartmentMorningCellsUnlocked() {
     return mode !== "department" || Boolean(state.departmentTopCellsUnlocked);
+  }
+
+  function canEditMainTableDirectly() {
+    if (mode !== "main") {
+      return false;
+    }
+
+    if (!sync.hasRemoteSync()) {
+      return true;
+    }
+
+    if (!sync.runtime || !sync.runtime.requireOwnerAuth) {
+      return true;
+    }
+
+    return showOwnerAuthTools();
   }
 
   function getDepartmentSourceTransferKeys(keys) {
@@ -4202,8 +4220,8 @@
     };
   }
 
-  function verifySavedDepartmentResult(expectedValues, resultSnapshot) {
-    const savedRow = getDepartmentRow(resultSnapshot, departmentId);
+  function verifySavedRowResult(targetDepartmentId, expectedValues, resultSnapshot) {
+    const savedRow = getDepartmentRow(resultSnapshot, targetDepartmentId);
     if (!savedRow) {
       return {
         ok: false,
@@ -4252,6 +4270,10 @@
       }
       return sum + getNumber(snapshot, row, key);
     }, 0);
+  }
+
+  function verifySavedDepartmentResult(expectedValues, resultSnapshot) {
+    return verifySavedRowResult(departmentId, expectedValues, resultSnapshot);
   }
 
   function getTransferColumnMismatchMeta(snapshot, rows) {
@@ -5168,6 +5190,7 @@
     const archiveRecords = ensureArchiveRecordsLoaded();
     const latestArchive = archiveRecords[0] || null;
     const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
+    const canEditMainTable = canEditMainTableDirectly();
     const mainBlankPdfPath = config.getMainBlankPdfPath
       ? config.getMainBlankPdfPath(basePath)
       : null;
@@ -5221,6 +5244,19 @@
               <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
               <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.")}</p>
               <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
+              ${canEditMainTable ? `
+                <div class="main-table-edit-panel">
+                  <label class="department-top-lock-switch" for="mainTableEditToggle">
+                    <input type="checkbox" id="mainTableEditToggle"${state.mainTableUnlocked ? " checked" : ""}>
+                    <span class="department-top-lock-slider" aria-hidden="true"></span>
+                    <span class="department-top-lock-copy">
+                      <strong>Main table editing</strong>
+                      <span>${escapeHtml(state.mainTableUnlocked ? "Cells are unlocked for editing." : "Cells are locked for editing.")}</span>
+                    </span>
+                  </label>
+                  <p class="hint main-table-edit-hint">Edits are saved automatically after leaving a cell.</p>
+                </div>
+              ` : ""}
               <div class="update-health-banner update-health-banner--${overallUpdateStatus.level}" id="overallUpdateBanner">
                 <strong id="overallUpdateLabel">${escapeHtml(overallUpdateStatus.label)}</strong>
                 <span id="overallUpdateDetail">${escapeHtml(overallUpdateStatus.detail)}</span>
@@ -5260,7 +5296,7 @@
                 <span class="status-chip status-chip--${summaryFreshness.level}" id="lastUpdatedBadge">${escapeHtml(summaryFreshness.label)}</span>
               </p>
                 <div class="table-wrap">
-                  ${renderTable(state.snapshot, state.snapshot.rows, { interactive: false, viewMode: "main" })}
+                  ${renderTable(state.snapshot, state.snapshot.rows, { interactive: state.mainTableUnlocked, viewMode: "main" })}
                 </div>
               </div>
             </div>
@@ -8049,6 +8085,17 @@
     refreshTableData();
   }
 
+  function handleMainTableEditToggle(unlocked) {
+    state.mainTableUnlocked = Boolean(unlocked);
+    renderPage();
+    setInfo(
+      state.mainTableUnlocked
+        ? "Main table editing is enabled. Changes are saved automatically after leaving a cell."
+        : "Main table editing is disabled again.",
+      false
+    );
+  }
+
   function sanitizeNumericInput(rawValue) {
     const cleaned = String(rawValue).replace(/[^\d]/g, "");
     if (!cleaned) {
@@ -8449,6 +8496,51 @@
     setInfo("Изменения сохранены локально. Нажми Сохранить для отправки.", false);
   }
 
+  async function persistMainTableRow(rowId) {
+    const row = getDepartmentRow(state.snapshot, rowId);
+    if (!row) {
+      return;
+    }
+
+    const loadedRow = getDepartmentRow(state.loadedSnapshot, rowId);
+    if (getRowValueSignature(row) === getRowValueSignature(loadedRow)) {
+      return;
+    }
+
+    syncCurrentReportDate();
+    const expectedValues = config.normalizeRowValues(row.values);
+    if (isQhCalcDepartment(row)) {
+      expectedValues.qhBaseSoldier = expectedValues.currentShar || 0;
+      expectedValues.qhBaseOfficer = expectedValues.currentSpa || 0;
+      expectedValues.qhBaseContract = expectedValues.currentPaym || 0;
+    }
+    const payloadValues = deepCopy(expectedValues);
+    const saveId = ++state.mainTableSaveSequence;
+    setInfo(`Saving row ${row.department}...`, false);
+
+    try {
+      const result = await sync.saveDepartmentFromMain(rowId, state.snapshot.reportDate, payloadValues);
+      if (saveId !== state.mainTableSaveSequence) {
+        return;
+      }
+
+      const verification = verifySavedRowResult(rowId, expectedValues, result.snapshot);
+      if (!verification.ok) {
+        setInfo(verification.reason, true);
+        return;
+      }
+
+      applyLoadedSnapshot(result);
+      setInfo(`Row ${row.department} saved.`, false);
+      refreshTableData();
+    } catch (error) {
+      if (saveId !== state.mainTableSaveSequence) {
+        return;
+      }
+      setInfo(error instanceof Error ? error.message : `Could not save row ${row.department}.`, true);
+    }
+  }
+
   function loadZoom() {
     const zoomScope = mode === "department" ? departmentId : "main";
     const ownValue = Number(localStorage.getItem(config.getZoomStorageKey(zoomScope)));
@@ -8800,6 +8892,13 @@
       });
     }
 
+    const mainTableEditToggle = document.getElementById("mainTableEditToggle");
+    if (mainTableEditToggle instanceof HTMLInputElement) {
+      mainTableEditToggle.addEventListener("change", () => {
+        handleMainTableEditToggle(mainTableEditToggle.checked);
+      });
+    }
+
     const photoZoomBtn = document.getElementById("photoZoomBtn");
     if (photoZoomBtn) {
       photoZoomBtn.addEventListener("click", () => {
@@ -8931,6 +9030,9 @@
 
     if (mode === "main" && sheetBody) {
       sheetBody.addEventListener("click", (event) => {
+        if (state.mainTableUnlocked) {
+          return;
+        }
         if (event.defaultPrevented || event.button !== 0) {
           return;
         }
@@ -8954,6 +9056,95 @@
         }
 
         window.location.href = departmentPath;
+      });
+
+      sheetBody.addEventListener("input", (event) => {
+        if (!state.mainTableUnlocked) {
+          return;
+        }
+
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement)) {
+          return;
+        }
+
+        const rowId = input.dataset.row;
+        const key = input.dataset.key;
+        if (!rowId || !key) {
+          return;
+        }
+
+        const row = getDepartmentRow(state.snapshot, rowId);
+        if (!row) {
+          return;
+        }
+
+        const sanitized = sanitizeNumericInput(input.value);
+        input.value = sanitized.text;
+        row.values[key] = sanitized.value;
+        refreshComputedCells();
+      });
+
+      sheetBody.addEventListener("change", (event) => {
+        if (!state.mainTableUnlocked) {
+          return;
+        }
+
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement)) {
+          return;
+        }
+
+        const rowId = input.dataset.row;
+        if (!rowId) {
+          return;
+        }
+
+        void persistMainTableRow(rowId);
+      });
+    }
+
+    if (sheetBody) {
+      sheetBody.addEventListener("keydown", (event) => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement) || !input.matches("input[data-row][data-key]")) {
+          return;
+        }
+
+        const key = event.key;
+        if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key)) {
+          return;
+        }
+
+        const rowElement = input.closest("tr.detail-row");
+        const currentColumnIndex = config.columnOrder.get(input.dataset.key);
+        if (!rowElement || !Number.isInteger(currentColumnIndex)) {
+          return;
+        }
+
+        const rows = getDetailRows();
+        const currentRowIndex = rows.indexOf(rowElement);
+        if (currentRowIndex === -1) {
+          return;
+        }
+
+        let target = null;
+        if (key === "ArrowLeft") {
+          target = findHorizontalTarget(rowElement, currentColumnIndex, -1);
+        } else if (key === "ArrowRight") {
+          target = findHorizontalTarget(rowElement, currentColumnIndex, 1);
+        } else if (key === "ArrowUp") {
+          target = findVerticalTarget(currentRowIndex, currentColumnIndex, -1);
+        } else if (key === "ArrowDown") {
+          target = findVerticalTarget(currentRowIndex, currentColumnIndex, 1);
+        }
+
+        if (!target) {
+          return;
+        }
+
+        event.preventDefault();
+        focusAndSelect(target);
       });
     }
 
@@ -8989,47 +9180,6 @@
       queueDepartmentSave();
     });
 
-    sheetBody.addEventListener("keydown", (event) => {
-      const input = event.target;
-      if (!(input instanceof HTMLInputElement) || !input.matches("input[data-row][data-key]")) {
-        return;
-      }
-
-      const key = event.key;
-      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key)) {
-        return;
-      }
-
-      const rowElement = input.closest("tr.detail-row");
-      const currentColumnIndex = config.columnOrder.get(input.dataset.key);
-      if (!rowElement || !Number.isInteger(currentColumnIndex)) {
-        return;
-      }
-
-      const rows = getDetailRows();
-      const currentRowIndex = rows.indexOf(rowElement);
-      if (currentRowIndex === -1) {
-        return;
-      }
-
-      let target = null;
-      if (key === "ArrowLeft") {
-        target = findHorizontalTarget(rowElement, currentColumnIndex, -1);
-      } else if (key === "ArrowRight") {
-        target = findHorizontalTarget(rowElement, currentColumnIndex, 1);
-      } else if (key === "ArrowUp") {
-        target = findVerticalTarget(currentRowIndex, currentColumnIndex, -1);
-      } else if (key === "ArrowDown") {
-        target = findVerticalTarget(currentRowIndex, currentColumnIndex, 1);
-      }
-
-      if (!target) {
-        return;
-      }
-
-      event.preventDefault();
-      focusAndSelect(target);
-    });
   }
 
   function startAutoRefreshIfNeeded() {
@@ -9040,6 +9190,9 @@
 
     state.refreshIntervalId = window.setInterval(async () => {
       if (mode === "department" && hasDepartmentPendingLocalChanges()) {
+        return;
+      }
+      if (mode === "main" && state.mainTableUnlocked) {
         return;
       }
 

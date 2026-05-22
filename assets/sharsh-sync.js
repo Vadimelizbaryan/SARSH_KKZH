@@ -838,6 +838,42 @@
     };
   }
 
+  async function saveDepartmentFromMain(departmentId, reportDate, values) {
+    const localSnapshot = loadLocalSnapshot();
+    const rowMap = new Map(localSnapshot.rows.map((row) => [row.id, row]));
+    const targetRow = rowMap.get(departmentId);
+
+    if (targetRow) {
+      targetRow.values = config.normalizeRowValues(values);
+      targetRow.updatedAt = new Date().toISOString();
+    }
+
+    localSnapshot.reportDate = typeof reportDate === "string" && reportDate.trim()
+      ? reportDate
+      : localSnapshot.reportDate;
+    localSnapshot.updatedAt = new Date().toISOString();
+    writeLocalSnapshot(localSnapshot);
+
+    if (!hasRemoteSync()) {
+      return {
+        snapshot: localSnapshot,
+        source: "local-only"
+      };
+    }
+
+    const snapshot = await postRemote({
+      type: "save_department_from_main",
+      departmentId,
+      reportDate: localSnapshot.reportDate,
+      values: config.normalizeRowValues(values)
+    });
+
+    return {
+      snapshot,
+      source: "remote"
+    };
+  }
+
   const NIGHT_SHIFT_TRANSFER_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"];
   const QH_CALC_DEPARTMENT_IDS = new Set(["r19", "r20", "r21"]);
   const MORNING_ROLLOVER_DONE_PREFIX = `${config.STORAGE_NAMESPACE || "sarsh-kkzh-v2"}:morning-rollover-done:`;
@@ -1571,6 +1607,7 @@
     hasRemoteSync,
     loadSnapshot,
     saveDepartment,
+    saveDepartmentFromMain,
     rolloverMainAfterArchive,
     applyNightShiftToMain,
     loadNightShiftDraft,
