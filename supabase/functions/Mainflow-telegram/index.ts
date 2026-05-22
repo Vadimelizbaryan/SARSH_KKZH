@@ -3312,17 +3312,18 @@ function applyNightShiftDraftValuesToMain(
     return null;
   }
 
-  // Formula approved for night workflow: n5 participates twice, n6 is kept separately.
-  const nightTotal = n1 + n2 + n3 + n4 + n5 + n5 + n7;
+  // Night/day shift rows describe newly admitted patients by category,
+  // so they must be added to both admission totals and current presence.
+  const nightTotal = n1 + n2 + n3 + n4 + n5 + n6 + n7;
   const output = sanitizeValues(values);
   addMainTableValue(output, "admittedSeries", n1);
   addMainTableValue(output, "currentShar", n1);
-  output.currentSpa = n2;
-  output.currentPaym = n3;
-  output.currentZh = n4;
-  output.family = n5;
-  output.officer = n6;
-  output.civil = n7;
+  addMainTableValue(output, "currentSpa", n2);
+  addMainTableValue(output, "currentPaym", n3);
+  addMainTableValue(output, "currentZh", n4);
+  addMainTableValue(output, "family", n5);
+  addMainTableValue(output, "officer", n6);
+  addMainTableValue(output, "civil", n7);
   addMainTableValue(output, "admittedTotal", nightTotal);
   addMainTableValue(output, "admittedSoldier", n1 + n2 + n3);
   return output;

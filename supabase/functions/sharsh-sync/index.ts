@@ -588,8 +588,9 @@ function applyNightShiftValues(
   const n5 = safeNumber(nightRow?.family);
   const n6 = safeNumber(nightRow?.zp);
   const n7 = safeNumber(nightRow?.qi);
-  // Formula from the night-shift workflow: n5 is counted twice, n6 is not included in admittedTotal.
-  const nightTotal = n1 + n2 + n3 + n4 + n5 + n5 + n7;
+  // Night/day shift rows describe newly admitted patients by category,
+  // so they must be added to both admission totals and current presence.
+  const nightTotal = n1 + n2 + n3 + n4 + n5 + n6 + n7;
   const hasAnyNightValue = n1 + n2 + n3 + n4 + n5 + n6 + n7;
 
   if (!hasAnyNightValue) {
@@ -599,12 +600,12 @@ function applyNightShiftValues(
   const output = sanitizeValues(values);
   addValue(output, "admittedSeries", n1);
   addValue(output, "currentShar", n1);
-  output.currentSpa = n2;
-  output.currentPaym = n3;
-  output.currentZh = n4;
-  output.family = n5;
-  output.officer = n6;
-  output.civil = n7;
+  addValue(output, "currentSpa", n2);
+  addValue(output, "currentPaym", n3);
+  addValue(output, "currentZh", n4);
+  addValue(output, "family", n5);
+  addValue(output, "officer", n6);
+  addValue(output, "civil", n7);
   addValue(output, "admittedTotal", nightTotal);
   addValue(output, "admittedSoldier", n1 + n2 + n3);
   return output;
