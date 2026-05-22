@@ -216,7 +216,7 @@
       }))
     },
     {
-      label: "Մնացել է",
+      label: "Հաշվարկ",
       cells: QH_CALC_COLUMNS.map((column) => ({
         key: column.outputKey,
         marker: column.outputMarker,
@@ -7125,7 +7125,7 @@
         cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.leaveKey, marker: column.baseMarker, role: "linked" }))
       },
       {
-        label: "Մնացել է արձակուրդում",
+        label: "Հաշվարկ",
         cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.leaveKey, marker: column.leaveOutputMarker, role: "leave-output" }))
       }
     ];
