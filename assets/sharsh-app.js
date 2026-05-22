@@ -3782,11 +3782,31 @@
     return Boolean(row && QH_CALC_DEPARTMENT_IDS.has(row.id));
   }
 
+  function getQhCalcColumnByKey(key) {
+    return QH_CALC_COLUMNS.find((column) =>
+      column.baseKey === key
+      || column.currentKey === key
+      || column.incomingKey === key
+      || column.dischargedKey === key
+      || column.outputKey === key
+    ) || null;
+  }
+
   function getQhCalcSourceValue(row, key, snapshot = state.snapshot) {
     if (!row) {
       return null;
     }
-    return config.normalizeCellValue(getEffectiveValue(snapshot, row, key));
+    const directValue = config.normalizeCellValue(getEffectiveValue(snapshot, row, key));
+    if (directValue !== null || !key) {
+      return directValue;
+    }
+
+    const column = getQhCalcColumnByKey(key);
+    if (column && column.baseKey === key) {
+      return config.normalizeCellValue(getEffectiveValue(snapshot, row, column.currentKey));
+    }
+
+    return directValue;
   }
 
   function getLeaveCalcSourceValue(row, key) {
@@ -3905,7 +3925,7 @@
   }
 
   function refreshQhCalcDisplay(row) {
-    if (!row || !isQhCalcDepartment(row)) {
+    if (!row) {
       return;
     }
 
@@ -3936,7 +3956,7 @@
     const shouldSave = options.save !== false;
     const shouldAnnounce = options.announce !== false;
     const row = getCurrentRow();
-    if (!row || !isQhCalcDepartment(row)) {
+    if (!row) {
       return;
     }
 
@@ -4086,9 +4106,7 @@
     }
 
     const originalValues = deepCopy(row.values);
-    if (isQhCalcDepartment(row)) {
-      applyQhCalcToDepartment({ refresh: false, save: false, announce: false });
-    }
+    applyQhCalcToDepartment({ refresh: false, save: false, announce: false });
 
     const leaveApplied = applyLeaveCalcToDepartment({ refresh: false, save: false, announce: false });
     if (!leaveApplied) {
@@ -6796,7 +6814,7 @@
   }
 
   function renderQhCalcPanel(row, options = {}) {
-    if (!isQhCalcDepartment(row)) {
+    if (!row) {
       return "";
     }
 
@@ -10424,7 +10442,7 @@
         }
 
         const row = getCurrentRow();
-        if (!row || !isQhCalcDepartment(row)) {
+        if (!row) {
           return;
         }
 
