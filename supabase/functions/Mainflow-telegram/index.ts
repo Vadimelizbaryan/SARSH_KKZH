@@ -3296,6 +3296,7 @@ function addMainTableValue(values: Record<string, number | null>, key: string, a
 }
 
 function applyNightShiftDraftValuesToMain(
+  departmentId: string,
   values: Record<string, unknown> | null | undefined,
   nightRow: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number> | undefined
 ) {
@@ -3317,9 +3318,16 @@ function applyNightShiftDraftValuesToMain(
   const nightTotal = n1 + n2 + n3 + n4 + n5 + n6 + n7;
   const output = sanitizeValues(values);
   addMainTableValue(output, "admittedSeries", n1);
-  addMainTableValue(output, "currentShar", n1);
-  addMainTableValue(output, "currentSpa", n2);
-  addMainTableValue(output, "currentPaym", n3);
+  if (QH_CALC_DEPARTMENT_IDS.has(departmentId as DepartmentId)) {
+    addMainTableValue(output, "qhIncomingSoldier", n1);
+    addMainTableValue(output, "qhIncomingOfficer", n2);
+    addMainTableValue(output, "qhIncomingContract", n3);
+    syncQhMorningCalculatedValues(departmentId, output);
+  } else {
+    addMainTableValue(output, "currentShar", n1);
+    addMainTableValue(output, "currentSpa", n2);
+    addMainTableValue(output, "currentPaym", n3);
+  }
   addMainTableValue(output, "currentZh", n4);
   addMainTableValue(output, "family", n5);
   addMainTableValue(output, "officer", n6);
@@ -3340,7 +3348,7 @@ async function applyNightShiftDraftToMainFromTelegram(
   const now = new Date().toISOString();
   const appliedDepartments: Array<{ marker: string; department: string; total: number }> = [];
   const updates = snapshot.rows.flatMap((row) => {
-    const values = applyNightShiftDraftValuesToMain(row.values, nightRows[row.id]);
+    const values = applyNightShiftDraftValuesToMain(row.id, row.values, nightRows[row.id]);
     if (!values) {
       return [];
     }

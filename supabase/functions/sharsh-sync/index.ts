@@ -578,6 +578,7 @@ function addValue(values: Record<string, number | null>, key: string, amount: nu
 }
 
 function applyNightShiftValues(
+  departmentId: string,
   values: Record<string, unknown> | null | undefined,
   nightRow: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number> | undefined
 ) {
@@ -599,9 +600,16 @@ function applyNightShiftValues(
 
   const output = sanitizeValues(values);
   addValue(output, "admittedSeries", n1);
-  addValue(output, "currentShar", n1);
-  addValue(output, "currentSpa", n2);
-  addValue(output, "currentPaym", n3);
+  if (QH_CALC_DEPARTMENT_IDS.has(departmentId)) {
+    addValue(output, "qhIncomingSoldier", n1);
+    addValue(output, "qhIncomingOfficer", n2);
+    addValue(output, "qhIncomingContract", n3);
+    syncQhMorningCalculatedValues(departmentId, output);
+  } else {
+    addValue(output, "currentShar", n1);
+    addValue(output, "currentSpa", n2);
+    addValue(output, "currentPaym", n3);
+  }
   addValue(output, "currentZh", n4);
   addValue(output, "family", n5);
   addValue(output, "officer", n6);
@@ -612,11 +620,12 @@ function applyNightShiftValues(
 }
 
 function applyDayShiftValues(
+  departmentId: string,
   values: Record<string, unknown> | null | undefined,
   dayRow: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number> | undefined
 ) {
   // Day-shift admissions currently follow the same transfer formula as night shift.
-  return applyNightShiftValues(values, dayRow);
+  return applyNightShiftValues(departmentId, values, dayRow);
 }
 
 function primeQhMorningBaseValues(values: Record<string, number | null>) {
@@ -2630,7 +2639,7 @@ Deno.serve(async (request) => {
       const snapshot = await loadSnapshot(supabase);
       const now = new Date().toISOString();
       const updates = snapshot.rows.flatMap((row) => {
-        const values = applyNightShiftValues(row.values, nightRows[row.id]);
+        const values = applyNightShiftValues(row.id, row.values, nightRows[row.id]);
         if (!values) {
           return [];
         }
@@ -2679,7 +2688,7 @@ Deno.serve(async (request) => {
       const snapshot = await loadSnapshot(supabase);
       const now = new Date().toISOString();
       const updates = snapshot.rows.flatMap((row) => {
-        const values = applyDayShiftValues(row.values, dayRows[row.id]);
+        const values = applyDayShiftValues(row.id, row.values, dayRows[row.id]);
         if (!values) {
           return [];
         }
