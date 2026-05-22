@@ -6137,6 +6137,129 @@
   }
 
 
+  function getPhotoImportPreviewStatus(photoState, reviewByKey, recognizedFields, suspectFields, key) {
+    const review = reviewByKey.get(key) || null;
+    if (suspectFields.has(key)) {
+      return "suspect";
+    }
+    if (review?.status === "review") {
+      return "review";
+    }
+    if (review?.status === "recognized" || recognizedFields.has(key) || key === "presentTotal") {
+      return "recognized";
+    }
+    const rawValues = photoState?.recognizedValues && typeof photoState.recognizedValues === "object"
+      ? photoState.recognizedValues
+      : {};
+    if (Object.prototype.hasOwnProperty.call(rawValues, key) && rawValues[key] !== null) {
+      return "neutral";
+    }
+    return "empty";
+  }
+
+  function renderPhotoImportPreviewTable(row, photoState, reviewByKey, recognizedFields, suspectFields) {
+    const rawValues = photoState?.recognizedValues && typeof photoState.recognizedValues === "object"
+      ? photoState.recognizedValues
+      : {};
+    const hasPreviewValues = PHOTO_FIELD_DEFINITIONS.some((field) => {
+      if (field.key === "presentTotal") {
+        return true;
+      }
+      return Object.prototype.hasOwnProperty.call(rawValues, field.key) && rawValues[field.key] !== null;
+    });
+
+    if (!hasPreviewValues) {
+      return "";
+    }
+
+    const groups = [
+      {
+        title: "ԵՂԵԼ Է",
+        keys: [
+          { key: "beenTotal", label: "ԸՆԴ" },
+          { key: "beenSoldier", label: "Զ/Ծ" },
+          { key: "beenSeries", label: "ՇԱՐ" }
+        ]
+      },
+      {
+        title: "ԸՆԴՈՒՆՎԵԼ Է",
+        keys: [
+          { key: "admittedTotal", label: "ԸՆԴ" },
+          { key: "admittedSoldier", label: "Զ/Ծ" },
+          { key: "admittedSeries", label: "ՇԱՐ" }
+        ]
+      },
+      {
+        title: "Դ/Գ",
+        keys: [
+          { key: "dgTotal", label: "ԸՆԴ" },
+          { key: "dgSoldier", label: "Զ/Ծ" },
+          { key: "dgSeries", label: "ՇԱՐ" }
+        ]
+      },
+      {
+        title: "Տեղափոխ",
+        keys: [
+          { key: "transferFromDepartment", label: "Դուրս" },
+          { key: "transferToDepartment", label: "Ներս" }
+        ]
+      },
+      {
+        title: "ԱՌԿԱ Է",
+        keys: [
+          { key: "presentTotal", label: "Ընդհ." },
+          { key: "currentShar", label: "ՇԱՐ" },
+          { key: "currentSpa", label: "ՍՊԱ" },
+          { key: "currentPaym", label: "ՊԱՅՄ" },
+          { key: "currentZh", label: "Զ/Հ" },
+          { key: "family", label: "Զ/Ծ ընտ" },
+          { key: "officer", label: "Զ/Պ" },
+          { key: "civil", label: "Ք-ի" }
+        ]
+      },
+      {
+        title: "Արձակուրդում",
+        keys: [
+          { key: "leaveSharq", label: "ՇԱՐ" },
+          { key: "leaveSpa", label: "ՍՊԱ" },
+          { key: "leavePaym", label: "ՊԱՅՄ" }
+        ]
+      }
+    ];
+
+    const groupHeaders = groups
+      .map((group) => `<th colspan="${group.keys.length}">${escapeHtml(group.title)}</th>`)
+      .join("");
+    const subHeaders = groups
+      .map((group) => group.keys.map((cell) => `<th>${escapeHtml(cell.label)}</th>`).join(""))
+      .join("");
+    const dataCells = groups
+      .map((group) => group.keys.map((cell) => {
+        const status = getPhotoImportPreviewStatus(photoState, reviewByKey, recognizedFields, suspectFields, cell.key);
+        const value = getPhotoPreviewValue(row, cell.key);
+        return `
+          <td class="photo-import-mini-table__cell photo-import-mini-table__cell--${status}">
+            <span>${escapeHtml(getDisplayValue(value) || "—")}</span>
+          </td>
+        `;
+      }).join(""))
+      .join("");
+
+    return `
+      <div class="photo-import-mini-table-wrap">
+        <table class="photo-import-mini-table" aria-label="OCR preview table">
+          <thead>
+            <tr>${groupHeaders}</tr>
+            <tr>${subHeaders}</tr>
+          </thead>
+          <tbody>
+            <tr>${dataCells}</tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
   function renderPhotoImportPanel(row) {
     const canRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
     const photoState = state.photoImport || buildInitialPhotoImportState();
@@ -6157,42 +6280,7 @@
     const reviewByKey = new Map(
       (Array.isArray(photoState.cellReviews) ? photoState.cellReviews : []).map((item) => [item.key, item])
     );
-    const recognizedRawValues = photoState.recognizedValues && typeof photoState.recognizedValues === "object"
-      ? photoState.recognizedValues
-      : {};
-    const previewFieldKeys = new Set(getRecognizablePhotoFields(row).map((item) => item.key));
-    previewFieldKeys.add("presentTotal");
-    const previewItems = PHOTO_FIELD_DEFINITIONS
-      .filter((item) => previewFieldKeys.has(item.key))
-      .filter((item) => {
-        if (item.key === "presentTotal") {
-          return true;
-        }
-        const hasRawValue = Object.prototype.hasOwnProperty.call(recognizedRawValues, item.key)
-          && recognizedRawValues[item.key] !== null;
-        return reviewByKey.has(item.key) || recognizedFields.has(item.key) || suspectFields.has(item.key) || hasRawValue;
-      })
-      .map((item) => {
-        const review = reviewByKey.get(item.key) || null;
-        const status = suspectFields.has(item.key)
-          ? "suspect"
-          : (review?.status === "review"
-            ? "review"
-            : (review?.status === "recognized" || recognizedFields.has(item.key) ? "recognized" : "neutral"));
-        const statusText = status === "suspect"
-          ? (photoState.suspectReason || "Проверьте вручную: формула не сошлась.")
-          : (status === "review"
-            ? (review?.reason || "Проверьте вручную")
-            : "Распознано уверенно");
-        return `
-          <div class="photo-import-result-item photo-import-result-item--${status}">
-            <span>Ячейка ${escapeHtml(item.label)}</span>
-            <strong>${escapeHtml(getDisplayValue(getPhotoPreviewValue(row, item.key)) || "—")}</strong>
-            <small>${escapeHtml(statusText)}</small>
-          </div>
-        `;
-      })
-      .join("");
+    const previewTable = renderPhotoImportPreviewTable(row, photoState, reviewByKey, recognizedFields, suspectFields);
 
     return `
       <section class="panel no-print photo-import-panel">
@@ -6233,10 +6321,10 @@
           )
         }</p>
         ${queueInfoText ? `<p class="hint"><strong>${escapeHtml(queueInfoText)}</strong></p>` : ""}
-        ${previewItems || photoState.lastReportDate || (photoState.notes && photoState.notes.length) ? `
+        ${previewTable || photoState.lastReportDate || (photoState.notes && photoState.notes.length) ? `
           <div class="photo-import-results">
             ${photoState.lastReportDate ? `<p class="hint">Дата на фото: <strong>${escapeHtml(photoState.lastReportDate)}</strong></p>` : ""}
-            ${previewItems ? `<div class="photo-import-result-grid">${previewItems}</div>` : ""}
+            ${previewTable}
             ${photoState.notes && photoState.notes.length ? `
               <div class="photo-import-notes">
                 ${photoState.notes.map((note) => `<p class="hint warning-note">${escapeHtml(note)}</p>`).join("")}

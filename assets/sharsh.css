@@ -510,6 +510,79 @@ a {
   gap: 8px;
 }
 
+.photo-import-mini-table-wrap {
+  overflow-x: auto;
+  border: 2px solid #111111;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.photo-import-mini-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: #111111;
+}
+
+.photo-import-mini-table th,
+.photo-import-mini-table td {
+  border: 1px solid #111111;
+  text-align: center;
+  padding: 7px 5px;
+}
+
+.photo-import-mini-table thead tr:first-child th {
+  background: #111111;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.photo-import-mini-table thead tr:last-child th {
+  background: #ffffff;
+  color: #111111;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.photo-import-mini-table__cell {
+  background: #ffffff;
+  color: #111111;
+  font-weight: 800;
+}
+
+.photo-import-mini-table__cell span {
+  display: block;
+  font-size: 19px;
+  line-height: 1.05;
+}
+
+.photo-import-mini-table__cell--recognized {
+  background: #ffffff;
+}
+
+.photo-import-mini-table__cell--neutral {
+  background: #ffffff;
+}
+
+.photo-import-mini-table__cell--review {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 2px #111111;
+}
+
+.photo-import-mini-table__cell--suspect {
+  background: #111111;
+  color: #ffffff;
+  box-shadow: inset 0 0 0 2px #111111;
+}
+
+.photo-import-mini-table__cell--empty {
+  color: #111111;
+}
+
 .photo-import-result-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
