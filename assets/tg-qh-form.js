@@ -210,6 +210,7 @@
     accumulator[column.returnedKey] = 0;
     return accumulator;
   }, {});
+  let fullEditUnlocked = false;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -331,6 +332,15 @@
     };
   }
 
+  function readFieldValues() {
+    const values = {};
+    fields.forEach((field) => {
+      const input = root ? root.querySelector(`[data-field="${field.key}"]`) : null;
+      values[field.key] = toNumber(input ? input.value : 0);
+    });
+    return values;
+  }
+
   function getValidationChecks(values) {
     const presentActual = values.currentShar
       + values.currentSpa
@@ -390,12 +400,23 @@
 
   function getValidationState() {
     const computed = getComputedValues();
-    const checks = getValidationChecks(computed.finalValues);
-    const hasNegativeRemaining = outputCells.some((cell) => computed[cell.key] < 0)
-      || Object.values(computed.leaveRemaining).some((value) => value < 0)
-      || Object.values(computed.leaveAdjustedPresent).some((value) => value < 0);
+    const finalValues = fullEditUnlocked ? readFieldValues() : computed.finalValues;
+    const checks = getValidationChecks(finalValues);
+    const hasNegativeRemaining = [
+      finalValues.currentShar,
+      finalValues.currentSpa,
+      finalValues.currentPaym,
+      finalValues.currentZh,
+      finalValues.family,
+      finalValues.officer,
+      finalValues.civil,
+      finalValues.leaveSharq,
+      finalValues.leaveSpa,
+      finalValues.leavePaym
+    ].some((value) => Number(value) < 0);
     return {
       ...computed,
+      finalValues,
       checks,
       hasNegativeRemaining,
       isValid: !hasNegativeRemaining && checks.every((check) => check.isValid)
@@ -550,6 +571,7 @@
           maxlength="4"
           value="0"
           readonly
+          title="Ստացվել է հաշվարկից"
           aria-readonly="true"
         >
       </label>
@@ -570,6 +592,39 @@
         </div>
       </section>
     `;
+  }
+
+  function syncFieldLockState(forceSyncValues = false) {
+    root.querySelectorAll("[data-field]").forEach((input) => {
+      const field = input.getAttribute("data-field");
+      if (!field) {
+        return;
+      }
+      input.readOnly = !fullEditUnlocked;
+      input.setAttribute("aria-readonly", fullEditUnlocked ? "false" : "true");
+      input.classList.toggle("tg-form-input--readonly", !fullEditUnlocked);
+      input.closest(".tg-sheet-field")?.classList.toggle("is-readonly", !fullEditUnlocked);
+      if (!fullEditUnlocked) {
+        input.setAttribute("title", "Ստացվել է հաշվարկից");
+      } else {
+        input.removeAttribute("title");
+      }
+    });
+
+    const lockInput = root.querySelector("[data-full-edit-toggle]");
+    const lockText = root.querySelector("[data-full-edit-status]");
+    if (lockInput) {
+      lockInput.checked = fullEditUnlocked;
+    }
+    if (lockText) {
+      lockText.textContent = fullEditUnlocked
+        ? "Խմբագրումը միացված է․ կարող եք փոխել 1-22 բոլոր բջիջները։"
+        : "Խմբագրումը անջատված է․ բջիջները միայն դիտման համար են։";
+    }
+
+    if (forceSyncValues) {
+      refreshUi(true);
+    }
   }
 
   function render() {
@@ -615,12 +670,22 @@
               ${getInitData() ? "Ստուգեք հաշվարկը և ուղարկեք ձևը գլխավոր աղյուսակ պահպանելու համար։" : "Բացեք ձևը Telegram բոտի կոճակով։"}
             </div>
           </div>
+          <div class="tg-inline-lock-panel">
+            <label class="department-top-lock-toggle">
+              <input type="checkbox" data-full-edit-toggle>
+              <span class="department-top-lock-toggle-slider"></span>
+            </label>
+            <div class="department-top-lock-meta">
+              <strong>Խմբագրել բոլոր բջիջները</strong>
+              <span data-full-edit-status>Խմբագրումը անջատված է․ բջիջները միայն դիտման համար են։</span>
+            </div>
+          </div>
         </form>
       </section>
     `;
   }
 
-  function refreshUi() {
+  function refreshUi(forceFieldSync = false) {
     const validation = getValidationState();
     const outputs = outputCells.reduce((accumulator, cell) => {
       accumulator[cell.key] = validation[cell.key];
@@ -634,12 +699,14 @@
       }
     });
 
-    Object.entries(validation.finalValues).forEach(([key, value]) => {
-      const target = root.querySelector(`[data-field="${key}"]`);
-      if (target) {
-        target.value = String(value);
-      }
-    });
+    if (!fullEditUnlocked || forceFieldSync) {
+      Object.entries(validation.finalValues).forEach(([key, value]) => {
+        const target = root.querySelector(`[data-field="${key}"]`);
+        if (target) {
+          target.value = String(value);
+        }
+      });
+    }
 
     const preserved = getPreservedValues();
     leaveColumns.forEach((column) => {
@@ -714,6 +781,24 @@
         refreshUi();
       });
     });
+
+    root.querySelectorAll("[data-field]").forEach((input) => {
+      input.addEventListener("input", () => {
+        if (!fullEditUnlocked) {
+          return;
+        }
+        input.value = String(toNumber(input.value));
+        refreshUi();
+      });
+    });
+
+    const fullEditToggle = root.querySelector("[data-full-edit-toggle]");
+    if (fullEditToggle) {
+      fullEditToggle.addEventListener("change", () => {
+        fullEditUnlocked = Boolean(fullEditToggle.checked);
+        syncFieldLockState(true);
+      });
+    }
   }
 
   async function submitForm(event) {
@@ -783,6 +868,7 @@
   render();
   bindEvents();
   refreshUi();
+  syncFieldLockState();
 
   if (telegram) {
     telegram.ready();
