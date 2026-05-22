@@ -860,16 +860,21 @@
     return PHOTO_FIELD_DEFINITIONS.find((item) => item.key === key) || null;
   }
 
+  const SAVE_RULE_DISPLAY_NAME = "Առկա է";
+  const SOLDIER_COUNT_DISPLAY_NAME = "Շարքայիններ";
+  const MILITARY_COUNT_DISPLAY_NAME = "Զինծառայողներ";
+  const OCR_TOP_CELLS_DISPLAY_NAME = "Եղել է";
+
   function buildPresentBalanceFailureMessage(actual, expected) {
-    return `Контроль 13-22 не сошёлся: сумма ячеек 13-22 сейчас ${actual}, должна быть ${expected}. Проверь ячейки 1, 4, 7, 10, 11 и блок 13-22.`;
+    return `${SAVE_RULE_DISPLAY_NAME} не сошлось: сумма ячеек 13-22 сейчас ${actual}, должна быть ${expected}. Проверь ячейки 1, 4, 7, 10, 11 и блок 13-22.`;
   }
 
   function buildSoldierCountFailureMessage(actual, expected) {
-    return `Количество срочников не сошлось: по ячейкам 3, 6 и 9 получилось ${actual}, а по ячейкам 13 и 20 сейчас ${expected}. Проверь ячейки 3, 6, 9, 13 и 20.`;
+    return `${SOLDIER_COUNT_DISPLAY_NAME} не сошлись: по ячейкам 3, 6 и 9 получилось ${actual}, а по ячейкам 13 и 20 сейчас ${expected}. Проверь ячейки 3, 6, 9, 13 и 20.`;
   }
 
   function buildMilitaryCountFailureMessage(actual, expected) {
-    return `Количество военнослужащих не сошлось: по ячейкам 2, 5 и 8 получилось ${actual}, а по ячейкам 13, 14, 15, 20, 21 и 22 сейчас ${expected}. Проверь ячейки 2, 5, 8, 13, 14, 15, 20, 21 и 22.`;
+    return `${MILITARY_COUNT_DISPLAY_NAME} не сошлись: по ячейкам 2, 5 и 8 получилось ${actual}, а по ячейкам 13, 14, 15, 20, 21 и 22 сейчас ${expected}. Проверь ячейки 2, 5, 8, 13, 14, 15, 20, 21 и 22.`;
   }
 
   function buildOcrTopCellsFailureMessage(mismatches = []) {
@@ -884,7 +889,7 @@
       })
       .join("; ");
 
-    return `OCR 1-3 не совпадает с таблицей отделения: ${details}.`;
+    return `${OCR_TOP_CELLS_DISPLAY_NAME}: OCR 1-3 не совпадает с таблицей отделения: ${details}.`;
   }
 
   function formatDepartmentValidationSuccessMessage(check) {
@@ -894,13 +899,13 @@
 
     switch (check.id) {
       case "present-balance":
-        return `Контроль 13-22: ${check.actual} = ${check.expected}.`;
+        return `${SAVE_RULE_DISPLAY_NAME}: ${check.actual} = ${check.expected}.`;
       case "soldier-count":
-        return `Срочники: ${check.actual} = ${check.expected}.`;
+        return `${SOLDIER_COUNT_DISPLAY_NAME}: ${check.actual} = ${check.expected}.`;
       case "military-count":
-        return `Военнослужащие: ${check.actual} = ${check.expected}.`;
+        return `${MILITARY_COUNT_DISPLAY_NAME}: ${check.actual} = ${check.expected}.`;
       case "ocr-top-cells":
-        return "OCR 1-3 совпадает с таблицей.";
+        return `${OCR_TOP_CELLS_DISPLAY_NAME}: OCR 1-3 совпадает с таблицей.`;
       default:
         return "";
     }
@@ -4459,7 +4464,7 @@
     const checks = [
       {
         id: "present-balance",
-        name: SAVE_RULE_NAME,
+        name: SAVE_RULE_DISPLAY_NAME,
         ruleText: row.hasLeaveTotal ? SAVE_RULE_TEXT : SAVE_RULE_TEXT_SHORT,
         applicable: true,
         isValid: presentActual === presentExpected,
@@ -4484,7 +4489,7 @@
 
       checks.push({
         id: "soldier-count",
-        name: SOLDIER_COUNT_RULE_NAME,
+        name: SOLDIER_COUNT_DISPLAY_NAME,
         ruleText: SOLDIER_COUNT_RULE_TEXT,
         applicable: true,
         isValid: soldierActual === soldierExpected,
@@ -4509,7 +4514,7 @@
 
       checks.push({
         id: "military-count",
-        name: MILITARY_COUNT_RULE_NAME,
+        name: MILITARY_COUNT_DISPLAY_NAME,
         ruleText: MILITARY_COUNT_RULE_TEXT,
         applicable: true,
         isValid: militaryActual === militaryExpected,
@@ -4547,7 +4552,7 @@
     if (mode !== "department" || !row || !values) {
       return {
         id: "ocr-top-cells",
-        name: OCR_TOP_CELLS_RULE_NAME,
+        name: OCR_TOP_CELLS_DISPLAY_NAME,
         ruleText: OCR_TOP_CELLS_RULE_TEXT,
         applicable: false,
         isValid: true,
@@ -4581,7 +4586,7 @@
     if (!comparedKeys.length) {
       return {
         id: "ocr-top-cells",
-        name: OCR_TOP_CELLS_RULE_NAME,
+        name: OCR_TOP_CELLS_DISPLAY_NAME,
         ruleText: OCR_TOP_CELLS_RULE_TEXT,
         applicable: false,
         isValid: true,
@@ -4602,7 +4607,7 @@
 
     return {
       id: "ocr-top-cells",
-      name: OCR_TOP_CELLS_RULE_NAME,
+      name: OCR_TOP_CELLS_DISPLAY_NAME,
       ruleText: OCR_TOP_CELLS_RULE_TEXT,
       applicable: true,
       isValid: mismatches.length === 0,
@@ -4677,7 +4682,7 @@
 
       checks.push({
         id: "present-balance",
-        name: SAVE_RULE_NAME,
+        name: SAVE_RULE_DISPLAY_NAME,
         ruleText: row.hasLeaveTotal ? SAVE_RULE_TEXT : SAVE_RULE_TEXT_SHORT,
         applicable: true,
         isValid: presentActual === presentExpected,
@@ -4689,7 +4694,7 @@
     } else {
       checks.push({
         id: "present-balance",
-        name: SAVE_RULE_NAME,
+        name: SAVE_RULE_DISPLAY_NAME,
         ruleText: row.hasLeaveTotal ? SAVE_RULE_TEXT : SAVE_RULE_TEXT_SHORT,
         applicable: false,
         isValid: true,
@@ -4721,7 +4726,7 @@
       const soldierExpected = (read("currentShar") || 0) + (read("leaveSharq") || 0);
       checks.push({
         id: "soldier-count",
-        name: SOLDIER_COUNT_RULE_NAME,
+        name: SOLDIER_COUNT_DISPLAY_NAME,
         ruleText: SOLDIER_COUNT_RULE_TEXT,
         applicable: true,
         isValid: soldierActual === soldierExpected,
@@ -4733,7 +4738,7 @@
     } else {
       checks.push({
         id: "soldier-count",
-        name: SOLDIER_COUNT_RULE_NAME,
+        name: SOLDIER_COUNT_DISPLAY_NAME,
         ruleText: SOLDIER_COUNT_RULE_TEXT,
         applicable: false,
         isValid: true,
@@ -4757,7 +4762,7 @@
 
       checks.push({
         id: "military-count",
-        name: MILITARY_COUNT_RULE_NAME,
+        name: MILITARY_COUNT_DISPLAY_NAME,
         ruleText: MILITARY_COUNT_RULE_TEXT,
         applicable: true,
         isValid: militaryActual === militaryExpected,
@@ -4769,7 +4774,7 @@
     } else {
       checks.push({
         id: "military-count",
-        name: MILITARY_COUNT_RULE_NAME,
+        name: MILITARY_COUNT_DISPLAY_NAME,
         ruleText: MILITARY_COUNT_RULE_TEXT,
         applicable: false,
         isValid: true,
@@ -4800,7 +4805,7 @@
 
       checks.push({
         id: "ocr-top-cells",
-        name: OCR_TOP_CELLS_RULE_NAME,
+        name: OCR_TOP_CELLS_DISPLAY_NAME,
         ruleText: OCR_TOP_CELLS_RULE_TEXT,
         applicable: true,
         isValid: mismatches.length === 0,
@@ -4812,7 +4817,7 @@
     } else {
       checks.push({
         id: "ocr-top-cells",
-        name: OCR_TOP_CELLS_RULE_NAME,
+        name: OCR_TOP_CELLS_DISPLAY_NAME,
         ruleText: OCR_TOP_CELLS_RULE_TEXT,
         applicable: false,
         isValid: true,
