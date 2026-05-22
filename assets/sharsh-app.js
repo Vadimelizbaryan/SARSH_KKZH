@@ -860,6 +860,73 @@
     return PHOTO_FIELD_DEFINITIONS.find((item) => item.key === key) || null;
   }
 
+  function buildPresentBalanceFailureMessage(actual, expected) {
+    return `Контроль 13-22 не сошёлся: сумма ячеек 13-22 сейчас ${actual}, должна быть ${expected}. Проверь ячейки 1, 4, 7, 10, 11 и блок 13-22.`;
+  }
+
+  function buildSoldierCountFailureMessage(actual, expected) {
+    return `Количество срочников не сошлось: по ячейкам 3, 6 и 9 получилось ${actual}, а по ячейкам 13 и 20 сейчас ${expected}. Проверь ячейки 3, 6, 9, 13 и 20.`;
+  }
+
+  function buildMilitaryCountFailureMessage(actual, expected) {
+    return `Количество военнослужащих не сошлось: по ячейкам 2, 5 и 8 получилось ${actual}, а по ячейкам 13, 14, 15, 20, 21 и 22 сейчас ${expected}. Проверь ячейки 2, 5, 8, 13, 14, 15, 20, 21 и 22.`;
+  }
+
+  function buildOcrTopCellsFailureMessage(mismatches = []) {
+    if (!Array.isArray(mismatches) || !mismatches.length) {
+      return "";
+    }
+
+    const details = mismatches
+      .map((item) => {
+        const cellLabel = getPhotoFieldMetaByKey(item.key)?.label || item.key;
+        return `ячейка ${cellLabel}: OCR ${item.ocrValue}, в таблице ${item.tableValue}`;
+      })
+      .join("; ");
+
+    return `OCR 1-3 не совпадает с таблицей отделения: ${details}.`;
+  }
+
+  function formatDepartmentValidationSuccessMessage(check) {
+    if (!check || !check.applicable) {
+      return "";
+    }
+
+    switch (check.id) {
+      case "present-balance":
+        return `Контроль 13-22: ${check.actual} = ${check.expected}.`;
+      case "soldier-count":
+        return `Срочники: ${check.actual} = ${check.expected}.`;
+      case "military-count":
+        return `Военнослужащие: ${check.actual} = ${check.expected}.`;
+      case "ocr-top-cells":
+        return "OCR 1-3 совпадает с таблицей.";
+      default:
+        return "";
+    }
+  }
+
+  function buildDepartmentValidationMessage(isValid, checks = [], failedChecks = []) {
+    if (isValid) {
+      const successParts = checks
+        .filter((item) => item.applicable)
+        .map((item) => formatDepartmentValidationSuccessMessage(item))
+        .filter(Boolean);
+
+      return successParts.length
+        ? `Проверка пройдена. ${successParts.join(" ")}`
+        : "Проверка пройдена.";
+    }
+
+    const failureParts = failedChecks
+      .map((item) => item.failureMessage)
+      .filter(Boolean);
+
+    return failureParts.length
+      ? `Сохранение заблокировано. ${failureParts.join(" ")}`
+      : "Сохранение заблокировано. Исправь данные и попробуй снова.";
+  }
+
   function getPhotoFieldReviewStatus(key) {
     if (mode !== "department" || !state.photoImport) {
       return "";
@@ -4401,7 +4468,7 @@
         suspectKeys: PHOTO_FIELD_DEFINITIONS
           .filter((item) => item.cell >= 13 && item.cell <= 22)
           .map((item) => item.key),
-        failureMessage: `сумма 13-22 = ${presentActual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${presentExpected}.`
+        failureMessage: buildPresentBalanceFailureMessage(presentActual, presentExpected)
       }
     ];
 
@@ -4424,7 +4491,7 @@
         actual: soldierActual,
         expected: soldierExpected,
         suspectKeys: ["beenSeries", "admittedSeries", "dgSeries", "currentShar", "leaveSharq"],
-        failureMessage: `контрольная сумма «${SOLDIER_COUNT_RULE_NAME}» не сошлась: (${getNumber(snapshot, row, "beenSeries")} + ${getNumber(snapshot, row, "admittedSeries")}) - ${getNumber(snapshot, row, "dgSeries")} = ${soldierActual}, а ${getNumber(snapshot, row, "currentShar")} + ${getNumber(snapshot, row, "leaveSharq")} = ${soldierExpected}.`
+        failureMessage: buildSoldierCountFailureMessage(soldierActual, soldierExpected)
       });
 
       const militaryActual = (
@@ -4459,7 +4526,7 @@
           "leaveSpa",
           "leavePaym"
         ],
-        failureMessage: `контрольная сумма «${MILITARY_COUNT_RULE_NAME}» не сошлась: (${getNumber(snapshot, row, "beenSoldier")} + ${getNumber(snapshot, row, "admittedSoldier")}) - ${getNumber(snapshot, row, "dgSoldier")} = ${militaryActual}, а ${getNumber(snapshot, row, "currentShar")} + ${getNumber(snapshot, row, "currentSpa")} + ${getNumber(snapshot, row, "currentPaym")} + ${getNumber(snapshot, row, "leaveSharq")} + ${getNumber(snapshot, row, "leaveSpa")} + ${getNumber(snapshot, row, "leavePaym")} = ${militaryExpected}.`
+        failureMessage: buildMilitaryCountFailureMessage(militaryActual, militaryExpected)
       });
     }
 
@@ -4542,9 +4609,7 @@
       actual: mismatches.length,
       expected: 0,
       suspectKeys: mismatches.map((item) => item.key),
-      failureMessage: mismatches.length
-        ? `данные OCR 1-3 не совпадают с таблицей отделения: ${mismatchMessage}.`
-        : ""
+      failureMessage: buildOcrTopCellsFailureMessage(mismatches)
     };
   }
 
@@ -4619,7 +4684,7 @@
         actual: presentActual,
         expected: presentExpected,
         suspectKeys: photoBlockKeys,
-        failureMessage: `сумма 13-22 = ${presentActual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${presentExpected}.`
+        failureMessage: buildPresentBalanceFailureMessage(presentActual, presentExpected)
       });
     } else {
       checks.push({
@@ -4663,7 +4728,7 @@
         actual: soldierActual,
         expected: soldierExpected,
         suspectKeys: soldierRequiredKeys,
-        failureMessage: `контрольная сумма «${SOLDIER_COUNT_RULE_NAME}» не сошлась: (${read("beenSeries") || 0} + ${read("admittedSeries") || 0}) - ${read("dgSeries") || 0} = ${soldierActual}, а ${(read("currentShar") || 0)} + ${(read("leaveSharq") || 0)} = ${soldierExpected}.`
+        failureMessage: buildSoldierCountFailureMessage(soldierActual, soldierExpected)
       });
     } else {
       checks.push({
@@ -4699,7 +4764,7 @@
         actual: militaryActual,
         expected: militaryExpected,
         suspectKeys: militaryRequiredKeys,
-        failureMessage: `контрольная сумма «${MILITARY_COUNT_RULE_NAME}» не сошлась: (${read("beenSoldier") || 0} + ${read("admittedSoldier") || 0}) - ${read("dgSoldier") || 0} = ${militaryActual}, а ${(read("currentShar") || 0)} + ${(read("currentSpa") || 0)} + ${(read("currentPaym") || 0)} + ${(read("leaveSharq") || 0)} + ${(read("leaveSpa") || 0)} + ${(read("leavePaym") || 0)} = ${militaryExpected}.`
+        failureMessage: buildMilitaryCountFailureMessage(militaryActual, militaryExpected)
       });
     } else {
       checks.push({
@@ -4742,9 +4807,7 @@
         actual: mismatches.length,
         expected: 0,
         suspectKeys: mismatches.map((item) => item.key),
-        failureMessage: mismatches.length
-          ? `данные OCR 1-3 не совпадают с таблицей отделения: ${mismatchMessage}.`
-          : ""
+        failureMessage: buildOcrTopCellsFailureMessage(mismatches)
       });
     } else {
       checks.push({
@@ -4841,7 +4904,6 @@
     const failedChecks = checks.filter((item) => item.applicable && !item.isValid);
     const primaryCheck = checks[0] || null;
     const isValid = failedChecks.length === 0;
-    const ruleText = getDepartmentSaveRuleText(row, checks);
 
     return {
       applicable: true,
@@ -4850,9 +4912,7 @@
       expected: primaryCheck ? primaryCheck.expected : 0,
       checks,
       failedChecks,
-      message: isValid
-        ? `Проверка пройдена: ${ruleText}.`
-        : `Сохранение заблокировано: ${failedChecks.map((item) => item.failureMessage).join(" ")}`
+      message: buildDepartmentValidationMessage(isValid, checks, failedChecks)
     };
   }
 
@@ -4886,7 +4946,6 @@
     const failedChecks = checks.filter((item) => item.applicable && !item.isValid);
     const primaryCheck = checks[0] || null;
     const isValid = failedChecks.length === 0;
-    const ruleText = getDepartmentSaveRuleText(row, checks);
 
     return {
       applicable: true,
@@ -4895,9 +4954,7 @@
       expected: primaryCheck ? primaryCheck.expected : 0,
       checks,
       failedChecks,
-      message: isValid
-        ? `Проверка пройдена: ${ruleText}.`
-        : `Сохранение заблокировано: ${failedChecks.map((item) => item.failureMessage).join(" ")}`
+      message: buildDepartmentValidationMessage(isValid, checks, failedChecks)
     };
   }
 
