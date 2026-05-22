@@ -3854,6 +3854,16 @@
     return Boolean(row && QH_CALC_DEPARTMENT_IDS.has(row.id));
   }
 
+  function hasPendingTelegramPhotoUpdate(row) {
+    if (!row) {
+      return false;
+    }
+
+    return String(row.photoWorkflowStatus || "").startsWith("pending")
+      && Boolean(row.photoFeedbackId)
+      && row.photoName !== "telegram-web-app-form";
+  }
+
   function getQhCalcColumnByKey(key) {
     return QH_CALC_COLUMNS.find((column) =>
       column.baseKey === key
@@ -5321,9 +5331,12 @@
     const openRowAttr = departmentPath
       ? ` data-open-department-path="${escapeHtml(departmentPath)}"`
       : "";
+    const pendingPhotoClass = viewMode === "main" && hasPendingTelegramPhotoUpdate(row)
+      ? " dept-cell--photo-pending"
+      : "";
     return `
       <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}${validationClass}${openRowClass}" data-row-id="${row.id}"${freshnessAttr}${validationAttr}${validationTitle}${openRowAttr}>
-        <td class="dept-cell" title="${escapeHtml(row.department)}">${renderResponsiveDepartmentName(row.department)}</td>
+        <td class="dept-cell${pendingPhotoClass}" title="${escapeHtml(row.department)}">${renderResponsiveDepartmentName(row.department)}</td>
         ${config.columns.map((key) => renderDetailCell(snapshot, row, key, interactive, options)).join("")}
       </tr>
     `;
@@ -7819,6 +7832,10 @@
         }
         if (sheetRowEl) {
           sheetRowEl.setAttribute("data-row-freshness", meta.level);
+          const deptCellEl = sheetRowEl.querySelector(".dept-cell");
+          if (deptCellEl) {
+            deptCellEl.classList.toggle("dept-cell--photo-pending", hasPendingTelegramPhotoUpdate(row));
+          }
           if (mode === "main") {
             const validation = getDepartmentValidationStateForSnapshot(state.snapshot, row);
             sheetRowEl.classList.toggle("main-fresh-row", meta.level === "fresh" && !(validation.applicable && !validation.isValid));

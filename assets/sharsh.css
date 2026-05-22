@@ -2350,6 +2350,16 @@ a {
   color: #991b1b;
 }
 
+.sheet tbody .dept-cell.dept-cell--photo-pending {
+  background: #fee2e2;
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.sheet tbody tr:hover .dept-cell.dept-cell--photo-pending {
+  background: #fecaca;
+}
+
 .sheet tbody td.transfer-mismatch-cell {
   box-shadow: inset 0 0 0 9999px rgba(239, 68, 68, 0.24);
 }
