@@ -5455,13 +5455,8 @@ function syncQhCalculatedSnapshotRows<T extends { id: string; values: Record<str
       return;
     }
 
-    QH_CALC_CARRYOVER_PAIRS.forEach(({ base, current }) => {
-      const currentValue = getSheetNumber(row.values, current);
-      if (row.values[base] === null && currentValue > 0) {
-        row.values[base] = currentValue;
-      }
-      row.values[current] = getSheetNumber(row.values, base);
-    });
+    primeQhMorningBaseValues(row.values);
+    syncQhMorningCalculatedValues(row.id, row.values);
   });
   return rows;
 }
