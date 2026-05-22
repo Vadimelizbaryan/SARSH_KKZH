@@ -6079,6 +6079,35 @@
           </div>
         </div>
 
+                    <div class="zoom-target">
+              <div class="sheet-shell">
+              ${canEditMainTable ? `
+                <div class="main-table-edit-panel main-table-edit-panel--table">
+                  <label class="department-top-lock-switch" for="mainTableEditToggle">
+                    <input type="checkbox" id="mainTableEditToggle"${state.mainTableUnlocked ? " checked" : ""}>
+                    <span class="department-top-lock-slider" aria-hidden="true"></span>
+                    <span class="department-top-lock-copy">
+                      <strong>Редактирование таблицы</strong>
+                      <span>${escapeHtml(state.mainTableUnlocked ? "Редактирование включено." : "Редактирование заблокировано.")}</span>
+                    </span>
+                  </label>
+                  <div class="photo-import-save-actions main-table-save-actions">
+                    <button type="button" id="mainSaveBtn">Сохранить таблицу</button>
+                    <span id="mainSaveRuleText">Изменений в главной таблице пока нет.</span>
+                  </div>
+                </div>
+              ` : ""}
+              <p class="status-line no-print">
+                <strong>Последнее обновление сводки:</strong>
+                <span id="lastUpdatedText">${escapeHtml(freshnessStats.newestRow ? formatTimestamp(getRowEffectiveUpdatedAt(freshnessStats.newestRow)) : "еще не отправлялось")}</span>
+                <span class="status-chip status-chip--${summaryFreshness.level}" id="lastUpdatedBadge">${escapeHtml(summaryFreshness.label)}</span>
+              </p>
+                <div class="table-wrap">
+                  ${renderTable(state.snapshot, state.snapshot.rows, { interactive: state.mainTableUnlocked, viewMode: "main" })}
+                </div>
+              </div>
+            </div>
+
         <div class="layout-grid split">
           <div class="info-stack">
             <div class="panel no-print">
@@ -6123,35 +6152,6 @@
             </div>
 
             ${renderMainPhotoRoutePanel()}
-
-            <div class="zoom-target">
-              <div class="sheet-shell">
-              ${canEditMainTable ? `
-                <div class="main-table-edit-panel main-table-edit-panel--table">
-                  <label class="department-top-lock-switch" for="mainTableEditToggle">
-                    <input type="checkbox" id="mainTableEditToggle"${state.mainTableUnlocked ? " checked" : ""}>
-                    <span class="department-top-lock-slider" aria-hidden="true"></span>
-                    <span class="department-top-lock-copy">
-                      <strong>Редактирование таблицы</strong>
-                      <span>${escapeHtml(state.mainTableUnlocked ? "Редактирование включено." : "Редактирование заблокировано.")}</span>
-                    </span>
-                  </label>
-                  <div class="photo-import-save-actions main-table-save-actions">
-                    <button type="button" id="mainSaveBtn">Сохранить таблицу</button>
-                    <span id="mainSaveRuleText">Изменений в главной таблице пока нет.</span>
-                  </div>
-                </div>
-              ` : ""}
-              <p class="status-line no-print">
-                <strong>Последнее обновление сводки:</strong>
-                <span id="lastUpdatedText">${escapeHtml(freshnessStats.newestRow ? formatTimestamp(getRowEffectiveUpdatedAt(freshnessStats.newestRow)) : "еще не отправлялось")}</span>
-                <span class="status-chip status-chip--${summaryFreshness.level}" id="lastUpdatedBadge">${escapeHtml(summaryFreshness.label)}</span>
-              </p>
-                <div class="table-wrap">
-                  ${renderTable(state.snapshot, state.snapshot.rows, { interactive: state.mainTableUnlocked, viewMode: "main" })}
-                </div>
-              </div>
-            </div>
 
             <section class="panel no-print updates-panel">
               <h2>Обновления отделений</h2>
