@@ -5076,6 +5076,9 @@
       return;
     }
     LEAVE_CALC_COLUMNS.forEach((column) => {
+      document.querySelectorAll(`[data-leave-calc-base="${column.leaveKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(getNumber(state.snapshot, row, column.leaveKey)) || "0";
+      });
       document.querySelectorAll(`[data-leave-calc-output="${column.leaveKey}"]`).forEach((element) => {
         element.textContent = getDisplayValue(calcLeaveRemainingValue(row, column.type)) || "0";
       });
@@ -6627,11 +6630,11 @@
             `;
           }
 
-          if (cell.role === "linked") {
-            return `
+      if (cell.role === "linked") {
+        return `
               <td class="qh-calc-cell qh-calc-cell--linked">
                 <span class="qh-calc-marker">${escapeHtml(cell.marker)}</span>
-                <strong data-leave-calc-output="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(getNumber(state.snapshot, row, cell.key)) || "0")}</strong>
+                <strong data-leave-calc-base="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(getNumber(state.snapshot, row, cell.key)) || "0")}</strong>
               </td>
             `;
           }
@@ -6895,6 +6898,9 @@
       });
 
       LEAVE_CALC_COLUMNS.forEach((column) => {
+        document.querySelectorAll(`[data-leave-calc-base="${column.leaveKey}"]`).forEach((element) => {
+          element.textContent = getDisplayValue(getNumber(state.snapshot, row, column.leaveKey)) || "0";
+        });
         document.querySelectorAll(`[data-leave-calc-output="${column.leaveKey}"]`).forEach((element) => {
           element.textContent = getDisplayValue(calcLeaveRemainingValue(row, column.type)) || "0";
         });
