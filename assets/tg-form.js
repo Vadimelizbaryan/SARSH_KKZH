@@ -156,6 +156,7 @@
     accumulator[column.returnedKey] = 0;
     return accumulator;
   }, {});
+  let fullEditUnlocked = false;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -335,7 +336,8 @@
 
   function readValues() {
     const values = {};
-    editableKeys.forEach((key) => {
+    fields.forEach((field) => {
+      const key = field.key;
       const input = root.querySelector(`[data-field="${key}"]`);
       values[key] = toNumber(input ? input.value : 0);
     });
@@ -397,6 +399,7 @@
     nextValues.leaveSharq = leaveRemainingByType.sharq;
     nextValues.leaveSpa = leaveRemainingByType.spa;
     nextValues.leavePaym = leaveRemainingByType.paym;
+    nextValues.presentTotal = getExpected(nextValues);
 
     const invalidCurrentColumns = calculatorColumns.filter((column) => remainingByType[column.type] < 0);
     const invalidLeaveColumns = leaveCalculatorColumns.filter((column) =>
@@ -594,7 +597,8 @@
   }
 
   function writeValuesToForm(values) {
-    editableKeys.forEach((key) => {
+    fields.forEach((field) => {
+      const key = field.key;
       const input = root.querySelector(`[data-field="${key}"]`);
       if (input) {
         input.value = String(toNumber(values[key]));
@@ -692,7 +696,7 @@
 
   function renderFieldCard(field) {
     const isControl = field.key === "presentTotal";
-    const isReadOnly = isControl || readOnlyKeys.has(field.key);
+    const isReadOnly = readOnlyKeys.has(field.key);
     const controlHtml = isControl
       ? '<span class="tg-sheet-field-value" data-control-total>0</span>'
       : `
@@ -734,6 +738,61 @@
         </div>
       </section>
     `;
+  }
+
+  function renderFieldCard(field) {
+    const isControl = field.key === "presentTotal";
+    const isReadOnly = readOnlyKeys.has(field.key);
+    return `
+      <label class="tg-sheet-field${isReadOnly ? " is-readonly" : ""}">
+        <span class="tg-sheet-field-top">
+          <span class="tg-sheet-field-index">${field.cell}</span>
+          <span class="tg-sheet-field-label">${escapeHtml(field.label)}</span>
+        </span>
+        <input
+          class="tg-form-input tg-sheet-field-input${isReadOnly ? " tg-form-input--readonly" : ""}"
+          ${isControl ? 'data-control-total' : ""}
+          data-field="${escapeHtml(field.key)}"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          type="text"
+          autocomplete="off"
+          maxlength="3"
+          value="${getInitialValue(field.key)}"
+          ${isReadOnly ? 'readonly aria-readonly="true" title="Ստացվել է գլխավոր աղյուսակից"' : ""}
+        >
+      </label>
+    `;
+  }
+
+  function syncFieldLockState() {
+    root.querySelectorAll("[data-field]").forEach((input) => {
+      const key = input.getAttribute("data-field");
+      const shouldLock = !fullEditUnlocked;
+      input.readOnly = shouldLock;
+      input.setAttribute("aria-readonly", shouldLock ? "true" : "false");
+      input.classList.toggle("tg-form-input--readonly", shouldLock);
+      input.closest(".tg-sheet-field")?.classList.toggle("is-readonly", shouldLock);
+      if (shouldLock) {
+        input.setAttribute("title", "Ստացվել է գլխավոր աղյուսակից");
+      } else {
+        input.setAttribute("title", "Խմբագրումը միացված է");
+      }
+      if (key === "presentTotal" && shouldLock) {
+        updateControl();
+      }
+    });
+
+    const lockInput = root.querySelector("[data-full-edit-toggle]");
+    const lockText = root.querySelector("[data-full-edit-status]");
+    if (lockInput) {
+      lockInput.checked = fullEditUnlocked;
+    }
+    if (lockText) {
+      lockText.textContent = fullEditUnlocked
+        ? "Խմբագրումը միացված է․ կարող եք փոխել 1-22 բոլոր բջիջները։"
+        : "Խմբագրումը անջատված է․ բջիջները միայն դիտման համար են։";
+    }
   }
 
   function getExpected(values) {
@@ -859,6 +918,49 @@
     return telegram && typeof telegram.initData === "string" ? telegram.initData : "";
   }
 
+  function updateControl() {
+    const values = readValues();
+    const validation = getValidationResult(values);
+    const primaryCheck = validation.checks[0];
+    const copiedState = isUsingCopiedValues(values);
+    const control = root.querySelector("[data-control-total]");
+    const status = root.querySelector("[data-status]");
+    const submit = root.querySelector("[data-submit]");
+
+    if (control && !fullEditUnlocked) {
+      control.value = String(copiedState || !primaryCheck
+        ? getInitialValue("presentTotal")
+        : primaryCheck.expected);
+    }
+    if (status) {
+      status.classList.toggle("bad", !validation.isValid);
+      status.innerHTML = getInitData()
+        ? `
+          <div class="tg-form-status-head">
+            <strong>${validation.isValid ? "Բոլոր վերահսկիչները համընկնում են" : "Ստուգեք վերահսկիչ գումարները"}</strong>
+            <span>${escapeHtml(copiedState
+              ? "Բոլոր բջիջները բերվել են գլխավոր աղյուսակից։"
+              : "Փոփոխված տվյալները ստուգվում են ընթացիկ մուտքի հիման վրա։")}</span>
+          </div>
+          <div class="tg-validation-list">
+            ${validation.checks.map((check) => `
+              <div class="tg-validation-item${check.isValid ? "" : " is-bad"}">
+                <span class="tg-validation-bullet">${check.isValid ? "✓" : "!"}</span>
+                <span>${escapeHtml(formatValidationLine(check))}</span>
+              </div>
+            `).join("")}
+            ${!shouldCheckExtraControls(values)
+              ? `<div class="tg-validation-note">${escapeHtml("«Շարքայիններ» և «Զինծառայողներ» ստուգումները միանում են, երբ 10 և 11 բջիջներում արժեքը 0 է։")}</div>`
+              : ""}
+          </div>
+        `
+        : `<div class="tg-form-status-head"><strong>${escapeHtml("Բացեք ձևը Telegram բոտի կոճակով։")}</strong></div>`;
+    }
+    if (submit) {
+      submit.disabled = !validation.isValid || !getInitData();
+    }
+  }
+
   function getEndpoint() {
     const baseUrl = String(runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co").replace(/\/+$/, "");
     return `${baseUrl}/functions/v1/Mainflow-telegram?action=web-form-submit`;
@@ -970,6 +1072,16 @@
               ${getInitData() ? "Ձևը բացվել է գլխավոր աղյուսակից բերված տվյալներով։" : "Բացեք ձևը Telegram բոտի կոճակով։"}
             </div>
           </div>
+          <div class="tg-inline-lock-panel">
+            <label class="department-top-lock-toggle">
+              <input type="checkbox" data-full-edit-toggle>
+              <span class="department-top-lock-toggle-slider"></span>
+            </label>
+            <div class="department-top-lock-meta">
+              <strong>Խմբագրել բոլոր բջիջները</strong>
+              <span data-full-edit-status>Խմբագրումը անջատված է․ բջիջները միայն դիտման համար են։</span>
+            </div>
+          </div>
         </form>
       </section>
     `;
@@ -1024,6 +1136,13 @@
     if (applyCalculators) {
       applyCalculators.addEventListener("click", applyCombinedCalculator);
     }
+    const fullEditToggle = root.querySelector("[data-full-edit-toggle]");
+    if (fullEditToggle) {
+      fullEditToggle.addEventListener("change", () => {
+        fullEditUnlocked = Boolean(fullEditToggle.checked);
+        syncFieldLockState();
+      });
+    }
     root.querySelectorAll("[data-patient-note-input]").forEach((input) => {
       input.addEventListener("input", () => {
         const notes = readPatientNotes();
@@ -1059,6 +1178,7 @@
     }
     refreshCalculatorUi();
     updateControl();
+    syncFieldLockState();
   }
 
   if (telegram) {
