@@ -6044,30 +6044,38 @@
         <div class="print-title print-only">
           <h1>${escapeHtml(PRINT_REPORT_TITLE)}</h1>
         </div>
-        <div class="toolbar no-print">
-          <div>
+        <div class="toolbar no-print toolbar--main">
+          <div class="toolbar-copy toolbar-copy--main">
             <h1>SARSH_KKZH</h1>
             <p>Главный файл собирает данные всех отделений, показывает общий документ и готов для печати в PDF.</p>
           </div>
-          <div class="toolbar-actions">
-            <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
-            ${buildOwnerAuthActions()}
-            ${downloadMainPdfButtonHtml}
-            <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
-            <div class="zoom-control">
-              <label for="zoomRange">Մասշտաբ</label>
-              <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
-              <span class="zoom-value" id="zoomValue">100%</span>
+          <div class="toolbar-actions toolbar-actions--main">
+            <div class="main-toolbar-group main-toolbar-group--status">
+              <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
+              ${buildOwnerAuthActions()}
+              <div class="zoom-control">
+                <label for="zoomRange">Մաշտաբ</label>
+                <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
+                <span class="zoom-value" id="zoomValue">100%</span>
+              </div>
             </div>
-            <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
-            <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Էջ՝ գիշ. ընդուն.</a>
-            <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. ընդուն.</a>
-            <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. դուրսգր.</a>
-            <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}" target="_blank" rel="noopener">Քաղ. ԲԿ բազա</a>
-            <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Հաշվետվ.</a>
-            <a class="button-link" href="${escapeHtml(getSetupPath())}">Կարգավ.</a>
-            <button type="button" id="refreshBtn">Թարմ.</button>
-            <button type="button" id="printBtn">Տպել</button>
+            <div class="main-toolbar-group">
+              ${downloadMainPdfButtonHtml}
+              <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
+              <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Հաշվետվ.</a>
+              <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
+            </div>
+            <div class="main-toolbar-group">
+              <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Էջ՝ գիշ. ընդուն.</a>
+              <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. ընդուն.</a>
+              <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. դուրսգր.</a>
+              <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}" target="_blank" rel="noopener">Քաղ. ԲԿ բազա</a>
+              <a class="button-link" href="${escapeHtml(getSetupPath())}">Կարգավ.</a>
+            </div>
+            <div class="main-toolbar-group main-toolbar-group--actions">
+              <button type="button" id="refreshBtn">Թարմ.</button>
+              <button type="button" id="printBtn">Տպել</button>
+            </div>
           </div>
         </div>
 

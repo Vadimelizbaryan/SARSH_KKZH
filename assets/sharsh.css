@@ -79,6 +79,49 @@ a {
   justify-content: flex-end;
 }
 
+.toolbar-copy {
+  min-width: 0;
+}
+
+.toolbar--main {
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.toolbar-copy--main {
+  max-width: 380px;
+}
+
+.toolbar-actions--main {
+  flex: 1 1 760px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.main-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 253, 247, 0.78);
+  box-shadow: 0 8px 22px rgba(17, 17, 17, 0.05);
+}
+
+.main-toolbar-group--status {
+  background: rgba(255, 248, 232, 0.9);
+}
+
+.main-toolbar-group--actions {
+  justify-content: flex-end;
+}
+
 .pill,
 .toolbar button,
 .toolbar a.button-link,
@@ -911,6 +954,31 @@ a {
 
 .qh-calc-actions button:active {
   transform: translateY(0);
+}
+
+.toolbar--main .pill,
+.toolbar--main button,
+.toolbar--main a.button-link,
+.toolbar--main .zoom-control {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 12px;
+}
+
+.toolbar--main .pill {
+  padding-inline: 10px;
+}
+
+.toolbar--main .zoom-control {
+  gap: 7px;
+}
+
+.toolbar--main .zoom-control input[type="range"] {
+  width: 96px;
+}
+
+.toolbar--main .zoom-value {
+  min-width: 38px;
 }
 
 .qh-calc-status {
@@ -2776,6 +2844,15 @@ a {
 
   .toolbar {
     flex-direction: column;
+  }
+
+  .toolbar-actions--main {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .main-toolbar-group {
+    justify-content: flex-start;
   }
 
   .sheet-shell,
