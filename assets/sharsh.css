@@ -1977,6 +1977,16 @@ a {
   background-image: linear-gradient(rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.02));
 }
 
+.sheet tbody tr.main-open-row {
+  cursor: pointer;
+}
+
+.sheet tbody tr.main-open-row .dept-cell {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.14em;
+}
+
 .sheet tbody tr.main-fresh-row td {
   box-shadow: inset 0 0 0 9999px rgba(31, 141, 73, 0.13);
 }

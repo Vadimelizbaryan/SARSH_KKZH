@@ -4478,8 +4478,15 @@
       ? " main-fresh-row"
       : "";
     const freshnessAttr = freshness ? ` data-row-freshness="${escapeHtml(freshness.level)}"` : "";
+    const departmentPath = viewMode === "main" && mode === "main"
+      ? appendShareQuery(config.getDepartmentPagePath(basePath, row.id))
+      : "";
+    const openRowClass = departmentPath ? " main-open-row" : "";
+    const openRowAttr = departmentPath
+      ? ` data-open-department-path="${escapeHtml(departmentPath)}"`
+      : "";
     return `
-      <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}${validationClass}" data-row-id="${row.id}"${freshnessAttr}${validationAttr}${validationTitle}>
+      <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}${validationClass}${openRowClass}" data-row-id="${row.id}"${freshnessAttr}${validationAttr}${validationTitle}${openRowAttr}>
         <td class="dept-cell" title="${escapeHtml(row.department)}">${renderResponsiveDepartmentName(row.department)}</td>
         ${config.columns.map((key) => renderDetailCell(snapshot, row, key, interactive, options)).join("")}
       </tr>
@@ -8919,6 +8926,34 @@
     if (mode === "department" && qhCalcApplyBtn) {
       qhCalcApplyBtn.addEventListener("click", () => {
         applyQhCalcToDepartment();
+      });
+    }
+
+    if (mode === "main" && sheetBody) {
+      sheetBody.addEventListener("click", (event) => {
+        if (event.defaultPrevented || event.button !== 0) {
+          return;
+        }
+
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        if (target.closest("a, button, input, textarea, select, label")) {
+          return;
+        }
+
+        const rowEl = target.closest("tr[data-open-department-path]");
+        if (!(rowEl instanceof HTMLTableRowElement)) {
+          return;
+        }
+
+        const departmentPath = rowEl.getAttribute("data-open-department-path") || "";
+        if (!departmentPath) {
+          return;
+        }
+
+        window.location.href = departmentPath;
       });
     }
 
