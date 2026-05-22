@@ -129,6 +129,67 @@
     { label: "Հաշվարկ", cells: leaveColumns.map((column) => ({ key: column.leaveKey, role: "output" })) }
   ];
 
+  const fields = [
+    { cell: 1, key: "beenTotal", group: "Եղել է", label: "ընդ." },
+    { cell: 2, key: "beenSoldier", group: "Եղել է", label: "զ/ծ" },
+    { cell: 3, key: "beenSeries", group: "Եղել է", label: "շարք" },
+    { cell: 4, key: "admittedTotal", group: "Ընդունվել է", label: "ընդ." },
+    { cell: 5, key: "admittedSoldier", group: "Ընդունվել է", label: "զ/ծ" },
+    { cell: 6, key: "admittedSeries", group: "Ընդունվել է", label: "շարք" },
+    { cell: 7, key: "dgTotal", group: "Դ/Գ", label: "ընդ." },
+    { cell: 8, key: "dgSoldier", group: "Դ/Գ", label: "զ/ծ" },
+    { cell: 9, key: "dgSeries", group: "Դ/Գ", label: "շարք" },
+    { cell: 10, key: "transferFromDepartment", group: "Տեղափոխ", label: "գնաց" },
+    { cell: 11, key: "transferToDepartment", group: "Տեղափոխ", label: "եկավ" },
+    { cell: 12, key: "presentTotal", group: "Հսկիչ", label: "հաշվ." },
+    { cell: 13, key: "currentShar", group: "Առկա է", label: "շարք" },
+    { cell: 14, key: "currentSpa", group: "Առկա է", label: "սպա" },
+    { cell: 15, key: "currentPaym", group: "Առկա է", label: "պայմ." },
+    { cell: 16, key: "currentZh", group: "Առկա է", label: "զ/հ" },
+    { cell: 17, key: "family", group: "Առկա է", label: "զ/ծ ընտ" },
+    { cell: 18, key: "officer", group: "Առկա է", label: "զ/պ" },
+    { cell: 19, key: "civil", group: "Առկա է", label: "քաղ." },
+    { cell: 20, key: "leaveSharq", group: "Արձակուրդ", label: "շարք" },
+    { cell: 21, key: "leaveSpa", group: "Արձակուրդ", label: "սպա" },
+    { cell: 22, key: "leavePaym", group: "Արձակուրդ", label: "պայմ." }
+  ];
+
+  const fieldByKey = Object.fromEntries(fields.map((field) => [field.key, field]));
+  const sectionDefinitions = [
+    {
+      title: "Եղել է",
+      note: "Բերվում է գլխավոր աղյուսակից և մնում է միայն դիտման համար։",
+      columns: 3,
+      keys: ["beenTotal", "beenSoldier", "beenSeries"]
+    },
+    {
+      title: "Ընդունվել է",
+      columns: 3,
+      keys: ["admittedTotal", "admittedSoldier", "admittedSeries"]
+    },
+    {
+      title: "Դ/Գ",
+      columns: 3,
+      keys: ["dgTotal", "dgSoldier", "dgSeries"]
+    },
+    {
+      title: "Տեղափոխ / Հսկիչ",
+      note: "12-րդ բջիջը վերահսկիչ հաշվարկն է և թարմացվում է ավտոմատ։",
+      columns: 3,
+      keys: ["transferFromDepartment", "transferToDepartment", "presentTotal"]
+    },
+    {
+      title: "Առկա է",
+      columns: 4,
+      keys: ["currentShar", "currentSpa", "currentPaym", "currentZh", "family", "officer", "civil"]
+    },
+    {
+      title: "Արձակուրդ",
+      columns: 3,
+      keys: ["leaveSharq", "leaveSpa", "leavePaym"]
+    }
+  ];
+
   const preservedQueryMap = {
     transferFromDepartment: "c10",
     transferToDepartment: "c11",
@@ -219,6 +280,13 @@
     const admittedMilitary = state.qhIncomingSoldier + state.qhIncomingOfficer + state.qhIncomingContract;
     const dischargedTotal = columns.reduce((sum, column) => sum + state[column.dischargedKey], 0);
     const dischargedMilitary = state.qhDischargedSoldier + state.qhDischargedOfficer + state.qhDischargedContract;
+    const presentExpected = (columns.reduce((sum, column) => sum + state[column.baseKey], 0)
+      + preserved.leaveSharq
+      + preserved.leaveSpa
+      + preserved.leavePaym
+      + admittedTotal
+      + preserved.transferToDepartment)
+      - (dischargedTotal + preserved.transferFromDepartment);
 
     const leaveRemaining = {
       sharq: preserved.leaveSharq + leaveState.leaveCalcSentSharq - leaveState.leaveCalcReturnedSharq,
@@ -248,6 +316,7 @@
         dgSeries: state.qhDischargedSoldier,
         transferFromDepartment: preserved.transferFromDepartment,
         transferToDepartment: preserved.transferToDepartment,
+        presentTotal: presentExpected,
         currentShar: leaveAdjustedPresent.sharq,
         currentSpa: leaveAdjustedPresent.spa,
         currentPaym: leaveAdjustedPresent.paym,
@@ -406,17 +475,98 @@
     `;
   }
 
-  function renderPreviewCard(title, items) {
+  function renderCombinedCalculator() {
     return `
-      <section class="tg-qh-preview-card">
-        <h3>${escapeHtml(title)}</h3>
-        <div class="tg-qh-preview-items">
-          ${items.map((item) => `
-            <div class="tg-qh-preview-item">
-              <span>${escapeHtml(item.label)}</span>
-              <strong data-preview-key="${escapeHtml(item.key)}">0</strong>
+      <section class="tg-sheet-section tg-sheet-section--wide">
+        <div class="tg-sheet-section-head">
+          <div>
+            <p class="tg-form-kicker">Հաշվարկային գործիքներ</p>
+            <p class="tg-sheet-section-note">Մուտքագրեք ընդունված, դուրս գրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը։ Սեղմեք «Հաշվել և տեղադրել», և տվյալները կտեղադրվեն ստորև եղած բջիջներում։</p>
+          </div>
+        </div>
+        <div class="tg-calc-grid">
+          <section class="tg-calc-card">
+            <div class="tg-sheet-section-head">
+              <div>
+                <p class="tg-form-kicker">Ընդունում/Դուրսգրում</p>
+              </div>
             </div>
-          `).join("")}
+            <div class="tg-form-table-wrap tg-qh-table-wrap">
+              <table class="tg-form-table tg-qh-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    ${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${editableRows.map(renderEditableRow).join("")}
+                  ${renderOutputRow()}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section class="tg-calc-card">
+            <div class="tg-sheet-section-head">
+              <div>
+                <p class="tg-form-kicker">Բուժական արձակուրդ</p>
+              </div>
+            </div>
+            <div class="tg-form-table-wrap tg-qh-table-wrap">
+              <table class="tg-form-table tg-qh-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    ${leaveColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${leaveRows.map(renderLeaveRow).join("")}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderFieldCard(field) {
+    const isControl = field.key === "presentTotal";
+    return `
+      <label class="tg-sheet-field is-readonly">
+        <span class="tg-sheet-field-top">
+          <span class="tg-sheet-field-index">${field.cell}</span>
+          <span class="tg-sheet-field-label">${escapeHtml(field.label)}</span>
+        </span>
+        <input
+          class="tg-form-input tg-sheet-field-input tg-form-input--readonly"
+          ${isControl ? 'data-control-total' : ""}
+          data-field="${escapeHtml(field.key)}"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          type="text"
+          autocomplete="off"
+          maxlength="4"
+          value="0"
+          readonly
+          aria-readonly="true"
+        >
+      </label>
+    `;
+  }
+
+  function renderSection(section) {
+    return `
+      <section class="tg-sheet-section${section.columns >= 4 ? " tg-sheet-section--wide" : ""}">
+        <div class="tg-sheet-section-head">
+          <div>
+            <p class="tg-form-kicker">${escapeHtml(section.title)}</p>
+            ${section.note ? `<p class="tg-sheet-section-note">${escapeHtml(section.note)}</p>` : ""}
+          </div>
+        </div>
+        <div class="tg-sheet-grid tg-sheet-grid--${section.columns}">
+          ${section.keys.map((key) => renderFieldCard(fieldByKey[key])).join("")}
         </div>
       </section>
     `;
@@ -454,92 +604,8 @@
 
         <form data-qh-form>
           <div class="tg-sheet-layout tg-sheet-layout--single">
-            <section class="tg-sheet-section tg-sheet-section--wide">
-              <div class="tg-sheet-section-head">
-                <div>
-                  <p class="tg-form-kicker">Ընդունում/Դուրսգրում</p>
-                  <p class="tg-sheet-section-note">Մուտքագրեք ընդունված, դուրս գրված և եղել է արժեքները։ Հաշվարկը կկատարվի ավտոմատ։</p>
-                </div>
-              </div>
-              <div class="tg-form-table-wrap tg-qh-table-wrap">
-                <table class="tg-form-table tg-qh-table">
-                  <thead>
-                    <tr>
-                      <th></th>
-                      ${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${editableRows.map(renderEditableRow).join("")}
-                    ${renderOutputRow()}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <section class="tg-sheet-section tg-sheet-section--wide">
-              <div class="tg-sheet-section-head">
-                <div>
-                  <p class="tg-form-kicker">Բուժական արձակուրդ</p>
-                  <p class="tg-sheet-section-note">Մուտքագրեք արձակուրդ գնացող և վերադարձած հիվանդների քանակը։ 13-15 և 20-22 բջիջների փոփոխությունը կհաշվարկվի ավտոմատ։</p>
-                </div>
-              </div>
-              <div class="tg-form-table-wrap tg-qh-table-wrap">
-                <table class="tg-form-table tg-qh-table">
-                  <thead>
-                    <tr>
-                      <th></th>
-                      ${leaveColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${leaveRows.map(renderLeaveRow).join("")}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <section class="tg-sheet-section tg-sheet-section--wide">
-              <div class="tg-sheet-section-head">
-                <div>
-                  <p class="tg-form-kicker">Կտեղադրվի գլխավոր աղյուսակում</p>
-                  <p class="tg-sheet-section-note">Ստուգելու համար այստեղ երևում է, թե ինչ արժեքներ կպահպանվեն բաժանմունքի տողում։</p>
-                </div>
-              </div>
-              <div class="tg-qh-preview">
-                <div class="tg-qh-preview-grid">
-                  ${renderPreviewCard("Եղել է (1-3)", [
-                    { label: "1", key: "beenTotal" },
-                    { label: "2", key: "beenSoldier" },
-                    { label: "3", key: "beenSeries" }
-                  ])}
-                  ${renderPreviewCard("Ընդունվել է (4-6)", [
-                    { label: "4", key: "admittedTotal" },
-                    { label: "5", key: "admittedSoldier" },
-                    { label: "6", key: "admittedSeries" }
-                  ])}
-                  ${renderPreviewCard("Դ/Գ (7-9)", [
-                    { label: "7", key: "dgTotal" },
-                    { label: "8", key: "dgSoldier" },
-                    { label: "9", key: "dgSeries" }
-                  ])}
-                  ${renderPreviewCard("Առկա է (13-19)", [
-                    { label: "13", key: "currentShar" },
-                    { label: "14", key: "currentSpa" },
-                    { label: "15", key: "currentPaym" },
-                    { label: "16", key: "currentZh" },
-                    { label: "17", key: "family" },
-                    { label: "18", key: "officer" },
-                    { label: "19", key: "civil" }
-                  ])}
-                  ${renderPreviewCard("Արձակուրդ (20-22)", [
-                    { label: "20", key: "leaveSharq" },
-                    { label: "21", key: "leaveSpa" },
-                    { label: "22", key: "leavePaym" }
-                  ])}
-                </div>
-              </div>
-            </section>
+            ${renderCombinedCalculator()}
+            ${sectionDefinitions.map((section) => renderSection(section)).join("")}
           </div>
 
           <div class="tg-form-status" data-status></div>
@@ -569,9 +635,9 @@
     });
 
     Object.entries(validation.finalValues).forEach(([key, value]) => {
-      const target = root.querySelector(`[data-preview-key="${key}"]`);
+      const target = root.querySelector(`[data-field="${key}"]`);
       if (target) {
-        target.textContent = String(value);
+        target.value = String(value);
       }
     });
 
