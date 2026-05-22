@@ -3931,7 +3931,10 @@
     });
   }
 
-  function applyQhCalcToDepartment() {
+  function applyQhCalcToDepartment(options = {}) {
+    const shouldRefresh = options.refresh !== false;
+    const shouldSave = options.save !== false;
+    const shouldAnnounce = options.announce !== false;
     const row = getCurrentRow();
     if (!row || !isQhCalcDepartment(row)) {
       return;
@@ -4010,15 +4013,24 @@
       row.values[column.dischargedKey] = 0;
     });
 
-    refreshTableData();
-    queueDepartmentSave();
-    setInfo("Հաշվարկային աղյուսակի արժեքները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
+    if (shouldRefresh) {
+      refreshTableData();
+    }
+    if (shouldSave) {
+      queueDepartmentSave();
+    }
+    if (shouldAnnounce) {
+      setInfo("Հաշվարկային աղյուսակի արժեքները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
+    }
   }
 
-  function applyLeaveCalcToDepartment() {
+  function applyLeaveCalcToDepartment(options = {}) {
+    const shouldRefresh = options.refresh !== false;
+    const shouldSave = options.save !== false;
+    const shouldAnnounce = options.announce !== false;
     const row = getCurrentRow();
     if (!row) {
-      return;
+      return false;
     }
 
     const invalidColumns = LEAVE_CALC_COLUMNS.filter((column) =>
@@ -4027,7 +4039,7 @@
     );
     if (invalidColumns.length) {
       setInfo(`Բուժական արձակուրդի հաշվարկը չի կարող կիրառվել․ ${invalidColumns.map((column) => column.label).join(", ")} սյունակներում ստացվել է բացասական արժեք։`, true);
-      return;
+      return false;
     }
 
     LEAVE_CALC_COLUMNS.forEach((column) => {
@@ -4055,9 +4067,39 @@
       refreshQhCalcDisplay(row);
     }
 
+    if (shouldRefresh) {
+      refreshTableData();
+    }
+    if (shouldSave) {
+      queueDepartmentSave();
+    }
+    if (shouldAnnounce) {
+      setInfo("Բուժական արձակուրդի հաշվարկը տեղափոխվել է հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
+    }
+    return true;
+  }
+
+  function applyDepartmentCombinedCalc() {
+    const row = getCurrentRow();
+    if (!row) {
+      return;
+    }
+
+    const originalValues = deepCopy(row.values);
+    if (isQhCalcDepartment(row)) {
+      applyQhCalcToDepartment({ refresh: false, save: false, announce: false });
+    }
+
+    const leaveApplied = applyLeaveCalcToDepartment({ refresh: false, save: false, announce: false });
+    if (!leaveApplied) {
+      row.values = originalValues;
+      refreshTableData();
+      return;
+    }
+
     refreshTableData();
     queueDepartmentSave();
-    setInfo("Բուժական արձակուրդի հաշվարկը տեղափոխվել է հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
+    setInfo("Հաշվարկները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
   }
 
   function getPhotoPreviewValue(row, key) {
@@ -6351,7 +6393,7 @@
     `;
   }
 
-  function renderQhCalcPanel(row) {
+  function renderQhCalcPanel(row, options = {}) {
     if (!isQhCalcDepartment(row)) {
       return "";
     }
@@ -6405,10 +6447,19 @@
       </tr>
     `).join("");
 
+    const isEmbedded = Boolean(options.embedded);
+    const panelClass = isEmbedded ? "department-calc-section department-calc-section--qh" : "panel qh-calc-panel";
+    const titleTag = isEmbedded ? "h3" : "h2";
+    const buttonHtml = options.showButton === false ? "" : `
+          <div class="qh-calc-actions">
+            <button type="button" id="qhCalcApplyBtn">Հաշվել և տեղադրել</button>
+          </div>
+    `;
+
     return `
-      <div class="panel qh-calc-panel">
-        <h2>Ընդունում/Դուրսգրում</h2>
-        <p>Մուտքագրեք ընդունված, դուրսգրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը, և հաշվարկները կկատարվեն ավտոմատ։ Սեղմեք «Հաշվել և տեղադրել» կոճակը․ տվյալները կտեղադրվեն բաժանմունքի սանդղակում, որից հետո սեղմեք «Պահպանել» կոճակը։</p>
+      <div class="${panelClass}">
+        <${titleTag}>Ընդունում/Դուրսգրում</${titleTag}>
+        ${isEmbedded ? "" : `<p>Մուտքագրեք ընդունված, դուրսգրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը, և հաշվարկները կկատարվեն ավտոմատ։ Սեղմեք «Հաշվել և տեղադրել» կոճակը․ տվյալները կտեղադրվեն բաժանմունքի սանդղակում, որից հետո սեղմեք «Պահպանել» կոճակը։</p>`}
         <div class="qh-calc-wrap" id="qhCalcPanel">
           <table class="qh-calc-table">
             <thead>
@@ -6417,7 +6468,7 @@
                 <th>ՇԱՐ</th>
                 <th>ՍՊԱ</th>
                 <th>ՊԱՅՄ</th>
-                <th>Զ/Հ</th>
+                <th>?/?</th>
                 <th>Զ/Ծ ընտ</th>
                 <th>Զ/Պ</th>
                 <th>Ք-ի</th>
@@ -6427,9 +6478,7 @@
               ${bodyRows}
             </tbody>
           </table>
-          <div class="qh-calc-actions">
-            <button type="button" id="qhCalcApplyBtn">Հաշվել և տեղադրել</button>
-          </div>
+          ${buttonHtml}
         </div>
       </div>
     `;
@@ -6499,6 +6548,21 @@
         </div>
 
         <div class="info-stack">
+          <div class="zoom-target">
+            <div class="sheet-shell">
+              <p class="status-line no-print">
+                <strong>Последняя отправка:</strong>
+                <span id="lastUpdatedText">${escapeHtml(rowFreshness.timestamp)}</span>
+                <span class="status-chip status-chip--${rowFreshness.level}" id="lastUpdatedBadge">${escapeHtml(rowFreshness.label)}</span>
+              </p>
+              <div class="table-wrap">
+                ${renderTable(state.snapshot, [row], { interactive: true, viewMode: "department" })}
+              </div>
+            </div>
+          </div>
+
+          ${renderPhotoImportPanel(row)}
+
           <div class="panel no-print">
             <h2>Синхронизация отделения</h2>
             <div class="meta-row">
@@ -6530,25 +6594,8 @@
             </div>
           </div>
 
-          ${renderPhotoImportPanel(row)}
-          <div class="department-calc-grid">
-            ${renderQhCalcPanel(row)}
-            ${renderLeaveCalcPanel(row)}
-          </div>
+          ${renderDepartmentCombinedCalcPanel(row)}
           ${renderTelegramFormReviewPanel(row)}
-
-          <div class="zoom-target">
-            <div class="sheet-shell">
-              <p class="status-line no-print">
-                <strong>Последняя отправка:</strong>
-                <span id="lastUpdatedText">${escapeHtml(rowFreshness.timestamp)}</span>
-                <span class="status-chip status-chip--${rowFreshness.level}" id="lastUpdatedBadge">${escapeHtml(rowFreshness.label)}</span>
-              </p>
-              <div class="table-wrap">
-                ${renderTable(state.snapshot, [row], { interactive: true, viewMode: "department" })}
-              </div>
-            </div>
-          </div>
           ${renderDepartmentPdfArchivePanel(row)}
         </div>
         ${renderPhotoLightbox()}
@@ -6661,7 +6708,7 @@
     `;
   }
 
-  function renderLeaveCalcPanel(row) {
+  function renderLeaveCalcPanel(row, options = {}) {
     const bodyRows = [
       {
         label: "Ուղարկվել է բուժ․ արձակուրդ",
@@ -6726,9 +6773,18 @@
       </tr>
     `).join("");
 
+    const isEmbedded = Boolean(options.embedded);
+    const panelClass = isEmbedded ? "department-calc-section department-calc-section--leave" : "panel qh-calc-panel";
+    const titleTag = isEmbedded ? "h3" : "h2";
+    const buttonHtml = options.showButton === false ? "" : `
+          <div class="qh-calc-actions">
+            <button type="button" id="leaveCalcApplyBtn">Հաշվել և տեղադրել</button>
+          </div>
+    `;
+
     return `
-      <div class="panel qh-calc-panel">
-        <h2>Բուժական արձակուրդ</h2>
+      <div class="${panelClass}">
+        <${titleTag}>Բուժական արձակուրդ</${titleTag}>
         <div class="qh-calc-wrap" id="leaveCalcPanel">
           <table class="qh-calc-table">
             <thead>
@@ -6742,9 +6798,28 @@
             </tbody>
           </table>
           <div id="leaveCalcStatus" class="qh-calc-status"></div>
-          <div class="qh-calc-actions">
-            <button type="button" id="leaveCalcApplyBtn">Հաշվել և տեղադրել</button>
-          </div>
+          ${buttonHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDepartmentCombinedCalcPanel(row) {
+    const qhSection = renderQhCalcPanel(row, { embedded: true, showButton: false });
+    const leaveSection = renderLeaveCalcPanel(row, { embedded: true, showButton: false });
+    const introHtml = qhSection
+      ? `<p class="department-calc-intro">Մուտքագրեք ընդունված, դուրսգրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը, և հաշվարկները կկատարվեն ավտոմատ։ Սեղմեք «Հաշվել և տեղադրել» կոճակը, տվյալները կտեղադրվեն բաժանմունքի սանդղակում, որից հետո սեղմեք «Պահպանել» կոճակը։</p>`
+      : "";
+
+    return `
+      <div class="panel department-calc-combined-panel">
+        ${introHtml}
+        <div class="department-calc-grid">
+          ${qhSection}
+          ${leaveSection}
+        </div>
+        <div class="qh-calc-actions">
+          <button type="button" id="departmentCalcApplyBtn">Հաշվել և տեղադրել</button>
         </div>
       </div>
     `;
@@ -9543,6 +9618,7 @@
     const sheetBody = document.getElementById("sheetBody");
     const qhCalcPanel = document.getElementById("qhCalcPanel");
     const qhCalcApplyBtn = document.getElementById("qhCalcApplyBtn");
+    const departmentCalcApplyBtn = document.getElementById("departmentCalcApplyBtn");
 
     bindUpdateAudioUnlock();
 
@@ -9982,6 +10058,12 @@
     if (mode === "department" && leaveCalcApplyBtn) {
       leaveCalcApplyBtn.addEventListener("click", () => {
         applyLeaveCalcToDepartment();
+      });
+    }
+
+    if (mode === "department" && departmentCalcApplyBtn) {
+      departmentCalcApplyBtn.addEventListener("click", () => {
+        applyDepartmentCombinedCalc();
       });
     }
 
