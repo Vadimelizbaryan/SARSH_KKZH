@@ -246,7 +246,7 @@
     const checks = [
       {
         id: "present-balance",
-        name: "Հսկիչ 13-22",
+        name: "Առկա է",
         ruleText: "13-22 = (1 + 4 + 11) - (7 + 10)",
         actual: presentActual,
         expected: presentExpected,
@@ -259,7 +259,7 @@
       const soldierExpected = values.currentShar + values.leaveSharq;
       checks.push({
         id: "soldier-count",
-        name: "Ժամկետայինների քանակ",
+        name: "Շարքայիններ",
         ruleText: "(3 + 6) - 9 = 13 + 20",
         actual: soldierActual,
         expected: soldierExpected,
@@ -275,7 +275,7 @@
         + values.leavePaym;
       checks.push({
         id: "military-count",
-        name: "Զինծառայողների քանակ",
+        name: "Զինծառայողներ",
         ruleText: "(2 + 5) - 8 = 13 + 14 + 15 + 20 + 21 + 22",
         actual: militaryActual,
         expected: militaryExpected,
@@ -304,7 +304,6 @@
         <th scope="row" class="tg-qh-row-title">${escapeHtml(row.label)}</th>
         ${row.cells.map((cell) => `
           <td class="tg-qh-cell">
-            <span class="tg-qh-marker">${escapeHtml(cell.marker)}</span>
             <input
               class="tg-form-input tg-qh-input"
               data-qh-key="${escapeHtml(cell.key)}"
@@ -324,10 +323,9 @@
   function renderOutputRow() {
     return `
       <tr class="tg-qh-output-row">
-        <th scope="row" class="tg-qh-row-title">Մնացել է</th>
+        <th scope="row" class="tg-qh-row-title">Հաշվարկ</th>
         ${outputCells.map((cell) => `
           <td class="tg-qh-cell tg-qh-cell--output">
-            <span class="tg-qh-marker">${escapeHtml(cell.marker)}</span>
             <span class="tg-form-control-value tg-qh-output" data-qh-output="${escapeHtml(cell.key)}">0</span>
           </td>
         `).join("")}
@@ -373,7 +371,7 @@
         <header class="tg-form-head">
           <div>
             <p class="tg-form-kicker">${escapeHtml(department.marker || department.id)}</p>
-            <h1 class="tg-form-title">${escapeHtml(department.department)} — հաշվարկային աղյուսակ</h1>
+            <h1 class="tg-form-title">${escapeHtml(department.department)}</h1>
           </div>
           <div class="tg-form-meta">
             <span class="tg-form-pill">Ամսաթիվ: ${escapeHtml(getReportDate())}</span>
@@ -381,68 +379,74 @@
           </div>
         </header>
 
-        <p class="tg-form-muted">
-          O-U սյունակները լռելյայն վերցված են գլխավոր աղյուսակի 13-19 բջիջներից։
-          A-N լրացրեք ձեռքով, իսկ V-AB հաշվարկվում են ավտոմատ։
-        </p>
-
         <form data-qh-form>
-          <div class="tg-form-table-wrap tg-qh-table-wrap">
-            <table class="tg-form-table tg-qh-table">
-              <thead>
-                <tr>
-                  <th></th>
-                  ${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
-                </tr>
-              </thead>
-              <tbody>
-                ${editableRows.map(renderEditableRow).join("")}
-                ${renderOutputRow()}
-              </tbody>
-            </table>
-          </div>
+          <div class="tg-sheet-layout tg-sheet-layout--single">
+            <section class="tg-sheet-section tg-sheet-section--wide">
+              <div class="tg-sheet-section-head">
+                <div>
+                  <p class="tg-form-kicker">Ընդունում/Դուրսգրում</p>
+                  <p class="tg-sheet-section-note">Մուտքագրեք ընդունված, դուրս գրված և եղել է արժեքները։ Հաշվարկը կկատարվի ավտոմատ։</p>
+                </div>
+              </div>
+              <div class="tg-form-table-wrap tg-qh-table-wrap">
+                <table class="tg-form-table tg-qh-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      ${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${editableRows.map(renderEditableRow).join("")}
+                    ${renderOutputRow()}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
-          <div class="tg-qh-formulas">
-            ${columns.map((column) => (
-              `<span>${escapeHtml(`${column.outputMarker} = (${column.baseMarker} + ${column.incomingMarker}) - ${column.dischargedMarker}`)}</span>`
-            )).join("")}
+            <section class="tg-sheet-section tg-sheet-section--wide">
+              <div class="tg-sheet-section-head">
+                <div>
+                  <p class="tg-form-kicker">Կտեղադրվի գլխավոր աղյուսակում</p>
+                  <p class="tg-sheet-section-note">Ստուգելու համար այստեղ երևում է, թե ինչ արժեքներ կպահպանվեն բաժանմունքի տողում։</p>
+                </div>
+              </div>
+              <div class="tg-qh-preview">
+                <div class="tg-qh-preview-grid">
+                  ${renderPreviewCard("Եղել է (1-3)", [
+                    { label: "1", key: "beenTotal" },
+                    { label: "2", key: "beenSoldier" },
+                    { label: "3", key: "beenSeries" }
+                  ])}
+                  ${renderPreviewCard("Ընդունվել է (4-6)", [
+                    { label: "4", key: "admittedTotal" },
+                    { label: "5", key: "admittedSoldier" },
+                    { label: "6", key: "admittedSeries" }
+                  ])}
+                  ${renderPreviewCard("Դ/Գ (7-9)", [
+                    { label: "7", key: "dgTotal" },
+                    { label: "8", key: "dgSoldier" },
+                    { label: "9", key: "dgSeries" }
+                  ])}
+                  ${renderPreviewCard("Առկա է (13-19)", [
+                    { label: "13", key: "currentShar" },
+                    { label: "14", key: "currentSpa" },
+                    { label: "15", key: "currentPaym" },
+                    { label: "16", key: "currentZh" },
+                    { label: "17", key: "family" },
+                    { label: "18", key: "officer" },
+                    { label: "19", key: "civil" }
+                  ])}
+                </div>
+              </div>
+            </section>
           </div>
-
-          <section class="tg-qh-preview">
-            <h2>Կպահպանվի գլխավոր աղյուսակում</h2>
-            <div class="tg-qh-preview-grid">
-              ${renderPreviewCard("Եղել է (1-3)", [
-                { label: "1", key: "beenTotal" },
-                { label: "2", key: "beenSoldier" },
-                { label: "3", key: "beenSeries" }
-              ])}
-              ${renderPreviewCard("Ընդունվել է (4-6)", [
-                { label: "4", key: "admittedTotal" },
-                { label: "5", key: "admittedSoldier" },
-                { label: "6", key: "admittedSeries" }
-              ])}
-              ${renderPreviewCard("Դ/Գ (7-9)", [
-                { label: "7", key: "dgTotal" },
-                { label: "8", key: "dgSoldier" },
-                { label: "9", key: "dgSeries" }
-              ])}
-              ${renderPreviewCard("Առկա է (13-19)", [
-                { label: "13", key: "currentShar" },
-                { label: "14", key: "currentSpa" },
-                { label: "15", key: "currentPaym" },
-                { label: "16", key: "currentZh" },
-                { label: "17", key: "family" },
-                { label: "18", key: "officer" },
-                { label: "19", key: "civil" }
-              ])}
-            </div>
-          </section>
 
           <div class="tg-form-status" data-status></div>
           <div class="tg-form-actions">
-            <button class="tg-form-submit" data-submit type="submit">Ուղարկել ստուգման</button>
+            <button class="tg-form-submit" data-submit type="submit">Ստուգել և ուղարկել</button>
             <div class="tg-form-message${getInitData() ? "" : " error"}" data-message>
-              ${getInitData() ? "Ստուգեք հաշվարկը և ուղարկեք ձևը գլխավոր աղյուսակ գրանցելու համար։" : "Բացեք ձևը Telegram բոտի կոճակով։"}
+              ${getInitData() ? "Ստուգեք հաշվարկը և ուղարկեք ձևը գլխավոր աղյուսակ պահպանելու համար։" : "Բացեք ձևը Telegram բոտի կոճակով։"}
             </div>
           </div>
         </form>
@@ -473,15 +477,28 @@
 
     const status = root.querySelector("[data-status]");
     if (status) {
-      const lines = [];
-      if (validation.hasNegativeRemaining) {
-        lines.push("V-AB սյունակներում չի կարող բացասական արժեք լինել։ Ստուգեք A-N և O-U արժեքները։");
-      }
-      validation.checks.forEach((check) => {
-        lines.push(`${check.isValid ? "✓" : "✕"} ${check.name}: ${check.actual} ${check.isValid ? "=" : "≠"} ${check.expected} (${check.ruleText})`);
-      });
       status.className = `tg-form-status${validation.isValid ? "" : " bad"}`;
-      status.innerHTML = lines.map((line) => `<div>${escapeHtml(line)}</div>`).join("");
+      status.innerHTML = `
+        <div class="tg-form-status-head">
+          <strong>${validation.isValid ? "Բոլոր վերահսկիչները համընկնում են" : "Ստուգեք հաշվարկը"}</strong>
+          <span>${escapeHtml(validation.hasNegativeRemaining
+            ? "Հաշվարկում բացասական արժեք կա։"
+            : "Արժեքները կհամեմատվեն գլխավոր աղյուսակի վերահսկիչների հետ։")}</span>
+        </div>
+        <div class="tg-validation-list">
+          ${validation.hasNegativeRemaining
+            ? `<div class="tg-validation-item is-bad"><span class="tg-validation-bullet">!</span><span>${escapeHtml("Հաշվարկի արդյունքում բացասական արժեք ստացվեց։ Ստուգեք մուտքային և ելքային արժեքները։")}</span></div>`
+            : ""}
+          ${validation.checks.map((check) => `
+            <div class="tg-validation-item${check.isValid ? "" : " is-bad"}">
+              <span class="tg-validation-bullet">${check.isValid ? "✓" : "!"}</span>
+              <span>${escapeHtml(check.isValid
+                ? `${check.name}: ${check.actual} = ${check.expected}`
+                : `${check.name}: հիմա ${check.actual}, պետք է ${check.expected}`)}</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
     }
 
     const submit = root.querySelector("[data-submit]");
@@ -525,11 +542,11 @@
     const message = root.querySelector("[data-message]");
     if (submit) {
       submit.disabled = true;
-      submit.textContent = "Ուղարկվում է...";
+      submit.textContent = "Ստուգվում է...";
     }
     if (message) {
       message.className = "tg-form-message";
-      message.textContent = "Պահպանում եմ հաշվարկային աղյուսակի տվյալները...";
+      message.textContent = "Ստուգում եմ և պահպանում հաշվարկի տվյալները...";
     }
 
     try {
@@ -566,7 +583,7 @@
       }
       if (submit) {
         submit.disabled = false;
-        submit.textContent = "Ուղարկել ստուգման";
+        submit.textContent = "Ստուգել և ուղարկել";
       }
     }
   }

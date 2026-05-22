@@ -85,6 +85,113 @@ input {
   color: var(--tg-muted);
 }
 
+.tg-sheet-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tg-sheet-layout--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tg-sheet-section {
+  border: 1px solid rgba(15, 139, 76, 0.14);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(255, 222, 139, 0.12), rgba(255, 255, 255, 0.94)),
+    #fffdf8;
+  padding: 12px;
+}
+
+.tg-sheet-section--wide {
+  grid-column: 1 / -1;
+}
+
+.tg-sheet-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tg-sheet-section-note {
+  margin: 0;
+  color: var(--tg-muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tg-sheet-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.tg-sheet-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tg-sheet-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.tg-sheet-field {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(216, 203, 179, 0.85);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.tg-sheet-field.is-readonly {
+  background: #f7f2e9;
+}
+
+.tg-sheet-field-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tg-sheet-field-index {
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 999px;
+  background: rgba(31, 42, 36, 0.08);
+  color: #4b5d53;
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-sheet-field-label {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.tg-sheet-field-input,
+.tg-sheet-field-value {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 14px;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.tg-sheet-field-value {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(31, 42, 36, 0.18);
+  background: #f3efe7;
+  color: var(--tg-ink);
+}
+
 .tg-form-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--tg-line);
@@ -158,6 +265,17 @@ input {
   border-color: var(--tg-accent);
 }
 
+.tg-sheet-field .tg-form-input,
+.tg-sheet-field .tg-sheet-field-value {
+  min-height: 44px;
+  border-radius: 14px;
+  font-size: 24px;
+}
+
+.tg-sheet-field .tg-form-input {
+  padding: 0 6px;
+}
+
 .tg-form-input--readonly {
   background: #f3efe7;
   color: var(--tg-muted);
@@ -184,6 +302,15 @@ input {
   background:
     linear-gradient(135deg, rgba(255, 222, 139, 0.22), rgba(255, 255, 255, 0.92)),
     #fffdf8;
+}
+
+.tg-patient-notes-summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.tg-patient-notes-summary::-webkit-details-marker {
+  display: none;
 }
 
 .tg-patient-notes-head {
@@ -317,6 +444,52 @@ input {
   border: 1px solid rgba(15, 139, 76, 0.22);
   font-size: 14px;
   font-weight: 800;
+}
+
+.tg-form-status-head {
+  display: grid;
+  gap: 4px;
+}
+
+.tg-form-status-head strong {
+  font-size: 15px;
+}
+
+.tg-form-status-head span,
+.tg-validation-note {
+  color: var(--tg-muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tg-validation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tg-validation-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.tg-validation-bullet {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(15, 139, 76, 0.14);
+  color: var(--tg-accent);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-validation-item.is-bad .tg-validation-bullet {
+  background: rgba(185, 45, 32, 0.14);
+  color: var(--tg-danger);
 }
 
 .tg-form-status.bad {
@@ -753,40 +926,23 @@ input {
 }
 
 .tg-qh-table {
-  min-width: 1400px;
+  min-width: 920px;
 }
 
 .tg-qh-row-title {
-  min-width: 190px;
+  min-width: 150px;
   text-align: left;
   padding-left: 12px !important;
 }
 
 .tg-qh-cell {
-  position: relative;
-  min-width: 140px;
-}
-
-.tg-qh-marker {
-  position: absolute;
-  top: 6px;
-  left: 8px;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: rgba(31, 42, 36, 0.08);
-  color: #4b5d53;
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-  font-weight: 900;
+  min-width: 96px;
 }
 
 .tg-qh-input,
 .tg-qh-output {
-  min-height: 64px;
-  padding-top: 18px;
-  font-size: 24px;
+  min-height: 48px;
+  font-size: 20px;
 }
 
 .tg-qh-cell--output .tg-qh-output {
@@ -815,17 +971,7 @@ input {
 }
 
 .tg-qh-preview {
-  padding: 12px;
-  border: 1px solid rgba(15, 139, 76, 0.16);
-  border-radius: 20px;
-  background:
-    linear-gradient(135deg, rgba(255, 222, 139, 0.18), rgba(255, 255, 255, 0.9)),
-    #fffdf8;
-}
-
-.tg-qh-preview h2 {
-  margin: 0 0 10px;
-  font-size: clamp(18px, 4vw, 24px);
+  padding: 0;
 }
 
 .tg-qh-preview-grid {
@@ -880,6 +1026,12 @@ input {
     padding: 10px;
   }
 
+  .tg-sheet-layout,
+  .tg-sheet-grid--3,
+  .tg-sheet-grid--4 {
+    grid-template-columns: 1fr;
+  }
+
   .tg-form-table {
     min-width: 1120px;
   }
@@ -896,6 +1048,12 @@ input {
     font-size: 13px;
   }
 
+  .tg-sheet-field .tg-form-input,
+  .tg-sheet-field .tg-sheet-field-value {
+    min-height: 40px;
+    font-size: 22px;
+  }
+
   .tg-patient-notes {
     padding: 10px;
   }
@@ -910,21 +1068,21 @@ input {
   }
 
   .tg-qh-table {
-    min-width: 1180px;
+    min-width: 840px;
   }
 
   .tg-qh-row-title {
-    min-width: 150px;
+    min-width: 132px;
   }
 
   .tg-qh-cell {
-    min-width: 120px;
+    min-width: 92px;
   }
 
   .tg-qh-input,
   .tg-qh-output {
-    min-height: 58px;
-    font-size: 20px;
+    min-height: 44px;
+    font-size: 18px;
   }
 
   .tg-qh-preview-grid {

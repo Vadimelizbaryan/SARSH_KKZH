@@ -71,14 +71,40 @@
     "leavePaym"
   ];
 
-  const groupSpans = [
-    { title: "Եղել է", span: 3 },
-    { title: "Ընդունվել է", span: 3 },
-    { title: "Դ/Գ", span: 3 },
-    { title: "Տեղափոխ", span: 2 },
-    { title: "Հսկիչ", span: 1 },
-    { title: "Առկա է", span: 7 },
-    { title: "Արձակուրդ", span: 3 }
+  const fieldByKey = Object.fromEntries(fields.map((field) => [field.key, field]));
+  const sectionDefinitions = [
+    {
+      title: "Եղել է",
+      note: "Բերվում է գլխավոր աղյուսակից և մնում է միայն կարդալու համար։",
+      columns: 3,
+      keys: ["beenTotal", "beenSoldier", "beenSeries"]
+    },
+    {
+      title: "Ընդունվել է",
+      columns: 3,
+      keys: ["admittedTotal", "admittedSoldier", "admittedSeries"]
+    },
+    {
+      title: "Դ/Գ",
+      columns: 3,
+      keys: ["dgTotal", "dgSoldier", "dgSeries"]
+    },
+    {
+      title: "Տեղափոխ / Հսկիչ",
+      note: "12-րդ բջիջը վերահսկիչ հաշվարկն է և թարմացվում է ավտոմատ։",
+      columns: 3,
+      keys: ["transferFromDepartment", "transferToDepartment", "presentTotal"]
+    },
+    {
+      title: "Առկա է",
+      columns: 4,
+      keys: ["currentShar", "currentSpa", "currentPaym", "currentZh", "family", "officer", "civil"]
+    },
+    {
+      title: "Արձակուրդ",
+      columns: 3,
+      keys: ["leaveSharq", "leaveSpa", "leavePaym"]
+    }
   ];
 
   const patientNoteSections = [
@@ -275,6 +301,107 @@
     return values;
   }
 
+  function renderPatientNotesMobileBlock(department, reportDate) {
+    const notes = loadPatientNotes(department, reportDate);
+    const filledCount = countPatientNotes(notes);
+    const sections = patientNoteSections.map((section) => {
+      const rows = notes[section.key] || [];
+      const inputs = Array.from({ length: section.rows }, (_, index) => `
+        <label class="tg-patient-note-row">
+          <span>${index + 1}.</span>
+          <input
+            class="tg-patient-note-input"
+            data-patient-note-input
+            data-note-section="${escapeHtml(section.key)}"
+            data-note-index="${index}"
+            type="text"
+            autocomplete="off"
+            placeholder="Ա.Ա.Հ."
+            value="${escapeHtml(rows[index] || "")}"
+          >
+        </label>
+      `).join("");
+
+      return `
+        <section class="tg-patient-note-section">
+          <h3>${escapeHtml(section.title)}</h3>
+          <div class="tg-patient-note-lines">${inputs}</div>
+        </section>
+      `;
+    }).join("");
+
+    return `
+      <details class="tg-patient-notes" data-patient-notes>
+        <summary class="tg-patient-notes-summary">
+          <div class="tg-patient-notes-head">
+            <div>
+              <p class="tg-form-kicker">ՏԵՂԱՅԻՆ ԳՐԱՌՈՒՄՆԵՐ</p>
+              <h2>Հիվանդների գրառումներ</h2>
+            </div>
+            <span class="tg-patient-notes-badge" data-patient-notes-badge>
+              ${filledCount ? `Լրացված է ${filledCount}` : "Տեղային գրառում չկա"}
+            </span>
+          </div>
+        </summary>
+        <p class="tg-patient-notes-help">
+          Այս մասը պահվում է այս սարքում և ուղարկվելիս կտեղադրվի PDF բլանկում։
+        </p>
+        <div class="tg-patient-notes-grid">${sections}</div>
+        <div class="tg-patient-notes-actions">
+          <button type="button" class="tg-patient-notes-save" data-save-patient-notes>Պահպանել տեղում</button>
+          <button type="button" class="tg-patient-notes-clear" data-clear-patient-notes>Մաքրել գրառումները</button>
+          <span data-patient-notes-status>Պահվում է այս սարքում և ուղարկվելիս կտեղադրվի PDF բլանկում։</span>
+        </div>
+      </details>
+    `;
+  }
+
+  function renderFieldCard(field) {
+    const isControl = field.key === "presentTotal";
+    const isReadOnly = isControl || readOnlyKeys.has(field.key);
+    const controlHtml = isControl
+      ? '<span class="tg-sheet-field-value" data-control-total>0</span>'
+      : `
+        <input
+          class="tg-form-input tg-sheet-field-input${isReadOnly ? " tg-form-input--readonly" : ""}"
+          data-field="${escapeHtml(field.key)}"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          type="text"
+          autocomplete="off"
+          maxlength="3"
+          value="${getInitialValue(field.key)}"
+          ${isReadOnly ? 'readonly aria-readonly="true" title="Ստացվել է գլխավոր աղյուսակից"' : ""}
+        >
+      `;
+
+    return `
+      <label class="tg-sheet-field${isReadOnly ? " is-readonly" : ""}">
+        <span class="tg-sheet-field-top">
+          <span class="tg-sheet-field-index">${field.cell}</span>
+          <span class="tg-sheet-field-label">${escapeHtml(field.label)}</span>
+        </span>
+        ${controlHtml}
+      </label>
+    `;
+  }
+
+  function renderSection(section) {
+    return `
+      <section class="tg-sheet-section${section.columns >= 4 ? " tg-sheet-section--wide" : ""}">
+        <div class="tg-sheet-section-head">
+          <div>
+            <p class="tg-form-kicker">${escapeHtml(section.title)}</p>
+            ${section.note ? `<p class="tg-sheet-section-note">${escapeHtml(section.note)}</p>` : ""}
+          </div>
+        </div>
+        <div class="tg-sheet-grid tg-sheet-grid--${section.columns}">
+          ${section.keys.map((key) => renderFieldCard(fieldByKey[key])).join("")}
+        </div>
+      </section>
+    `;
+  }
+
   function getExpected(values) {
     return (values.beenTotal + values.admittedTotal + values.transferToDepartment)
       - (values.dgTotal + values.transferFromDepartment);
@@ -294,7 +421,7 @@
     const expected = getExpected(values);
     checks.push({
       id: "present-balance",
-      name: "Контроль 13-22",
+      name: "Առկա է",
       ruleText: "13-22 = (1 + 4 + 11) - (7 + 10)",
       actual,
       expected,
@@ -306,7 +433,7 @@
       const soldierExpected = values.currentShar + values.leaveSharq;
       checks.push({
         id: "soldier-count",
-        name: "Количество срочников",
+        name: "Շարքայիններ",
         ruleText: "(3 + 6) - 9 = 13 + 20",
         actual: soldierActual,
         expected: soldierExpected,
@@ -322,7 +449,7 @@
         + values.leavePaym;
       checks.push({
         id: "military-count",
-        name: "Количество военнослужащих",
+        name: "Զինծառայողներ",
         ruleText: "(2 + 5) - 8 = 13 + 14 + 15 + 20 + 21 + 22",
         actual: militaryActual,
         expected: militaryExpected,
@@ -343,8 +470,8 @@
 
   function formatValidationLine(check) {
     return check.isValid
-      ? `- ${check.name}: ${check.actual} = ${check.expected} (${check.ruleText})`
-      : `- ${check.name}: ${check.actual}, должно быть ${check.expected} (${check.ruleText})`;
+      ? `${check.name}: ${check.actual} = ${check.expected}`
+      : `${check.name}: հիմա ${check.actual}, պետք է ${check.expected}`;
   }
 
   function isUsingCopiedValues(values) {
@@ -368,18 +495,26 @@
     if (status) {
       status.classList.toggle("bad", !validation.isValid);
       status.innerHTML = getInitData()
-        ? [
-          `<div>${escapeHtml("Ячейки 1-22 скопированы из основной таблицы.")}</div>`,
-          `<div>${escapeHtml(copiedState
-            ? "Ячейка 12 сейчас показывает скопированное значение из сайта."
-            : "Ячейка 12 сейчас показывает расчётный контроль по текущему вводу.")}</div>`,
-          `<div>${validation.isValid ? "Контрольные суммы совпали." : "Контрольные суммы не совпали."}</div>`,
-          ...validation.checks.map((check) => `<div>${escapeHtml(formatValidationLine(check))}</div>`),
-          !shouldCheckExtraControls(values)
-            ? `<div>${escapeHtml("Проверки «Количество срочников» и «Количество военнослужащих» включаются, когда в ячейках 10 и 11 стоит 0.")}</div>`
-            : ""
-        ].filter(Boolean).join("")
-        : `<div>${escapeHtml("Откройте форму через кнопку бота в Telegram.")}</div>`;
+        ? `
+          <div class="tg-form-status-head">
+            <strong>${validation.isValid ? "Բոլոր վերահսկիչները համընկնում են" : "Ստուգեք վերահսկիչ գումարները"}</strong>
+            <span>${escapeHtml(copiedState
+              ? "Բոլոր բջիջները բերվել են գլխավոր աղյուսակից։"
+              : "Փոփոխված տվյալները ստուգվում են ընթացիկ մուտքի հիման վրա։")}</span>
+          </div>
+          <div class="tg-validation-list">
+            ${validation.checks.map((check) => `
+              <div class="tg-validation-item${check.isValid ? "" : " is-bad"}">
+                <span class="tg-validation-bullet">${check.isValid ? "✓" : "!"}</span>
+                <span>${escapeHtml(formatValidationLine(check))}</span>
+              </div>
+            `).join("")}
+            ${!shouldCheckExtraControls(values)
+              ? `<div class="tg-validation-note">${escapeHtml("«Շարքայիններ» և «Զինծառայողներ» ստուգումները միանում են, երբ 10 և 11 բջիջներում արժեքը 0 է։")}</div>`
+              : ""}
+          </div>
+        `
+        : `<div class="tg-form-status-head"><strong>${escapeHtml("Բացեք ձևը Telegram բոտի կոճակով։")}</strong></div>`;
     }
     if (submit) {
       submit.disabled = !validation.isValid || !getInitData();
@@ -417,7 +552,7 @@
     }
     if (message) {
       message.className = "tg-form-message";
-      message.textContent = "Проверяю и отправляю данные...";
+      message.textContent = "Ստուգում եմ և ուղարկում տվյալները...";
     }
 
     try {
@@ -434,27 +569,27 @@
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload || payload.ok !== true) {
-        throw new Error(payload && payload.error ? payload.error : "Не удалось отправить форму.");
+        throw new Error(payload && payload.error ? payload.error : "Չհաջողվեց ուղարկել ձևը։");
       }
       if (message) {
         message.className = "tg-form-message success";
-        message.textContent = "Спасибо. Данные проверены и сохранены в общую таблицу.";
+        message.textContent = "Տվյալները ստուգվել են և պահպանվել գլխավոր աղյուսակում։";
       }
       if (telegram) {
         telegram.HapticFeedback && telegram.HapticFeedback.notificationOccurred("success");
-        telegram.MainButton && telegram.MainButton.setText("Закрыть").show().onClick(() => telegram.close());
+        telegram.MainButton && telegram.MainButton.setText("Փակել").show().onClick(() => telegram.close());
       }
     } catch (error) {
       if (message) {
         message.className = "tg-form-message error";
-        message.textContent = error instanceof Error ? error.message : "Не удалось отправить форму.";
+        message.textContent = error instanceof Error ? error.message : "Չհաջողվեց ուղարկել ձևը։";
       }
       if (telegram && telegram.HapticFeedback) {
         telegram.HapticFeedback.notificationOccurred("error");
       }
       if (submit) {
         submit.disabled = false;
-        submit.textContent = "Отправить на проверку";
+        submit.textContent = "Ստուգել և ուղարկել";
       }
     }
   }
@@ -466,47 +601,12 @@
       root.innerHTML = `
         <section class="tg-form-card">
           <p class="tg-form-kicker">SARSH_KKZH</p>
-          <h1 class="tg-form-title">Отделение не найдено</h1>
-          <p class="tg-form-muted">Закройте окно и запросите форму у бота ещё раз.</p>
+          <h1 class="tg-form-title">Բաժանմունքը չի գտնվել</h1>
+          <p class="tg-form-muted">Փակեք պատուհանը և կրկին բացեք ձևը Telegram բոտի կոճակով։</p>
         </section>
       `;
       return;
     }
-
-    const groupRow = groupSpans
-      .map((group) => `<th colspan="${group.span}">${escapeHtml(group.title)}</th>`)
-      .join("");
-    const labelRow = fields
-      .map((field) => `
-        <th>
-          <span class="tg-form-cell-number">${field.cell}</span>
-          <span class="tg-form-cell-label">${escapeHtml(field.label)}</span>
-        </th>
-      `)
-      .join("");
-    const inputRow = fields
-      .map((field) => {
-        if (field.key === "presentTotal") {
-          return '<td><span class="tg-form-control-value" data-control-total>0</span></td>';
-        }
-        const isReadOnly = readOnlyKeys.has(field.key);
-        return `
-          <td>
-            <input
-              class="tg-form-input${isReadOnly ? " tg-form-input--readonly" : ""}"
-              data-field="${escapeHtml(field.key)}"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              type="text"
-              autocomplete="off"
-              maxlength="3"
-              value="${getInitialValue(field.key)}"
-              ${isReadOnly ? 'readonly aria-readonly="true" title="Заполнено из основной таблицы"' : ""}
-            >
-          </td>
-        `;
-      })
-      .join("");
 
     root.innerHTML = `
       <section class="tg-form-card">
@@ -516,31 +616,23 @@
             <h1 class="tg-form-title">${escapeHtml(department.department)}</h1>
           </div>
           <div class="tg-form-meta">
-            <span class="tg-form-pill">Дата: ${escapeHtml(reportDate)}</span>
-            <span class="tg-form-pill">Форма Telegram</span>
+            <span class="tg-form-pill">Ամսաթիվ: ${escapeHtml(reportDate)}</span>
+            <span class="tg-form-pill">Telegram ձև</span>
           </div>
         </header>
 
         <form data-form>
-          <div class="tg-form-table-wrap" aria-label="Таблица отделения">
-            <table class="tg-form-table">
-              <thead>
-                <tr>${groupRow}</tr>
-                <tr>${labelRow}</tr>
-              </thead>
-              <tbody>
-                <tr>${inputRow}</tr>
-              </tbody>
-            </table>
+          <div class="tg-sheet-layout" aria-label="Բաժանմունքի ձև">
+            ${sectionDefinitions.map((section) => renderSection(section)).join("")}
           </div>
 
-          ${renderPatientNotesBlock(department, reportDate)}
+          ${renderPatientNotesMobileBlock(department, reportDate)}
 
           <div class="tg-form-status" data-status></div>
           <div class="tg-form-actions">
-            <button class="tg-form-submit" data-submit type="submit">Отправить на проверку</button>
+            <button class="tg-form-submit" data-submit type="submit">Ստուգել և ուղարկել</button>
             <div class="tg-form-message${getInitData() ? "" : " error"}" data-message>
-              ${getInitData() ? "Ячейки 1-22 скопированы из основной таблицы. Автопроверка включена. При изменении данных ячейка 12 становится расчетной." : "Откройте форму через кнопку бота в Telegram."}
+              ${getInitData() ? "Ձևը բացվել է գլխավոր աղյուսակից բերված տվյալներով։" : "Բացեք ձևը Telegram բոտի կոճակով։"}
             </div>
           </div>
         </form>
@@ -549,7 +641,7 @@
 
     const initialMessage = root.querySelector("[data-message]");
     if (initialMessage && getInitData()) {
-      initialMessage.textContent = "Ячейки 1-22 скопированы из основной таблицы. Автопроверка включена. Пока данные не меняли, ячейка 12 показывает копию из сайта. После изменения ввода ячейка 12 становится расчетной.";
+      initialMessage.textContent = "Բջիջները բերվել են գլխավոր աղյուսակից։ Փոփոխելուց հետո ստուգումը կթարմացվի ավտոմատ։";
     }
 
     root.querySelectorAll(".tg-form-input").forEach((input) => {
