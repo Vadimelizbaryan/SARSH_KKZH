@@ -3864,6 +3864,72 @@
       && row.photoName !== "telegram-web-app-form";
   }
 
+  function getDepartmentMainTableStateMeta(row, validation = null) {
+    if (!row) {
+      return {
+        tone: "none",
+        label: "",
+        title: ""
+      };
+    }
+
+    if (validation && validation.applicable && !validation.isValid) {
+      return {
+        tone: "control-error",
+        label: "Ошибка контрольных сумм",
+        title: "В строке есть ошибка контрольных сумм."
+      };
+    }
+
+    if (hasPendingTelegramPhotoUpdate(row)) {
+      return {
+        tone: "photo-pending",
+        label: "Новое фото, проверь OCR",
+        title: "Пришло новое фото из Telegram. Проверь OCR и сохрани строку отделения."
+      };
+    }
+
+    const freshness = getRowFreshnessMeta(row);
+    if (freshness.level === "warning" || freshness.level === "stale" || freshness.level === "missing") {
+      return {
+        tone: "waiting",
+        label: "Нет новых данных",
+        title: "За текущее окно новые данные ещё не отправлены."
+      };
+    }
+
+    const source = row && typeof row.lastUpdateSource === "string" && row.lastUpdateSource.trim()
+      ? row.lastUpdateSource.trim()
+      : (row && typeof row.photoWorkflowStatus === "string" ? row.photoWorkflowStatus.trim() : "");
+
+    if (source === "telegram-form" || source === "processed_telegram" || source === "photo" || source === "processed_photo") {
+      return {
+        tone: "auto",
+        label: "Обновлено автоматически",
+        title: "Строка обновилась автоматически из Telegram формы или фото."
+      };
+    }
+
+    if (
+      source === "site"
+      || source === "processed_site"
+      || source === "processed_night_shift"
+      || source === "processed_day_shift"
+    ) {
+      return {
+        tone: "manual",
+        label: "Обновлено вручную",
+        title: "Строка обновлена вручную пользователем."
+      };
+    }
+
+    return {
+      tone: "none",
+      label: "",
+      title: ""
+    };
+  }
+
   function getQhCalcColumnByKey(key) {
     return QH_CALC_COLUMNS.find((column) =>
       column.baseKey === key
@@ -5313,6 +5379,7 @@
   function renderDetailRow(snapshot, row, interactive, viewMode, options = null) {
     const freshness = viewMode === "main" ? getRowFreshnessMeta(row) : null;
     const validation = viewMode === "main" ? getDepartmentValidationStateForSnapshot(snapshot, row) : null;
+    const mainRowState = viewMode === "main" ? getDepartmentMainTableStateMeta(row, validation) : null;
     const validationClass = validation && validation.applicable && !validation.isValid ? " main-invalid-row" : "";
     const validationAttr = validation && validation.applicable
       ? ` data-row-validation="${validation.isValid ? "valid" : "invalid"}"`
@@ -5331,12 +5398,15 @@
     const openRowAttr = departmentPath
       ? ` data-open-department-path="${escapeHtml(departmentPath)}"`
       : "";
-    const pendingPhotoClass = viewMode === "main" && hasPendingTelegramPhotoUpdate(row)
-      ? " dept-cell--photo-pending"
+    const deptStateClass = mainRowState && mainRowState.tone !== "none"
+      ? ` dept-cell--state-${mainRowState.tone}`
       : "";
+    const deptTitle = mainRowState && mainRowState.title
+      ? `${row.department}\n${mainRowState.title}`
+      : row.department;
     return `
       <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}${validationClass}${openRowClass}" data-row-id="${row.id}"${freshnessAttr}${validationAttr}${validationTitle}${openRowAttr}>
-        <td class="dept-cell${pendingPhotoClass}" title="${escapeHtml(row.department)}">${renderResponsiveDepartmentName(row.department)}</td>
+        <td class="dept-cell${deptStateClass}" title="${escapeHtml(deptTitle)}">${renderResponsiveDepartmentName(row.department)}</td>
         ${config.columns.map((key) => renderDetailCell(snapshot, row, key, interactive, options)).join("")}
       </tr>
     `;
@@ -6195,6 +6265,13 @@
                 <span id="lastUpdatedText">${escapeHtml(freshnessStats.newestRow ? formatTimestamp(getRowEffectiveUpdatedAt(freshnessStats.newestRow)) : "еще не отправлялось")}</span>
                 <span class="status-chip status-chip--${summaryFreshness.level}" id="lastUpdatedBadge">${escapeHtml(summaryFreshness.label)}</span>
               </p>
+              <div class="main-table-state-legend no-print">
+                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--auto"></span>Авто</span>
+                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--manual"></span>Вручную</span>
+                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--waiting"></span>Нет новых данных</span>
+                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--pending"></span>Новые данные, проверь OCR</span>
+                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--invalid"></span>Ошибка контроля</span>
+              </div>
                 <div class="table-wrap">
                   ${renderTable(state.snapshot, state.snapshot.rows, { interactive: state.mainTableUnlocked, viewMode: "main" })}
                 </div>
@@ -7834,7 +7911,21 @@
           sheetRowEl.setAttribute("data-row-freshness", meta.level);
           const deptCellEl = sheetRowEl.querySelector(".dept-cell");
           if (deptCellEl) {
-            deptCellEl.classList.toggle("dept-cell--photo-pending", hasPendingTelegramPhotoUpdate(row));
+            const validation = mode === "main" ? getDepartmentValidationStateForSnapshot(state.snapshot, row) : null;
+            const mainRowState = mode === "main" ? getDepartmentMainTableStateMeta(row, validation) : null;
+            deptCellEl.classList.remove(
+              "dept-cell--state-auto",
+              "dept-cell--state-manual",
+              "dept-cell--state-waiting",
+              "dept-cell--state-photo-pending",
+              "dept-cell--state-control-error"
+            );
+            if (mainRowState && mainRowState.tone !== "none") {
+              deptCellEl.classList.add(`dept-cell--state-${mainRowState.tone}`);
+              deptCellEl.setAttribute("title", `${row.department}\n${mainRowState.title}`);
+            } else {
+              deptCellEl.setAttribute("title", row.department);
+            }
           }
           if (mode === "main") {
             const validation = getDepartmentValidationStateForSnapshot(state.snapshot, row);
