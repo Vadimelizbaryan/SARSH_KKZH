@@ -1244,8 +1244,18 @@ function getTelegramWebFormUrl(
     params.set("c20", String(carryoverValues.leaveSharq ?? 0));
     params.set("c21", String(carryoverValues.leaveSpa ?? 0));
     params.set("c22", String(carryoverValues.leavePaym ?? 0));
+    if (QH_CALC_DEPARTMENT_IDS.has(departmentId)) {
+      params.set("qg", String(carryoverValues.qhBaseSoldier ?? carryoverValues.currentShar ?? 0));
+      params.set("qh", String(carryoverValues.qhBaseOfficer ?? carryoverValues.currentSpa ?? 0));
+      params.set("qi", String(carryoverValues.qhBaseContract ?? carryoverValues.currentPaym ?? 0));
+      params.set("qj", String(carryoverValues.currentZh ?? 0));
+      params.set("qk", String(carryoverValues.family ?? 0));
+      params.set("ql", String(carryoverValues.officer ?? 0));
+      params.set("qm", String(carryoverValues.civil ?? 0));
+    }
   }
-  return `${getPublicSiteBaseUrl()}/tg-form.html?${params.toString()}`;
+  const formPath = QH_CALC_DEPARTMENT_IDS.has(departmentId) ? "tg-qh-form.html" : "tg-form.html";
+  return `${getPublicSiteBaseUrl()}/${formPath}?${params.toString()}`;
 }
 
 function getTelegramNightFormUrl(reportDateTime: string) {
@@ -5531,7 +5541,10 @@ function getTelegramWebFormCarryoverValues(values: Record<string, number | null>
     civil,
     leaveSharq,
     leaveSpa,
-    leavePaym
+    leavePaym,
+    qhBaseSoldier: safeNumber(values.qhBaseSoldier) || currentShar,
+    qhBaseOfficer: safeNumber(values.qhBaseOfficer) || currentSpa,
+    qhBaseContract: safeNumber(values.qhBaseContract) || currentPaym
   };
 }
 
@@ -5551,6 +5564,123 @@ function applyTelegramWebFormCarryoverValues(
   values.beenSoldier = carryoverValues.beenSoldier ?? 0;
   values.beenSeries = carryoverValues.beenSeries ?? 0;
   return values;
+}
+
+function sanitizeQhTelegramFormValues(values: unknown) {
+  const source = values && typeof values === "object" && !Array.isArray(values)
+    ? values as Record<string, unknown>
+    : {};
+  return {
+    qhIncomingSoldier: safeNumber(source.qhIncomingSoldier),
+    qhIncomingOfficer: safeNumber(source.qhIncomingOfficer),
+    qhIncomingContract: safeNumber(source.qhIncomingContract),
+    qhIncomingZh: safeNumber(source.qhIncomingZh),
+    qhIncomingFamily: safeNumber(source.qhIncomingFamily),
+    qhIncomingReserve: safeNumber(source.qhIncomingReserve),
+    qhIncomingCivil: safeNumber(source.qhIncomingCivil),
+    qhDischargedSoldier: safeNumber(source.qhDischargedSoldier),
+    qhDischargedOfficer: safeNumber(source.qhDischargedOfficer),
+    qhDischargedContract: safeNumber(source.qhDischargedContract),
+    qhDischargedZh: safeNumber(source.qhDischargedZh),
+    qhDischargedFamily: safeNumber(source.qhDischargedFamily),
+    qhDischargedReserve: safeNumber(source.qhDischargedReserve),
+    qhDischargedCivil: safeNumber(source.qhDischargedCivil),
+    qhBaseSoldier: safeNumber(source.qhBaseSoldier),
+    qhBaseOfficer: safeNumber(source.qhBaseOfficer),
+    qhBaseContract: safeNumber(source.qhBaseContract),
+    qhBaseZh: safeNumber(source.qhBaseZh),
+    qhBaseFamily: safeNumber(source.qhBaseFamily),
+    qhBaseReserve: safeNumber(source.qhBaseReserve),
+    qhBaseCivil: safeNumber(source.qhBaseCivil)
+  };
+}
+
+function sanitizeQhTelegramPreservedValues(values: unknown) {
+  const source = values && typeof values === "object" && !Array.isArray(values)
+    ? values as Record<string, unknown>
+    : {};
+  return {
+    transferFromDepartment: safeNumber(source.transferFromDepartment),
+    transferToDepartment: safeNumber(source.transferToDepartment),
+    currentZh: safeNumber(source.currentZh),
+    family: safeNumber(source.family),
+    officer: safeNumber(source.officer),
+    civil: safeNumber(source.civil),
+    leaveSharq: safeNumber(source.leaveSharq),
+    leaveSpa: safeNumber(source.leaveSpa),
+    leavePaym: safeNumber(source.leavePaym)
+  };
+}
+
+function buildQhTelegramFormDepartmentValues(
+  qhValues: ReturnType<typeof sanitizeQhTelegramFormValues>,
+  preserved: ReturnType<typeof sanitizeQhTelegramPreservedValues>
+) {
+  const output = sanitizeValues(null);
+  const remainingSoldier = qhValues.qhBaseSoldier + qhValues.qhIncomingSoldier - qhValues.qhDischargedSoldier;
+  const remainingOfficer = qhValues.qhBaseOfficer + qhValues.qhIncomingOfficer - qhValues.qhDischargedOfficer;
+  const remainingContract = qhValues.qhBaseContract + qhValues.qhIncomingContract - qhValues.qhDischargedContract;
+  const remainingZh = qhValues.qhBaseZh + qhValues.qhIncomingZh - qhValues.qhDischargedZh;
+  const remainingFamily = qhValues.qhBaseFamily + qhValues.qhIncomingFamily - qhValues.qhDischargedFamily;
+  const remainingReserve = qhValues.qhBaseReserve + qhValues.qhIncomingReserve - qhValues.qhDischargedReserve;
+  const remainingCivil = qhValues.qhBaseCivil + qhValues.qhIncomingCivil - qhValues.qhDischargedCivil;
+  const admittedTotal = qhValues.qhIncomingSoldier
+    + qhValues.qhIncomingOfficer
+    + qhValues.qhIncomingContract
+    + qhValues.qhIncomingZh
+    + qhValues.qhIncomingFamily
+    + qhValues.qhIncomingReserve
+    + qhValues.qhIncomingCivil;
+  const admittedMilitary = qhValues.qhIncomingSoldier + qhValues.qhIncomingOfficer + qhValues.qhIncomingContract;
+  const dischargedTotal = qhValues.qhDischargedSoldier
+    + qhValues.qhDischargedOfficer
+    + qhValues.qhDischargedContract
+    + qhValues.qhDischargedZh
+    + qhValues.qhDischargedFamily
+    + qhValues.qhDischargedReserve
+    + qhValues.qhDischargedCivil;
+  const dischargedMilitary = qhValues.qhDischargedSoldier + qhValues.qhDischargedOfficer + qhValues.qhDischargedContract;
+
+  output.beenTotal = qhValues.qhBaseSoldier
+    + qhValues.qhBaseOfficer
+    + qhValues.qhBaseContract
+    + qhValues.qhBaseZh
+    + qhValues.qhBaseFamily
+    + qhValues.qhBaseReserve
+    + qhValues.qhBaseCivil
+    + preserved.leaveSharq
+    + preserved.leaveSpa
+    + preserved.leavePaym;
+  output.beenSoldier = qhValues.qhBaseSoldier + qhValues.qhBaseOfficer + qhValues.qhBaseContract;
+  output.beenSeries = qhValues.qhBaseSoldier;
+  output.admittedTotal = admittedTotal;
+  output.admittedSoldier = admittedMilitary;
+  output.admittedSeries = qhValues.qhIncomingSoldier;
+  output.dgTotal = dischargedTotal;
+  output.dgSoldier = dischargedMilitary;
+  output.dgSeries = qhValues.qhDischargedSoldier;
+  output.transferFromDepartment = preserved.transferFromDepartment;
+  output.transferToDepartment = preserved.transferToDepartment;
+  output.currentShar = remainingSoldier;
+  output.currentSpa = remainingOfficer;
+  output.currentPaym = remainingContract;
+  output.currentZh = remainingZh;
+  output.family = remainingFamily;
+  output.officer = remainingReserve;
+  output.civil = remainingCivil;
+  output.leaveSharq = preserved.leaveSharq;
+  output.leaveSpa = preserved.leaveSpa;
+  output.leavePaym = preserved.leavePaym;
+  output.qhBaseSoldier = remainingSoldier;
+  output.qhBaseOfficer = remainingOfficer;
+  output.qhBaseContract = remainingContract;
+  output.qhIncomingSoldier = 0;
+  output.qhIncomingOfficer = 0;
+  output.qhIncomingContract = 0;
+  output.qhDischargedSoldier = 0;
+  output.qhDischargedOfficer = 0;
+  output.qhDischargedContract = 0;
+  return output;
 }
 
 type DepartmentValidationCheck = {
@@ -7285,6 +7415,165 @@ async function handleTelegramWebFormSubmit(request: Request) {
     return jsonResponse({
       ok: true,
       autoSaved: didAutoSave,
+      feedbackId,
+      validation,
+      message: messageText
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      error: sanitizePublicErrorMessage(error)
+    }, 500);
+  }
+}
+
+async function handleTelegramQhFormSubmit(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const verifiedUser = await verifyTelegramWebAppInitData(String(payload?.initData || ""));
+    if (!verifiedUser) {
+      return jsonResponse({ ok: false, error: "Telegram Web App authorization failed." }, 403);
+    }
+
+    const departmentId = typeof payload?.departmentId === "string" && Object.prototype.hasOwnProperty.call(DEPARTMENTS, payload.departmentId)
+      ? payload.departmentId as DepartmentId
+      : null;
+    if (!departmentId || !QH_CALC_DEPARTMENT_IDS.has(departmentId)) {
+      return jsonResponse({ ok: false, error: "Հաշվարկային ձևի բաժանմունքը որոշել չհաջողվեց։" }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    if (!await isTelegramUserAllowedByRuntimeState(supabase, verifiedUser.userId)) {
+      return jsonResponse({
+        ok: false,
+        error: "Բոտը ժամանակավորապես անջատված է կոլեգաների համար։ Խնդրում ենք դիմել ադմինիստրատորին։"
+      }, 403);
+    }
+
+    const reportDate = sanitizeReportDate(payload?.reportDate) || DEFAULT_DATE;
+    const qhValues = sanitizeQhTelegramFormValues(payload?.qhValues);
+    const preservedValues = sanitizeQhTelegramPreservedValues(payload?.preservedValues);
+    const values = buildQhTelegramFormDepartmentValues(qhValues, preservedValues);
+
+    if (
+      Number(values.currentShar) < 0
+      || Number(values.currentSpa) < 0
+      || Number(values.currentPaym) < 0
+      || Number(values.currentZh) < 0
+      || Number(values.family) < 0
+      || Number(values.officer) < 0
+      || Number(values.civil) < 0
+    ) {
+      return jsonResponse({
+        ok: false,
+        error: "V-AB սյունակներում չի կարող բացասական արժեք լինել։ Ստուգեք A-N և O-U արժեքները։"
+      }, 400);
+    }
+
+    const validation = validateDepartmentSheetValues(values);
+    const validationLinesHy = formatDepartmentValidationLinesHy(validation);
+    if (!validation.isValid) {
+      return jsonResponse({
+        ok: false,
+        error: "Հաշվարկային ձևի վերահսկումը չի անցել։",
+        validation
+      }, 400);
+    }
+
+    const userName = [
+      verifiedUser.firstName,
+      verifiedUser.lastName,
+      verifiedUser.username ? `@${verifiedUser.username}` : ""
+    ].filter(Boolean).join(" ");
+    const feedbackId = await insertTelegramWebFormFeedback(
+      supabase as ReturnType<typeof createClient>,
+      departmentId,
+      reportDate,
+      values,
+      verifiedUser.userId,
+      userName,
+      createEmptyDepartmentPatientNotes()
+    );
+    const pairedPhotoFeedback = await loadLatestDepartmentPhotoFeedback(
+      supabase as ReturnType<typeof createClient>,
+      departmentId,
+      reportDate
+    );
+    await saveDepartmentSnapshot(supabase as ReturnType<typeof createClient>, departmentId, reportDate, values, "telegram-form");
+    await markDepartmentPhotoProcessed(
+      supabase as ReturnType<typeof createClient>,
+      departmentId,
+      pairedPhotoFeedback ? pairedPhotoFeedback.id : feedbackId,
+      pairedPhotoFeedback ? (pairedPhotoFeedback.imageName || "telegram-photo") : "telegram-qh-form",
+      "processed_telegram"
+    );
+
+    const savedSnapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
+    let autoPdfResult:
+      | Awaited<ReturnType<typeof maybeAutoSendMainPdfsWhenSnapshotReady>>
+      | null = null;
+    try {
+      autoPdfResult = await maybeAutoSendMainPdfsWhenSnapshotReady(
+        supabase as ReturnType<typeof createClient>,
+        savedSnapshot
+      );
+    } catch (error) {
+      console.error("Failed to auto-send main PDFs after Telegram QH form save:", sanitizePublicErrorMessage(error));
+    }
+
+    const meta = DEPARTMENTS[departmentId];
+    const messageText = [
+      "Հաշվարկային աղյուսակի տվյալները ստացվել են։ Շնորհակալություն։",
+      `Բաժանմունք: ${meta.department} (${meta.marker})`,
+      ...(validationLinesHy.length ? ["Վերահսկիչ գումարներ:", ...validationLinesHy] : []),
+      "Տվյալները ավտոմատ գրանցվել են ընդհանուր աղյուսակում։",
+      ...(autoPdfResult?.sent ? [buildMainPdfsAutoSentNoticeHy(autoPdfResult.sent)] : []),
+      "Կցում եմ PDF բլանկը՝ հաշվարկային ձևից ստացված նոր արժեքներով։"
+    ].join("\n");
+
+    if (verifiedUser.userId) {
+      try {
+        const pdfBytes = await buildFilledDepartmentPdfBytes(
+          departmentId,
+          values,
+          reportDate,
+          createEmptyDepartmentPatientNotes()
+        );
+        await sendTelegramDocument(
+          verifiedUser.userId,
+          buildDepartmentPdfFileName(departmentId, reportDate, "telegram-qh-form"),
+          pdfBytes,
+          messageText,
+          "application/pdf"
+        );
+      } catch (error) {
+        console.error("Failed to notify Telegram QH form user:", sanitizePublicErrorMessage(error));
+        await sendTelegramMessage(verifiedUser.userId, messageText).catch((fallbackError) => {
+          console.error("Failed to send fallback Telegram QH form message:", sanitizePublicErrorMessage(fallbackError));
+        });
+      }
+    }
+
+    const notifyChatIds = getTelegramNotifyChatIds(null);
+    if (notifyChatIds.length) {
+      const adminIntro = buildTelegramWebAutoSaveAdminText(
+        departmentId,
+        reportDate,
+        userName || String(verifiedUser.userId || ""),
+        true
+      );
+
+      await sendTelegramMessageToMany(notifyChatIds, [
+        adminIntro,
+        "",
+        `OCR feedback: ${feedbackId || "без номера"}`,
+        `QH Web App: ${buildTelegramWebFormValuesText(values)}`
+      ].join("\n"));
+    }
+
+    return jsonResponse({
+      ok: true,
+      autoSaved: true,
       feedbackId,
       validation,
       message: messageText
@@ -9648,6 +9937,9 @@ Deno.serve(async (request) => {
   const postUrl = new URL(request.url);
   if (postUrl.searchParams.get("action") === "web-form-submit") {
     return await handleTelegramWebFormSubmit(request);
+  }
+  if (postUrl.searchParams.get("action") === "web-qh-form-submit") {
+    return await handleTelegramQhFormSubmit(request);
   }
   if (postUrl.searchParams.get("action") === "night-form-load") {
     return await handleTelegramShiftFormLoad(request, "night");

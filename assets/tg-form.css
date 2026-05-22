@@ -747,6 +747,129 @@ input {
   margin-top: 12px;
 }
 
+.tg-qh-card {
+  display: grid;
+  gap: 14px;
+}
+
+.tg-qh-table {
+  min-width: 1400px;
+}
+
+.tg-qh-row-title {
+  min-width: 190px;
+  text-align: left;
+  padding-left: 12px !important;
+}
+
+.tg-qh-cell {
+  position: relative;
+  min-width: 140px;
+}
+
+.tg-qh-marker {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(31, 42, 36, 0.08);
+  color: #4b5d53;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-qh-input,
+.tg-qh-output {
+  min-height: 64px;
+  padding-top: 18px;
+  font-size: 24px;
+}
+
+.tg-qh-cell--output .tg-qh-output {
+  background: rgba(15, 139, 76, 0.08);
+  color: var(--tg-accent);
+}
+
+.tg-qh-output-row td,
+.tg-qh-output-row th {
+  background: rgba(15, 139, 76, 0.05);
+}
+
+.tg-qh-formulas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tg-qh-formulas span {
+  border: 1px solid rgba(15, 139, 76, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tg-qh-preview {
+  padding: 12px;
+  border: 1px solid rgba(15, 139, 76, 0.16);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(255, 222, 139, 0.18), rgba(255, 255, 255, 0.9)),
+    #fffdf8;
+}
+
+.tg-qh-preview h2 {
+  margin: 0 0 10px;
+  font-size: clamp(18px, 4vw, 24px);
+}
+
+.tg-qh-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tg-qh-preview-card {
+  border: 1px solid rgba(216, 203, 179, 0.9);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 10px;
+}
+
+.tg-qh-preview-card h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.tg-qh-preview-items {
+  display: grid;
+  gap: 8px;
+}
+
+.tg-qh-preview-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #fffaf0;
+  border: 1px solid rgba(216, 203, 179, 0.9);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tg-qh-preview-item strong {
+  font-size: 20px;
+  color: var(--tg-accent);
+}
+
 @media (max-width: 720px) {
   .tg-form-root {
     padding: 8px;
@@ -784,6 +907,28 @@ input {
   .tg-patient-note-input {
     min-height: 34px;
     font-size: 13px;
+  }
+
+  .tg-qh-table {
+    min-width: 1180px;
+  }
+
+  .tg-qh-row-title {
+    min-width: 150px;
+  }
+
+  .tg-qh-cell {
+    min-width: 120px;
+  }
+
+  .tg-qh-input,
+  .tg-qh-output {
+    min-height: 58px;
+    font-size: 20px;
+  }
+
+  .tg-qh-preview-grid {
+    grid-template-columns: 1fr;
   }
 
   .tg-night-table {

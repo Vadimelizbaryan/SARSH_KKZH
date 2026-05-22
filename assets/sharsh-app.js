@@ -93,53 +93,141 @@
     { cell: 22, key: "leavePaym", label: "22" }
   ];
   const QH_CALC_DEPARTMENT_IDS = new Set(["r19", "r20", "r21"]);
+  const QH_CALC_COLUMNS = [
+    {
+      type: "soldier",
+      label: "ՇԱՐ",
+      currentKey: "currentShar",
+      incomingKey: "qhIncomingSoldier",
+      dischargedKey: "qhDischargedSoldier",
+      baseKey: "qhBaseSoldier",
+      outputKey: "qhRemainingSoldier",
+      incomingMarker: "A",
+      dischargedMarker: "H",
+      baseMarker: "O",
+      outputMarker: "V"
+    },
+    {
+      type: "officer",
+      label: "ՍՊԱ",
+      currentKey: "currentSpa",
+      incomingKey: "qhIncomingOfficer",
+      dischargedKey: "qhDischargedOfficer",
+      baseKey: "qhBaseOfficer",
+      outputKey: "qhRemainingOfficer",
+      incomingMarker: "B",
+      dischargedMarker: "I",
+      baseMarker: "P",
+      outputMarker: "W"
+    },
+    {
+      type: "contract",
+      label: "ՊԱՅՄ",
+      currentKey: "currentPaym",
+      incomingKey: "qhIncomingContract",
+      dischargedKey: "qhDischargedContract",
+      baseKey: "qhBaseContract",
+      outputKey: "qhRemainingContract",
+      incomingMarker: "C",
+      dischargedMarker: "J",
+      baseMarker: "Q",
+      outputMarker: "X"
+    },
+    {
+      type: "zh",
+      label: "Զ/Հ",
+      currentKey: "currentZh",
+      incomingKey: "qhIncomingZh",
+      dischargedKey: "qhDischargedZh",
+      baseKey: "qhBaseZh",
+      outputKey: "qhRemainingZh",
+      incomingMarker: "D",
+      dischargedMarker: "K",
+      baseMarker: "R",
+      outputMarker: "Y"
+    },
+    {
+      type: "family",
+      label: "Զ/Ծ ընտ",
+      currentKey: "family",
+      incomingKey: "qhIncomingFamily",
+      dischargedKey: "qhDischargedFamily",
+      baseKey: "qhBaseFamily",
+      outputKey: "qhRemainingFamily",
+      incomingMarker: "E",
+      dischargedMarker: "L",
+      baseMarker: "S",
+      outputMarker: "Z"
+    },
+    {
+      type: "reserve",
+      label: "Զ/Պ",
+      currentKey: "officer",
+      incomingKey: "qhIncomingReserve",
+      dischargedKey: "qhDischargedReserve",
+      baseKey: "qhBaseReserve",
+      outputKey: "qhRemainingReserve",
+      incomingMarker: "F",
+      dischargedMarker: "M",
+      baseMarker: "T",
+      outputMarker: "AA"
+    },
+    {
+      type: "civil",
+      label: "Ք-ի",
+      currentKey: "civil",
+      incomingKey: "qhIncomingCivil",
+      dischargedKey: "qhDischargedCivil",
+      baseKey: "qhBaseCivil",
+      outputKey: "qhRemainingCivil",
+      incomingMarker: "G",
+      dischargedMarker: "N",
+      baseMarker: "U",
+      outputMarker: "AB"
+    }
+  ];
+  const QH_CALC_TYPE_MAP = QH_CALC_COLUMNS.reduce((map, column) => {
+    map[column.type] = column;
+    return map;
+  }, {});
   const QH_CALC_FIELD_ROWS = [
     {
       label: "Ընդունվել է",
-      cells: [
-        { key: "qhIncomingSoldier", marker: "A", role: "input" },
-        { key: "qhIncomingOfficer", marker: "B", role: "input" },
-        { key: "qhIncomingContract", marker: "C", role: "input" }
-      ]
+      cells: QH_CALC_COLUMNS.map((column) => ({
+        key: column.incomingKey,
+        marker: column.incomingMarker,
+        role: "input"
+      }))
     },
     {
       label: "Դուրս է գրվել",
-      cells: [
-        { key: "qhDischargedSoldier", marker: "D", role: "input" },
-        { key: "qhDischargedOfficer", marker: "E", role: "input" },
-        { key: "qhDischargedContract", marker: "F", role: "input" }
-      ]
+      cells: QH_CALC_COLUMNS.map((column) => ({
+        key: column.dischargedKey,
+        marker: column.dischargedMarker,
+        role: "input"
+      }))
     },
     {
       label: "Եղել է",
-      cells: [
-        { key: "qhBaseSoldier", marker: "G", role: "input" },
-        { key: "qhBaseOfficer", marker: "H", role: "input" },
-        { key: "qhBaseContract", marker: "I", role: "input" }
-      ]
+      cells: QH_CALC_COLUMNS.map((column) => ({
+        key: column.baseKey,
+        marker: column.baseMarker,
+        role: "input"
+      }))
     },
     {
       label: "Մնացել է",
-      cells: [
-        { key: "qhRemainingSoldier", marker: "J", role: "output" },
-        { key: "qhRemainingOfficer", marker: "K", role: "output" },
-        { key: "qhRemainingContract", marker: "L", role: "output" }
-      ]
+      cells: QH_CALC_COLUMNS.map((column) => ({
+        key: column.outputKey,
+        marker: column.outputMarker,
+        role: "output"
+      }))
     }
   ];
-  const QH_CALC_INPUT_KEYS = new Set([
-    "qhIncomingSoldier",
-    "qhIncomingOfficer",
-    "qhIncomingContract",
-    "qhDischargedSoldier",
-    "qhDischargedOfficer",
-    "qhDischargedContract"
-  ]);
-  const QH_CALC_OPTIONAL_INPUT_KEYS = new Set([
-    "qhBaseSoldier",
-    "qhBaseOfficer",
-    "qhBaseContract"
-  ]);
+  const QH_CALC_INPUT_KEYS = new Set(
+    QH_CALC_COLUMNS.flatMap((column) => [column.incomingKey, column.dischargedKey])
+  );
+  const QH_CALC_OPTIONAL_INPUT_KEYS = new Set(QH_CALC_COLUMNS.map((column) => column.baseKey));
   const HOSPITAL_REPORT_PRIMARY_ITEMS = [
     { key: "beenTotal", cell: 1, label: "Հոսպիտալում եղել է" },
     { key: "admittedTotal", cell: 4, label: "Ընդունվել է" },
@@ -3662,32 +3750,14 @@
       return null;
     }
 
-    const keyMap = {
-      soldier: {
-        previous: "qhBaseSoldier",
-        incoming: "qhIncomingSoldier",
-        discharged: "qhDischargedSoldier"
-      },
-      officer: {
-        previous: "qhBaseOfficer",
-        incoming: "qhIncomingOfficer",
-        discharged: "qhDischargedOfficer"
-      },
-      contract: {
-        previous: "qhBaseContract",
-        incoming: "qhIncomingContract",
-        discharged: "qhDischargedContract"
-      }
-    };
-
-    const source = keyMap[type];
+    const source = QH_CALC_TYPE_MAP[type];
     if (!source) {
       return null;
     }
 
-    const previous = getQhCalcSourceValue(row, source.previous, snapshot);
-    const incoming = getQhCalcSourceValue(row, source.incoming, snapshot);
-    const discharged = getQhCalcSourceValue(row, source.discharged, snapshot);
+    const previous = getQhCalcSourceValue(row, source.baseKey, snapshot);
+    const incoming = getQhCalcSourceValue(row, source.incomingKey, snapshot);
+    const discharged = getQhCalcSourceValue(row, source.dischargedKey, snapshot);
 
     if (previous === null && incoming === null && discharged === null) {
       return null;
@@ -3706,20 +3776,14 @@
         return;
       }
 
-      const hasBaseValues =
-        (row.values.qhBaseSoldier || 0) !== 0
-        || (row.values.qhBaseOfficer || 0) !== 0
-        || (row.values.qhBaseContract || 0) !== 0;
-      const hasCurrentValues =
-        (row.values.currentShar || 0) !== 0
-        || (row.values.currentSpa || 0) !== 0
-        || (row.values.currentPaym || 0) !== 0;
-
-      if (!hasBaseValues && hasCurrentValues) {
-        row.values.qhBaseSoldier = row.values.currentShar || 0;
-        row.values.qhBaseOfficer = row.values.currentSpa || 0;
-        row.values.qhBaseContract = row.values.currentPaym || 0;
-      }
+      QH_CALC_COLUMNS.forEach((column) => {
+        const hasBaseValue = row.values[column.baseKey] !== null
+          && typeof row.values[column.baseKey] !== "undefined"
+          && row.values[column.baseKey] !== "";
+        if (!hasBaseValue) {
+          row.values[column.baseKey] = row.values[column.currentKey] || 0;
+        }
+      });
     });
 
     return snapshot;
@@ -3735,9 +3799,9 @@
         return;
       }
 
-      row.values.currentShar = calcQhRemainingValue(row, "soldier", snapshot) || 0;
-      row.values.currentSpa = calcQhRemainingValue(row, "officer", snapshot) || 0;
-      row.values.currentPaym = calcQhRemainingValue(row, "contract", snapshot) || 0;
+      QH_CALC_COLUMNS.forEach((column) => {
+        row.values[column.currentKey] = calcQhRemainingValue(row, column.type, snapshot) || 0;
+      });
     });
 
     return snapshot;
@@ -3756,6 +3820,18 @@
     }
     if (key === "qhRemainingContract") {
       return getDisplayValue(calcQhRemainingValue(row, "contract"));
+    }
+    if (key === "qhRemainingZh") {
+      return getDisplayValue(calcQhRemainingValue(row, "zh"));
+    }
+    if (key === "qhRemainingFamily") {
+      return getDisplayValue(calcQhRemainingValue(row, "family"));
+    }
+    if (key === "qhRemainingReserve") {
+      return getDisplayValue(calcQhRemainingValue(row, "reserve"));
+    }
+    if (key === "qhRemainingCivil") {
+      return getDisplayValue(calcQhRemainingValue(row, "civil"));
     }
 
     const value = getQhCalcSourceValue(row, key);
@@ -3783,9 +3859,17 @@
       "currentShar",
       "currentSpa",
       "currentPaym",
+      "currentZh",
+      "family",
+      "officer",
+      "civil",
       "qhRemainingSoldier",
       "qhRemainingOfficer",
-      "qhRemainingContract"
+      "qhRemainingContract",
+      "qhRemainingZh",
+      "qhRemainingFamily",
+      "qhRemainingReserve",
+      "qhRemainingCivil"
     ].forEach((key) => {
       document.querySelectorAll(`[data-qh-output="${key}"]`).forEach((element) => {
         element.textContent = getQhCalcDisplayValue(row, key);
@@ -3804,26 +3888,37 @@
     const originalCell14 = getNumber(state.snapshot, row, "currentSpa") || 0;
     const originalCell15 = getNumber(state.snapshot, row, "currentPaym") || 0;
 
-    const incomingSoldier = getQhCalcSourceValue(row, "qhIncomingSoldier") || 0;
-    const incomingOfficer = getQhCalcSourceValue(row, "qhIncomingOfficer") || 0;
-    const incomingContract = getQhCalcSourceValue(row, "qhIncomingContract") || 0;
-    const dischargedSoldier = getQhCalcSourceValue(row, "qhDischargedSoldier") || 0;
-    const dischargedOfficer = getQhCalcSourceValue(row, "qhDischargedOfficer") || 0;
-    const dischargedContract = getQhCalcSourceValue(row, "qhDischargedContract") || 0;
+    const incomingByType = Object.fromEntries(
+      QH_CALC_COLUMNS.map((column) => [column.type, getQhCalcSourceValue(row, column.incomingKey) || 0])
+    );
+    const dischargedByType = Object.fromEntries(
+      QH_CALC_COLUMNS.map((column) => [column.type, getQhCalcSourceValue(row, column.dischargedKey) || 0])
+    );
+    const remainingByType = Object.fromEntries(
+      QH_CALC_COLUMNS.map((column) => [column.type, calcQhRemainingValue(row, column.type) || 0])
+    );
 
-    const cell4 = incomingSoldier + incomingOfficer + incomingContract;
-    const cell5 = incomingSoldier + incomingOfficer + incomingContract;
-    const cell6 = incomingSoldier;
-    const cell7 = dischargedSoldier + dischargedOfficer + dischargedContract;
-    const cell8 = dischargedSoldier + dischargedOfficer + dischargedContract;
-    const cell9 = dischargedSoldier;
-    const cell13 = calcQhRemainingValue(row, "soldier") || 0;
-    const cell14 = calcQhRemainingValue(row, "officer") || 0;
-    const cell15 = calcQhRemainingValue(row, "contract") || 0;
+    const cell4 = QH_CALC_COLUMNS.reduce((sum, column) => sum + incomingByType[column.type], 0);
+    const cell5 = incomingByType.soldier + incomingByType.officer + incomingByType.contract;
+    const cell6 = incomingByType.soldier;
+    const cell7 = QH_CALC_COLUMNS.reduce((sum, column) => sum + dischargedByType[column.type], 0);
+    const cell8 = dischargedByType.soldier + dischargedByType.officer + dischargedByType.contract;
+    const cell9 = dischargedByType.soldier;
+    const cell13 = remainingByType.soldier;
+    const cell14 = remainingByType.officer;
+    const cell15 = remainingByType.contract;
+    const cell16 = remainingByType.zh;
+    const cell17 = remainingByType.family;
+    const cell18 = remainingByType.reserve;
+    const cell19 = remainingByType.civil;
 
     row.values.currentShar = cell13;
     row.values.currentSpa = cell14;
     row.values.currentPaym = cell15;
+    row.values.currentZh = cell16;
+    row.values.family = cell17;
+    row.values.officer = cell18;
+    row.values.civil = cell19;
 
     row.values.beenTotal = originalCell12;
     row.values.beenSoldier = originalCell13 + originalCell14 + originalCell15;
@@ -3847,21 +3942,23 @@
       ["dgSeries", row.values.dgSeries],
       ["currentShar", row.values.currentShar],
       ["currentSpa", row.values.currentSpa],
-      ["currentPaym", row.values.currentPaym]
+      ["currentPaym", row.values.currentPaym],
+      ["currentZh", row.values.currentZh],
+      ["family", row.values.family],
+      ["officer", row.values.officer],
+      ["civil", row.values.civil]
     ].forEach(([key, value]) => {
       syncDepartmentRowInput(row.id, key, value);
     });
 
-    row.values.qhIncomingSoldier = 0;
-    row.values.qhIncomingOfficer = 0;
-    row.values.qhIncomingContract = 0;
-    row.values.qhDischargedSoldier = 0;
-    row.values.qhDischargedOfficer = 0;
-    row.values.qhDischargedContract = 0;
+    QH_CALC_COLUMNS.forEach((column) => {
+      row.values[column.incomingKey] = 0;
+      row.values[column.dischargedKey] = 0;
+    });
 
     refreshTableData();
     queueDepartmentSave();
-    setInfo("Հաշվարկային աղյուսակի արժեքները տեղափոխվել են հիմնական բջիջներ, իսկ A-F մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
+    setInfo("Հաշվարկային աղյուսակի արժեքները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
   }
 
   function getPhotoPreviewValue(row, key) {
@@ -6074,7 +6171,7 @@
     return `
       <div class="panel qh-calc-panel">
         <h2>Հաշվարկային աղյուսակ</h2>
-        <p>Լրացուցիչ աղյուսակ այս էջի համար։ G, H և I արժեքները վերցվում են հիմնական աղյուսակի 13, 14 և 15 բջիջներից, իսկ J, K և L արժեքները հաշվարկվում են ավտոմատ։</p>
+        <p>Լրացուցիչ աղյուսակ այս էջի համար։ O-U արժեքները վերցվում են հիմնական աղյուսակի 13-19 բջիջներից, իսկ V-AB արժեքները հաշվարկվում են ավտոմատ։</p>
         <div class="qh-calc-wrap" id="qhCalcPanel">
           <table class="qh-calc-table">
             <thead>
@@ -6083,6 +6180,10 @@
                 <th>ՇԱՐ</th>
                 <th>ՍՊԱ</th>
                 <th>ՊԱՅՄ</th>
+                <th>Զ/Հ</th>
+                <th>Զ/Ծ ընտ</th>
+                <th>Զ/Պ</th>
+                <th>Ք-ի</th>
               </tr>
             </thead>
             <tbody>
@@ -6090,9 +6191,13 @@
             </tbody>
           </table>
           <div class="qh-calc-formulas">
-            <span>J = (G + A) - D</span>
-            <span>K = (H + B) - E</span>
-            <span>L = (I + C) - F</span>
+            <span>V = (O + A) - H</span>
+            <span>W = (P + B) - I</span>
+            <span>X = (Q + C) - J</span>
+            <span>Y = (R + D) - K</span>
+            <span>Z = (S + E) - L</span>
+            <span>AA = (T + F) - M</span>
+            <span>AB = (U + G) - N</span>
           </div>
           <div class="qh-calc-actions">
             <button type="button" id="qhCalcApplyBtn">Հաշվել և տեղադրել</button>
@@ -6508,9 +6613,17 @@
           "currentShar",
           "currentSpa",
           "currentPaym",
+          "currentZh",
+          "family",
+          "officer",
+          "civil",
           "qhRemainingSoldier",
           "qhRemainingOfficer",
-          "qhRemainingContract"
+          "qhRemainingContract",
+          "qhRemainingZh",
+          "qhRemainingFamily",
+          "qhRemainingReserve",
+          "qhRemainingCivil"
         ].forEach((key) => {
           document.querySelectorAll(`[data-qh-output="${key}"]`).forEach((element) => {
             element.textContent = getQhCalcDisplayValue(row, key);
