@@ -32,7 +32,7 @@
   const editableKeys = fields
     .filter((field) => field.key !== "presentTotal")
     .map((field) => field.key);
-  const readOnlyKeys = new Set(["beenTotal", "beenSoldier", "beenSeries"]);
+  const readOnlyKeys = new Set(editableKeys);
   const carryoverQueryParamByKey = {
     beenTotal: "c1",
     beenSoldier: "c2",
