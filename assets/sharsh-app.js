@@ -1498,8 +1498,17 @@ function buildInitialPhotoLightboxState() {
   }
 
   async function normalizeTelegramFeedbackImageDataUrl(sourceDataUrl, notes) {
-    void notes;
-    return normalizeImageDataUrl(sourceDataUrl);
+    const normalizedSourceDataUrl = typeof sourceDataUrl === "string" ? sourceDataUrl.trim() : "";
+    const normalizedNotes = Array.isArray(notes) ? notes : [];
+    const rotatedToLandscape = normalizedNotes.some((note) => {
+      return typeof note === "string" && note.toLowerCase().includes("photo auto-rotated by");
+    });
+
+    return {
+      dataUrl: normalizedSourceDataUrl,
+      rotatedToLandscape,
+      normalizedRotation: 0
+    };
   }
 
   async function compressImageFile(file) {
