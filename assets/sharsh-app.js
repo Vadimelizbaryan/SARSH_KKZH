@@ -399,11 +399,14 @@
     };
   }
 
-  function buildInitialPhotoLightboxState() {
+function buildInitialPhotoLightboxState() {
     return {
       open: false,
       imageDataUrl: "",
-      alt: "Фото бланка"
+      alt: "Фото бланка",
+      sourceKind: "",
+      sourceId: "",
+      isRotating: false
     };
   }
 
@@ -2169,7 +2172,12 @@
         if (!record) {
           return;
         }
-        openPhotoLightbox(record.imageDataUrl, `Фото бланка ${record.departmentName || record.departmentId || feedbackId}`);
+        openPhotoLightbox(
+          record.imageDataUrl,
+          `Фото бланка ${record.departmentName || record.departmentId || feedbackId}`,
+          "main-table-gallery",
+          feedbackId
+        );
       });
     });
   }
@@ -6780,6 +6788,14 @@
       <div class="photo-lightbox" id="photoLightbox" aria-modal="true" role="dialog">
         <div class="photo-lightbox-backdrop" data-photo-lightbox-close="true"></div>
         <div class="photo-lightbox-dialog">
+          <button
+            type="button"
+            class="photo-lightbox-rotate"
+            id="photoLightboxRotate"
+            aria-label="Повернуть фото"
+            title="Повернуть фото"
+            ${lightbox.isRotating ? "disabled" : ""}
+          >↻</button>
           <button type="button" class="photo-lightbox-close" id="photoLightboxClose" aria-label="Закрыть просмотр">×</button>
           <img src="${escapeHtml(lightbox.imageDataUrl)}" alt="${escapeHtml(lightbox.alt || "Фото бланка")}">
         </div>
@@ -9263,16 +9279,78 @@
     renderPage();
   }
 
-  function openPhotoLightbox(imageDataUrl, alt) {
+  function openPhotoLightbox(imageDataUrl, alt, sourceKind = "", sourceId = "") {
     if (!imageDataUrl) {
       return;
     }
     state.photoLightbox = {
       open: true,
       imageDataUrl,
-      alt: alt || "Фото бланка"
+      alt: alt || "Фото бланка",
+      sourceKind: typeof sourceKind === "string" ? sourceKind : "",
+      sourceId: sourceId == null ? "" : String(sourceId),
+      isRotating: false
     };
     renderPage();
+  }
+
+  function persistPhotoLightboxImage(imageDataUrl) {
+    const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+    const sourceKind = String(lightbox.sourceKind || "");
+    const sourceId = String(lightbox.sourceId || "");
+
+    if (sourceKind === "main-route") {
+      state.mainPhotoRoute.imageDataUrl = imageDataUrl;
+      return;
+    }
+
+    if (sourceKind === "photo-import") {
+      state.photoImport.imageDataUrl = imageDataUrl;
+      return;
+    }
+
+    if (sourceKind === "main-table-gallery") {
+      state.mainTablePhotoGallery.records = ensureMainTablePhotoGalleryRecordsLoaded().map((record) => {
+        if (Number(record?.id) === Number(sourceId)) {
+          return {
+            ...record,
+            imageDataUrl
+          };
+        }
+        return record;
+      });
+    }
+  }
+
+  async function handleRotatePhotoLightbox() {
+    const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+    if (!lightbox.open || !lightbox.imageDataUrl || lightbox.isRotating) {
+      return;
+    }
+
+    state.photoLightbox = {
+      ...lightbox,
+      isRotating: true
+    };
+    renderPage();
+
+    try {
+      const rotatedDataUrl = await rotateImageDataUrl(lightbox.imageDataUrl, 90);
+      persistPhotoLightboxImage(rotatedDataUrl);
+      state.photoLightbox = {
+        ...state.photoLightbox,
+        imageDataUrl: rotatedDataUrl,
+        isRotating: false
+      };
+      renderPage();
+    } catch (error) {
+      state.photoLightbox = {
+        ...state.photoLightbox,
+        isRotating: false
+      };
+      renderPage();
+      setInfo(error instanceof Error ? error.message : "Не удалось повернуть фото.", true);
+    }
   }
 
   function closePhotoLightbox() {
@@ -10746,7 +10824,7 @@
     const mainPhotoRouteZoomBtn = document.getElementById("mainPhotoRouteZoomBtn");
     if (mainPhotoRouteZoomBtn) {
       mainPhotoRouteZoomBtn.addEventListener("click", () => {
-        openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Фото для определения отделения");
+        openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Фото для определения отделения", "main-route");
       });
     }
 
@@ -10832,7 +10910,7 @@
     const photoZoomBtn = document.getElementById("photoZoomBtn");
     if (photoZoomBtn) {
       photoZoomBtn.addEventListener("click", () => {
-        openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Фото бланка");
+        openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Фото бланка", "photo-import");
       });
     }
 
@@ -10840,10 +10918,10 @@
       image.addEventListener("click", () => {
         const kind = image.getAttribute("data-photo-zoom-trigger");
         if (kind === "main") {
-          openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Фото для определения отделения");
+          openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Фото для определения отделения", "main-route");
           return;
         }
-        openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Фото бланка");
+        openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Фото бланка", "photo-import");
       });
     });
 
@@ -10853,6 +10931,13 @@
     if (photoLightboxClose) {
       photoLightboxClose.addEventListener("click", () => {
         closePhotoLightbox();
+      });
+    }
+
+    const photoLightboxRotate = document.getElementById("photoLightboxRotate");
+    if (photoLightboxRotate) {
+      photoLightboxRotate.addEventListener("click", () => {
+        void handleRotatePhotoLightbox();
       });
     }
 
