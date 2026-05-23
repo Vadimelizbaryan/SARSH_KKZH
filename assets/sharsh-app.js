@@ -2097,6 +2097,7 @@ function buildInitialPhotoLightboxState() {
         return {
           ...record,
           feedbackId,
+          departmentId: row.id,
           rowId: row.id,
           departmentName: row.department || record.departmentName || row.id,
           updatedAt: getRowEffectiveUpdatedAt(row),
@@ -2105,6 +2106,13 @@ function buildInitialPhotoLightboxState() {
         };
       })
       .filter(Boolean);
+  }
+
+  function buildMainTablePhotoDepartmentOptions(selectedDepartmentId = "") {
+    return config.departmentDefinitions.map((definition) => {
+      const selected = definition.id === selectedDepartmentId ? " selected" : "";
+      return `<option value="${escapeHtml(definition.id)}"${selected}>${escapeHtml(shortenText(definition.department, 18))}</option>`;
+    }).join("");
   }
 
   function buildMainTablePhotoGalleryContent(displayContext = getMainTableDisplaySnapshotContext()) {
@@ -2133,20 +2141,42 @@ function buildInitialPhotoLightboxState() {
     }
 
     return {
-      summary: `Показано сегодняшних фото бланков: ${items.length}. Нажмите на фото, чтобы открыть его крупно.`,
+      summary: `Показано сегодняшних фото бланков: ${items.length}. Один клик открывает фото, двойной клик — страницу отделения.`,
       html: `
         <div class="main-table-photo-gallery-grid">
           ${items.map((item) => `
-            <button
-              type="button"
-              class="main-table-photo-thumb"
-              data-main-table-photo-open="${escapeHtml(String(item.feedbackId))}"
-              aria-label="${escapeHtml(`Открыть фото бланка ${item.departmentName}`)}"
-              title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `\nДата на фото: ${item.photoReportDate}` : ""}${item.updatedAt ? `\nОбновлено: ${formatTimestamp(item.updatedAt)}` : ""}`)}"
-            >
-              <img src="${escapeHtml(item.imageDataUrl)}" alt="${escapeHtml(`Фото бланка ${item.departmentName}`)}">
-              <span class="main-table-photo-thumb__caption">${escapeHtml(item.departmentName)}</span>
-            </button>
+            <div class="main-table-photo-thumb-card" data-main-table-photo-feedback="${escapeHtml(String(item.feedbackId))}">
+              <button
+                type="button"
+                class="main-table-photo-thumb-delete"
+                data-main-table-photo-delete="${escapeHtml(String(item.feedbackId))}"
+                data-main-table-photo-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
+                aria-label="${escapeHtml(`Удалить фото ${item.departmentName}`)}"
+                title="Удалить фото"
+              >×</button>
+              <button
+                type="button"
+                class="main-table-photo-thumb"
+                data-main-table-photo-open="${escapeHtml(String(item.feedbackId))}"
+                data-main-table-photo-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
+                aria-label="${escapeHtml(`Открыть фото бланка ${item.departmentName}`)}"
+                title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `\nДата на фото: ${item.photoReportDate}` : ""}${item.updatedAt ? `\nОбновлено: ${formatTimestamp(item.updatedAt)}` : ""}`)}"
+              >
+                <img src="${escapeHtml(item.imageDataUrl)}" alt="${escapeHtml(`Фото бланка ${item.departmentName}`)}">
+              </button>
+              <div class="main-table-photo-thumb__meta">
+                <span class="main-table-photo-thumb__caption">${escapeHtml(item.departmentName)}</span>
+                <label class="main-table-photo-thumb__department-picker">
+                  <span>Отделение</span>
+                  <select
+                    data-main-table-photo-department-select="${escapeHtml(String(item.feedbackId))}"
+                    data-current-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
+                  >
+                    ${buildMainTablePhotoDepartmentOptions(item.departmentId || item.rowId || "")}
+                  </select>
+                </label>
+              </div>
+            </div>
           `).join("")}
         </div>
       `
@@ -2184,6 +2214,18 @@ function buildInitialPhotoLightboxState() {
       return;
     }
 
+    root.querySelectorAll("[data-main-table-photo-delete]").forEach((button) => {
+      if (button.dataset.mainTablePhotoDeleteBound === "true") {
+        return;
+      }
+      button.dataset.mainTablePhotoDeleteBound = "true";
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handleDeleteMainTablePhotoGalleryFeedback(button);
+      });
+    });
+
     root.querySelectorAll("[data-main-table-photo-open]").forEach((button) => {
       if (button.dataset.mainTablePhotoBound === "true") {
         return;
@@ -2213,6 +2255,7 @@ function buildInitialPhotoLightboxState() {
       });
       button.addEventListener("dblclick", () => {
         const feedbackId = Number(button.getAttribute("data-main-table-photo-open") || "");
+        const boundDepartmentId = String(button.getAttribute("data-main-table-photo-department-id") || "").trim();
         if (!Number.isFinite(feedbackId)) {
           return;
         }
@@ -2223,11 +2266,27 @@ function buildInitialPhotoLightboxState() {
           return;
         }
         window.clearTimeout(clickTimeoutId);
-        const departmentPath = getMainTablePhotoGalleryDepartmentPath(record, feedbackId);
+        const departmentPath = getMainTablePhotoGalleryDepartmentPath(
+          boundDepartmentId ? { ...record, departmentId: boundDepartmentId } : record,
+          feedbackId
+        );
         if (!departmentPath) {
           return;
         }
         window.open(departmentPath, "_blank", "noopener");
+      });
+    });
+
+    root.querySelectorAll("[data-main-table-photo-department-select]").forEach((select) => {
+      if (select.dataset.mainTablePhotoDepartmentBound === "true") {
+        return;
+      }
+      select.dataset.mainTablePhotoDepartmentBound = "true";
+      select.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+      select.addEventListener("change", () => {
+        handleReassignMainTablePhotoGalleryFeedback(select);
       });
     });
   }
@@ -9530,6 +9589,118 @@ function buildInitialPhotoLightboxState() {
     } catch (error) {
       setInfo(error instanceof Error ? error.message : "Не удалось удалить отправленные данные.", true);
       button.disabled = false;
+    }
+  }
+
+  function removeMainTablePhotoGalleryRecord(feedbackId) {
+    const normalizedFeedbackId = Number(feedbackId);
+    state.mainTablePhotoGallery.records = ensureMainTablePhotoGalleryRecordsLoaded().filter(
+      (record) => Number(record?.id) !== normalizedFeedbackId
+    );
+  }
+
+  function upsertMainTablePhotoGalleryRecord(record) {
+    const normalizedRecord = normalizeMainTablePhotoGalleryRecord(record);
+    if (!normalizedRecord) {
+      return;
+    }
+
+    const normalizedId = Number(normalizedRecord.id);
+    const nextRecords = [];
+    let replaced = false;
+    ensureMainTablePhotoGalleryRecordsLoaded().forEach((currentRecord) => {
+      if (Number(currentRecord?.id) === normalizedId) {
+        nextRecords.push(normalizedRecord);
+        replaced = true;
+        return;
+      }
+      nextRecords.push(currentRecord);
+    });
+    if (!replaced) {
+      nextRecords.push(normalizedRecord);
+    }
+    state.mainTablePhotoGallery.records = nextRecords;
+  }
+
+  async function handleDeleteMainTablePhotoGalleryFeedback(button) {
+    const feedbackId = Number(button.getAttribute("data-main-table-photo-delete") || "");
+    const departmentIdToDelete = button.getAttribute("data-main-table-photo-department-id") || "";
+    const record = ensureMainTablePhotoGalleryRecordsLoaded()
+      .map((item) => normalizeMainTablePhotoGalleryRecord(item))
+      .find((item) => item && item.id === feedbackId);
+    const department = config.getDepartmentById(departmentIdToDelete);
+    const departmentName = department?.department || record?.departmentName || departmentIdToDelete || `feedback ${feedbackId}`;
+
+    if (!Number.isFinite(feedbackId) || !departmentIdToDelete) {
+      setInfo("У этого фото нет корректной привязки к отделению для удаления.", true);
+      return;
+    }
+
+    if (typeof sync.deleteDepartmentFeedback !== "function") {
+      setInfo("Удаление фото пока недоступно. Обновите файлы синхронизации.", true);
+      return;
+    }
+
+    const confirmed = window.confirm(`Удалить фото бланка отделения ${departmentName} с сервера?`);
+    if (!confirmed) {
+      return;
+    }
+
+    button.disabled = true;
+    setInfo(`Удаляю фото: ${departmentName}...`, false);
+    try {
+      const result = await sync.deleteDepartmentFeedback(departmentIdToDelete, feedbackId);
+      removeMainTablePhotoGalleryRecord(feedbackId);
+      if (state.photoLightbox?.open && Number(state.photoLightbox.sourceId) === feedbackId) {
+        closePhotoLightbox();
+      }
+      applyLoadedSnapshot(result);
+      setInfo(`Фото удалено: ${departmentName}.`, false);
+      renderPage();
+    } catch (error) {
+      setInfo(error instanceof Error ? error.message : "Не удалось удалить фото бланка.", true);
+      button.disabled = false;
+    }
+  }
+
+  async function handleReassignMainTablePhotoGalleryFeedback(select) {
+    const feedbackId = Number(select.getAttribute("data-main-table-photo-department-select") || "");
+    const currentDepartmentId = select.getAttribute("data-current-department-id") || "";
+    const nextDepartmentId = String(select.value || "").trim();
+    const currentDepartment = config.getDepartmentById(currentDepartmentId);
+    const nextDepartment = config.getDepartmentById(nextDepartmentId);
+
+    if (!Number.isFinite(feedbackId) || !currentDepartmentId || !nextDepartmentId || nextDepartmentId === currentDepartmentId) {
+      select.value = currentDepartmentId;
+      return;
+    }
+
+    if (typeof sync.reassignOcrFeedbackDepartment !== "function") {
+      setInfo("Переназначение фото пока недоступно. Обновите файлы синхронизации.", true);
+      select.value = currentDepartmentId;
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Перенести фото из "${currentDepartment?.department || currentDepartmentId}" в "${nextDepartment?.department || nextDepartmentId}"?`
+    );
+    if (!confirmed) {
+      select.value = currentDepartmentId;
+      return;
+    }
+
+    select.disabled = true;
+    setInfo(`Переназначаю фото в отделение ${nextDepartment?.department || nextDepartmentId}...`, false);
+    try {
+      const result = await sync.reassignOcrFeedbackDepartment(feedbackId, nextDepartmentId);
+      upsertMainTablePhotoGalleryRecord(result?.record);
+      applyLoadedSnapshot(result);
+      setInfo(`Фото перенесено в отделение ${nextDepartment?.department || nextDepartmentId}.`, false);
+      renderPage();
+    } catch (error) {
+      setInfo(error instanceof Error ? error.message : "Не удалось изменить отделение для фото.", true);
+      select.value = currentDepartmentId;
+      select.disabled = false;
     }
   }
 

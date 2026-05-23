@@ -1447,6 +1447,46 @@
     return payload && typeof payload.record === "object" ? payload.record : null;
   }
 
+  async function reassignOcrFeedbackDepartment(feedbackId, departmentId) {
+    if (!hasRemoteSync()) {
+      throw new Error("Переназначение фото доступно только в онлайн-режиме владельца.");
+    }
+
+    const normalizedFeedbackId = Number(feedbackId);
+    const normalizedDepartmentId = String(departmentId || "").trim();
+    if (!Number.isFinite(normalizedFeedbackId) || normalizedFeedbackId <= 0) {
+      throw new Error("Нужен корректный id OCR feedback.");
+    }
+    if (!normalizedDepartmentId) {
+      throw new Error("Нужно выбрать отделение.");
+    }
+
+    ensureOwnerAuth();
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "reassign_ocr_feedback_department",
+        feedbackId: Math.trunc(normalizedFeedbackId),
+        departmentId: normalizedDepartmentId
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось изменить отделение для фото");
+    }
+
+    return {
+      snapshot: payload && payload.snapshot ? payload.snapshot : null,
+      record: payload && typeof payload.record === "object" ? payload.record : null,
+      source: "remote"
+    };
+  }
+
   async function deleteDepartmentFeedback(departmentId, feedbackId) {
     if (!hasRemoteSync()) {
       throw new Error("Удаление отправленных данных доступно только в онлайн-режиме владельца.");
@@ -1667,6 +1707,7 @@
     deleteCivilReferrals,
     saveOcrFeedback,
     updateOcrFeedbackImage,
+    reassignOcrFeedbackDepartment,
     deleteDepartmentFeedback,
     saveReportDate,
     notifyOwnerLogin,

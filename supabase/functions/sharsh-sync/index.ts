@@ -2362,6 +2362,69 @@ async function updateOcrFeedbackImage(
   return mapOcrFeedbackRows(data ? [data as Record<string, unknown>] : [])[0] || null;
 }
 
+async function reassignOcrFeedbackDepartment(
+  supabase: ReturnType<typeof createClient>,
+  feedbackId: number,
+  departmentId: keyof typeof DEPARTMENTS
+) {
+  const departmentMeta = DEPARTMENTS[departmentId];
+  const { data: existing, error: existingError } = await supabase
+    .from("sharsh_ocr_feedback")
+    .select("id, department_id, image_name")
+    .eq("id", feedbackId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw existingError;
+  }
+  if (!existing) {
+    throw new Error("OCR feedback not found.");
+  }
+
+  const previousDepartmentId = typeof existing.department_id === "string" ? existing.department_id : "";
+  const imageName = typeof existing.image_name === "string" ? existing.image_name : "";
+
+  const { data, error } = await supabase
+    .from("sharsh_ocr_feedback")
+    .update({
+      department_id: departmentId,
+      department_name: departmentMeta.department
+    })
+    .eq("id", feedbackId)
+    .select("id, created_at, department_id, department_name, report_date, photo_report_date, save_status, image_name, image_data_url, recognized_keys, changed_keys, ocr_raw, final_values, notes, cell_reviews")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (previousDepartmentId && previousDepartmentId !== departmentId) {
+    const { error: clearPreviousError } = await supabase
+      .from("sharsh_departments")
+      .update({
+        photo_workflow_status: "idle",
+        photo_feedback_id: null,
+        photo_feedback_updated_at: null,
+        photo_name: null
+      })
+      .eq("department_id", previousDepartmentId)
+      .eq("photo_feedback_id", feedbackId);
+
+    if (clearPreviousError) {
+      throw clearPreviousError;
+    }
+  }
+
+  await markDepartmentPhotoPending(
+    supabase,
+    departmentId,
+    feedbackId,
+    imageName
+  );
+
+  return mapOcrFeedbackRows(data ? [data as Record<string, unknown>] : [])[0] || null;
+}
+
 function createSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -2549,6 +2612,28 @@ Deno.serve(async (request) => {
 
       const record = await updateOcrFeedbackImage(supabase, feedbackId, imageDataUrl);
       return jsonResponse({ ok: true, record });
+    }
+
+    if (type === "reassign_ocr_feedback_department") {
+      const feedbackId = Number(payload.feedbackId);
+      const departmentId = typeof payload.departmentId === "string" ? payload.departmentId : "";
+      if (!Number.isInteger(feedbackId) || feedbackId <= 0) {
+        return jsonResponse({ error: "A valid feedback id is required." }, 400);
+      }
+      if (!Object.prototype.hasOwnProperty.call(DEPARTMENTS, departmentId)) {
+        return jsonResponse({ error: "Unknown department." }, 400);
+      }
+
+      const record = await reassignOcrFeedbackDepartment(
+        supabase,
+        feedbackId,
+        departmentId as keyof typeof DEPARTMENTS
+      );
+      return jsonResponse({
+        ok: true,
+        record,
+        snapshot: await loadSnapshot(supabase)
+      });
     }
 
     if (type === "notify_owner_login") {
