@@ -2673,7 +2673,10 @@ Deno.serve(async (request) => {
           department_group: departmentMeta.group,
           values: applyMorningRolloverValues(row.id, row.values),
           updated_at: now,
-          photo_workflow_status: "processed_rollover"
+          photo_workflow_status: "processed_rollover",
+          photo_feedback_id: null,
+          photo_feedback_updated_at: null,
+          photo_name: null
         };
       });
 

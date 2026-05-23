@@ -2139,6 +2139,19 @@ function buildInitialPhotoLightboxState() {
     };
   }
 
+  function getMainTablePhotoGalleryDepartmentPath(record, feedbackId) {
+    const departmentId = typeof record?.departmentId === "string" && record.departmentId.trim()
+      ? record.departmentId.trim()
+      : "";
+    if (!departmentId) {
+      return "";
+    }
+
+    return appendQueryParams(config.getDepartmentPagePath(basePath, departmentId), {
+      tgFeedback: feedbackId
+    });
+  }
+
   function refreshMainTablePhotoGalleryUi(displayContext = getMainTableDisplaySnapshotContext()) {
     const summaryEl = document.getElementById("mainTablePhotoGallerySummaryText");
     const listEl = document.getElementById("mainTablePhotoGalleryList");
@@ -2162,6 +2175,7 @@ function buildInitialPhotoLightboxState() {
         return;
       }
       button.dataset.mainTablePhotoBound = "true";
+      let clickTimeoutId = 0;
       button.addEventListener("click", () => {
         const feedbackId = Number(button.getAttribute("data-main-table-photo-open") || "");
         if (!Number.isFinite(feedbackId)) {
@@ -2173,12 +2187,33 @@ function buildInitialPhotoLightboxState() {
         if (!record) {
           return;
         }
-        openPhotoLightbox(
-          record.imageDataUrl,
-          `Фото бланка ${record.departmentName || record.departmentId || feedbackId}`,
-          "main-table-gallery",
-          feedbackId
-        );
+        window.clearTimeout(clickTimeoutId);
+        clickTimeoutId = window.setTimeout(() => {
+          openPhotoLightbox(
+            record.imageDataUrl,
+            `Photo ${record.departmentName || record.departmentId || feedbackId}`,
+            "main-table-gallery",
+            feedbackId
+          );
+        }, 220);
+      });
+      button.addEventListener("dblclick", () => {
+        const feedbackId = Number(button.getAttribute("data-main-table-photo-open") || "");
+        if (!Number.isFinite(feedbackId)) {
+          return;
+        }
+        const record = ensureMainTablePhotoGalleryRecordsLoaded()
+          .map((item) => normalizeMainTablePhotoGalleryRecord(item))
+          .find((item) => item && item.id === feedbackId);
+        if (!record) {
+          return;
+        }
+        window.clearTimeout(clickTimeoutId);
+        const departmentPath = getMainTablePhotoGalleryDepartmentPath(record, feedbackId);
+        if (!departmentPath) {
+          return;
+        }
+        window.open(departmentPath, "_blank", "noopener");
       });
     });
   }
