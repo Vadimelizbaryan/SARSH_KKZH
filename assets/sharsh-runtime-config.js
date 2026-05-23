@@ -6,6 +6,7 @@
     supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZWN2bGFwZGxhb2pwdmlqYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNTAzMjgsImV4cCI6MjA5MzYyNjMyOH0._HEPdPB2bBTo_N-1Qo8jLau5g5oYGgvoGnBWPxDupL4",
     functionName: "sharsh-sync",
     autoSync: true,
+    autoRotateImages: false,
     refreshIntervalMs: 30000,
     requireAccessCode: false,
     requireOwnerAuth: true
@@ -70,6 +71,7 @@
       }
 
       next.autoSync = parseBoolean(source.autoSync, DEFAULT_CONFIG.autoSync);
+      next.autoRotateImages = parseBoolean(source.autoRotateImages, DEFAULT_CONFIG.autoRotateImages);
       next.refreshIntervalMs = parsePositiveInteger(source.refreshIntervalMs, DEFAULT_CONFIG.refreshIntervalMs);
       next.requireAccessCode = parseBoolean(source.requireAccessCode, DEFAULT_CONFIG.requireAccessCode);
       next.requireOwnerAuth = parseBoolean(source.requireOwnerAuth, DEFAULT_CONFIG.requireOwnerAuth);
@@ -111,6 +113,7 @@
       && left.supabaseAnonKey === right.supabaseAnonKey
       && left.functionName === right.functionName
       && left.autoSync === right.autoSync
+      && left.autoRotateImages === right.autoRotateImages
       && left.refreshIntervalMs === right.refreshIntervalMs
       && left.requireAccessCode === right.requireAccessCode
       && left.requireOwnerAuth === right.requireOwnerAuth;
@@ -118,7 +121,7 @@
 
   function parseQueryConfig() {
     const params = new URLSearchParams(window.location.search);
-    const hasOverride = ["sync", "sbUrl", "sbKey", "fn", "as", "ri", "ac", "oa"].some((key) => params.has(key));
+    const hasOverride = ["sync", "sbUrl", "sbKey", "fn", "as", "ar", "ri", "ac", "oa"].some((key) => params.has(key));
     if (!hasOverride) {
       return null;
     }
@@ -132,6 +135,7 @@
       supabaseAnonKey: params.get("sbKey") || "",
       functionName: params.get("fn") || DEFAULT_CONFIG.functionName,
       autoSync: params.has("as") ? params.get("as") : DEFAULT_CONFIG.autoSync,
+      autoRotateImages: params.has("ar") ? params.get("ar") : DEFAULT_CONFIG.autoRotateImages,
       refreshIntervalMs: params.get("ri") || DEFAULT_CONFIG.refreshIntervalMs,
       requireAccessCode: params.has("ac") ? params.get("ac") : DEFAULT_CONFIG.requireAccessCode,
       requireOwnerAuth: params.has("oa") ? params.get("oa") : DEFAULT_CONFIG.requireOwnerAuth
@@ -164,6 +168,9 @@
     }
     if (!normalized.autoSync) {
       params.set("as", "0");
+    }
+    if (normalized.autoRotateImages !== DEFAULT_CONFIG.autoRotateImages) {
+      params.set("ar", normalized.autoRotateImages ? "1" : "0");
     }
     if (normalized.refreshIntervalMs !== DEFAULT_CONFIG.refreshIntervalMs) {
       params.set("ri", String(normalized.refreshIntervalMs));

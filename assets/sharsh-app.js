@@ -1474,6 +1474,10 @@ function buildInitialPhotoLightboxState() {
       throw new Error("Не удалось определить размер изображения.");
     }
 
+    if (!runtime.autoRotateImages) {
+      return buildPreparedPhotoResultFromCanvas(buildRotatedCanvasFromImage(image, 0), 0);
+    }
+
     const candidateRotations = [0, 90, 180, 270];
     let bestRotation = 0;
     let bestCanvas = null;

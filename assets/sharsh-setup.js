@@ -14,7 +14,8 @@
     functionName: document.getElementById("functionNameField"),
     refreshInterval: document.getElementById("refreshIntervalField"),
     requireAccessCode: document.getElementById("requireAccessCodeField"),
-    requireOwnerAuth: document.getElementById("requireOwnerAuthField")
+    requireOwnerAuth: document.getElementById("requireOwnerAuthField"),
+    autoRotateImages: document.getElementById("autoRotateImagesField")
   };
 
   const statusText = document.getElementById("setupStatusText");
@@ -54,7 +55,8 @@
       functionName: fields.functionName ? fields.functionName.value : "",
       refreshIntervalMs: fields.refreshInterval ? fields.refreshInterval.value : "",
       requireAccessCode: fields.requireAccessCode ? fields.requireAccessCode.checked : false,
-      requireOwnerAuth: fields.requireOwnerAuth ? fields.requireOwnerAuth.checked : false
+      requireOwnerAuth: fields.requireOwnerAuth ? fields.requireOwnerAuth.checked : false,
+      autoRotateImages: fields.autoRotateImages ? fields.autoRotateImages.checked : false
     });
   }
 
@@ -217,6 +219,9 @@
     if (fields.requireOwnerAuth) {
       fields.requireOwnerAuth.checked = false;
     }
+    if (fields.autoRotateImages) {
+      fields.autoRotateImages.checked = false;
+    }
 
     updateGeneratedLinks();
     updateSourceLabel();
@@ -244,6 +249,9 @@
     }
     if (fields.requireOwnerAuth) {
       fields.requireOwnerAuth.checked = runtime.requireOwnerAuth !== false;
+    }
+    if (fields.autoRotateImages) {
+      fields.autoRotateImages.checked = Boolean(runtime.autoRotateImages);
     }
   }
 
