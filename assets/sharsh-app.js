@@ -2145,6 +2145,33 @@
     const content = buildMainTablePhotoGalleryContent(displayContext);
     summaryEl.textContent = content.summary;
     listEl.innerHTML = content.html;
+    bindMainTablePhotoGalleryEvents(listEl);
+  }
+
+  function bindMainTablePhotoGalleryEvents(root = document) {
+    if (!root || typeof root.querySelectorAll !== "function") {
+      return;
+    }
+
+    root.querySelectorAll("[data-main-table-photo-open]").forEach((button) => {
+      if (button.dataset.mainTablePhotoBound === "true") {
+        return;
+      }
+      button.dataset.mainTablePhotoBound = "true";
+      button.addEventListener("click", () => {
+        const feedbackId = Number(button.getAttribute("data-main-table-photo-open") || "");
+        if (!Number.isFinite(feedbackId)) {
+          return;
+        }
+        const record = ensureMainTablePhotoGalleryRecordsLoaded()
+          .map((item) => normalizeMainTablePhotoGalleryRecord(item))
+          .find((item) => item && item.id === feedbackId);
+        if (!record) {
+          return;
+        }
+        openPhotoLightbox(record.imageDataUrl, `Фото бланка ${record.departmentName || record.departmentId || feedbackId}`);
+      });
+    });
   }
 
   async function refreshMainTablePhotoGalleryRecordsFromRemote(displayContext = getMainTableDisplaySnapshotContext()) {
@@ -10820,21 +10847,7 @@
       });
     });
 
-    document.querySelectorAll("[data-main-table-photo-open]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const feedbackId = Number(button.getAttribute("data-main-table-photo-open") || "");
-        if (!Number.isFinite(feedbackId)) {
-          return;
-        }
-        const record = ensureMainTablePhotoGalleryRecordsLoaded()
-          .map((item) => normalizeMainTablePhotoGalleryRecord(item))
-          .find((item) => item && item.id === feedbackId);
-        if (!record) {
-          return;
-        }
-        openPhotoLightbox(record.imageDataUrl, `Фото бланка ${record.departmentName || record.departmentId || feedbackId}`);
-      });
-    });
+    bindMainTablePhotoGalleryEvents(document);
 
     const photoLightboxClose = document.getElementById("photoLightboxClose");
     if (photoLightboxClose) {
