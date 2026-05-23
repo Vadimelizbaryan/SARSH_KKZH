@@ -1411,6 +1411,42 @@
     return payload;
   }
 
+  async function updateOcrFeedbackImage(feedbackId, imageDataUrl) {
+    if (!hasRemoteSync()) {
+      throw new Error("Поворот фото на сервере доступен только в онлайн-режиме владельца.");
+    }
+
+    const normalizedFeedbackId = Number(feedbackId);
+    const normalizedImageDataUrl = typeof imageDataUrl === "string" ? imageDataUrl.trim() : "";
+    if (!Number.isFinite(normalizedFeedbackId) || normalizedFeedbackId <= 0) {
+      throw new Error("Нужен корректный id OCR feedback.");
+    }
+    if (!normalizedImageDataUrl.startsWith("data:image/")) {
+      throw new Error("Нужно корректное изображение для сохранения.");
+    }
+
+    ensureOwnerAuth();
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "update_ocr_feedback_image",
+        feedbackId: Math.trunc(normalizedFeedbackId),
+        imageDataUrl: normalizedImageDataUrl
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось сохранить поворот фото");
+    }
+
+    return payload && typeof payload.record === "object" ? payload.record : null;
+  }
+
   async function deleteDepartmentFeedback(departmentId, feedbackId) {
     if (!hasRemoteSync()) {
       throw new Error("Удаление отправленных данных доступно только в онлайн-режиме владельца.");
@@ -1630,6 +1666,7 @@
     saveCivilReferrals,
     deleteCivilReferrals,
     saveOcrFeedback,
+    updateOcrFeedbackImage,
     deleteDepartmentFeedback,
     saveReportDate,
     notifyOwnerLogin,

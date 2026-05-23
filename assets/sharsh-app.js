@@ -9295,22 +9295,20 @@ function buildInitialPhotoLightboxState() {
     renderPage();
   }
 
-  function persistPhotoLightboxImage(imageDataUrl) {
+  function persistPhotoLightboxImageLocally(imageDataUrl) {
     const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
     const sourceKind = String(lightbox.sourceKind || "");
     const sourceId = String(lightbox.sourceId || "");
 
     if (sourceKind === "main-route") {
       state.mainPhotoRoute.imageDataUrl = imageDataUrl;
-      return;
     }
 
     if (sourceKind === "photo-import") {
       state.photoImport.imageDataUrl = imageDataUrl;
-      return;
     }
 
-    if (sourceKind === "main-table-gallery") {
+    if (sourceKind === "main-table-gallery" || sourceKind === "photo-import") {
       state.mainTablePhotoGallery.records = ensureMainTablePhotoGalleryRecordsLoaded().map((record) => {
         if (Number(record?.id) === Number(sourceId)) {
           return {
@@ -9321,6 +9319,48 @@ function buildInitialPhotoLightboxState() {
         return record;
       });
     }
+  }
+
+  async function persistPhotoLightboxImage(imageDataUrl) {
+    const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+    const sourceKind = String(lightbox.sourceKind || "");
+    const sourceId = String(lightbox.sourceId || "");
+
+    persistPhotoLightboxImageLocally(imageDataUrl);
+
+    const canSaveRemote = (
+      sourceKind === "main-table-gallery"
+      || sourceKind === "photo-import"
+    ) && Number.isFinite(Number(sourceId))
+      && sync.hasRemoteSync?.()
+      && typeof sync.updateOcrFeedbackImage === "function";
+
+    if (!canSaveRemote) {
+      return null;
+    }
+
+    const savedRecord = await sync.updateOcrFeedbackImage(sourceId, imageDataUrl);
+    const normalizedRecord = normalizeMainTablePhotoGalleryRecord(savedRecord);
+    if (normalizedRecord) {
+      const normalizedId = Number(normalizedRecord.id);
+      const existingRecords = ensureMainTablePhotoGalleryRecordsLoaded();
+      const nextRecords = [];
+      let replaced = false;
+      existingRecords.forEach((record) => {
+        if (Number(record?.id) === normalizedId) {
+          nextRecords.push(normalizedRecord);
+          replaced = true;
+          return;
+        }
+        nextRecords.push(record);
+      });
+      if (!replaced) {
+        nextRecords.push(normalizedRecord);
+      }
+      state.mainTablePhotoGallery.records = nextRecords;
+    }
+
+    return savedRecord;
   }
 
   async function handleRotatePhotoLightbox() {
@@ -9337,7 +9377,7 @@ function buildInitialPhotoLightboxState() {
 
     try {
       const rotatedDataUrl = await rotateImageDataUrl(lightbox.imageDataUrl, 90);
-      persistPhotoLightboxImage(rotatedDataUrl);
+      await persistPhotoLightboxImage(rotatedDataUrl);
       state.photoLightbox = {
         ...state.photoLightbox,
         imageDataUrl: rotatedDataUrl,
@@ -10911,7 +10951,7 @@ function buildInitialPhotoLightboxState() {
     const photoZoomBtn = document.getElementById("photoZoomBtn");
     if (photoZoomBtn) {
       photoZoomBtn.addEventListener("click", () => {
-        openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Фото бланка", "photo-import");
+        openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Photo", "photo-import", state.photoImport?.feedbackId || "");
       });
     }
 
@@ -10922,7 +10962,7 @@ function buildInitialPhotoLightboxState() {
           openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Фото для определения отделения", "main-route");
           return;
         }
-        openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Фото бланка", "photo-import");
+        openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Photo", "photo-import", state.photoImport?.feedbackId || "");
       });
     });
 

@@ -2336,6 +2336,32 @@ async function deleteDepartmentFeedback(
   }
 }
 
+async function updateOcrFeedbackImage(
+  supabase: ReturnType<typeof createClient>,
+  feedbackId: number,
+  imageDataUrl: string
+) {
+  const normalizedImageDataUrl = typeof imageDataUrl === "string" ? imageDataUrl.trim() : "";
+  if (!normalizedImageDataUrl.startsWith("data:image/")) {
+    throw new Error("A valid image is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("sharsh_ocr_feedback")
+    .update({
+      image_data_url: normalizedImageDataUrl
+    })
+    .eq("id", feedbackId)
+    .select("id, created_at, department_id, department_name, report_date, photo_report_date, save_status, image_name, image_data_url, recognized_keys, changed_keys, ocr_raw, final_values, notes, cell_reviews")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapOcrFeedbackRows(data ? [data as Record<string, unknown>] : [])[0] || null;
+}
+
 function createSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -2509,6 +2535,20 @@ Deno.serve(async (request) => {
 
       await deleteDepartmentFeedback(supabase, departmentId as keyof typeof DEPARTMENTS, feedbackId);
       return jsonResponse(await loadSnapshot(supabase));
+    }
+
+    if (type === "update_ocr_feedback_image") {
+      const feedbackId = Number(payload.feedbackId);
+      const imageDataUrl = typeof payload.imageDataUrl === "string" ? payload.imageDataUrl.trim() : "";
+      if (!Number.isInteger(feedbackId) || feedbackId <= 0) {
+        return jsonResponse({ error: "A valid feedback id is required." }, 400);
+      }
+      if (!imageDataUrl.startsWith("data:image/")) {
+        return jsonResponse({ error: "A valid image is required." }, 400);
+      }
+
+      const record = await updateOcrFeedbackImage(supabase, feedbackId, imageDataUrl);
+      return jsonResponse({ ok: true, record });
     }
 
     if (type === "notify_owner_login") {
