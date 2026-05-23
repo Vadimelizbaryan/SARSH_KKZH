@@ -407,7 +407,10 @@ function buildInitialPhotoLightboxState() {
       alt: "Фото бланка",
       sourceKind: "",
       sourceId: "",
-      isRotating: false
+      isRotating: false,
+      isRechecking: false,
+      status: "",
+      statusIsError: false
     };
   }
 
@@ -6972,6 +6975,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     let ocrPreviewHtml = "";
+    let recheckButtonHtml = "";
     if (lightbox.sourceKind === "main-table-gallery" && lightbox.sourceId) {
       const record = getMainTablePhotoGalleryRecordById(lightbox.sourceId);
       const displayContext = getMainTableDisplaySnapshotContext();
@@ -6985,6 +6989,7 @@ function buildInitialPhotoLightboxState() {
           ? record.recognizedKeys.map((item) => String(item))
           : Object.keys(previewValues);
         const recognizedFields = new Set(recognizedKeys);
+        const suspectDetails = getPhotoImportSuspectDetails(boundRow, recognizedFields, previewValues);
         const reviewByKey = new Map(
           (Array.isArray(record.cellReviews) ? record.cellReviews : []).map((item) => [item.key, item])
         );
@@ -6993,12 +6998,12 @@ function buildInitialPhotoLightboxState() {
           {
             recognizedValues: previewValues,
             cellReviews: Array.isArray(record.cellReviews) ? record.cellReviews : [],
-            suspectKeys: [],
-            suspectReason: ""
+            suspectKeys: Array.isArray(suspectDetails?.suspectKeys) ? suspectDetails.suspectKeys : [],
+            suspectReason: suspectDetails?.suspectReason || ""
           },
           reviewByKey,
           recognizedFields,
-          new Set(),
+          new Set(Array.isArray(suspectDetails?.suspectKeys) ? suspectDetails.suspectKeys : []),
           { editable: false }
         );
         if (previewTable) {
@@ -7011,9 +7016,18 @@ function buildInitialPhotoLightboxState() {
                 <span class="photo-import-mini-table-status photo-import-mini-table-status--${escapeHtml(validationStatus.tone)}">${escapeHtml(validationStatus.text)}</span>
               </div>
               ${previewTable}
+              ${lightbox.status ? `<p class="hint${lightbox.statusIsError ? " warning-note" : ""}">${escapeHtml(lightbox.status)}</p>` : ""}
             </div>
           `;
         }
+        recheckButtonHtml = `
+          <button
+            type="button"
+            class="photo-lightbox-recheck"
+            id="photoLightboxRecheck"
+            ${lightbox.isRechecking ? "disabled" : ""}
+          >${lightbox.isRechecking ? "\u041F\u0440\u043E\u0432\u0435\u0440\u044F\u044E..." : "\u041F\u0435\u0440\u0435\u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C"}</button>
+        `;
       }
     }
 
@@ -7021,6 +7035,7 @@ function buildInitialPhotoLightboxState() {
       <div class="photo-lightbox" id="photoLightbox" aria-modal="true" role="dialog">
         <div class="photo-lightbox-backdrop" data-photo-lightbox-close="true"></div>
         <div class="photo-lightbox-dialog">
+          ${recheckButtonHtml}
           <button
             type="button"
             class="photo-lightbox-rotate"
@@ -9524,7 +9539,10 @@ function buildInitialPhotoLightboxState() {
       alt: alt || "Фото бланка",
       sourceKind: typeof sourceKind === "string" ? sourceKind : "",
       sourceId: sourceId == null ? "" : String(sourceId),
-      isRotating: false
+      isRotating: false,
+      isRechecking: false,
+      status: "",
+      statusIsError: false
     };
     renderPage();
   }
@@ -9629,6 +9647,118 @@ function buildInitialPhotoLightboxState() {
       };
       renderPage();
       setInfo(error instanceof Error ? error.message : "Не удалось повернуть фото.", true);
+    }
+  }
+
+  async function handlePhotoLightboxRecheck() {
+    const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+    if (
+      !lightbox.open
+      || lightbox.isRechecking
+      || lightbox.sourceKind !== "main-table-gallery"
+      || !lightbox.sourceId
+    ) {
+      return;
+    }
+
+    if (!sync.hasRemoteSync() || typeof sync.recognizeDepartmentPhoto !== "function") {
+      state.photoLightbox = {
+        ...lightbox,
+        status: "\u041F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0435 OCR \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E \u0442\u043E\u043B\u044C\u043A\u043E \u0432 \u043E\u043D\u043B\u0430\u0439\u043D-\u0440\u0435\u0436\u0438\u043C\u0435 \u0432\u043B\u0430\u0434\u0435\u043B\u044C\u0446\u0430.",
+        statusIsError: true
+      };
+      renderPage();
+      return;
+    }
+
+    const record = getMainTablePhotoGalleryRecordById(lightbox.sourceId);
+    if (!record) {
+      state.photoLightbox = {
+        ...lightbox,
+        status: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043D\u0430\u0439\u0442\u0438 OCR feedback \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0444\u043E\u0442\u043E.",
+        statusIsError: true
+      };
+      renderPage();
+      return;
+    }
+
+    const displayContext = getMainTableDisplaySnapshotContext();
+    const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
+    const boundRow = rows.find((row) => Number(row?.photoFeedbackId) === Number(record.id) || row?.id === record.departmentId) || null;
+    const departmentId = boundRow?.id || record.departmentId || "";
+    if (!departmentId) {
+      state.photoLightbox = {
+        ...lightbox,
+        status: "\u0423 \u044D\u0442\u043E\u0433\u043E \u0444\u043E\u0442\u043E \u043D\u0435\u0442 \u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u043E\u0439 \u043F\u0440\u0438\u0432\u044F\u0437\u043A\u0438 \u043A \u043E\u0442\u0434\u0435\u043B\u0435\u043D\u0438\u044E.",
+        statusIsError: true
+      };
+      renderPage();
+      return;
+    }
+
+    state.photoLightbox = {
+      ...lightbox,
+      isRechecking: true,
+      status: "\u041F\u043E\u0432\u0442\u043E\u0440\u043D\u043E \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u044E \u0446\u0438\u0444\u0440\u044B \u043D\u0430 \u0431\u043B\u0430\u043D\u043A\u0435...",
+      statusIsError: false
+    };
+    renderPage();
+
+    try {
+      const sourceDataUrl = state.photoLightbox?.imageDataUrl || record.imageDataUrl;
+      const ocrImageDataUrl = await buildFocusedOcrImageDataUrl(sourceDataUrl);
+      const alignedArtifacts = await buildAlignedRightOcrArtifacts(sourceDataUrl);
+      const rightOcrImageDataUrl = alignedArtifacts
+        ? alignedArtifacts.rightCropDataUrl
+        : await buildCroppedImageDataUrl(sourceDataUrl, OCR_RIGHT_FOCUS_CROP);
+      const rightCellCropDataUrls = alignedArtifacts
+        ? alignedArtifacts.rightCellCropDataUrls
+        : await buildRightCellCropDataUrls(sourceDataUrl);
+      const result = await sync.recognizeDepartmentPhoto(
+        departmentId,
+        ocrImageDataUrl,
+        [rightOcrImageDataUrl, ...rightCellCropDataUrls]
+      );
+
+      const recognizedValues = normalizePhotoPreviewValueObject(result?.values);
+      const recognizedKeys = Array.isArray(result?.recognizedKeys) && result.recognizedKeys.length
+        ? result.recognizedKeys.map((item) => String(item))
+        : Object.keys(recognizedValues);
+      const nextRecord = {
+        ...record,
+        departmentId,
+        imageDataUrl: sourceDataUrl,
+        reportDate: typeof result?.reportDate === "string" && result.reportDate.trim()
+          ? result.reportDate.trim()
+          : record.reportDate,
+        recognizedKeys,
+        changedKeys: [],
+        recognizedValues,
+        finalValues: recognizedValues,
+        notes: Array.isArray(result?.notes) ? normalizeOcrNotes(result.notes) : record.notes,
+        cellReviews: normalizePhotoCellReviews(result)
+      };
+      upsertMainTablePhotoGalleryRecord(nextRecord);
+
+      const hasValues = recognizedKeys.length > 0
+        && recognizedKeys.some((key) => Object.prototype.hasOwnProperty.call(recognizedValues, key));
+      state.photoLightbox = {
+        ...state.photoLightbox,
+        isRechecking: false,
+        status: hasValues
+          ? "OCR-\u0442\u0430\u0431\u043B\u0438\u0446\u0430 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u043F\u043E \u044D\u0442\u043E\u043C\u0443 \u0444\u043E\u0442\u043E."
+          : "OCR \u043E\u0442\u0440\u0430\u0431\u043E\u0442\u0430\u043B\u043E, \u043D\u043E \u043D\u043E\u0432\u044B\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F \u043D\u0435 \u0431\u044B\u043B\u0438 \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u043D\u044B.",
+        statusIsError: !hasValues
+      };
+      renderPage();
+    } catch (error) {
+      state.photoLightbox = {
+        ...state.photoLightbox,
+        isRechecking: false,
+        status: error instanceof Error ? error.message : "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0435 OCR.",
+        statusIsError: true
+      };
+      renderPage();
     }
   }
 
@@ -11332,6 +11462,13 @@ function buildInitialPhotoLightboxState() {
     if (photoLightboxRotate) {
       photoLightboxRotate.addEventListener("click", () => {
         void handleRotatePhotoLightbox();
+      });
+    }
+
+    const photoLightboxRecheck = document.getElementById("photoLightboxRecheck");
+    if (photoLightboxRecheck) {
+      photoLightboxRecheck.addEventListener("click", () => {
+        void handlePhotoLightboxRecheck();
       });
     }
 

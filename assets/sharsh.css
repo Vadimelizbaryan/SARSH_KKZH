@@ -581,7 +581,30 @@ a {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
 
+.photo-lightbox-recheck {
+  position: absolute;
+  top: -12px;
+  right: 92px;
+  min-width: 144px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 16px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
 .photo-lightbox-rotate:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.photo-lightbox-recheck:disabled {
   opacity: 0.6;
   cursor: wait;
 }
@@ -591,6 +614,10 @@ a {
 }
 
 .photo-lightbox-rotate:hover:not(:disabled) {
+  background: #000000;
+}
+
+.photo-lightbox-recheck:hover:not(:disabled) {
   background: #000000;
 }
 
