@@ -2145,7 +2145,9 @@
         .map((row) => Number(row?.photoFeedbackId))
         .filter((value) => Number.isFinite(value))
     );
-    if (!neededFeedbackIds.size && state.mainTablePhotoGallery.loaded) {
+    if (!neededFeedbackIds.size) {
+      state.mainTablePhotoGallery.loaded = true;
+      state.mainTablePhotoGallery.error = "";
       refreshMainTablePhotoGalleryUi(displayContext);
       return;
     }
@@ -2162,14 +2164,24 @@
     refreshMainTablePhotoGalleryUi(displayContext);
 
     try {
-      const records = await sync.listOcrFeedback(500);
-      state.mainTablePhotoGallery.records = (Array.isArray(records) ? records : [])
+      const records = await sync.listOcrFeedback(
+        Math.max(neededFeedbackIds.size, 1),
+        Array.from(neededFeedbackIds)
+      );
+      const fetchedRecords = (Array.isArray(records) ? records : [])
         .map(normalizeMainTablePhotoGalleryRecord)
         .filter(Boolean);
+      const mergedById = new Map();
+      [...fetchedRecords, ...loadedRecords].forEach((record) => {
+        const recordId = Number(record?.id);
+        if (Number.isFinite(recordId) && !mergedById.has(recordId)) {
+          mergedById.set(recordId, record);
+        }
+      });
+      state.mainTablePhotoGallery.records = Array.from(mergedById.values());
       state.mainTablePhotoGallery.loaded = true;
       state.mainTablePhotoGallery.error = "";
     } catch (error) {
-      state.mainTablePhotoGallery.records = [];
       state.mainTablePhotoGallery.loaded = true;
       state.mainTablePhotoGallery.error = error instanceof Error ? error.message : "Не удалось загрузить фото бланков.";
     } finally {

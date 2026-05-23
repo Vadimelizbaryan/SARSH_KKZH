@@ -1353,18 +1353,24 @@
     };
   }
 
-  async function listOcrFeedback(limit) {
+  async function listOcrFeedback(limit, feedbackIds) {
     if (!hasRemoteSync()) {
       return [];
     }
 
     ensureOwnerAuth();
+    const cleanFeedbackIds = Array.isArray(feedbackIds)
+      ? feedbackIds
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value > 0)
+      : [];
     const response = await fetch(getSyncEndpoint(), {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
         type: "list_ocr_feedback",
-        limit: Number.isFinite(Number(limit)) ? Number(limit) : 100
+        limit: Number.isFinite(Number(limit)) ? Number(limit) : 100,
+        feedbackIds: cleanFeedbackIds
       })
     });
 
