@@ -60,6 +60,7 @@
   const MAIN_PHOTO_ROUTE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-photo-route:v1`;
   const MAIN_PHOTO_ROUTE_MAX_AGE_MS = 15 * 60 * 1000;
   const MAIN_PHOTO_ROUTE_TRANSFER_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:main-photo-route-transfer:`;
+  const OCR_FEEDBACK_IMAGE_OVERRIDE_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:ocr-feedback-image-override:`;
   const MAIN_SAVE_NOTICE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-save-notice:v1`;
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
@@ -2381,6 +2382,49 @@ function buildInitialPhotoLightboxState() {
 
   function buildMainPhotoRouteTransferStorageKey(transferId) {
     return `${MAIN_PHOTO_ROUTE_TRANSFER_STORAGE_PREFIX}${transferId}`;
+  }
+
+  function buildOcrFeedbackImageOverrideStorageKey(feedbackId) {
+    return `${OCR_FEEDBACK_IMAGE_OVERRIDE_STORAGE_PREFIX}${String(feedbackId || "").trim()}`;
+  }
+
+  function storeOcrFeedbackImageOverride(feedbackId, imageDataUrl) {
+    const normalizedFeedbackId = String(feedbackId || "").trim();
+    const normalizedImageDataUrl = typeof imageDataUrl === "string" ? imageDataUrl.trim() : "";
+    if (!normalizedFeedbackId || !normalizedImageDataUrl.startsWith("data:image/")) {
+      return;
+    }
+
+    try {
+      sessionStorage.setItem(
+        buildOcrFeedbackImageOverrideStorageKey(normalizedFeedbackId),
+        JSON.stringify({
+          imageDataUrl: normalizedImageDataUrl,
+          savedAt: Date.now()
+        })
+      );
+    } catch (_error) {
+    }
+  }
+
+  function getOcrFeedbackImageOverride(feedbackId) {
+    const normalizedFeedbackId = String(feedbackId || "").trim();
+    if (!normalizedFeedbackId) {
+      return "";
+    }
+
+    try {
+      const raw = sessionStorage.getItem(buildOcrFeedbackImageOverrideStorageKey(normalizedFeedbackId));
+      if (!raw) {
+        return "";
+      }
+
+      const parsed = JSON.parse(raw);
+      const imageDataUrl = typeof parsed?.imageDataUrl === "string" ? parsed.imageDataUrl.trim() : "";
+      return imageDataUrl.startsWith("data:image/") ? imageDataUrl : "";
+    } catch (_error) {
+      return "";
+    }
   }
 
   function storePendingMainPhotoRouteTransfer(payload) {
@@ -9344,6 +9388,10 @@ function buildInitialPhotoLightboxState() {
     const sourceKind = String(lightbox.sourceKind || "");
     const sourceId = String(lightbox.sourceId || "");
 
+    if ((sourceKind === "main-table-gallery" || sourceKind === "photo-import") && sourceId) {
+      storeOcrFeedbackImageOverride(sourceId, imageDataUrl);
+    }
+
     if (sourceKind === "main-route") {
       state.mainPhotoRoute.imageDataUrl = imageDataUrl;
     }
@@ -9833,7 +9881,8 @@ function buildInitialPhotoLightboxState() {
         return;
       }
 
-      const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
+      const imageDataUrl = getOcrFeedbackImageOverride(feedbackId)
+        || (typeof record.imageDataUrl === "string" ? record.imageDataUrl : "");
       if (!imageDataUrl.startsWith("data:image/")) {
         return;
       }
@@ -9873,7 +9922,8 @@ function buildInitialPhotoLightboxState() {
         return;
       }
 
-      const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
+      const imageDataUrl = getOcrFeedbackImageOverride(feedbackId)
+        || (typeof record.imageDataUrl === "string" ? record.imageDataUrl : "");
       if (!imageDataUrl.startsWith("data:image/")) {
         return;
       }
@@ -9997,7 +10047,8 @@ function buildInitialPhotoLightboxState() {
         return;
       }
 
-      const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
+      const imageDataUrl = getOcrFeedbackImageOverride(feedbackId)
+        || (typeof record.imageDataUrl === "string" ? record.imageDataUrl : "");
       if (!imageDataUrl.startsWith("data:image/")) {
         return;
       }
