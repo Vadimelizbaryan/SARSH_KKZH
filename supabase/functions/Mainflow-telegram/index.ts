@@ -4829,6 +4829,15 @@ function isRetryableTelegramError(error: unknown) {
     /\(5\d\d\)/.test(message);
 }
 
+function isSupabaseTimeoutLikeError(error: unknown) {
+  const message = stringifyUnknownError(error).toLowerCase();
+  return message.includes("522") ||
+    message.includes("connection timed out") ||
+    message.includes("timed out") ||
+    message.includes("cloudflare") ||
+    message.includes("host error");
+}
+
 async function withTelegramRetry<T>(operation: () => Promise<T>, actionLabel: string) {
   let lastError: unknown = null;
 
@@ -9034,7 +9043,13 @@ async function handleTelegramCommand(
 
   if (command === "/start") {
     const person = message ? getTelegramPersonFromMessage(message, chatId) : null;
-    const gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
+    let gpsEnabled = false;
+    try {
+      gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
+    } catch (error) {
+      console.error("Failed to load Telegram GPS scenario state:", stringifyUnknownError(error));
+      gpsEnabled = false;
+    }
     await sendTelegramMessageWithReplyMarkup(
       chatId,
       [
@@ -9174,8 +9189,20 @@ async function handleTelegramCommand(
   }
 
   if (command === "/status") {
-    const snapshot = await loadSnapshot(supabase);
-    await sendTelegramMessage(chatId, buildStatusText(snapshot));
+    try {
+      const snapshot = await loadSnapshot(supabase);
+      await sendTelegramMessage(chatId, buildStatusText(snapshot));
+    } catch (error) {
+      console.error("Failed to build Telegram status text:", stringifyUnknownError(error));
+      if (isSupabaseTimeoutLikeError(error)) {
+        await sendTelegramMessage(
+          chatId,
+          "Այս պահին սերվերի տվյալների բազան ժամանակավորապես չի պատասխանում (timeout 522)։ Մի քանի րոպեից կրկին փորձեք /status հրամանը։"
+        );
+      } else {
+        throw error;
+      }
+    }
     return;
   }
 
