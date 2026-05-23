@@ -621,6 +621,82 @@ a {
   background: #000000;
 }
 
+.photo-lightbox-save-actions {
+  display: grid;
+  gap: 8px;
+}
+
+#photoLightboxSaveBtn {
+  justify-self: start;
+  min-width: 180px;
+}
+
+#photoLightboxSaveBtn.save-ready {
+  background: #0f8b4c;
+  border-color: #0f8b4c;
+  color: #ffffff;
+}
+
+#photoLightboxSaveBtn.save-ready:hover {
+  background: #0c6d3c;
+  border-color: #0c6d3c;
+}
+
+#photoLightboxSaveBtn.save-blocked,
+#photoLightboxSaveBtn.save-blocked:disabled {
+  background: #b13a2d;
+  border-color: #b13a2d;
+  color: #ffffff;
+  cursor: not-allowed;
+}
+
+.photo-lightbox-save-hint {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.photo-lightbox-department-table {
+  display: grid;
+  gap: 10px;
+}
+
+.photo-lightbox-department-table__wrap {
+  overflow-x: auto;
+}
+
+.photo-lightbox-department-table .sheet,
+.photo-lightbox-department-table .sheet * {
+  color: #111111 !important;
+}
+
+.photo-lightbox-department-table .sheet th,
+.photo-lightbox-department-table .sheet td {
+  background: #ffffff !important;
+  border-color: #111111 !important;
+}
+
+.photo-lightbox-department-table .sheet thead th {
+  background: #111111 !important;
+  color: #ffffff !important;
+}
+
+.photo-lightbox-department-table .sheet .dept-cell {
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+
+.photo-lightbox-department-table .sheet .single-total-row td,
+.photo-lightbox-department-table .sheet .subtotal-row td,
+.photo-lightbox-department-table .sheet .grand-row td {
+  background: #f3f3f3 !important;
+  color: #111111 !important;
+}
+
+.photo-lightbox-department-table .sheet td input,
+.photo-lightbox-department-table .sheet td button {
+  pointer-events: none;
+}
+
 .photo-import-results {
   display: grid;
   gap: 8px;
@@ -2047,6 +2123,14 @@ a {
   font-size: 12px;
   font-weight: 700;
   color: var(--ink);
+  text-align: left;
+}
+
+.main-table-photo-thumb__updated {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #2563eb;
   text-align: left;
 }
 

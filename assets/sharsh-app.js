@@ -409,6 +409,7 @@ function buildInitialPhotoLightboxState() {
       sourceId: "",
       isRotating: false,
       isRechecking: false,
+      isSaving: false,
       status: "",
       statusIsError: false
     };
@@ -2148,6 +2149,85 @@ function buildInitialPhotoLightboxState() {
     }).join("");
   }
 
+  function getMainTablePhotoLightboxContext(lightbox = state.photoLightbox || buildInitialPhotoLightboxState()) {
+    if (String(lightbox?.sourceKind || "") !== "main-table-gallery" || !lightbox?.sourceId) {
+      return null;
+    }
+
+    const record = getMainTablePhotoGalleryRecordById(lightbox.sourceId);
+    if (!record) {
+      return null;
+    }
+
+    const displayContext = getMainTableDisplaySnapshotContext();
+    const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
+    const boundRow = rows.find((row) => Number(row?.photoFeedbackId) === Number(record.id) || row?.id === record.departmentId) || null;
+    const previewValues = buildPhotoPreviewValuesFromRecord(record);
+    const recognizedKeys = Array.isArray(record.recognizedKeys) && record.recognizedKeys.length
+      ? record.recognizedKeys.map((item) => String(item))
+      : Object.keys(previewValues);
+    const recognizedFields = new Set(recognizedKeys);
+    const suspectDetails = boundRow
+      ? getPhotoImportSuspectDetails(boundRow, recognizedFields, previewValues)
+      : { suspectKeys: [], suspectReason: "" };
+    const reviewByKey = new Map(
+      (Array.isArray(record.cellReviews) ? record.cellReviews : []).map((item) => [item.key, item])
+    );
+    const validation = boundRow
+      ? buildPhotoImportPreviewValidation(boundRow, previewValues)
+      : {
+        applicable: false,
+        checks: [],
+        applicableChecks: [],
+        failedChecks: [],
+        failedKeySet: new Set(),
+        isValid: false,
+        statusTone: "neutral"
+      };
+    const validationStatus = buildPhotoImportPreviewValidationStatus(validation);
+
+    return {
+      record,
+      displayContext,
+      rows,
+      boundRow,
+      previewValues,
+      recognizedKeys,
+      recognizedFields,
+      suspectDetails,
+      reviewByKey,
+      validation,
+      validationStatus
+    };
+  }
+
+  function renderPhotoLightboxDepartmentTable(snapshot, row) {
+    if (!snapshot || !row) {
+      return "";
+    }
+
+    const tableHtml = renderTable(
+      snapshot,
+      [row],
+      {
+        interactive: false,
+        viewMode: "department",
+        headerDateTime: getHeaderDateTimeParts(snapshot.reportDate) || getCurrentDateTimeParts()
+      }
+    ).replace(' id="sheetTable"', "");
+
+    return `
+      <div class="photo-lightbox-department-table">
+        <div class="photo-lightbox-ocr__head">
+          <h3>Ð¢ÐµÐºÑƒÑ‰Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ</h3>
+        </div>
+        <div class="table-wrap photo-lightbox-department-table__wrap">
+          ${tableHtml}
+        </div>
+      </div>
+    `;
+  }
+
   function buildMainTablePhotoGalleryContent(displayContext = getMainTableDisplaySnapshotContext()) {
     const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
     const items = getMainTablePhotoGalleryItems(rows);
@@ -2199,6 +2279,7 @@ function buildInitialPhotoLightboxState() {
               </button>
               <div class="main-table-photo-thumb__meta">
                 <span class="main-table-photo-thumb__caption">${escapeHtml(item.departmentName)}</span>
+                ${item.updatedAt ? `<span class="main-table-photo-thumb__updated">ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾ ${escapeHtml(formatTimestamp(item.updatedAt))}</span>` : ""}
                 <label class="main-table-photo-thumb__department-picker">
                   <span>Отделение</span>
                   <select
@@ -6977,45 +7058,54 @@ function buildInitialPhotoLightboxState() {
     let ocrPreviewHtml = "";
     let recheckButtonHtml = "";
     if (lightbox.sourceKind === "main-table-gallery" && lightbox.sourceId) {
-      const record = getMainTablePhotoGalleryRecordById(lightbox.sourceId);
-      const displayContext = getMainTableDisplaySnapshotContext();
-      const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
-      const boundRow = record
-        ? rows.find((row) => Number(row?.photoFeedbackId) === Number(record.id) || row?.id === record.departmentId)
-        : null;
-      if (record && boundRow) {
-        const previewValues = buildPhotoPreviewValuesFromRecord(record);
-        const recognizedKeys = Array.isArray(record.recognizedKeys) && record.recognizedKeys.length
-          ? record.recognizedKeys.map((item) => String(item))
-          : Object.keys(previewValues);
-        const recognizedFields = new Set(recognizedKeys);
-        const suspectDetails = getPhotoImportSuspectDetails(boundRow, recognizedFields, previewValues);
-        const reviewByKey = new Map(
-          (Array.isArray(record.cellReviews) ? record.cellReviews : []).map((item) => [item.key, item])
-        );
+      const context = getMainTablePhotoLightboxContext(lightbox);
+      const boundRow = context?.boundRow || null;
+      if (context?.record && boundRow) {
         const previewTable = renderPhotoImportPreviewTable(
           boundRow,
           {
-            recognizedValues: previewValues,
-            cellReviews: Array.isArray(record.cellReviews) ? record.cellReviews : [],
-            suspectKeys: Array.isArray(suspectDetails?.suspectKeys) ? suspectDetails.suspectKeys : [],
-            suspectReason: suspectDetails?.suspectReason || ""
+            recognizedValues: context.previewValues,
+            cellReviews: Array.isArray(context.record.cellReviews) ? context.record.cellReviews : [],
+            suspectKeys: Array.isArray(context.suspectDetails?.suspectKeys) ? context.suspectDetails.suspectKeys : [],
+            suspectReason: context.suspectDetails?.suspectReason || ""
           },
-          reviewByKey,
-          recognizedFields,
-          new Set(Array.isArray(suspectDetails?.suspectKeys) ? suspectDetails.suspectKeys : []),
+          context.reviewByKey,
+          context.recognizedFields,
+          new Set(Array.isArray(context.suspectDetails?.suspectKeys) ? context.suspectDetails.suspectKeys : []),
           { editable: false }
         );
         if (previewTable) {
-          const validation = buildPhotoImportPreviewValidation(boundRow, previewValues);
-          const validationStatus = buildPhotoImportPreviewValidationStatus(validation);
+          const isArchivePreview = Boolean(state.activeMainTableSavedPreviewKey);
+          const hasDirtyMainTableRows = getMainTableDirtyRows().length > 0;
+          const saveBlockedByControls = !context.validation.applicable || !context.validation.isValid;
+          const saveBlockedByState = isArchivePreview || hasDirtyMainTableRows || state.mainTableSaveInFlight;
+          const canSave = !saveBlockedByControls && !saveBlockedByState && !lightbox.isSaving;
+          const saveHint = isArchivePreview
+            ? "Ð”Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ OCR Ð²ÐµÑ€Ð½Ð¸Ñ‚ÐµÑÑŒ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ."
+            : (hasDirtyMainTableRows
+              ? "Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¸Ð»Ð¸ ÑÐ½Ð¸Ð¼Ð¸Ñ‚Ðµ Ñ€ÑƒÑ‡Ð½Ñ‹Ðµ Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ."
+              : (state.mainTableSaveInFlight
+                ? "Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑƒÐ¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ. ÐŸÐ¾Ð´Ð¾Ð¶Ð´Ð¸Ñ‚Ðµ."
+                : (saveBlockedByControls
+                  ? context.validation.failedChecks.map((item) => item.failureMessage).join(" ")
+                  : "ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒ Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½. OCR Ð¼Ð¾Ð¶Ð½Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð² ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.")));
           ocrPreviewHtml = `
             <div class="photo-lightbox-ocr">
               <div class="photo-lightbox-ocr__head">
                 <h3>OCR данные</h3>
-                <span class="photo-import-mini-table-status photo-import-mini-table-status--${escapeHtml(validationStatus.tone)}">${escapeHtml(validationStatus.text)}</span>
+                <span class="photo-import-mini-table-status photo-import-mini-table-status--${escapeHtml(context.validationStatus.tone)}">${escapeHtml(context.validationStatus.text)}</span>
               </div>
               ${previewTable}
+              <div class="photo-lightbox-save-actions">
+                <button
+                  type="button"
+                  id="photoLightboxSaveBtn"
+                  class="${canSave ? "save-ready" : "save-blocked"}"
+                  ${(canSave && !lightbox.isSaving) ? "" : "disabled"}
+                >${lightbox.isSaving ? "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ..." : "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ"}</button>
+                <span class="photo-lightbox-save-hint${(!canSave && saveBlockedByControls) || lightbox.statusIsError ? " warning-note" : ""}">${escapeHtml(saveHint)}</span>
+              </div>
+              ${renderPhotoLightboxDepartmentTable(context.displayContext?.snapshot || state.snapshot, boundRow)}
               ${lightbox.status ? `<p class="hint${lightbox.statusIsError ? " warning-note" : ""}">${escapeHtml(lightbox.status)}</p>` : ""}
             </div>
           `;
@@ -7025,7 +7115,7 @@ function buildInitialPhotoLightboxState() {
             type="button"
             class="photo-lightbox-recheck"
             id="photoLightboxRecheck"
-            ${lightbox.isRechecking ? "disabled" : ""}
+            ${(lightbox.isRechecking || lightbox.isSaving) ? "disabled" : ""}
           >${lightbox.isRechecking ? "\u041F\u0440\u043E\u0432\u0435\u0440\u044F\u044E..." : "\u041F\u0435\u0440\u0435\u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C"}</button>
         `;
       }
@@ -7042,7 +7132,7 @@ function buildInitialPhotoLightboxState() {
             id="photoLightboxRotate"
             aria-label="Повернуть фото"
             title="Повернуть фото"
-            ${lightbox.isRotating ? "disabled" : ""}
+            ${(lightbox.isRotating || lightbox.isSaving) ? "disabled" : ""}
           >↻</button>
           <button type="button" class="photo-lightbox-close" id="photoLightboxClose" aria-label="Закрыть просмотр">×</button>
           <img src="${escapeHtml(lightbox.imageDataUrl)}" alt="${escapeHtml(lightbox.alt || "Фото бланка")}">
@@ -9541,6 +9631,7 @@ function buildInitialPhotoLightboxState() {
       sourceId: sourceId == null ? "" : String(sourceId),
       isRotating: false,
       isRechecking: false,
+      isSaving: false,
       status: "",
       statusIsError: false
     };
@@ -9621,7 +9712,7 @@ function buildInitialPhotoLightboxState() {
 
   async function handleRotatePhotoLightbox() {
     const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
-    if (!lightbox.open || !lightbox.imageDataUrl || lightbox.isRotating) {
+    if (!lightbox.open || !lightbox.imageDataUrl || lightbox.isRotating || lightbox.isSaving) {
       return;
     }
 
@@ -9655,6 +9746,7 @@ function buildInitialPhotoLightboxState() {
     if (
       !lightbox.open
       || lightbox.isRechecking
+      || lightbox.isSaving
       || lightbox.sourceKind !== "main-table-gallery"
       || !lightbox.sourceId
     ) {
@@ -9756,6 +9848,127 @@ function buildInitialPhotoLightboxState() {
         ...state.photoLightbox,
         isRechecking: false,
         status: error instanceof Error ? error.message : "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0435 OCR.",
+        statusIsError: true
+      };
+      renderPage();
+    }
+  }
+
+  async function handlePhotoLightboxSave() {
+    const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+    if (
+      !lightbox.open
+      || lightbox.isSaving
+      || lightbox.sourceKind !== "main-table-gallery"
+      || !lightbox.sourceId
+    ) {
+      return;
+    }
+
+    if (!sync.hasRemoteSync() || typeof sync.saveDepartmentFromMain !== "function") {
+      state.photoLightbox = {
+        ...lightbox,
+        status: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ OCR Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.",
+        statusIsError: true
+      };
+      renderPage();
+      return;
+    }
+
+    if (state.activeMainTableSavedPreviewKey) {
+      state.photoLightbox = {
+        ...lightbox,
+        status: "Ð’ÐµÑ€Ð½Ð¸Ñ‚ÐµÑÑŒ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ OCR Ð² Ð³Ð»Ð°Ð²Ð½ÑƒÑŽ ÑÑ‚Ñ€Ð¾ÐºÑƒ.",
+        statusIsError: true
+      };
+      renderPage();
+      return;
+    }
+
+    if (getMainTableDirtyRows().length) {
+      state.photoLightbox = {
+        ...lightbox,
+        status: "Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¸Ð»Ð¸ ÑÐ½Ð¸Ð¼Ð¸Ñ‚Ðµ Ñ€ÑƒÑ‡Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ.",
+        statusIsError: true
+      };
+      renderPage();
+      return;
+    }
+
+    if (state.mainTableSaveInFlight) {
+      state.photoLightbox = {
+        ...lightbox,
+        status: "Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑƒÐ¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ. ÐŸÐ¾Ð´Ð¾Ð¶Ð´Ð¸Ñ‚Ðµ.",
+        statusIsError: true
+      };
+      renderPage();
+      return;
+    }
+
+    const context = getMainTablePhotoLightboxContext(lightbox);
+    if (!context?.record || !context.boundRow) {
+      state.photoLightbox = {
+        ...lightbox,
+        status: "Ð£ ÑÑ‚Ð¾Ð³Ð¾ Ñ„Ð¾Ñ‚Ð¾ Ð½ÐµÑ‚ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð¹ Ð¿Ñ€Ð¸Ð²ÑÐ·ÐºÐ¸ Ðº ÑÑ‚Ñ€Ð¾ÐºÐµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.",
+        statusIsError: true
+      };
+      renderPage();
+      return;
+    }
+
+    if (!context.validation.applicable || !context.validation.isValid) {
+      state.photoLightbox = {
+        ...lightbox,
+        status: context.validation.failedChecks.map((item) => item.failureMessage).join(" ") || "ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ñ‹Ðµ ÑÑƒÐ¼Ð¼Ñ‹ OCR Ð½Ðµ ÑÐ¾ÑˆÐ»Ð¸ÑÑŒ.",
+        statusIsError: true
+      };
+      renderPage();
+      return;
+    }
+
+    state.photoLightbox = {
+      ...lightbox,
+      isSaving: true,
+      status: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð² ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ...",
+      statusIsError: false
+    };
+    renderPage();
+
+    try {
+      const draftRow = deepCopy(context.boundRow);
+      const appliedKeys = applyPreviewValuesToDepartmentRow(draftRow, context.previewValues, context.recognizedKeys);
+      if (!appliedKeys.length) {
+        throw new Error("Ð’ OCR Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ Ð½ÐµÑ‚ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ð¹ Ð´Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ.");
+      }
+
+      const expectedValues = config.normalizeRowValues(draftRow.values);
+      if (isQhCalcDepartment(draftRow)) {
+        expectedValues.qhBaseSoldier = expectedValues.currentShar || 0;
+        expectedValues.qhBaseOfficer = expectedValues.currentSpa || 0;
+        expectedValues.qhBaseContract = expectedValues.currentPaym || 0;
+      }
+
+      const payloadValues = deepCopy(expectedValues);
+      const result = await sync.saveDepartmentFromMain(draftRow.id, state.snapshot.reportDate, payloadValues);
+      const verification = verifySavedRowResult(draftRow.id, expectedValues, result.snapshot);
+      if (!verification.ok) {
+        throw new Error(verification.reason);
+      }
+
+      applyLoadedSnapshot(result);
+      state.photoLightbox = {
+        ...state.photoLightbox,
+        isSaving: false,
+        status: `OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹. ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾: ${formatTimestamp(verification.savedRow.updatedAt)}.`,
+        statusIsError: false
+      };
+      setInfo(`OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð´Ð»Ñ ${draftRow.department} ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ.`, false);
+      refreshTableData();
+    } catch (error) {
+      state.photoLightbox = {
+        ...state.photoLightbox,
+        isSaving: false,
+        status: error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ.",
         statusIsError: true
       };
       renderPage();
@@ -11469,6 +11682,13 @@ function buildInitialPhotoLightboxState() {
     if (photoLightboxRecheck) {
       photoLightboxRecheck.addEventListener("click", () => {
         void handlePhotoLightboxRecheck();
+      });
+    }
+
+    const photoLightboxSaveBtn = document.getElementById("photoLightboxSaveBtn");
+    if (photoLightboxSaveBtn) {
+      photoLightboxSaveBtn.addEventListener("click", () => {
+        void handlePhotoLightboxSave();
       });
     }
 
