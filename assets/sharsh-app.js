@@ -1473,17 +1473,18 @@ function buildInitialPhotoLightboxState() {
       throw new Error("Не удалось определить размер изображения.");
     }
 
-    const candidateRotations = [0];
+    const candidateRotations = [0, 90, 180, 270];
     let bestRotation = 0;
     let bestCanvas = null;
     let bestScore = Number.NEGATIVE_INFINITY;
 
     candidateRotations.forEach((rotation) => {
-      const candidateCanvas = buildRotatedCanvasFromImage(image, rotation);
+      const initialCanvas = buildRotatedCanvasFromImage(image, rotation);
+      const { canvas: candidateCanvas, rotation: normalizedRotation } = flipCanvasIfSrIsBottomLeft(initialCanvas, rotation);
       const score = scoreCanvasForSrTopRight(candidateCanvas);
       if (score > bestScore) {
         bestScore = score;
-        bestRotation = rotation;
+        bestRotation = normalizedRotation;
         bestCanvas = candidateCanvas;
       }
     });
