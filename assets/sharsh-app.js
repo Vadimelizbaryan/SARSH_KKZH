@@ -416,6 +416,15 @@
     };
   }
 
+  function buildInitialMainTablePhotoGalleryState() {
+    return {
+      records: [],
+      isLoading: false,
+      error: "",
+      loaded: false
+    };
+  }
+
   const state = {
     snapshot: config.buildDefaultSnapshot(),
     loadedSnapshot: config.buildDefaultSnapshot(),
@@ -455,6 +464,7 @@
     mainPhotoSaveDirectoryName: "",
     mainPhotoRoute: buildInitialMainPhotoRouteState(),
     feedback: buildInitialFeedbackState(),
+    mainTablePhotoGallery: buildInitialMainTablePhotoGalleryState(),
     departmentTopCellsUnlocked: false,
     mainTableUnlocked: false,
     mainTableSaveSequence: 0,
@@ -1996,6 +2006,175 @@
       state.feedback.error = error instanceof Error ? error.message : "Не удалось загрузить OCR feedback.";
     } finally {
       state.feedback.isLoading = false;
+    }
+  }
+
+  function normalizeMainTablePhotoGalleryRecord(record) {
+    if (!record || typeof record !== "object") {
+      return null;
+    }
+
+    const id = Number(record.id);
+    const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl.trim() : "";
+    if (!Number.isFinite(id) || !imageDataUrl.startsWith("data:image/")) {
+      return null;
+    }
+
+    return {
+      id,
+      departmentId: typeof record.departmentId === "string" ? record.departmentId : "",
+      departmentName: typeof record.departmentName === "string" ? record.departmentName : "",
+      reportDate: typeof record.reportDate === "string" ? record.reportDate : "",
+      photoReportDate: typeof record.photoReportDate === "string" ? record.photoReportDate : "",
+      imageName: typeof record.imageName === "string" ? record.imageName : "",
+      imageDataUrl,
+      createdAt: typeof record.createdAt === "string" ? record.createdAt : "",
+      saveStatus: typeof record.saveStatus === "string" ? record.saveStatus : "",
+      notes: normalizeOcrNotes(record.notes)
+    };
+  }
+
+  function ensureMainTablePhotoGalleryRecordsLoaded() {
+    if (!Array.isArray(state.mainTablePhotoGallery.records)) {
+      state.mainTablePhotoGallery.records = [];
+    }
+    return state.mainTablePhotoGallery.records;
+  }
+
+  function getMainTablePhotoGalleryItems(rows) {
+    const records = ensureMainTablePhotoGalleryRecordsLoaded();
+    const byId = new Map(
+      records
+        .map((record) => normalizeMainTablePhotoGalleryRecord(record))
+        .filter(Boolean)
+        .map((record) => [record.id, record])
+    );
+
+    return (Array.isArray(rows) ? rows : [])
+      .filter((row) => row && Number.isFinite(Number(row.photoFeedbackId)))
+      .map((row) => {
+        const feedbackId = Number(row.photoFeedbackId);
+        const record = byId.get(feedbackId);
+        if (!record) {
+          return null;
+        }
+        return {
+          ...record,
+          feedbackId,
+          rowId: row.id,
+          departmentName: row.department || record.departmentName || row.id,
+          updatedAt: getRowEffectiveUpdatedAt(row),
+          workflowStatus: row.photoWorkflowStatus || "",
+          freshness: getRowFreshnessMeta(row)
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function buildMainTablePhotoGalleryContent(displayContext = getMainTableDisplaySnapshotContext()) {
+    const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
+    const items = getMainTablePhotoGalleryItems(rows);
+
+    if (state.mainTablePhotoGallery.error) {
+      return {
+        summary: state.mainTablePhotoGallery.error,
+        html: '<div class="archive-empty">Не удалось загрузить фото бланков для этой таблицы.</div>'
+      };
+    }
+
+    if (state.mainTablePhotoGallery.isLoading && !items.length) {
+      return {
+        summary: "Загружаю фото бланков для текущей сводки...",
+        html: '<div class="archive-empty">Загружаю фото...</div>'
+      };
+    }
+
+    if (!items.length) {
+      return {
+        summary: "Для показанной версии таблицы пока нет связанных фото бланков.",
+        html: '<div class="archive-empty">Связанных фото бланков пока нет.</div>'
+      };
+    }
+
+    return {
+      summary: `Показано фото бланков: ${items.length}. Нажмите на фото, чтобы открыть его крупно.`,
+      html: `
+        <div class="main-table-photo-gallery-grid">
+          ${items.map((item) => `
+            <button
+              type="button"
+              class="main-table-photo-thumb"
+              data-main-table-photo-open="${escapeHtml(String(item.feedbackId))}"
+              aria-label="${escapeHtml(`Открыть фото бланка ${item.departmentName}`)}"
+              title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `\nДата на фото: ${item.photoReportDate}` : ""}${item.updatedAt ? `\nОбновлено: ${formatTimestamp(item.updatedAt)}` : ""}`)}"
+            >
+              <img src="${escapeHtml(item.imageDataUrl)}" alt="${escapeHtml(`Фото бланка ${item.departmentName}`)}">
+              <span class="main-table-photo-thumb__caption">${escapeHtml(item.departmentName)}</span>
+            </button>
+          `).join("")}
+        </div>
+      `
+    };
+  }
+
+  function refreshMainTablePhotoGalleryUi(displayContext = getMainTableDisplaySnapshotContext()) {
+    const summaryEl = document.getElementById("mainTablePhotoGallerySummaryText");
+    const listEl = document.getElementById("mainTablePhotoGalleryList");
+    if (!summaryEl || !listEl) {
+      return;
+    }
+
+    const content = buildMainTablePhotoGalleryContent(displayContext);
+    summaryEl.textContent = content.summary;
+    listEl.innerHTML = content.html;
+  }
+
+  async function refreshMainTablePhotoGalleryRecordsFromRemote(displayContext = getMainTableDisplaySnapshotContext()) {
+    if (
+      mode !== "main"
+      || state.mainTablePhotoGallery.isLoading
+      || !sync.hasRemoteSync?.()
+      || typeof sync.listOcrFeedback !== "function"
+    ) {
+      refreshMainTablePhotoGalleryUi(displayContext);
+      return;
+    }
+
+    const neededFeedbackIds = new Set(
+      (Array.isArray(displayContext?.rows) ? displayContext.rows : [])
+        .map((row) => Number(row?.photoFeedbackId))
+        .filter((value) => Number.isFinite(value))
+    );
+    if (!neededFeedbackIds.size && state.mainTablePhotoGallery.loaded) {
+      refreshMainTablePhotoGalleryUi(displayContext);
+      return;
+    }
+
+    const loadedRecords = ensureMainTablePhotoGalleryRecordsLoaded();
+    const hasAllNeeded = Array.from(neededFeedbackIds).every((id) => loadedRecords.some((record) => Number(record?.id) === id));
+    if (state.mainTablePhotoGallery.loaded && hasAllNeeded) {
+      refreshMainTablePhotoGalleryUi(displayContext);
+      return;
+    }
+
+    state.mainTablePhotoGallery.isLoading = true;
+    state.mainTablePhotoGallery.error = "";
+    refreshMainTablePhotoGalleryUi(displayContext);
+
+    try {
+      const records = await sync.listOcrFeedback(500);
+      state.mainTablePhotoGallery.records = (Array.isArray(records) ? records : [])
+        .map(normalizeMainTablePhotoGalleryRecord)
+        .filter(Boolean);
+      state.mainTablePhotoGallery.loaded = true;
+      state.mainTablePhotoGallery.error = "";
+    } catch (error) {
+      state.mainTablePhotoGallery.records = [];
+      state.mainTablePhotoGallery.loaded = true;
+      state.mainTablePhotoGallery.error = error instanceof Error ? error.message : "Не удалось загрузить фото бланков.";
+    } finally {
+      state.mainTablePhotoGallery.isLoading = false;
+      refreshMainTablePhotoGalleryUi(displayContext);
     }
   }
 
@@ -6257,6 +6436,10 @@
     const displayedMainTableHeaderDateTime = activeMainTableSavedRecord
       ? getHeaderDateTimeParts(activeMainTableSavedRecord.reportDate)
       : null;
+    const mainTablePhotoGalleryContent = buildMainTablePhotoGalleryContent({
+      snapshot: displayedMainTableSnapshot,
+      rows: displayedMainTableRows
+    });
     const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
     const canEditMainTable = canEditMainTableDirectly();
     const mainBlankPdfPath = config.getMainBlankPdfPath
@@ -6367,6 +6550,14 @@
                 </div>
               </div>
             </div>
+
+        <section class="panel no-print main-table-photo-gallery-panel">
+          <h2>Фото бланков текущей таблицы</h2>
+          <p id="mainTablePhotoGallerySummaryText">${escapeHtml(mainTablePhotoGalleryContent.summary)}</p>
+          <div class="archive-list" id="mainTablePhotoGalleryList">
+            ${mainTablePhotoGalleryContent.html}
+          </div>
+        </section>
 
         <div class="layout-grid split">
           <div class="info-stack">
@@ -7906,6 +8097,8 @@
         departmentPdfArchiveList.innerHTML = buildMainDepartmentPdfArchivePicker(departmentPdfArchiveRecords);
       }
       syncMainDepartmentPdfArchivePickerUi();
+      refreshMainTablePhotoGalleryUi(mainDisplayContext);
+      void refreshMainTablePhotoGalleryRecordsFromRemote(mainDisplayContext);
 
       state.snapshot.rows.forEach((row) => {
         const meta = getRowFreshnessMeta(row);
@@ -10594,6 +10787,22 @@
           return;
         }
         openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Фото бланка");
+      });
+    });
+
+    document.querySelectorAll("[data-main-table-photo-open]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const feedbackId = Number(button.getAttribute("data-main-table-photo-open") || "");
+        if (!Number.isFinite(feedbackId)) {
+          return;
+        }
+        const record = ensureMainTablePhotoGalleryRecordsLoaded()
+          .map((item) => normalizeMainTablePhotoGalleryRecord(item))
+          .find((item) => item && item.id === feedbackId);
+        if (!record) {
+          return;
+        }
+        openPhotoLightbox(record.imageDataUrl, `Фото бланка ${record.departmentName || record.departmentId || feedbackId}`);
       });
     });
 
