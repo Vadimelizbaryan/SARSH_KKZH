@@ -511,8 +511,11 @@ a {
 .photo-lightbox-dialog {
   position: relative;
   z-index: 1;
+  display: grid;
+  gap: 16px;
   max-width: min(92vw, 1400px);
   max-height: 88vh;
+  overflow: auto;
   padding: 14px;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.97);
@@ -522,10 +525,28 @@ a {
 .photo-lightbox-dialog img {
   display: block;
   max-width: min(88vw, 1320px);
-  max-height: calc(88vh - 28px);
+  max-height: min(56vh, 720px);
   width: auto;
   height: auto;
   border-radius: 14px;
+}
+
+.photo-lightbox-ocr {
+  display: grid;
+  gap: 10px;
+}
+
+.photo-lightbox-ocr__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.photo-lightbox-ocr__head h3 {
+  margin: 0;
+  font-size: 18px;
 }
 
 .photo-lightbox-close {

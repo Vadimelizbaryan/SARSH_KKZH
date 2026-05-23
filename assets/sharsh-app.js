@@ -1516,6 +1516,20 @@ function buildInitialPhotoLightboxState() {
     };
   }
 
+  function normalizePhotoPreviewValueObject(values) {
+    if (!values || typeof values !== "object") {
+      return {};
+    }
+
+    const output = {};
+    PHOTO_FIELD_DEFINITIONS.forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(values, field.key)) {
+        output[field.key] = config.normalizeCellValue(values[field.key]);
+      }
+    });
+    return output;
+  }
+
   async function compressImageFile(file) {
     const sourceDataUrl = await readFileAsDataUrl(file);
     return normalizeImageDataUrl(sourceDataUrl);
@@ -2048,7 +2062,16 @@ function buildInitialPhotoLightboxState() {
       imageDataUrl,
       createdAt: typeof record.createdAt === "string" ? record.createdAt : "",
       saveStatus: typeof record.saveStatus === "string" ? record.saveStatus : "",
-      notes: normalizeOcrNotes(record.notes)
+      notes: normalizeOcrNotes(record.notes),
+      recognizedKeys: Array.isArray(record.recognizedKeys)
+        ? record.recognizedKeys.map((item) => String(item))
+        : [],
+      changedKeys: Array.isArray(record.changedKeys)
+        ? record.changedKeys.map((item) => String(item))
+        : [],
+      recognizedValues: normalizePhotoPreviewValueObject(record.recognizedValues || record.recognized_values),
+      finalValues: normalizePhotoPreviewValueObject(record.finalValues || record.final_values),
+      cellReviews: Array.isArray(record.cellReviews) ? record.cellReviews : []
     };
   }
 
@@ -2057,6 +2080,13 @@ function buildInitialPhotoLightboxState() {
       state.mainTablePhotoGallery.records = [];
     }
     return state.mainTablePhotoGallery.records;
+  }
+
+  function getMainTablePhotoGalleryRecordById(feedbackId) {
+    const normalizedFeedbackId = Number(feedbackId);
+    return ensureMainTablePhotoGalleryRecordsLoaded()
+      .map((record) => normalizeMainTablePhotoGalleryRecord(record))
+      .find((record) => record && Number(record.id) === normalizedFeedbackId) || null;
   }
 
   function getArchiveDateKey(value = new Date()) {
@@ -4712,12 +4742,17 @@ function buildInitialPhotoLightboxState() {
     setInfo("Հաշվարկները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
   }
 
-  function getPhotoPreviewValue(row, key) {
-    if (!row || !state.photoImport || !state.photoImport.recognizedValues || typeof state.photoImport.recognizedValues !== "object") {
+  function getPhotoPreviewValue(row, key, sourceValues = null) {
+    const effectiveSourceValues = sourceValues && typeof sourceValues === "object"
+      ? sourceValues
+      : (state.photoImport?.recognizedValues && typeof state.photoImport.recognizedValues === "object"
+        ? state.photoImport.recognizedValues
+        : null);
+    if (!row || !effectiveSourceValues) {
       return "";
     }
-    return Object.prototype.hasOwnProperty.call(state.photoImport.recognizedValues, key)
-      ? state.photoImport.recognizedValues[key]
+    return Object.prototype.hasOwnProperty.call(effectiveSourceValues, key)
+      ? effectiveSourceValues[key]
       : "";
   }
 
@@ -6936,6 +6971,52 @@ function buildInitialPhotoLightboxState() {
       return "";
     }
 
+    let ocrPreviewHtml = "";
+    if (lightbox.sourceKind === "main-table-gallery" && lightbox.sourceId) {
+      const record = getMainTablePhotoGalleryRecordById(lightbox.sourceId);
+      const displayContext = getMainTableDisplaySnapshotContext();
+      const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
+      const boundRow = record
+        ? rows.find((row) => Number(row?.photoFeedbackId) === Number(record.id) || row?.id === record.departmentId)
+        : null;
+      if (record && boundRow) {
+        const previewValues = buildPhotoPreviewValuesFromRecord(record);
+        const recognizedKeys = Array.isArray(record.recognizedKeys) && record.recognizedKeys.length
+          ? record.recognizedKeys.map((item) => String(item))
+          : Object.keys(previewValues);
+        const recognizedFields = new Set(recognizedKeys);
+        const reviewByKey = new Map(
+          (Array.isArray(record.cellReviews) ? record.cellReviews : []).map((item) => [item.key, item])
+        );
+        const previewTable = renderPhotoImportPreviewTable(
+          boundRow,
+          {
+            recognizedValues: previewValues,
+            cellReviews: Array.isArray(record.cellReviews) ? record.cellReviews : [],
+            suspectKeys: [],
+            suspectReason: ""
+          },
+          reviewByKey,
+          recognizedFields,
+          new Set(),
+          { editable: false }
+        );
+        if (previewTable) {
+          const validation = buildPhotoImportPreviewValidation(boundRow, previewValues);
+          const validationStatus = buildPhotoImportPreviewValidationStatus(validation);
+          ocrPreviewHtml = `
+            <div class="photo-lightbox-ocr">
+              <div class="photo-lightbox-ocr__head">
+                <h3>OCR данные</h3>
+                <span class="photo-import-mini-table-status photo-import-mini-table-status--${escapeHtml(validationStatus.tone)}">${escapeHtml(validationStatus.text)}</span>
+              </div>
+              ${previewTable}
+            </div>
+          `;
+        }
+      }
+    }
+
     return `
       <div class="photo-lightbox" id="photoLightbox" aria-modal="true" role="dialog">
         <div class="photo-lightbox-backdrop" data-photo-lightbox-close="true"></div>
@@ -6950,6 +7031,7 @@ function buildInitialPhotoLightboxState() {
           >↻</button>
           <button type="button" class="photo-lightbox-close" id="photoLightboxClose" aria-label="Закрыть просмотр">×</button>
           <img src="${escapeHtml(lightbox.imageDataUrl)}" alt="${escapeHtml(lightbox.alt || "Фото бланка")}">
+          ${ocrPreviewHtml}
         </div>
       </div>
     `;
@@ -7167,14 +7249,14 @@ function buildInitialPhotoLightboxState() {
       if (field.computed) {
         const output = cell.querySelector("[data-photo-preview-output]");
         if (output) {
-          output.textContent = getDisplayValue(getPhotoPreviewValue(row, field.key)) || "—";
+          output.textContent = getDisplayValue(getPhotoPreviewValue(row, field.key, photoState.recognizedValues)) || "—";
         }
         return;
       }
 
       const input = cell.querySelector("input[data-photo-preview-key]");
       if (input instanceof HTMLInputElement) {
-        const value = getPhotoPreviewValue(row, field.key);
+        const value = getPhotoPreviewValue(row, field.key, photoState.recognizedValues);
         const expectedText = getDisplayValue(value) || "";
         if (input.value !== expectedText) {
           input.value = expectedText;
@@ -7243,10 +7325,11 @@ function buildInitialPhotoLightboxState() {
     return sanitized;
   }
 
-  function renderPhotoImportPreviewTable(row, photoState, reviewByKey, recognizedFields, suspectFields) {
+  function renderPhotoImportPreviewTable(row, photoState, reviewByKey, recognizedFields, suspectFields, options = {}) {
     const rawValues = photoState?.recognizedValues && typeof photoState.recognizedValues === "object"
       ? photoState.recognizedValues
       : {};
+    const editable = options?.editable !== false;
     const hasPreviewValues = PHOTO_FIELD_DEFINITIONS.some((field) => {
       if (field.key === "presentTotal") {
         return true;
@@ -7325,7 +7408,7 @@ function buildInitialPhotoLightboxState() {
     const dataCells = groups
       .map((group) => group.keys.map((cell) => {
         const status = getPhotoImportPreviewStatus(photoState, reviewByKey, recognizedFields, suspectFields, cell.key);
-        const value = getPhotoPreviewValue(row, cell.key);
+        const value = getPhotoPreviewValue(row, cell.key, photoState.recognizedValues);
         const fieldMeta = getPhotoFieldMetaByKey(cell.key);
         const controlTone = getPhotoImportPreviewControlTone(validation, cell.key);
         const classes = [
@@ -7333,7 +7416,7 @@ function buildInitialPhotoLightboxState() {
           `photo-import-mini-table__cell--${status}`,
           controlTone ? `photo-import-mini-table__cell--control-${controlTone}` : ""
         ].filter(Boolean).join(" ");
-        const inputHtml = fieldMeta?.computed
+        const inputHtml = fieldMeta?.computed || !editable
           ? `<span data-photo-preview-output="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(value) || "—")}</span>`
           : `<input
               type="number"
