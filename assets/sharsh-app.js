@@ -2041,11 +2041,29 @@
     return state.mainTablePhotoGallery.records;
   }
 
+  function getArchiveDateKey(value = new Date()) {
+    const context = getArchiveContext(value);
+    if (!context || !context.year || !context.month || !context.day) {
+      return "";
+    }
+    return `${context.year}-${context.month}-${context.day}`;
+  }
+
+  function getArchiveDateKeyForTimestamp(value) {
+    const parsed = new Date(value || "");
+    if (Number.isNaN(parsed.getTime())) {
+      return "";
+    }
+    return getArchiveDateKey(parsed);
+  }
+
   function getMainTablePhotoGalleryItems(rows) {
     const records = ensureMainTablePhotoGalleryRecordsLoaded();
+    const todayDateKey = getArchiveDateKey();
     const byId = new Map(
       records
         .map((record) => normalizeMainTablePhotoGalleryRecord(record))
+        .filter((record) => getArchiveDateKeyForTimestamp(record?.createdAt) === todayDateKey)
         .filter(Boolean)
         .map((record) => [record.id, record])
     );
@@ -2091,13 +2109,13 @@
 
     if (!items.length) {
       return {
-        summary: "Для показанной версии таблицы пока нет связанных фото бланков.",
-        html: '<div class="archive-empty">Связанных фото бланков пока нет.</div>'
+        summary: "Для текущих суток пока нет связанных фото бланков.",
+        html: '<div class="archive-empty">Сегодняшних связанных фото бланков пока нет.</div>'
       };
     }
 
     return {
-      summary: `Показано фото бланков: ${items.length}. Нажмите на фото, чтобы открыть его крупно.`,
+      summary: `Показано сегодняшних фото бланков: ${items.length}. Нажмите на фото, чтобы открыть его крупно.`,
       html: `
         <div class="main-table-photo-gallery-grid">
           ${items.map((item) => `
