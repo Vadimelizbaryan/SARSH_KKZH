@@ -4800,6 +4800,23 @@ function sanitizePublicErrorMessage(error: unknown) {
     .replace(/bot[0-9]+:[A-Za-z0-9_-]+/g, "bot***");
 }
 
+function stringifyUnknownError(error: unknown) {
+  if (error instanceof Error) {
+    return sanitizePublicErrorMessage(error);
+  }
+  if (typeof error === "string") {
+    return sanitizePublicErrorMessage(error);
+  }
+  try {
+    const serialized = JSON.stringify(error);
+    return serialized && serialized !== "{}"
+      ? sanitizePublicErrorMessage(serialized)
+      : sanitizePublicErrorMessage(error);
+  } catch (_jsonError) {
+    return sanitizePublicErrorMessage(error);
+  }
+}
+
 function isRetryableTelegramError(error: unknown) {
   const message = sanitizePublicErrorMessage(error).toLowerCase();
   return message.includes("connection") ||
@@ -9712,6 +9729,60 @@ Deno.serve(async (request) => {
       }
     }
 
+    if (action === "debug-start") {
+      try {
+        const supabase = createSupabaseAdmin();
+        const gpsEnabled = await isTelegramGpsScenarioEnabled(supabase);
+        const text = [
+          buildColleagueStartText("Vadim"),
+          "",
+          gpsEnabled
+            ? "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը։"
+            : `Գիշերային հերթափոխի ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
+        ].join("\n");
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          status: "ready",
+          action,
+          gpsEnabled,
+          textLength: text.length,
+          replyMarkup: buildWorkplaceLocationReplyMarkup(gpsEnabled),
+          text
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "debug_start_failed",
+          error: stringifyUnknownError(error)
+        }, 500);
+      }
+    }
+
+    if (action === "debug-status") {
+      try {
+        const supabase = createSupabaseAdmin();
+        const snapshot = await loadSnapshot(supabase);
+        const text = buildStatusText(snapshot);
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          status: "ready",
+          action,
+          textLength: text.length,
+          text
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "debug_status_failed",
+          error: stringifyUnknownError(error)
+        }, 500);
+      }
+    }
+
     if (action === "daily-reminder") {
       if (!isTelegramReminderRequestValid(request)) {
         return jsonResponse({ ok: false, error: "Invalid reminder secret." }, 403);
@@ -9982,7 +10053,7 @@ Deno.serve(async (request) => {
   }
 
   const task = processTelegramUpdate(update as Record<string, unknown>).catch(async (error) => {
-    const publicMessage = sanitizePublicErrorMessage(error);
+    const publicMessage = stringifyUnknownError(error);
     console.error("Telegram update processing failed:", publicMessage);
     const message = (update as Record<string, unknown>).message as Record<string, unknown> | undefined;
     const chatId = message ? getMessageChatId(message) : null;
