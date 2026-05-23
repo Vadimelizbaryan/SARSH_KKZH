@@ -439,6 +439,7 @@
     selectedArchiveKey: "",
     mainTableSavedRecords: [],
     selectedMainTableSavedKey: "",
+    activeMainTableSavedPreviewKey: "",
     departmentPdfArchiveRecords: [],
     selectedDepartmentPdfArchiveKey: "",
     selectedDepartmentPdfArchiveDate: "",
@@ -2784,6 +2785,35 @@
     return records[0];
   }
 
+  function getActiveMainTableSavedPreviewRecord(records = ensureMainTableSavedRecordsLoaded()) {
+    if (!state.activeMainTableSavedPreviewKey) {
+      return null;
+    }
+
+    const activeRecord = Array.isArray(records)
+      ? records.find((record) => record.snapshotKey === state.activeMainTableSavedPreviewKey) || null
+      : null;
+    if (activeRecord) {
+      return activeRecord;
+    }
+
+    state.activeMainTableSavedPreviewKey = "";
+    return null;
+  }
+
+  function getMainTableDisplaySnapshotContext(records = ensureMainTableSavedRecordsLoaded()) {
+    const previewRecord = getActiveMainTableSavedPreviewRecord(records);
+    const snapshot = previewRecord
+      ? syncQhCalculatedTargets(primeQhBaseInputs(deepCopy(previewRecord.snapshot)))
+      : state.snapshot;
+    return {
+      previewRecord,
+      snapshot,
+      rows: Array.isArray(snapshot?.rows) ? snapshot.rows : [],
+      headerDateTime: previewRecord ? getHeaderDateTimeParts(previewRecord.reportDate) : null
+    };
+  }
+
   function getMainTableSavedSnapshotPath(snapshotKey) {
     if (basePath === "@site") {
       return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&savedMain=${encodeURIComponent(snapshotKey)}&autoprint=0`);
@@ -2802,7 +2832,7 @@
     const currentIndex = current
       ? records.findIndex((record) => record.snapshotKey === current.snapshotKey)
       : 0;
-    const nextIndex = Math.min(records.length - 1, Math.max(0, currentIndex + direction));
+    const nextIndex = Math.min(records.length - 1, Math.max(0, currentIndex - direction));
     state.selectedMainTableSavedKey = records[nextIndex].snapshotKey;
   }
 
@@ -2820,6 +2850,16 @@
     return `Дата документа: ${record.reportDate}. Это сохранённый снимок главной таблицы для окна ${record.slotLabel}.`;
   }
 
+  function buildMainTableSavedDisplayMetaText(record) {
+    if (!record) {
+      return buildMainTableSavedMetaText(record);
+    }
+    if (state.activeMainTableSavedPreviewKey === record.snapshotKey) {
+      return `Сейчас на таблице показан снимок за окно ${record.slotLabel}. Дата документа: ${record.reportDate}.`;
+    }
+    return `Сейчас показана текущая таблица. Снимок ${record.slotLabel} можно открыть стрелками прямо здесь или в отдельной странице.`;
+  }
+
   function buildMainTableSavedNavigator(records) {
     const selectedRecord = getSelectedMainTableSavedRecord(records);
     if (!selectedRecord) {
@@ -2832,9 +2872,10 @@
           <button type="button" class="archive-open-link archive-nav-button" data-main-saved-nav="-1" aria-label="Назад">←</button>
           <div class="archive-current-stamp" id="mainTableSavedStamp">${escapeHtml(buildMainTableSavedSelectionText(selectedRecord))}</div>
           <button type="button" class="archive-open-link archive-nav-button" data-main-saved-nav="1" aria-label="Вперёд">→</button>
+          <button type="button" class="archive-open-link archive-open-link--secondary" id="mainTableSavedLiveBtn">Текущая таблица</button>
           <a class="archive-open-link archive-open-link--secondary" id="mainTableSavedOpenLink" href="${escapeHtml(getMainTableSavedSnapshotPath(selectedRecord.snapshotKey))}" target="_blank" rel="noopener">Открыть</a>
         </div>
-        <div class="archive-selected-meta" id="mainTableSavedMeta">${escapeHtml(buildMainTableSavedMetaText(selectedRecord))}</div>
+        <div class="archive-selected-meta" id="mainTableSavedMeta">${escapeHtml(buildMainTableSavedDisplayMetaText(selectedRecord))}</div>
       </div>
     `;
   }
@@ -2845,13 +2886,14 @@
     const stamp = document.getElementById("mainTableSavedStamp");
     const meta = document.getElementById("mainTableSavedMeta");
     const link = document.getElementById("mainTableSavedOpenLink");
+    const liveBtn = document.getElementById("mainTableSavedLiveBtn");
     const buttons = Array.from(document.querySelectorAll("[data-main-saved-nav]"));
 
     if (stamp) {
       stamp.textContent = buildMainTableSavedSelectionText(selectedRecord);
     }
     if (meta) {
-      meta.textContent = buildMainTableSavedMetaText(selectedRecord);
+      meta.textContent = buildMainTableSavedDisplayMetaText(selectedRecord);
     }
     if (link instanceof HTMLAnchorElement) {
       if (selectedRecord) {
@@ -2861,6 +2903,12 @@
         link.removeAttribute("href");
         link.setAttribute("aria-disabled", "true");
       }
+    }
+    if (liveBtn instanceof HTMLButtonElement) {
+      const previewActive = Boolean(state.activeMainTableSavedPreviewKey);
+      liveBtn.disabled = !previewActive;
+      liveBtn.setAttribute("aria-disabled", String(!previewActive));
+      liveBtn.textContent = previewActive ? "Вернуться к текущей таблице" : "Текущая таблица";
     }
 
     const selectedIndex = selectedRecord
@@ -5178,8 +5226,11 @@
   }
 
   function hasActiveMainTransferColumnMismatch() {
-    return mode === "main"
-      && getTransferColumnMismatchMeta(state.snapshot, state.snapshot.rows).hasMismatch;
+    if (mode !== "main") {
+      return false;
+    }
+    const displayContext = getMainTableDisplaySnapshotContext();
+    return getTransferColumnMismatchMeta(displayContext.snapshot, displayContext.rows).hasMismatch;
   }
 
   function shouldHighlightTransferMismatchCell(key, options) {
@@ -6193,6 +6244,19 @@
     const archiveRecords = ensureArchiveRecordsLoaded();
     const latestArchive = archiveRecords[0] || null;
     const mainTableSavedRecords = ensureMainTableSavedRecordsLoaded();
+    const activeMainTableSavedRecord = getActiveMainTableSavedPreviewRecord(mainTableSavedRecords);
+    const displayedMainTableSnapshot = activeMainTableSavedRecord
+      ? syncQhCalculatedTargets(primeQhBaseInputs(deepCopy(activeMainTableSavedRecord.snapshot)))
+      : state.snapshot;
+    const displayedMainTableRows = Array.isArray(displayedMainTableSnapshot.rows) ? displayedMainTableSnapshot.rows : [];
+    const displayedMainTableFreshness = buildFreshnessStats(displayedMainTableRows);
+    const displayedMainTableSummaryFreshness = getFreshnessMeta(
+      displayedMainTableFreshness.newestRow ? getRowEffectiveUpdatedAt(displayedMainTableFreshness.newestRow) : "",
+      Boolean(displayedMainTableFreshness.newestRow)
+    );
+    const displayedMainTableHeaderDateTime = activeMainTableSavedRecord
+      ? getHeaderDateTimeParts(activeMainTableSavedRecord.reportDate)
+      : null;
     const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
     const canEditMainTable = canEditMainTableDirectly();
     const mainBlankPdfPath = config.getMainBlankPdfPath
@@ -6244,7 +6308,12 @@
 
                     <div class="zoom-target">
               <div class="sheet-shell">
-              ${canEditMainTable ? `
+              ${activeMainTableSavedRecord ? `
+                <div class="main-table-edit-panel main-table-edit-panel--table main-table-edit-panel--preview">
+                  <strong>Показан сохранённый снимок главной таблицы.</strong>
+                  <span>Чтобы вернуться к живым данным и редактированию, нажмите «Вернуться к текущей таблице».</span>
+                </div>
+              ` : (canEditMainTable ? `
                 <div class="main-table-edit-panel main-table-edit-panel--table">
                   <label class="department-top-lock-switch" for="mainTableEditToggle">
                     <input type="checkbox" id="mainTableEditToggle"${state.mainTableUnlocked ? " checked" : ""}>
@@ -6259,11 +6328,24 @@
                     <span id="mainSaveRuleText">Изменений в главной таблице пока нет.</span>
                   </div>
                 </div>
-              ` : ""}
+              ` : "")}
+              <div class="main-table-saved-panel no-print">
+                <div class="main-table-saved-panel__head">
+                  <strong>Сохранённые таблицы 02:00 / 18:00</strong>
+                  <span id="mainTableSavedSummaryText">${
+                    mainTableSavedRecords.length
+                      ? escapeHtml(`Снимков: ${mainTableSavedRecords.length}.`)
+                      : "Снимков пока нет. После сохранения таблицы здесь появятся версии за окна 02:00 и 18:00."
+                  }</span>
+                </div>
+                <div class="archive-list" id="mainTableSavedList">
+                  ${buildMainTableSavedNavigator(mainTableSavedRecords)}
+                </div>
+              </div>
               <p class="status-line no-print">
-                <strong>Последнее обновление сводки:</strong>
-                <span id="lastUpdatedText">${escapeHtml(freshnessStats.newestRow ? formatTimestamp(getRowEffectiveUpdatedAt(freshnessStats.newestRow)) : "еще не отправлялось")}</span>
-                <span class="status-chip status-chip--${summaryFreshness.level}" id="lastUpdatedBadge">${escapeHtml(summaryFreshness.label)}</span>
+                <strong>${escapeHtml(activeMainTableSavedRecord ? "Последнее обновление показанной таблицы:" : "Последнее обновление сводки:")}</strong>
+                <span id="lastUpdatedText">${escapeHtml(displayedMainTableFreshness.newestRow ? formatTimestamp(getRowEffectiveUpdatedAt(displayedMainTableFreshness.newestRow)) : "еще не отправлялось")}</span>
+                <span class="status-chip status-chip--${displayedMainTableSummaryFreshness.level}" id="lastUpdatedBadge">${escapeHtml(displayedMainTableSummaryFreshness.label)}</span>
               </p>
               <div class="main-table-state-legend no-print">
                 <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--auto"></span>Авто</span>
@@ -6273,7 +6355,15 @@
                 <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--invalid"></span>Ошибка контроля</span>
               </div>
                 <div class="table-wrap">
-                  ${renderTable(state.snapshot, state.snapshot.rows, { interactive: state.mainTableUnlocked, viewMode: "main" })}
+                  ${renderTable(
+                    displayedMainTableSnapshot,
+                    displayedMainTableRows,
+                    {
+                      interactive: state.mainTableUnlocked && !activeMainTableSavedRecord,
+                      viewMode: "main",
+                      headerDateTime: displayedMainTableHeaderDateTime || undefined
+                    }
+                  )}
                 </div>
               </div>
             </div>
@@ -6328,18 +6418,6 @@
               <p>Точный список по каждому отделению: когда именно пришли последние данные.</p>
               <div class="updates-list" id="departmentUpdatesList">
                 ${state.snapshot.rows.map((row) => buildDepartmentUpdateItem(row)).join("")}
-              </div>
-            </section>
-            <section class="panel no-print archive-panel">
-              <h2>Сохранённые таблицы</h2>
-              <p id="mainTableSavedSummaryText">${
-                mainTableSavedRecords.length
-                  ? escapeHtml(`Сохранённых таблиц: ${mainTableSavedRecords.length}.`)
-                  : "Сохранённых таблиц пока нет. После ручного сохранения здесь появятся две рабочие версии за сутки."
-              }</p>
-              <p class="hint">После сохранения можно быстро открыть старые данные таблицы и перелистывать сохранённые версии назад и вперёд.</p>
-              <div class="archive-list" id="mainTableSavedList">
-                ${buildMainTableSavedNavigator(mainTableSavedRecords)}
               </div>
             </section>
             <section class="panel no-print archive-panel">
@@ -7542,27 +7620,31 @@
       return;
     }
 
-    const rows = mode === "department" ? [getCurrentRow()].filter(Boolean) : state.snapshot.rows;
+    const mainDisplayContext = mode === "main" ? getMainTableDisplaySnapshotContext() : null;
+    const activeSnapshot = mainDisplayContext ? mainDisplayContext.snapshot : state.snapshot;
+    const rows = mode === "department"
+      ? [getCurrentRow()].filter(Boolean)
+      : (mainDisplayContext ? mainDisplayContext.rows : state.snapshot.rows);
     rows.forEach((row) => {
       const presentEl = body.querySelector(`[data-output="presentTotal"][data-row="${row.id}"]`);
       if (presentEl) {
-        presentEl.textContent = String(calcPresentTotal(state.snapshot, row));
+        presentEl.textContent = String(calcPresentTotal(activeSnapshot, row));
       }
 
       const leaveEl = body.querySelector(`[data-output="leaveTotal"][data-row="${row.id}"]`);
       if (leaveEl) {
-        leaveEl.textContent = String(calcLeaveTotal(state.snapshot, row) || 0);
+        leaveEl.textContent = String(calcLeaveTotal(activeSnapshot, row) || 0);
       }
 
       config.columns.forEach((key) => {
         const span = body.querySelector(`[data-value="${row.id}:${key}"]`);
         if (span) {
-          span.textContent = getDisplayValue(getEffectiveValue(state.snapshot, row, key));
+          span.textContent = getDisplayValue(getEffectiveValue(activeSnapshot, row, key));
         }
 
         const input = body.querySelector(`input[data-row="${row.id}"][data-key="${key}"]`);
         if (input instanceof HTMLInputElement) {
-          const nextValue = getDisplayValue(getEffectiveValue(state.snapshot, row, key));
+          const nextValue = getDisplayValue(getEffectiveValue(activeSnapshot, row, key));
           input.value = nextValue === "" ? "0" : nextValue;
         }
       });
@@ -7608,7 +7690,7 @@
 
       LEAVE_CALC_COLUMNS.forEach((column) => {
         document.querySelectorAll(`[data-leave-calc-base="${column.leaveKey}"]`).forEach((element) => {
-          element.textContent = getDisplayValue(getNumber(state.snapshot, row, column.leaveKey)) || "0";
+          element.textContent = getDisplayValue(getNumber(activeSnapshot, row, column.leaveKey)) || "0";
         });
         document.querySelectorAll(`[data-leave-calc-output="${column.leaveKey}"]`).forEach((element) => {
           element.textContent = getDisplayValue(calcLeaveRemainingValue(row, column.type)) || "0";
@@ -7624,24 +7706,25 @@
       const [targetRowId, targetKey] = linkedKey.split(":");
       const linkedEl = body.querySelector(`[data-linked="${linkedKey}"]`);
       if (linkedEl) {
-        const targetRow = getDepartmentRow(state.snapshot, targetRowId);
-        linkedEl.textContent = targetRow ? getDisplayValue(getEffectiveValue(state.snapshot, targetRow, targetKey)) : "";
+        const targetRow = getDepartmentRow(activeSnapshot, targetRowId);
+        linkedEl.textContent = targetRow ? getDisplayValue(getEffectiveValue(activeSnapshot, targetRow, targetKey)) : "";
       }
     });
 
     if (mode === "main") {
-      refreshSummary("subtotal", state.snapshot.rows.filter((row) => row.group === "primary"));
-      refreshSummary("grand", state.snapshot.rows);
+      const summaryRows = mainDisplayContext ? mainDisplayContext.rows : state.snapshot.rows;
+      refreshSummary("subtotal", summaryRows.filter((row) => row.group === "primary"), activeSnapshot);
+      refreshSummary("grand", summaryRows, activeSnapshot);
       syncMainTransferMismatchUi();
     } else {
       const row = getCurrentRow();
       if (row) {
-        refreshSummary("single", [row]);
+        refreshSummary("single", [row], activeSnapshot);
       }
     }
   }
 
-  function refreshSummary(summaryId, rows) {
+  function refreshSummary(summaryId, rows, snapshot = state.snapshot) {
     const body = document.getElementById("sheetBody");
     if (!body) {
       return;
@@ -7649,7 +7732,7 @@
     config.columns.forEach((key) => {
       const el = body.querySelector(`[data-summary="${summaryId}"][data-key="${key}"]`);
       if (el) {
-        el.textContent = String(getSummaryValue(state.snapshot, rows, key));
+        el.textContent = String(getSummaryValue(snapshot, rows, key));
       }
     });
   }
@@ -7721,7 +7804,8 @@
           lastUpdatedBadge.className = `status-chip status-chip--${meta.level}`;
         }
       } else {
-        const stats = buildFreshnessStats(state.snapshot.rows);
+        const mainDisplayContext = getMainTableDisplaySnapshotContext();
+        const stats = buildFreshnessStats(mainDisplayContext.rows);
         const newestUpdatedAt = stats.newestRow ? getRowEffectiveUpdatedAt(stats.newestRow) : "";
         lastUpdatedText.textContent = newestUpdatedAt ? formatTimestamp(newestUpdatedAt) : "еще не отправлялось";
         if (lastUpdatedBadge) {
@@ -7754,6 +7838,7 @@
       const savedTablesSummaryText = document.getElementById("mainTableSavedSummaryText");
       const savedTablesList = document.getElementById("mainTableSavedList");
       const savedTableRecords = ensureMainTableSavedRecordsLoaded();
+      const mainDisplayContext = getMainTableDisplaySnapshotContext(savedTableRecords);
       const departmentPdfArchiveSummaryText = document.getElementById("departmentPdfArchiveSummaryText");
       const departmentPdfArchiveList = document.getElementById("departmentPdfArchiveList");
       const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
@@ -7908,11 +7993,13 @@
           listAgeEl.textContent = meta.age;
         }
         if (sheetRowEl) {
-          sheetRowEl.setAttribute("data-row-freshness", meta.level);
+          const tableRow = getDepartmentRow(mainDisplayContext.snapshot, row.id) || row;
+          const tableMeta = getRowFreshnessMeta(tableRow);
+          const tableValidation = getDepartmentValidationStateForSnapshot(mainDisplayContext.snapshot, tableRow);
+          const tableMainRowState = getDepartmentMainTableStateMeta(tableRow, tableValidation);
+          sheetRowEl.setAttribute("data-row-freshness", tableMeta.level);
           const deptCellEl = sheetRowEl.querySelector(".dept-cell");
           if (deptCellEl) {
-            const validation = mode === "main" ? getDepartmentValidationStateForSnapshot(state.snapshot, row) : null;
-            const mainRowState = mode === "main" ? getDepartmentMainTableStateMeta(row, validation) : null;
             deptCellEl.classList.remove(
               "dept-cell--state-auto",
               "dept-cell--state-manual",
@@ -7920,28 +8007,27 @@
               "dept-cell--state-photo-pending",
               "dept-cell--state-control-error"
             );
-            if (mainRowState && mainRowState.tone !== "none") {
-              deptCellEl.classList.add(`dept-cell--state-${mainRowState.tone}`);
-              deptCellEl.setAttribute("title", `${row.department}\n${mainRowState.title}`);
+            if (tableMainRowState && tableMainRowState.tone !== "none") {
+              deptCellEl.classList.add(`dept-cell--state-${tableMainRowState.tone}`);
+              deptCellEl.setAttribute("title", `${row.department}\n${tableMainRowState.title}`);
             } else {
               deptCellEl.setAttribute("title", row.department);
             }
           }
           if (mode === "main") {
-            const validation = getDepartmentValidationStateForSnapshot(state.snapshot, row);
-            sheetRowEl.classList.toggle("main-fresh-row", meta.level === "fresh" && !(validation.applicable && !validation.isValid));
-            if (validation.applicable) {
-              sheetRowEl.setAttribute("data-row-validation", validation.isValid ? "valid" : "invalid");
-              sheetRowEl.classList.toggle("main-invalid-row", !validation.isValid);
-              if (!validation.isValid) {
-                sheetRowEl.setAttribute("title", validation.failedChecks.map((item) => item.failureMessage).join(" "));
+            sheetRowEl.classList.toggle("main-fresh-row", tableMeta.level === "fresh" && !(tableValidation.applicable && !tableValidation.isValid));
+            if (tableValidation.applicable) {
+              sheetRowEl.setAttribute("data-row-validation", tableValidation.isValid ? "valid" : "invalid");
+              sheetRowEl.classList.toggle("main-invalid-row", !tableValidation.isValid);
+              if (!tableValidation.isValid) {
+                sheetRowEl.setAttribute("title", tableValidation.failedChecks.map((item) => item.failureMessage).join(" "));
               } else {
                 sheetRowEl.removeAttribute("title");
               }
             } else {
               sheetRowEl.removeAttribute("data-row-validation");
               sheetRowEl.classList.remove("main-invalid-row");
-              sheetRowEl.classList.toggle("main-fresh-row", meta.level === "fresh");
+              sheetRowEl.classList.toggle("main-fresh-row", tableMeta.level === "fresh");
               sheetRowEl.removeAttribute("title");
             }
           } else {
@@ -10545,9 +10631,22 @@
           return;
         }
         moveMainTableSavedSelection(direction);
-        syncMainTableSavedNavigatorUi();
+        const selectedRecord = getSelectedMainTableSavedRecord();
+        state.activeMainTableSavedPreviewKey = selectedRecord ? selectedRecord.snapshotKey : "";
+        renderPage();
       });
     });
+
+    const mainTableSavedLiveBtn = document.getElementById("mainTableSavedLiveBtn");
+    if (mainTableSavedLiveBtn) {
+      mainTableSavedLiveBtn.addEventListener("click", () => {
+        if (!state.activeMainTableSavedPreviewKey) {
+          return;
+        }
+        state.activeMainTableSavedPreviewKey = "";
+        renderPage();
+      });
+    }
 
     const departmentPdfArchiveSelect = document.getElementById("departmentPdfArchiveSelect");
     if (departmentPdfArchiveSelect) {
