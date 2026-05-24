@@ -2323,28 +2323,98 @@ function buildInitialPhotoLightboxState() {
     };
   }
 
+  function getPhotoPreviewGroups() {
+    return [
+      {
+        title: "ԵՂԵԼ Է",
+        keys: [
+          { key: "beenTotal", label: "ԸՆԴ" },
+          { key: "beenSoldier", label: "Զ/Ծ" },
+          { key: "beenSeries", label: "ՇԱՐ" }
+        ]
+      },
+      {
+        title: "ԸՆԴՈՒՆՎԵԼ Է",
+        keys: [
+          { key: "admittedTotal", label: "ԸՆԴ" },
+          { key: "admittedSoldier", label: "Զ/Ծ" },
+          { key: "admittedSeries", label: "ՇԱՐ" }
+        ]
+      },
+      {
+        title: "Դ/Գ",
+        keys: [
+          { key: "dgTotal", label: "ԸՆԴ" },
+          { key: "dgSoldier", label: "Զ/Ծ" },
+          { key: "dgSeries", label: "ՇԱՐ" }
+        ]
+      },
+      {
+        title: "Տեղափոխ",
+        keys: [
+          { key: "transferFromDepartment", label: "Դուրս" },
+          { key: "transferToDepartment", label: "Ներս" }
+        ]
+      },
+      {
+        title: "Առկա է",
+        keys: [
+          { key: "presentTotal", label: "Ընդհ." },
+          { key: "currentShar", label: "ՇԱՐ" },
+          { key: "currentSpa", label: "ՍՊԱ" },
+          { key: "currentPaym", label: "ՊԱՅՄ" },
+          { key: "currentZh", label: "Զ/Հ" },
+          { key: "family", label: "Զ/Ծ ընտ" },
+          { key: "officer", label: "Զ/Պ" },
+          { key: "civil", label: "Ք-ի" }
+        ]
+      },
+      {
+        title: "Արձակուրդում",
+        keys: [
+          { key: "leaveSharq", label: "ՇԱՐ" },
+          { key: "leaveSpa", label: "ՍՊԱ" },
+          { key: "leavePaym", label: "ՊԱՅՄ" }
+        ]
+      }
+    ];
+  }
+
   function renderPhotoLightboxDepartmentTable(snapshot, row) {
     if (!snapshot || !row) {
       return "";
     }
 
-    const tableHtml = renderTable(
-      snapshot,
-      [row],
-      {
-        interactive: false,
-        viewMode: "department",
-        headerDateTime: getHeaderDateTimeParts(snapshot.reportDate) || getCurrentDateTimeParts()
-      }
-    ).replace(' id="sheetTable"', "");
+    const groups = getPhotoPreviewGroups();
+    const groupHeaders = groups
+      .map((group) => `<th colspan="${group.keys.length}">${escapeHtml(group.title)}</th>`)
+      .join("");
+    const subHeaders = groups
+      .map((group) => group.keys.map((cell) => `<th>${escapeHtml(cell.label)}</th>`).join(""))
+      .join("");
+    const dataCells = groups
+      .map((group) => group.keys.map((cell) => `
+        <td class="photo-import-mini-table__cell photo-import-mini-table__cell--neutral">
+          <span>${escapeHtml(getRowDisplayValue(snapshot, row, cell.key) || "?")}</span>
+        </td>
+      `).join(""))
+      .join("");
 
     return `
       <div class="photo-lightbox-department-table">
         <div class="photo-lightbox-ocr__head">
           <h3>Текущая таблица отделения</h3>
         </div>
-        <div class="table-wrap photo-lightbox-department-table__wrap">
-          ${tableHtml}
+        <div class="photo-import-mini-table-wrap photo-lightbox-department-table__wrap">
+          <table class="photo-import-mini-table photo-lightbox-department-mini-table" aria-label="Текущая таблица отделения">
+            <thead>
+              <tr>${groupHeaders}</tr>
+              <tr>${subHeaders}</tr>
+            </thead>
+            <tbody>
+              <tr>${dataCells}</tr>
+            </tbody>
+          </table>
         </div>
       </div>
     `;
@@ -7390,7 +7460,6 @@ function buildInitialPhotoLightboxState() {
             <div class="photo-lightbox-ocr">
               <div class="photo-lightbox-ocr__head">
                 <h3>OCR данные</h3>
-                <span class="photo-import-mini-table-status photo-import-mini-table-status--${escapeHtml(context.validationStatus.tone)}">${escapeHtml(context.validationStatus.text)}</span>
               </div>
               ${previewTable}
               <div class="photo-lightbox-save-actions">
