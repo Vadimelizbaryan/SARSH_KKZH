@@ -2341,7 +2341,7 @@ function buildInitialPhotoLightboxState() {
     return `
       <div class="photo-lightbox-department-table">
         <div class="photo-lightbox-ocr__head">
-          <h3>Ð¢ÐµÐºÑƒÑ‰Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ</h3>
+          <h3>Текущая таблица отделения</h3>
         </div>
         <div class="table-wrap photo-lightbox-department-table__wrap">
           ${tableHtml}
@@ -2395,13 +2395,15 @@ function buildInitialPhotoLightboxState() {
                 data-main-table-photo-open="${escapeHtml(String(item.feedbackId))}"
                 data-main-table-photo-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
                 aria-label="${escapeHtml(`Открыть фото бланка ${item.departmentName}`)}"
-                title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `\nДата на фото: ${item.photoReportDate}` : ""}${item.updatedAt ? `\nОбновлено: ${formatTimestamp(item.updatedAt)}` : ""}`)}"
+                title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `
+Дата на фото: ${item.photoReportDate}` : ""}${item.updatedAt ? `
+Обновлено: ${formatTimestamp(item.updatedAt)}` : ""}`)}"
               >
                 <img src="${escapeHtml(item.imageDataUrl)}" alt="${escapeHtml(`Фото бланка ${item.departmentName}`)}">
               </button>
               <div class="main-table-photo-thumb__meta">
                 <span class="main-table-photo-thumb__caption">${escapeHtml(item.departmentName)}</span>
-                ${item.updatedAt ? `<span class="main-table-photo-thumb__updated">ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾ ${escapeHtml(formatTimestamp(item.updatedAt))}</span>` : ""}
+                ${item.updatedAt ? `<span class="main-table-photo-thumb__updated">Обновлено ${escapeHtml(formatTimestamp(item.updatedAt))}</span>` : ""}
                 <label class="main-table-photo-thumb__department-picker">
                   <span>Отделение</span>
                   <select
@@ -7376,14 +7378,14 @@ function buildInitialPhotoLightboxState() {
           const saveBlockedByState = isArchivePreview || hasDirtyMainTableRows || state.mainTableSaveInFlight;
           const canSave = !saveBlockedByControls && !saveBlockedByState && !lightbox.isSaving;
           const saveHint = isArchivePreview
-            ? "Ð”Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ OCR Ð²ÐµÑ€Ð½Ð¸Ñ‚ÐµÑÑŒ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ."
+            ? "Для сохранения OCR вернитесь к текущей таблице."
             : (hasDirtyMainTableRows
-              ? "Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¸Ð»Ð¸ ÑÐ½Ð¸Ð¼Ð¸Ñ‚Ðµ Ñ€ÑƒÑ‡Ð½Ñ‹Ðµ Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ."
+              ? "Сначала сохраните или снимите ручные правки в главной таблице."
               : (state.mainTableSaveInFlight
-                ? "Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑƒÐ¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ. ÐŸÐ¾Ð´Ð¾Ð¶Ð´Ð¸Ñ‚Ðµ."
+                ? "Главная таблица уже сохраняется. Подождите."
                 : (saveBlockedByControls
                   ? context.validation.failedChecks.map((item) => item.failureMessage).join(" ")
-                  : "ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒ Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½. OCR Ð¼Ð¾Ð¶Ð½Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð² ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.")));
+                  : "Контроль пройден. OCR можно сохранить в строку отделения.")));
           ocrPreviewHtml = `
             <div class="photo-lightbox-ocr">
               <div class="photo-lightbox-ocr__head">
@@ -7397,7 +7399,7 @@ function buildInitialPhotoLightboxState() {
                   id="photoLightboxSaveBtn"
                   class="${canSave ? "save-ready" : "save-blocked"}"
                   ${(canSave && !lightbox.isSaving) ? "" : "disabled"}
-                >${lightbox.isSaving ? "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ..." : "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ"}</button>
+                >${lightbox.isSaving ? "Сохраняю..." : "Сохранить"}</button>
                 <span class="photo-lightbox-save-hint${(!canSave && saveBlockedByControls) || lightbox.statusIsError ? " warning-note" : ""}">${escapeHtml(saveHint)}</span>
               </div>
               ${renderPhotoLightboxDepartmentTable(context.displayContext?.snapshot || state.snapshot, boundRow)}
@@ -7411,7 +7413,7 @@ function buildInitialPhotoLightboxState() {
             class="photo-lightbox-recheck"
             id="photoLightboxRecheck"
             ${(lightbox.isRechecking || lightbox.isSaving) ? "disabled" : ""}
-          >${lightbox.isRechecking ? "\u041F\u0440\u043E\u0432\u0435\u0440\u044F\u044E..." : "\u041F\u0435\u0440\u0435\u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C"}</button>
+          >${lightbox.isRechecking ? "Проверяю..." : "Перепроверить"}</button>
         `;
       }
     }
@@ -10165,7 +10167,7 @@ function buildInitialPhotoLightboxState() {
     if (!sync.hasRemoteSync() || typeof sync.saveDepartmentFromMain !== "function") {
       state.photoLightbox = {
         ...lightbox,
-        status: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ OCR Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.",
+        status: "Сохранение OCR доступно только в онлайн-режиме владельца.",
         statusIsError: true
       };
       renderPage();
@@ -10175,7 +10177,7 @@ function buildInitialPhotoLightboxState() {
     if (state.activeMainTableSavedPreviewKey) {
       state.photoLightbox = {
         ...lightbox,
-        status: "Ð’ÐµÑ€Ð½Ð¸Ñ‚ÐµÑÑŒ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ OCR Ð² Ð³Ð»Ð°Ð²Ð½ÑƒÑŽ ÑÑ‚Ñ€Ð¾ÐºÑƒ.",
+        status: "Вернитесь к текущей таблице, чтобы сохранить OCR в главную строку.",
         statusIsError: true
       };
       renderPage();
@@ -10185,7 +10187,7 @@ function buildInitialPhotoLightboxState() {
     if (getMainTableDirtyRows().length) {
       state.photoLightbox = {
         ...lightbox,
-        status: "Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¸Ð»Ð¸ ÑÐ½Ð¸Ð¼Ð¸Ñ‚Ðµ Ñ€ÑƒÑ‡Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ.",
+        status: "Сначала сохраните или снимите ручные изменения в главной таблице.",
         statusIsError: true
       };
       renderPage();
@@ -10195,7 +10197,7 @@ function buildInitialPhotoLightboxState() {
     if (state.mainTableSaveInFlight) {
       state.photoLightbox = {
         ...lightbox,
-        status: "Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑƒÐ¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ. ÐŸÐ¾Ð´Ð¾Ð¶Ð´Ð¸Ñ‚Ðµ.",
+        status: "Главная таблица уже сохраняется. Подождите.",
         statusIsError: true
       };
       renderPage();
@@ -10206,7 +10208,7 @@ function buildInitialPhotoLightboxState() {
     if (!context?.record || !context.boundRow) {
       state.photoLightbox = {
         ...lightbox,
-        status: "Ð£ ÑÑ‚Ð¾Ð³Ð¾ Ñ„Ð¾Ñ‚Ð¾ Ð½ÐµÑ‚ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð¹ Ð¿Ñ€Ð¸Ð²ÑÐ·ÐºÐ¸ Ðº ÑÑ‚Ñ€Ð¾ÐºÐµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.",
+        status: "У этого фото нет корректной привязки к строке отделения.",
         statusIsError: true
       };
       renderPage();
@@ -10216,7 +10218,7 @@ function buildInitialPhotoLightboxState() {
     if (!context.validation.applicable || !context.validation.isValid) {
       state.photoLightbox = {
         ...lightbox,
-        status: context.validation.failedChecks.map((item) => item.failureMessage).join(" ") || "ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ñ‹Ðµ ÑÑƒÐ¼Ð¼Ñ‹ OCR Ð½Ðµ ÑÐ¾ÑˆÐ»Ð¸ÑÑŒ.",
+        status: context.validation.failedChecks.map((item) => item.failureMessage).join(" ") || "Контрольные суммы OCR не сошлись.",
         statusIsError: true
       };
       renderPage();
@@ -10226,7 +10228,7 @@ function buildInitialPhotoLightboxState() {
     state.photoLightbox = {
       ...lightbox,
       isSaving: true,
-      status: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð² ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ...",
+      status: "Сохраняю OCR данные в строку отделения...",
       statusIsError: false
     };
     renderPage();
@@ -10235,7 +10237,7 @@ function buildInitialPhotoLightboxState() {
       const draftRow = deepCopy(context.boundRow);
       const appliedKeys = applyPreviewValuesToDepartmentRow(draftRow, context.previewValues, context.recognizedKeys);
       if (!appliedKeys.length) {
-        throw new Error("Ð’ OCR Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ Ð½ÐµÑ‚ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ð¹ Ð´Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ.");
+        throw new Error("В OCR таблице нет значений для сохранения.");
       }
 
       const expectedValues = config.normalizeRowValues(draftRow.values);
@@ -10256,16 +10258,16 @@ function buildInitialPhotoLightboxState() {
       state.photoLightbox = {
         ...state.photoLightbox,
         isSaving: false,
-        status: `OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹. ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾: ${formatTimestamp(verification.savedRow.updatedAt)}.`,
+        status: `OCR данные сохранены. Обновлено: ${formatTimestamp(verification.savedRow.updatedAt)}.`,
         statusIsError: false
       };
-      setInfo(`OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð´Ð»Ñ ${draftRow.department} ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ.`, false);
+      setInfo(`OCR данные для ${draftRow.department} сохранены в основную таблицу.`, false);
       refreshTableData();
     } catch (error) {
       state.photoLightbox = {
         ...state.photoLightbox,
         isSaving: false,
-        status: error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ.",
+        status: error instanceof Error ? error.message : "Не удалось сохранить OCR данные.",
         statusIsError: true
       };
       renderPage();
