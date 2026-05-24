@@ -248,6 +248,10 @@
     return `${baseUrl}/functions/v1/Mainflow-telegram?action=web-qh-form-submit`;
   }
 
+  function getApkDownloadUrl() {
+    return new URL("android/releases/MAINFORM.apk", window.location.href).href;
+  }
+
   function getPreservedValues() {
     return Object.keys(preservedQueryMap).reduce((accumulator, key) => {
       accumulator[key] = toNumber(getQuery().get(preservedQueryMap[key] || ""));
@@ -669,6 +673,9 @@
             <div class="tg-form-message${getInitData() ? "" : " error"}" data-message>
               ${getInitData() ? "Ստուգեք հաշվարկը և ուղարկեք ձևը գլխավոր աղյուսակ պահպանելու համար։" : "Բացեք ձևը Telegram բոտի կոճակով։"}
             </div>
+          </div>
+          <div class="tg-form-downloads">
+            <a class="tg-form-download" href="${escapeHtml(getApkDownloadUrl())}" target="_blank" rel="noopener">Скачать MAINFORM.apk</a>
           </div>
           <div class="tg-inline-lock-panel">
             <label class="department-top-lock-toggle">

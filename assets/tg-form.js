@@ -145,6 +145,23 @@
     { label: "Հաշվարկ", cells: leaveCalculatorColumns.map((column) => ({ key: column.leaveKey, role: "output" })) }
   ];
 
+  const transferCalculatorColumns = [
+    { type: "soldier", label: "ՇԱՐ", currentKey: "currentShar", incomingKey: "transferCalcIncomingSoldier", outgoingKey: "transferCalcOutgoingSoldier", outputKey: "transferCalcRemainingSoldier" },
+    { type: "officer", label: "ՍՊԱ", currentKey: "currentSpa", incomingKey: "transferCalcIncomingOfficer", outgoingKey: "transferCalcOutgoingOfficer", outputKey: "transferCalcRemainingOfficer" },
+    { type: "contract", label: "ՊԱՅՄ", currentKey: "currentPaym", incomingKey: "transferCalcIncomingContract", outgoingKey: "transferCalcOutgoingContract", outputKey: "transferCalcRemainingContract" },
+    { type: "zh", label: "Զ/Հ", currentKey: "currentZh", incomingKey: "transferCalcIncomingZh", outgoingKey: "transferCalcOutgoingZh", outputKey: "transferCalcRemainingZh" },
+    { type: "family", label: "Զ/Ծ ընտ", currentKey: "family", incomingKey: "transferCalcIncomingFamily", outgoingKey: "transferCalcOutgoingFamily", outputKey: "transferCalcRemainingFamily" },
+    { type: "reserve", label: "Զ/Պ", currentKey: "officer", incomingKey: "transferCalcIncomingReserve", outgoingKey: "transferCalcOutgoingReserve", outputKey: "transferCalcRemainingReserve" },
+    { type: "civil", label: "Ք-ի", currentKey: "civil", incomingKey: "transferCalcIncomingCivil", outgoingKey: "transferCalcOutgoingCivil", outputKey: "transferCalcRemainingCivil" }
+  ];
+
+  const transferCalculatorRows = [
+    { label: "Ներս է եկել", cells: transferCalculatorColumns.map((column) => ({ key: column.incomingKey, role: "input" })) },
+    { label: "Դուրս է գնացել", cells: transferCalculatorColumns.map((column) => ({ key: column.outgoingKey, role: "input" })) },
+    { label: "Եղել է", cells: transferCalculatorColumns.map((column) => ({ key: column.currentKey, role: "linked" })) },
+    { label: "Հաշվարկ", cells: transferCalculatorColumns.map((column) => ({ key: column.outputKey, role: "output" })) }
+  ];
+
   const calculatorState = calculatorColumns.reduce((accumulator, column) => {
     accumulator[column.incomingKey] = 0;
     accumulator[column.dischargedKey] = 0;
@@ -154,6 +171,12 @@
   const leaveCalculatorState = leaveCalculatorColumns.reduce((accumulator, column) => {
     accumulator[column.sentKey] = 0;
     accumulator[column.returnedKey] = 0;
+    return accumulator;
+  }, {});
+
+  const transferCalculatorState = transferCalculatorColumns.reduce((accumulator, column) => {
+    accumulator[column.incomingKey] = 0;
+    accumulator[column.outgoingKey] = 0;
     return accumulator;
   }, {});
   let fullEditUnlocked = false;
@@ -194,6 +217,10 @@
   function toNumber(value) {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 0;
+  }
+
+  function getApkDownloadUrl() {
+    return new URL("android/releases/MAINFORM.apk", window.location.href).href;
   }
 
   function getPatientNotesStorageKey(department, reportDate) {
@@ -399,20 +426,46 @@
     nextValues.leaveSharq = leaveRemainingByType.sharq;
     nextValues.leaveSpa = leaveRemainingByType.spa;
     nextValues.leavePaym = leaveRemainingByType.paym;
+
+    const transferIncomingByType = Object.fromEntries(
+      transferCalculatorColumns.map((column) => [column.type, toNumber(transferCalculatorState[column.incomingKey])])
+    );
+    const transferOutgoingByType = Object.fromEntries(
+      transferCalculatorColumns.map((column) => [column.type, toNumber(transferCalculatorState[column.outgoingKey])])
+    );
+    const transferRemainingByType = Object.fromEntries(
+      transferCalculatorColumns.map((column) => [
+        column.type,
+        toNumber(nextValues[column.currentKey]) + transferIncomingByType[column.type] - transferOutgoingByType[column.type]
+      ])
+    );
+
+    nextValues.currentShar = transferRemainingByType.soldier;
+    nextValues.currentSpa = transferRemainingByType.officer;
+    nextValues.currentPaym = transferRemainingByType.contract;
+    nextValues.currentZh = transferRemainingByType.zh;
+    nextValues.family = transferRemainingByType.family;
+    nextValues.officer = transferRemainingByType.reserve;
+    nextValues.civil = transferRemainingByType.civil;
+    nextValues.transferToDepartment = transferCalculatorColumns.reduce((sum, column) => sum + transferIncomingByType[column.type], 0);
+    nextValues.transferFromDepartment = transferCalculatorColumns.reduce((sum, column) => sum + transferOutgoingByType[column.type], 0);
     nextValues.presentTotal = getExpected(nextValues);
 
     const invalidCurrentColumns = calculatorColumns.filter((column) => remainingByType[column.type] < 0);
     const invalidLeaveColumns = leaveCalculatorColumns.filter((column) =>
       leaveRemainingByType[column.type] < 0 || leavePresentByType[column.type] < 0
     );
+    const invalidTransferColumns = transferCalculatorColumns.filter((column) => transferRemainingByType[column.type] < 0);
 
     return {
       nextValues,
       remainingByType,
       leaveRemainingByType,
+      transferRemainingByType,
       invalidCurrentColumns,
       invalidLeaveColumns,
-      isValid: invalidCurrentColumns.length === 0 && invalidLeaveColumns.length === 0
+      invalidTransferColumns,
+      isValid: invalidCurrentColumns.length === 0 && invalidLeaveColumns.length === 0 && invalidTransferColumns.length === 0
     };
   }
 
@@ -489,13 +542,51 @@
     `;
   }
 
+  function renderTransferCalculatorRow(row) {
+    return `
+      <tr>
+        <th scope="row" class="tg-qh-row-title">${escapeHtml(row.label)}</th>
+        ${row.cells.map((cell) => {
+          if (cell.role === "input") {
+            return `
+              <td class="tg-qh-cell">
+                <input
+                  class="tg-form-input tg-qh-input"
+                  data-transfer-calc-key="${escapeHtml(cell.key)}"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  type="text"
+                  autocomplete="off"
+                  maxlength="4"
+                  value="${escapeHtml(transferCalculatorState[cell.key] || 0)}"
+                >
+              </td>
+            `;
+          }
+          if (cell.role === "linked") {
+            return `
+              <td class="tg-qh-cell tg-qh-cell--output">
+                <span class="tg-form-control-value tg-qh-output" data-transfer-base="${escapeHtml(cell.key)}">0</span>
+              </td>
+            `;
+          }
+          return `
+            <td class="tg-qh-cell tg-qh-cell--output">
+              <span class="tg-form-control-value tg-qh-output" data-transfer-output="${escapeHtml(cell.key)}">0</span>
+            </td>
+          `;
+        }).join("")}
+      </tr>
+    `;
+  }
+
   function renderCombinedCalculator() {
     return `
       <section class="tg-sheet-section tg-sheet-section--wide">
         <div class="tg-sheet-section-head">
           <div>
             <p class="tg-form-kicker">Հաշվարկային գործիքներ</p>
-            <p class="tg-sheet-section-note">Մուտքագրեք ընդունված, դուրս գրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը։ Սեղմեք «Հաշվել և տեղադրել», և տվյալները կտեղադրվեն ստորև եղած բջիջներում։</p>
+            <p class="tg-sheet-section-note">Մուտքագրեք ընդունված, դուրս գրված, տեղափոխված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը։ Սեղմեք «Հաշվել և տեղադրել», և տվյալները կտեղադրվեն ստորև եղած բջիջներում։</p>
           </div>
         </div>
         <div class="tg-calc-grid">
@@ -540,6 +631,26 @@
               </table>
             </div>
           </section>
+          <section class="tg-calc-card">
+            <div class="tg-sheet-section-head">
+              <div>
+                <p class="tg-form-kicker">Տեղափոխություն</p>
+              </div>
+            </div>
+            <div class="tg-form-table-wrap tg-qh-table-wrap">
+              <table class="tg-form-table tg-qh-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    ${transferCalculatorColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${transferCalculatorRows.map(renderTransferCalculatorRow).join("")}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
         <div class="tg-form-status" data-calc-status></div>
         <button class="tg-form-submit tg-calc-apply" data-apply-calculators type="button">Հաշվել և տեղադրել</button>
@@ -569,12 +680,24 @@
       }
     });
 
+    transferCalculatorColumns.forEach((column) => {
+      const baseTarget = root.querySelector(`[data-transfer-base="${column.currentKey}"]`);
+      const outputTarget = root.querySelector(`[data-transfer-output="${column.outputKey}"]`);
+      if (baseTarget) {
+        baseTarget.textContent = String(toNumber(values[column.currentKey]));
+      }
+      if (outputTarget) {
+        outputTarget.textContent = String(calculatorResult.transferRemainingByType[column.type] || 0);
+      }
+    });
+
     const status = root.querySelector("[data-calc-status]");
     const applyButton = root.querySelector("[data-apply-calculators]");
     if (status) {
       const invalidLabels = [
         ...calculatorResult.invalidCurrentColumns.map((column) => column.label),
-        ...calculatorResult.invalidLeaveColumns.map((column) => column.label)
+        ...calculatorResult.invalidLeaveColumns.map((column) => column.label),
+        ...calculatorResult.invalidTransferColumns.map((column) => column.label)
       ];
       status.className = `tg-form-status${calculatorResult.isValid ? "" : " bad"}`;
       status.innerHTML = calculatorResult.isValid
@@ -625,6 +748,13 @@
     Object.keys(leaveCalculatorState).forEach((key) => {
       leaveCalculatorState[key] = 0;
       const input = root.querySelector(`[data-leave-calc-key="${key}"]`);
+      if (input) {
+        input.value = "0";
+      }
+    });
+    Object.keys(transferCalculatorState).forEach((key) => {
+      transferCalculatorState[key] = 0;
+      const input = root.querySelector(`[data-transfer-calc-key="${key}"]`);
       if (input) {
         input.value = "0";
       }
@@ -1072,6 +1202,9 @@
               ${getInitData() ? "Ձևը բացվել է գլխավոր աղյուսակից բերված տվյալներով։" : "Բացեք ձևը Telegram բոտի կոճակով։"}
             </div>
           </div>
+          <div class="tg-form-downloads">
+            <a class="tg-form-download" href="${escapeHtml(getApkDownloadUrl())}" target="_blank" rel="noopener">Скачать MAINFORM.apk</a>
+          </div>
           <div class="tg-inline-lock-panel">
             <label class="department-top-lock-toggle">
               <input type="checkbox" data-full-edit-toggle>
@@ -1125,6 +1258,21 @@
         }
         const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
         leaveCalculatorState[key] = toNumber(digitsOnly);
+        if (input.value !== digitsOnly) {
+          input.value = digitsOnly;
+        }
+        refreshCalculatorUi();
+      });
+      input.addEventListener("focus", () => input.select());
+    });
+    root.querySelectorAll("[data-transfer-calc-key]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const key = input.getAttribute("data-transfer-calc-key");
+        if (!key || !Object.prototype.hasOwnProperty.call(transferCalculatorState, key)) {
+          return;
+        }
+        const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
+        transferCalculatorState[key] = toNumber(digitsOnly);
         if (input.value !== digitsOnly) {
           input.value = digitsOnly;
         }
