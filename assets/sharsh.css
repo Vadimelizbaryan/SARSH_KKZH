@@ -3920,6 +3920,37 @@ a {
     -webkit-print-color-adjust: exact;
   }
 
+  .sheet,
+  .sheet-shell,
+  .table-wrap {
+    background: #ffffff !important;
+  }
+
+  .sheet th,
+  .sheet td,
+  .sheet thead th,
+  .sheet tbody th,
+  .sheet tbody td,
+  .sheet tfoot th,
+  .sheet tfoot td,
+  .sheet [class*="hdr-"],
+  .sheet [class*="cell-"] {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border-color: #000000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .sheet input,
+  .sheet textarea,
+  .sheet select,
+  .sheet button {
+    color: #000000 !important;
+    background: #ffffff !important;
+    border-color: #000000 !important;
+  }
+
   .no-print {
     display: none !important;
   }
@@ -4021,13 +4052,15 @@ a {
 
   .hospital-report-print-table th,
   .hospital-report-print-table td {
-    border: 1px solid rgba(17, 17, 17, 0.18);
+    border: 1px solid #000000;
     padding: 4px 6px;
     vertical-align: top;
+    background: #ffffff !important;
+    color: #000000 !important;
   }
 
   .hospital-report-print-table th {
-    background: #f4ead5;
+    background: #ffffff !important;
     font-weight: 800;
     text-align: left;
   }
@@ -4046,7 +4079,7 @@ a {
 
   .hospital-report-print-section td,
   .hospital-report-print-group td {
-    background: #faf6ec;
+    background: #ffffff !important;
     font-weight: 800;
   }
 }

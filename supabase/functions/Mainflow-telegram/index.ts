@@ -3805,7 +3805,7 @@ function drawDepartmentPatientNotes(
 ) {
   const font = fonts.regular;
   const boldFont = fonts.bold;
-  const color = rgb(0.07, 0.08, 0.38);
+  const color = rgb(0, 0, 0);
   const titleColor = rgb(0, 0, 0);
   const white = rgb(1, 1, 1);
 
@@ -4007,11 +4007,11 @@ async function buildMainMovementPdfBytes(snapshot: Awaited<ReturnType<typeof loa
   const valueWidth = 29.85;
   const rowHeight = 18.5;
   const headerHeight = 23;
-  const headerFill = rgb(0.99, 0.78, 0.56);
-  const headerFillDark = rgb(0.98, 0.72, 0.48);
-  const totalFill = rgb(1, 0.92, 0);
-  const calcFill = rgb(1, 0.96, 0.24);
-  const nameFill = rgb(0.99, 0.97, 0.92);
+  const headerFill = rgb(1, 1, 1);
+  const headerFillDark = rgb(1, 1, 1);
+  const totalFill = rgb(1, 1, 1);
+  const calcFill = rgb(1, 1, 1);
+  const nameFill = rgb(1, 1, 1);
   const border = rgb(0, 0, 0);
   const labelSize = 6.3;
   const valueSize = 6.4;
@@ -4202,11 +4202,11 @@ async function buildReportPdfBytes(snapshot: Awaited<ReturnType<typeof loadSnaps
   const primaryRows = snapshot.rows.filter((row) => row.group === "primary");
   const title = getPdfText("Օրվա շարժ․", fonts, "Report");
   const subtitle = getPdfText(`Ամսաթիվ՝ ${snapshot.reportDate}`, fonts, `Date: ${snapshot.reportDate}`);
-  const headerFill = rgb(0.95, 0.88, 0.76);
-  const sectionFill = rgb(0.9, 0.96, 0.92);
-  const border = rgb(0.15, 0.15, 0.15);
+  const headerFill = rgb(1, 1, 1);
+  const sectionFill = rgb(1, 1, 1);
+  const border = rgb(0, 0, 0);
 
-  drawPdfText(page, title, 34, 555, { font: fonts.bold, size: 20, color: rgb(0.03, 0.25, 0.16) });
+  drawPdfText(page, title, 34, 555, { font: fonts.bold, size: 20, color: rgb(0, 0, 0) });
   drawPdfText(page, subtitle, 34, 532, { font: fonts.regular, size: 11 });
 
   const leftX = 34;
@@ -6287,7 +6287,7 @@ async function buildFilledDepartmentPdfBytes(
   const font = await pdf.embedFont(StandardFonts.HelveticaBoldOblique);
   const dateFont = await pdf.embedFont(StandardFonts.HelveticaBold);
   const fontSize = 15;
-  const valueColor = rgb(0.07, 0.08, 0.38);
+  const valueColor = rgb(0, 0, 0);
   const pdfValues = buildDepartmentPdfValues(values);
   const sanitizedPatientNotes = sanitizeDepartmentPatientNotes(patientNotes);
 
