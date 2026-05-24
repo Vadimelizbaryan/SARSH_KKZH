@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">MAINFORM</string>
+    <string name="select_department">Отделение</string>
+    <string name="open_main">Главная</string>
+    <string name="refresh">Обновить</string>
+    <string name="choose_image">Фото бланка</string>
+    <string name="choose_department_title">Выберите отделение</string>
+    <string name="no_department_selected">Отделение не выбрано. Нажмите «Отделение» и выберите нужную страницу.</string>
+    <string name="loading_department">Открыто: %1$s</string>
+    <string name="loading_main_page">Открыта главная страница</string>
+</resources>

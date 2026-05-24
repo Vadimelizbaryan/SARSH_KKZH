@@ -8,3 +8,5 @@ scripts/.sarsh-local-server.pid
 supabase/.temp/
 tools/PdfMergeTool/bin/
 tools/PdfMergeTool/obj/
+android/**/bin/
+android/**/obj/
