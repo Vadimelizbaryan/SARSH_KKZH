@@ -2686,6 +2686,7 @@ function buildInitialPhotoLightboxState() {
     refreshMainTablePhotoGalleryUi(displayContext);
 
     try {
+      const loadedRecords = ensureMainTablePhotoGalleryRecordsLoaded();
       const records = await sync.listOcrFeedback(120);
       const fetchedRecords = (Array.isArray(records) ? records : [])
         .map(normalizeMainTablePhotoGalleryRecord)
