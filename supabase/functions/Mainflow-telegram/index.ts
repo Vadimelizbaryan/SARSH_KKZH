@@ -8048,10 +8048,6 @@ function buildPhotoSaveSummary(
     safeLines.push(...validationLinesHy.map(escapeTelegramHtml));
   }
 
-  if (recognized.notes.length) {
-    safeLines.push(escapeTelegramHtml(`Заметки OCR: ${recognized.notes.join("; ")}`));
-  }
-
   safeLines.push(escapeTelegramHtml(
     didSaveSnapshot
       ? `Տվյալները պահպանվել են ընդհանուր աղյուսակում։${saveSource === "telegram-form" ? " Պահպանման աղբյուր՝ Telegram Web App։" : (saveSource === "photo" ? " Պահպանման աղբյուր՝ լուսանկար։" : "")}`
@@ -9298,8 +9294,6 @@ async function handleTelegramPhoto(
   const hintedReportDate = detectReportDateFromHint(hintText);
   const senderPerson = getTelegramPersonFromMessage(message, chatId);
   const senderFirstName = getTelegramColleagueFirstName(senderPerson);
-  const shouldSendOrientationAdvice = shouldSendTelegramPhotoOrientationAdvice(chatId, hintText);
-
   if (!options.approved && !isTelegramAdminChat(chatId)) {
     await requestTelegramPhotoApproval(supabase, chatId, message, fileId, hintText, senderPerson);
     return;
@@ -9328,11 +9322,10 @@ async function handleTelegramPhoto(
   const preparedPhoto = await inspectTelegramPhotoOrientation(
     downloadedPhoto.dataUrl,
     downloadedPhoto.fileName,
-    { requireAdvice: shouldSendOrientationAdvice }
+    { requireAdvice: false }
   );
   const dataUrl = preparedPhoto.dataUrl;
   const fileName = preparedPhoto.fileName;
-  const orientationAdvice = preparedPhoto.orientationAdvice;
   const orientationNotes = preparedPhoto.orientationNotes;
 
   let departmentId = hintedDepartmentId;
@@ -9344,9 +9337,7 @@ async function handleTelegramPhoto(
     if (!departmentId) {
       const detectionSummary = [
         "Фото обработано. Отделение не определено.",
-        "Источник отделения: автоопределение по фото",
-        orientationNotes.length ? `Orientation OCR: ${orientationNotes.join("; ")}` : "",
-        detection.notes.length ? `Заметки OCR: ${detection.notes.join("; ")}` : ""
+        "Источник отделения: автоопределение по фото"
       ].filter(Boolean).join("\n");
       const notifyChatIds = getTelegramNotifyChatIds(chatId);
       if (notifyChatIds.length) {
@@ -9358,14 +9349,6 @@ async function handleTelegramPhoto(
         chatId,
         buildPhotoRetakeResponse("լուսանկարով բաժանմունքը վստահ որոշել չհաջողվեց", senderFirstName)
       );
-      if (shouldSendOrientationAdvice && orientationAdvice) {
-        runTelegramBackgroundTask(
-          sendTelegramPhotoOrientationAdvicePrepared(chatId, orientationAdvice, {
-            reportDate: hintedReportDate || getYerevanReportDateText()
-          }),
-          "Telegram photo orientation advice"
-        );
-      }
       return;
     }
   }
@@ -9486,19 +9469,6 @@ async function handleTelegramPhoto(
     );
   }
 
-  if (shouldSendOrientationAdvice) {
-    if (orientationAdvice) {
-      runTelegramBackgroundTask(
-        sendTelegramPhotoOrientationAdvicePrepared(chatId, orientationAdvice, { departmentId, reportDate }),
-        "Telegram photo orientation advice"
-      );
-    } else {
-      runTelegramBackgroundTask(
-        sendTelegramPhotoOrientationAdviceSafe(chatId, dataUrl, { departmentId, reportDate }),
-        "Telegram photo orientation advice"
-      );
-    }
-  }
 }
 
 async function handleTelegramSheetDocument(
