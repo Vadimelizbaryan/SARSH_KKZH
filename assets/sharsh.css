@@ -2156,6 +2156,124 @@ a {
   font-size: 12px;
 }
 
+.main-table-telegram-form-panel {
+  margin-top: 18px;
+}
+
+.main-table-telegram-form-list {
+  display: grid;
+  gap: 14px;
+}
+
+.main-table-telegram-form-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.main-table-telegram-form-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.main-table-telegram-form-card__meta {
+  display: grid;
+  gap: 4px;
+}
+
+.main-table-telegram-form-card__meta strong {
+  font-size: 15px;
+}
+
+.main-table-telegram-form-card__meta span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.main-table-telegram-form-card__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+}
+
+.main-table-telegram-form-card__status--saved {
+  background: #eaf9f0;
+  color: #0b6b43;
+  border-color: rgba(12, 112, 73, 0.18);
+}
+
+.main-table-telegram-form-card__status--pending {
+  background: #eef6ff;
+  color: #174ea6;
+  border-color: rgba(23, 78, 166, 0.18);
+}
+
+.main-table-telegram-form-card__status--error {
+  background: #fff1ed;
+  color: #9a1c0e;
+  border-color: rgba(154, 28, 14, 0.18);
+}
+
+.main-table-telegram-form-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.main-table-telegram-form-card__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.main-table-telegram-form-card__actions button:hover {
+  transform: translateY(-1px);
+  background: #fff6e9;
+}
+
+.main-table-telegram-form-card__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
+}
+
+.main-table-telegram-form-card__delete {
+  color: #9a1c0e !important;
+  border-color: rgba(154, 28, 14, 0.18) !important;
+  background: #fff7f3 !important;
+}
+
+.main-table-telegram-form-card__hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.main-table-telegram-form-card__table-wrap {
+  overflow-x: auto;
+}
+
 .main-table-edit-hint {
   margin: 0;
 }

@@ -2170,6 +2170,22 @@ async function listOcrFeedbackRecords(supabase: ReturnType<typeof createClient>,
   return mapOcrFeedbackRows(data as Array<Record<string, unknown>> | null | undefined);
 }
 
+async function listTelegramFormFeedbackRecords(supabase: ReturnType<typeof createClient>, limit: number) {
+  const safeLimit = Math.min(200, Math.max(1, Math.trunc(limit || 80)));
+  const { data, error } = await supabase
+    .from("sharsh_ocr_feedback")
+    .select("id, created_at, department_id, department_name, report_date, photo_report_date, save_status, image_name, image_data_url, recognized_keys, changed_keys, ocr_raw, final_values, notes, cell_reviews")
+    .in("image_name", ["telegram-web-app-form", "telegram-qh-form"])
+    .order("created_at", { ascending: false })
+    .limit(safeLimit);
+
+  if (error) {
+    throw error;
+  }
+
+  return mapOcrFeedbackRows(data as Array<Record<string, unknown>> | null | undefined);
+}
+
 async function listOcrFeedbackRecordsByIds(
   supabase: ReturnType<typeof createClient>,
   feedbackIds: number[]
@@ -2311,6 +2327,20 @@ async function deleteDepartmentFeedback(
   departmentId: keyof typeof DEPARTMENTS,
   feedbackId: number
 ) {
+  const { data: existing, error: existingError } = await supabase
+    .from("sharsh_ocr_feedback")
+    .select("id, department_id")
+    .eq("id", feedbackId)
+    .eq("department_id", departmentId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw existingError;
+  }
+  if (!existing) {
+    return;
+  }
+
   const { error: deleteError } = await supabase
     .from("sharsh_ocr_feedback")
     .delete()
@@ -2329,7 +2359,8 @@ async function deleteDepartmentFeedback(
       photo_feedback_updated_at: null,
       photo_name: null
     })
-    .eq("department_id", departmentId);
+    .eq("department_id", departmentId)
+    .eq("photo_feedback_id", feedbackId);
 
   if (updateError) {
     throw updateError;
@@ -2573,6 +2604,16 @@ Deno.serve(async (request) => {
         records: feedbackIds.length
           ? await listOcrFeedbackRecordsByIds(supabase, feedbackIds)
           : await listOcrFeedbackRecords(supabase, Number.isFinite(limit) ? limit : 100)
+      });
+    }
+
+    if (type === "list_telegram_form_feedback") {
+      const limit = Number(payload?.limit);
+      return jsonResponse({
+        records: await listTelegramFormFeedbackRecords(
+          supabase,
+          Number.isFinite(limit) ? limit : 80
+        )
       });
     }
 

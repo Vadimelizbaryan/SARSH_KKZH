@@ -1385,6 +1385,32 @@
     return Array.isArray(payload?.records) ? payload.records : [];
   }
 
+  async function listTelegramFormFeedback(limit) {
+    if (!hasRemoteSync()) {
+      return [];
+    }
+
+    ensureOwnerAuth();
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "list_telegram_form_feedback",
+        limit: Number.isFinite(Number(limit)) ? Number(limit) : 80
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось загрузить Telegram Web формы");
+    }
+
+    return Array.isArray(payload?.records) ? payload.records : [];
+  }
+
   async function saveOcrFeedback(feedback) {
     if (!hasRemoteSync() || !feedback || typeof feedback !== "object") {
       return { ok: false };
@@ -1707,6 +1733,7 @@
     deleteCivilReferrals,
     saveOcrFeedback,
     updateOcrFeedbackImage,
+    listTelegramFormFeedback,
     reassignOcrFeedbackDepartment,
     deleteDepartmentFeedback,
     saveReportDate,

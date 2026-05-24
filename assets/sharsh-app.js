@@ -433,6 +433,16 @@ function buildInitialPhotoLightboxState() {
     };
   }
 
+  function buildInitialMainTableTelegramFormState() {
+    return {
+      records: [],
+      isLoading: false,
+      error: "",
+      loaded: false,
+      lastLoadedAt: 0
+    };
+  }
+
   const state = {
     snapshot: config.buildDefaultSnapshot(),
     loadedSnapshot: config.buildDefaultSnapshot(),
@@ -473,6 +483,7 @@ function buildInitialPhotoLightboxState() {
     mainPhotoRoute: buildInitialMainPhotoRouteState(),
     feedback: buildInitialFeedbackState(),
     mainTablePhotoGallery: buildInitialMainTablePhotoGalleryState(),
+    mainTableTelegramForms: buildInitialMainTableTelegramFormState(),
     departmentTopCellsUnlocked: false,
     mainTableUnlocked: false,
     mainTableSaveSequence: 0,
@@ -2086,6 +2097,58 @@ function buildInitialPhotoLightboxState() {
     return state.mainTablePhotoGallery.records;
   }
 
+  function isTelegramFormFeedbackImageName(imageName) {
+    const normalized = typeof imageName === "string" ? imageName.trim() : "";
+    return normalized === "telegram-web-app-form" || normalized === "telegram-qh-form";
+  }
+
+  function normalizeMainTableTelegramFormRecord(record) {
+    if (!record || typeof record !== "object") {
+      return null;
+    }
+
+    const id = Number(record.id);
+    const imageName = typeof record.imageName === "string" ? record.imageName.trim() : "";
+    if (!Number.isFinite(id) || !isTelegramFormFeedbackImageName(imageName)) {
+      return null;
+    }
+
+    return {
+      id,
+      departmentId: typeof record.departmentId === "string" ? record.departmentId : "",
+      departmentName: typeof record.departmentName === "string" ? record.departmentName : "",
+      reportDate: typeof record.reportDate === "string" ? record.reportDate : "",
+      photoReportDate: typeof record.photoReportDate === "string" ? record.photoReportDate : "",
+      imageName,
+      createdAt: typeof record.createdAt === "string" ? record.createdAt : "",
+      saveStatus: typeof record.saveStatus === "string" ? record.saveStatus : "",
+      notes: normalizeOcrNotes(record.notes),
+      recognizedKeys: Array.isArray(record.recognizedKeys)
+        ? record.recognizedKeys.map((item) => String(item))
+        : [],
+      changedKeys: Array.isArray(record.changedKeys)
+        ? record.changedKeys.map((item) => String(item))
+        : [],
+      recognizedValues: normalizePhotoPreviewValueObject(record.recognizedValues || record.recognized_values),
+      finalValues: normalizePhotoPreviewValueObject(record.finalValues || record.final_values),
+      cellReviews: Array.isArray(record.cellReviews) ? record.cellReviews : []
+    };
+  }
+
+  function ensureMainTableTelegramFormRecordsLoaded() {
+    if (!Array.isArray(state.mainTableTelegramForms.records)) {
+      state.mainTableTelegramForms.records = [];
+    }
+    return state.mainTableTelegramForms.records;
+  }
+
+  function getMainTableTelegramFormRecordById(feedbackId) {
+    const normalizedFeedbackId = Number(feedbackId);
+    return ensureMainTableTelegramFormRecordsLoaded()
+      .map((record) => normalizeMainTableTelegramFormRecord(record))
+      .find((record) => record && Number(record.id) === normalizedFeedbackId) || null;
+  }
+
   function getMainTablePhotoGalleryRecordById(feedbackId) {
     const normalizedFeedbackId = Number(feedbackId);
     return ensureMainTablePhotoGalleryRecordsLoaded()
@@ -2140,6 +2203,68 @@ function buildInitialPhotoLightboxState() {
         };
       })
       .filter(Boolean);
+  }
+
+  function buildMainTableTelegramFormItems() {
+    const records = ensureMainTableTelegramFormRecordsLoaded();
+    const todayDateKey = getArchiveDateKey();
+    return records
+      .map((record) => normalizeMainTableTelegramFormRecord(record))
+      .filter((record) => record && getArchiveDateKeyForTimestamp(record.createdAt) === todayDateKey)
+      .map((record) => {
+        const liveRow = getDepartmentRow(state.snapshot, record.departmentId);
+        const previewValues = buildPhotoPreviewValuesFromRecord(record);
+        const recognizedKeys = Array.isArray(record.recognizedKeys) && record.recognizedKeys.length
+          ? record.recognizedKeys.map((item) => String(item))
+          : Object.keys(previewValues);
+        const previewRow = liveRow ? deepCopy(liveRow) : null;
+        const appliedKeys = previewRow
+          ? applyTelegramFormValuesToDepartmentRow(previewRow, previewValues, recognizedKeys)
+          : [];
+        const alreadySaved = liveRow
+          ? doesDepartmentRowMatchPreviewValues(state.snapshot, liveRow, previewValues, recognizedKeys)
+          : false;
+        return {
+          ...record,
+          liveRow,
+          previewRow,
+          previewValues,
+          recognizedKeys,
+          appliedKeys,
+          alreadySaved,
+          formLabel: record.imageName === "telegram-qh-form" ? "Telegram QH" : "Telegram Web"
+        };
+      })
+      .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
+  }
+
+  function renderMainTableTelegramFormPreviewTable(record, row) {
+    if (!record || !row) {
+      return "";
+    }
+
+    const tableHtml = renderTable(
+      {
+        ...deepCopy(state.snapshot),
+        reportDate: record.reportDate || state.snapshot.reportDate
+      },
+      [row],
+      {
+        interactive: false,
+        viewMode: "department",
+        headerDateTime: getHeaderDateTimeParts(record.reportDate) || getCurrentDateTimeParts()
+      }
+    )
+      .replace(' id="sheetTable"', "")
+      .replace(' id="sheetBody"', "");
+
+    return `
+      <div class="main-table-telegram-form-card__table">
+        <div class="table-wrap main-table-telegram-form-card__table-wrap">
+          ${tableHtml}
+        </div>
+      </div>
+    `;
   }
 
   function buildMainTablePhotoDepartmentOptions(selectedDepartmentId = "") {
@@ -2297,6 +2422,106 @@ function buildInitialPhotoLightboxState() {
     };
   }
 
+  function buildMainTableTelegramFormContent() {
+    const items = buildMainTableTelegramFormItems();
+
+    if (!sync.hasRemoteSync?.() || typeof sync.listTelegramFormFeedback !== "function") {
+      return {
+        summary: "Блок Telegram Web форм доступен только в онлайн-режиме владельца.",
+        html: '<div class="archive-empty">Telegram Web формы на сервере недоступны в локальном режиме.</div>'
+      };
+    }
+
+    if (state.mainTableTelegramForms.error) {
+      return {
+        summary: state.mainTableTelegramForms.error,
+        html: '<div class="archive-empty">Не удалось загрузить сегодняшние Telegram Web формы.</div>'
+      };
+    }
+
+    if (state.mainTableTelegramForms.isLoading && !items.length) {
+      return {
+        summary: "Загружаю сегодняшние Telegram Web формы...",
+        html: '<div class="archive-empty">Загружаю формы...</div>'
+      };
+    }
+
+    if (!items.length) {
+      return {
+        summary: "За текущие сутки отправленных Telegram Web форм пока нет.",
+        html: '<div class="archive-empty">Сегодняшние Telegram Web формы пока не поступали.</div>'
+      };
+    }
+
+    const archivePreviewActive = Boolean(state.activeMainTableSavedPreviewKey);
+    const dirtyMainRows = getMainTableDirtyRows();
+    const hasDirtyMainRows = dirtyMainRows.length > 0;
+
+    return {
+      summary: `Показано сегодняшних Telegram Web форм: ${items.length}. Для каждой формы можно обновить основную таблицу или удалить её отдельно.`,
+      html: `
+        <div class="main-table-telegram-form-list">
+          ${items.map((item) => {
+            const canApply = Boolean(item.liveRow && item.appliedKeys.length)
+              && !archivePreviewActive
+              && !hasDirtyMainRows
+              && !state.mainTableSaveInFlight;
+            const statusText = item.alreadySaved
+              ? "Уже в основной таблице"
+              : (item.liveRow ? "Готова к обновлению" : "Не удалось привязать к строке отделения");
+            const statusClass = item.alreadySaved
+              ? "main-table-telegram-form-card__status--saved"
+              : (item.liveRow ? "main-table-telegram-form-card__status--pending" : "main-table-telegram-form-card__status--error");
+            const reportDateText = item.reportDate
+              ? `Дата отчёта: ${item.reportDate}`
+              : "Дата отчёта не указана";
+            const createdAtText = item.createdAt
+              ? `Отправлено: ${formatTimestamp(item.createdAt)}`
+              : "Время отправки не указано";
+            const disabledReason = archivePreviewActive
+              ? "Сначала вернитесь к текущей таблице."
+              : (hasDirtyMainRows
+                ? "Сначала сохраните или отмените ручные правки в главной таблице."
+                : (!item.liveRow
+                  ? "У формы нет корректной привязки к строке отделения."
+                  : (!item.appliedKeys.length
+                    ? "В этой форме нет значений для записи в основную таблицу."
+                    : "")));
+            return `
+              <article class="main-table-telegram-form-card">
+                <div class="main-table-telegram-form-card__head">
+                  <div class="main-table-telegram-form-card__meta">
+                    <strong>${escapeHtml(item.departmentName || item.departmentId || `feedback ${item.id}`)}</strong>
+                    <span>${escapeHtml(item.formLabel)}</span>
+                    <span>${escapeHtml(reportDateText)}</span>
+                    <span>${escapeHtml(createdAtText)}</span>
+                  </div>
+                  <span class="main-table-telegram-form-card__status ${statusClass}">${escapeHtml(statusText)}</span>
+                </div>
+                <div class="main-table-telegram-form-card__actions">
+                  <button
+                    type="button"
+                    data-main-table-telegram-form-apply="${escapeHtml(String(item.id))}"
+                    ${canApply ? "" : "disabled"}
+                    title="${escapeHtml(disabledReason || "Записать значения этой формы в основную таблицу")}"
+                  >Обновить основную таблицу</button>
+                  <button
+                    type="button"
+                    class="main-table-telegram-form-card__delete"
+                    data-main-table-telegram-form-delete="${escapeHtml(String(item.id))}"
+                    data-main-table-telegram-form-department-id="${escapeHtml(item.departmentId || "")}"
+                  >Удалить</button>
+                </div>
+                ${disabledReason && !canApply ? `<div class="main-table-telegram-form-card__hint">${escapeHtml(disabledReason)}</div>` : ""}
+                ${item.previewRow ? renderMainTableTelegramFormPreviewTable(item, item.previewRow) : '<div class="archive-empty">Не удалось собрать таблицу предпросмотра для этой формы.</div>'}
+              </article>
+            `;
+          }).join("")}
+        </div>
+      `
+    };
+  }
+
   function getMainTablePhotoGalleryDepartmentPath(record, feedbackId) {
     const departmentId = typeof record?.departmentId === "string" && record.departmentId.trim()
       ? record.departmentId.trim()
@@ -2321,6 +2546,19 @@ function buildInitialPhotoLightboxState() {
     summaryEl.textContent = content.summary;
     listEl.innerHTML = content.html;
     bindMainTablePhotoGalleryEvents(listEl);
+  }
+
+  function refreshMainTableTelegramFormUi() {
+    const summaryEl = document.getElementById("mainTableTelegramFormSummaryText");
+    const listEl = document.getElementById("mainTableTelegramFormList");
+    if (!summaryEl || !listEl) {
+      return;
+    }
+
+    const content = buildMainTableTelegramFormContent();
+    summaryEl.textContent = content.summary;
+    listEl.innerHTML = content.html;
+    bindMainTableTelegramFormEvents(listEl);
   }
 
   function bindMainTablePhotoGalleryEvents(root = document) {
@@ -2405,6 +2643,32 @@ function buildInitialPhotoLightboxState() {
     });
   }
 
+  function bindMainTableTelegramFormEvents(root = document) {
+    if (!root || typeof root.querySelectorAll !== "function") {
+      return;
+    }
+
+    root.querySelectorAll("[data-main-table-telegram-form-apply]").forEach((button) => {
+      if (button.dataset.mainTableTelegramFormApplyBound === "true") {
+        return;
+      }
+      button.dataset.mainTableTelegramFormApplyBound = "true";
+      button.addEventListener("click", () => {
+        void handleApplyMainTableTelegramForm(button);
+      });
+    });
+
+    root.querySelectorAll("[data-main-table-telegram-form-delete]").forEach((button) => {
+      if (button.dataset.mainTableTelegramFormDeleteBound === "true") {
+        return;
+      }
+      button.dataset.mainTableTelegramFormDeleteBound = "true";
+      button.addEventListener("click", () => {
+        void handleDeleteMainTableTelegramForm(button);
+      });
+    });
+  }
+
   async function refreshMainTablePhotoGalleryRecordsFromRemote(displayContext = getMainTableDisplaySnapshotContext()) {
     if (
       mode !== "main"
@@ -2463,6 +2727,48 @@ function buildInitialPhotoLightboxState() {
     } finally {
       state.mainTablePhotoGallery.isLoading = false;
       refreshMainTablePhotoGalleryUi(displayContext);
+    }
+  }
+
+  async function refreshMainTableTelegramFormRecordsFromRemote() {
+    if (
+      mode !== "main"
+      || state.mainTableTelegramForms.isLoading
+      || !sync.hasRemoteSync?.()
+      || typeof sync.listTelegramFormFeedback !== "function"
+    ) {
+      refreshMainTableTelegramFormUi();
+      return;
+    }
+
+    const now = Date.now();
+    if (
+      state.mainTableTelegramForms.loaded
+      && Number.isFinite(state.mainTableTelegramForms.lastLoadedAt)
+      && now - state.mainTableTelegramForms.lastLoadedAt < 45000
+    ) {
+      refreshMainTableTelegramFormUi();
+      return;
+    }
+
+    state.mainTableTelegramForms.isLoading = true;
+    state.mainTableTelegramForms.error = "";
+    refreshMainTableTelegramFormUi();
+
+    try {
+      const records = await sync.listTelegramFormFeedback(120);
+      state.mainTableTelegramForms.records = (Array.isArray(records) ? records : [])
+        .map((record) => normalizeMainTableTelegramFormRecord(record))
+        .filter(Boolean);
+      state.mainTableTelegramForms.loaded = true;
+      state.mainTableTelegramForms.error = "";
+      state.mainTableTelegramForms.lastLoadedAt = Date.now();
+    } catch (error) {
+      state.mainTableTelegramForms.loaded = true;
+      state.mainTableTelegramForms.error = error instanceof Error ? error.message : "Не удалось загрузить Telegram Web формы.";
+    } finally {
+      state.mainTableTelegramForms.isLoading = false;
+      refreshMainTableTelegramFormUi();
     }
   }
 
@@ -6776,6 +7082,7 @@ function buildInitialPhotoLightboxState() {
       snapshot: displayedMainTableSnapshot,
       rows: displayedMainTableRows
     });
+    const mainTableTelegramFormContent = buildMainTableTelegramFormContent();
     const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
     const canEditMainTable = canEditMainTableDirectly();
     const mainBlankPdfPath = config.getMainBlankPdfPath
@@ -6892,6 +7199,14 @@ function buildInitialPhotoLightboxState() {
           <p id="mainTablePhotoGallerySummaryText">${escapeHtml(mainTablePhotoGalleryContent.summary)}</p>
           <div class="archive-list" id="mainTablePhotoGalleryList">
             ${mainTablePhotoGalleryContent.html}
+          </div>
+        </section>
+
+        <section class="panel no-print main-table-telegram-form-panel">
+          <h2>Ð¢Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Telegram Web Ñ„Ð¾Ñ€Ð¼ Ð·Ð° ÑÐµÐ³Ð¾Ð´Ð½Ñ</h2>
+          <p id="mainTableTelegramFormSummaryText">${escapeHtml(mainTableTelegramFormContent.summary)}</p>
+          <div class="archive-list" id="mainTableTelegramFormList">
+            ${mainTableTelegramFormContent.html}
           </div>
         </section>
 
@@ -8512,6 +8827,8 @@ function buildInitialPhotoLightboxState() {
       syncMainDepartmentPdfArchivePickerUi();
       refreshMainTablePhotoGalleryUi(mainDisplayContext);
       void refreshMainTablePhotoGalleryRecordsFromRemote(mainDisplayContext);
+      refreshMainTableTelegramFormUi();
+      void refreshMainTableTelegramFormRecordsFromRemote();
 
       state.snapshot.rows.forEach((row) => {
         const meta = getRowFreshnessMeta(row);
@@ -10127,6 +10444,125 @@ function buildInitialPhotoLightboxState() {
       setInfo(error instanceof Error ? error.message : "Не удалось изменить отделение для фото.", true);
       select.value = currentDepartmentId;
       select.disabled = false;
+    }
+  }
+
+  function removeMainTableTelegramFormRecord(feedbackId) {
+    const normalizedFeedbackId = Number(feedbackId);
+    state.mainTableTelegramForms.records = ensureMainTableTelegramFormRecordsLoaded().filter(
+      (record) => Number(record?.id) !== normalizedFeedbackId
+    );
+    state.mainTableTelegramForms.lastLoadedAt = 0;
+  }
+
+  async function handleApplyMainTableTelegramForm(button) {
+    const feedbackId = Number(button.getAttribute("data-main-table-telegram-form-apply") || "");
+    if (!Number.isFinite(feedbackId)) {
+      return;
+    }
+
+    if (!sync.hasRemoteSync() || typeof sync.saveDepartmentFromMain !== "function") {
+      setInfo("Обновление по Telegram Web форме доступно только в онлайн-режиме владельца.", true);
+      return;
+    }
+    if (state.activeMainTableSavedPreviewKey) {
+      setInfo("Сначала вернитесь к текущей таблице, потом обновляйте её по Telegram Web форме.", true);
+      return;
+    }
+    if (getMainTableDirtyRows().length) {
+      setInfo("Сначала сохраните или отмените ручные изменения в главной таблице.", true);
+      return;
+    }
+    if (state.mainTableSaveInFlight) {
+      setInfo("Главная таблица уже сохраняется. Подождите пару секунд.", true);
+      return;
+    }
+
+    const record = getMainTableTelegramFormRecordById(feedbackId);
+    if (!record) {
+      setInfo("Не удалось найти выбранную Telegram Web форму.", true);
+      return;
+    }
+
+    const liveRow = getDepartmentRow(state.snapshot, record.departmentId);
+    if (!liveRow) {
+      setInfo("У этой Telegram Web формы нет корректной привязки к строке отделения.", true);
+      return;
+    }
+
+    button.disabled = true;
+    setInfo(`Обновляю основную таблицу по Telegram Web форме: ${liveRow.department}...`, false);
+
+    try {
+      const draftRow = deepCopy(liveRow);
+      const previewValues = buildPhotoPreviewValuesFromRecord(record);
+      const recognizedKeys = Array.isArray(record.recognizedKeys) && record.recognizedKeys.length
+        ? record.recognizedKeys.map((item) => String(item))
+        : Object.keys(previewValues);
+      const appliedKeys = applyTelegramFormValuesToDepartmentRow(draftRow, previewValues, recognizedKeys);
+      if (!appliedKeys.length) {
+        throw new Error("В этой Telegram Web форме нет значений для записи в основную таблицу.");
+      }
+
+      const expectedValues = config.normalizeRowValues(draftRow.values);
+      if (isQhCalcDepartment(draftRow)) {
+        expectedValues.qhBaseSoldier = expectedValues.currentShar || 0;
+        expectedValues.qhBaseOfficer = expectedValues.currentSpa || 0;
+        expectedValues.qhBaseContract = expectedValues.currentPaym || 0;
+      }
+
+      const result = await sync.saveDepartmentFromMain(
+        draftRow.id,
+        state.snapshot.reportDate,
+        deepCopy(expectedValues)
+      );
+      const verification = verifySavedRowResult(draftRow.id, expectedValues, result.snapshot);
+      if (!verification.ok) {
+        throw new Error(verification.reason);
+      }
+
+      applyLoadedSnapshot(result);
+      state.mainTableTelegramForms.lastLoadedAt = 0;
+      setInfo(`Основная таблица обновлена по Telegram Web форме: ${draftRow.department}.`, false);
+      renderPage();
+    } catch (error) {
+      setInfo(error instanceof Error ? error.message : "Не удалось обновить основную таблицу по Telegram Web форме.", true);
+      button.disabled = false;
+    }
+  }
+
+  async function handleDeleteMainTableTelegramForm(button) {
+    const feedbackId = Number(button.getAttribute("data-main-table-telegram-form-delete") || "");
+    const departmentId = String(button.getAttribute("data-main-table-telegram-form-department-id") || "").trim();
+    const record = getMainTableTelegramFormRecordById(feedbackId);
+    const department = config.getDepartmentById(departmentId);
+    const departmentName = department?.department || record?.departmentName || departmentId || `feedback ${feedbackId}`;
+
+    if (!Number.isFinite(feedbackId) || !departmentId) {
+      setInfo("У этой Telegram Web формы нет корректной привязки к отделению для удаления.", true);
+      return;
+    }
+    if (typeof sync.deleteDepartmentFeedback !== "function") {
+      setInfo("Удаление Telegram Web формы пока недоступно. Обновите файлы синхронизации.", true);
+      return;
+    }
+
+    const confirmed = window.confirm(`Удалить Telegram Web форму отделения ${departmentName}?`);
+    if (!confirmed) {
+      return;
+    }
+
+    button.disabled = true;
+    setInfo(`Удаляю Telegram Web форму: ${departmentName}...`, false);
+    try {
+      const result = await sync.deleteDepartmentFeedback(departmentId, feedbackId);
+      removeMainTableTelegramFormRecord(feedbackId);
+      applyLoadedSnapshot(result);
+      setInfo(`Telegram Web форма удалена: ${departmentName}.`, false);
+      renderPage();
+    } catch (error) {
+      setInfo(error instanceof Error ? error.message : "Не удалось удалить Telegram Web форму.", true);
+      button.disabled = false;
     }
   }
 
