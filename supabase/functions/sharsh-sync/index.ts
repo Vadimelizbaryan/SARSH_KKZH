@@ -2382,14 +2382,12 @@ async function markDepartmentPhotoPending(
 
 async function deleteDepartmentFeedback(
   supabase: ReturnType<typeof createClient>,
-  departmentId: keyof typeof DEPARTMENTS,
   feedbackId: number
 ) {
   const { data: existing, error: existingError } = await supabase
     .from("sharsh_ocr_feedback")
     .select("id, department_id")
     .eq("id", feedbackId)
-    .eq("department_id", departmentId)
     .maybeSingle();
 
   if (existingError) {
@@ -2402,8 +2400,7 @@ async function deleteDepartmentFeedback(
   const { error: deleteError } = await supabase
     .from("sharsh_ocr_feedback")
     .delete()
-    .eq("id", feedbackId)
-    .eq("department_id", departmentId);
+    .eq("id", feedbackId);
 
   if (deleteError) {
     throw deleteError;
@@ -2417,7 +2414,6 @@ async function deleteDepartmentFeedback(
       photo_feedback_updated_at: null,
       photo_name: null
     })
-    .eq("department_id", departmentId)
     .eq("photo_feedback_id", feedbackId);
 
   if (updateError) {
@@ -2694,16 +2690,12 @@ Deno.serve(async (request) => {
     }
 
     if (type === "delete_department_feedback") {
-      const departmentId = typeof payload.departmentId === "string" ? payload.departmentId : "";
       const feedbackId = Number(payload.feedbackId);
-      if (!Object.prototype.hasOwnProperty.call(DEPARTMENTS, departmentId)) {
-        return jsonResponse({ error: "Unknown department." }, 400);
-      }
       if (!Number.isInteger(feedbackId) || feedbackId <= 0) {
         return jsonResponse({ error: "A valid feedback id is required." }, 400);
       }
 
-      await deleteDepartmentFeedback(supabase, departmentId as keyof typeof DEPARTMENTS, feedbackId);
+      await deleteDepartmentFeedback(supabase, feedbackId);
       return jsonResponse(await loadSnapshot(supabase));
     }
 

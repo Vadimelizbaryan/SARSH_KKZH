@@ -273,6 +273,95 @@
   const LEAVE_CALC_INPUT_KEYS = new Set(
     LEAVE_CALC_COLUMNS.flatMap((column) => [column.sentKey, column.returnedKey])
   );
+  const TRANSFER_CALC_COLUMNS = [
+    {
+      type: "soldier",
+      label: "ՇԱՐ",
+      currentKey: "currentShar",
+      incomingKey: "transferCalcIncomingSoldier",
+      outgoingKey: "transferCalcOutgoingSoldier",
+      outputKey: "transferCalcRemainingSoldier",
+      incomingMarker: "A",
+      outgoingMarker: "H",
+      baseMarker: "O",
+      outputMarker: "V"
+    },
+    {
+      type: "officer",
+      label: "ՍՊԱ",
+      currentKey: "currentSpa",
+      incomingKey: "transferCalcIncomingOfficer",
+      outgoingKey: "transferCalcOutgoingOfficer",
+      outputKey: "transferCalcRemainingOfficer",
+      incomingMarker: "B",
+      outgoingMarker: "I",
+      baseMarker: "P",
+      outputMarker: "W"
+    },
+    {
+      type: "contract",
+      label: "ՊԱՅՄ",
+      currentKey: "currentPaym",
+      incomingKey: "transferCalcIncomingContract",
+      outgoingKey: "transferCalcOutgoingContract",
+      outputKey: "transferCalcRemainingContract",
+      incomingMarker: "C",
+      outgoingMarker: "J",
+      baseMarker: "Q",
+      outputMarker: "X"
+    },
+    {
+      type: "zh",
+      label: "Զ/Հ",
+      currentKey: "currentZh",
+      incomingKey: "transferCalcIncomingZh",
+      outgoingKey: "transferCalcOutgoingZh",
+      outputKey: "transferCalcRemainingZh",
+      incomingMarker: "D",
+      outgoingMarker: "K",
+      baseMarker: "R",
+      outputMarker: "Y"
+    },
+    {
+      type: "family",
+      label: "Զ/Ծ ընտ",
+      currentKey: "family",
+      incomingKey: "transferCalcIncomingFamily",
+      outgoingKey: "transferCalcOutgoingFamily",
+      outputKey: "transferCalcRemainingFamily",
+      incomingMarker: "E",
+      outgoingMarker: "L",
+      baseMarker: "S",
+      outputMarker: "Z"
+    },
+    {
+      type: "reserve",
+      label: "Զ/Պ",
+      currentKey: "officer",
+      incomingKey: "transferCalcIncomingReserve",
+      outgoingKey: "transferCalcOutgoingReserve",
+      outputKey: "transferCalcRemainingReserve",
+      incomingMarker: "F",
+      outgoingMarker: "M",
+      baseMarker: "T",
+      outputMarker: "AA"
+    },
+    {
+      type: "civil",
+      label: "Ք-ի",
+      currentKey: "civil",
+      incomingKey: "transferCalcIncomingCivil",
+      outgoingKey: "transferCalcOutgoingCivil",
+      outputKey: "transferCalcRemainingCivil",
+      incomingMarker: "G",
+      outgoingMarker: "N",
+      baseMarker: "U",
+      outputMarker: "AB"
+    }
+  ];
+  const TRANSFER_CALC_INPUT_KEYS = new Set(
+    TRANSFER_CALC_COLUMNS.flatMap((column) => [column.incomingKey, column.outgoingKey])
+  );
   const HOSPITAL_REPORT_PRIMARY_ITEMS = [
     { key: "beenTotal", cell: 1, label: "Հոսպիտալում եղել է" },
     { key: "admittedTotal", cell: 4, label: "Ընդունվել է" },
@@ -484,6 +573,7 @@ function buildInitialPhotoLightboxState() {
     feedback: buildInitialFeedbackState(),
     mainTablePhotoGallery: buildInitialMainTablePhotoGalleryState(),
     mainTableTelegramForms: buildInitialMainTableTelegramFormState(),
+    selectedMainCalcDepartmentId: "",
     departmentTopCellsUnlocked: false,
     mainTableUnlocked: false,
     mainTableSaveSequence: 0,
@@ -4359,7 +4449,7 @@ function buildInitialPhotoLightboxState() {
   }
 
   function syncDepartmentPdfArchivePickerUi() {
-    const row = getCurrentRow();
+    const row = getDepartmentCalcTargetRow();
     if (!row) {
       return;
     }
@@ -5019,7 +5109,7 @@ function buildInitialPhotoLightboxState() {
     const shouldRefresh = options.refresh !== false;
     const shouldSave = options.save !== false;
     const shouldAnnounce = options.announce !== false;
-    const row = getCurrentRow();
+    const row = getDepartmentCalcTargetRow();
     if (!row) {
       return;
     }
@@ -5099,9 +5189,16 @@ function buildInitialPhotoLightboxState() {
 
     if (shouldRefresh) {
       refreshTableData();
+      if (mode === "main") {
+        renderPage();
+      }
     }
     if (shouldSave) {
-      queueDepartmentSave();
+      if (mode === "department") {
+        queueDepartmentSave();
+      } else if (mode === "main") {
+        refreshMainTableSaveState();
+      }
     }
     if (shouldAnnounce) {
       setInfo("Հաշվարկային աղյուսակի արժեքները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
@@ -5112,7 +5209,7 @@ function buildInitialPhotoLightboxState() {
     const shouldRefresh = options.refresh !== false;
     const shouldSave = options.save !== false;
     const shouldAnnounce = options.announce !== false;
-    const row = getCurrentRow();
+    const row = getDepartmentCalcTargetRow();
     if (!row) {
       return false;
     }
@@ -5153,9 +5250,16 @@ function buildInitialPhotoLightboxState() {
 
     if (shouldRefresh) {
       refreshTableData();
+      if (mode === "main") {
+        renderPage();
+      }
     }
     if (shouldSave) {
-      queueDepartmentSave();
+      if (mode === "department") {
+        queueDepartmentSave();
+      } else if (mode === "main") {
+        refreshMainTableSaveState();
+      }
     }
     if (shouldAnnounce) {
       setInfo("Բուժական արձակուրդի հաշվարկը տեղափոխվել է հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
@@ -5163,8 +5267,85 @@ function buildInitialPhotoLightboxState() {
     return true;
   }
 
+  function applyTransferCalcToDepartment(options = {}) {
+    const shouldRefresh = options.refresh !== false;
+    const shouldSave = options.save !== false;
+    const shouldAnnounce = options.announce !== false;
+    const row = getDepartmentCalcTargetRow();
+    if (!row) {
+      return false;
+    }
+
+    const invalidColumns = getTransferCalcInvalidColumns(row);
+    if (invalidColumns.length) {
+      setInfo(`Переводы не могут быть рассчитаны: ${invalidColumns.map((column) => column.label).join(", ")} дают отрицательный остаток.`, true);
+      return false;
+    }
+
+    let incomingTotal = 0;
+    let outgoingTotal = 0;
+    TRANSFER_CALC_COLUMNS.forEach((column) => {
+      const incoming = getTransferCalcSourceValue(row, column.incomingKey) || 0;
+      const outgoing = getTransferCalcSourceValue(row, column.outgoingKey) || 0;
+      const nextCurrent = calcTransferRemainingValue(row, column.type) || 0;
+
+      row.values[column.currentKey] = nextCurrent;
+      row.values[column.incomingKey] = 0;
+      row.values[column.outgoingKey] = 0;
+
+      incomingTotal += incoming;
+      outgoingTotal += outgoing;
+    });
+
+    row.values.transferToDepartment = incomingTotal;
+    row.values.transferFromDepartment = outgoingTotal;
+
+    [
+      ["currentShar", row.values.currentShar],
+      ["currentSpa", row.values.currentSpa],
+      ["currentPaym", row.values.currentPaym],
+      ["currentZh", row.values.currentZh],
+      ["family", row.values.family],
+      ["officer", row.values.officer],
+      ["civil", row.values.civil],
+      ["transferToDepartment", row.values.transferToDepartment],
+      ["transferFromDepartment", row.values.transferFromDepartment]
+    ].forEach(([key, value]) => {
+      syncDepartmentRowInput(row.id, key, value);
+    });
+
+    if (isQhCalcDepartment(row)) {
+      row.values.qhBaseSoldier = row.values.currentShar || 0;
+      row.values.qhBaseOfficer = row.values.currentSpa || 0;
+      row.values.qhBaseContract = row.values.currentPaym || 0;
+      row.values.qhBaseZh = row.values.currentZh || 0;
+      row.values.qhBaseFamily = row.values.family || 0;
+      row.values.qhBaseReserve = row.values.officer || 0;
+      row.values.qhBaseCivil = row.values.civil || 0;
+      refreshQhCalcDisplay(row);
+    }
+
+    if (shouldRefresh) {
+      refreshTableData();
+      if (mode === "main") {
+        renderPage();
+      }
+    }
+    if (shouldSave) {
+      if (mode === "department") {
+        queueDepartmentSave();
+      } else if (mode === "main") {
+        refreshMainTableSaveState();
+      }
+    }
+    if (shouldAnnounce) {
+      setInfo("Расчёт переводов перенесён в строку отделения. Для отправки в общий файл нажмите «Сохранить».", false);
+    }
+    return true;
+  }
+
   function applyDepartmentCombinedCalc() {
-    const row = getCurrentRow();
+    const row = getDepartmentCalcTargetRow();
     if (!row) {
       return;
     }
@@ -5173,14 +5354,23 @@ function buildInitialPhotoLightboxState() {
     applyQhCalcToDepartment({ refresh: false, save: false, announce: false });
 
     const leaveApplied = applyLeaveCalcToDepartment({ refresh: false, save: false, announce: false });
-    if (!leaveApplied) {
+    const transferApplied = applyTransferCalcToDepartment({ refresh: false, save: false, announce: false });
+    if (!leaveApplied || !transferApplied) {
       row.values = originalValues;
       refreshTableData();
+      if (mode === "main") {
+        renderPage();
+      }
       return;
     }
 
     refreshTableData();
-    queueDepartmentSave();
+    if (mode === "department") {
+      queueDepartmentSave();
+    } else if (mode === "main") {
+      refreshMainTableSaveState();
+      renderPage();
+    }
     setInfo("Հաշվարկները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
   }
 
@@ -6394,6 +6584,43 @@ function buildInitialPhotoLightboxState() {
     return mode === "department" ? getDepartmentRow(state.loadedSnapshot, departmentId) : null;
   }
 
+  function getSelectedMainCalcDepartmentId(rows = null) {
+    const availableRows = Array.isArray(rows)
+      ? rows.filter((row) => row && typeof row.id === "string")
+      : [];
+    if (!availableRows.length) {
+      state.selectedMainCalcDepartmentId = "";
+      return "";
+    }
+
+    const currentId = String(state.selectedMainCalcDepartmentId || "").trim();
+    const hasCurrent = availableRows.some((row) => row.id === currentId);
+    if (hasCurrent) {
+      return currentId;
+    }
+
+    state.selectedMainCalcDepartmentId = availableRows[0].id;
+    return state.selectedMainCalcDepartmentId;
+  }
+
+  function getSelectedMainCalcRow(snapshot = state.snapshot) {
+    if (mode !== "main" || !snapshot || !Array.isArray(snapshot.rows)) {
+      return null;
+    }
+    const rowId = getSelectedMainCalcDepartmentId(snapshot.rows);
+    return rowId ? getDepartmentRow(snapshot, rowId) : null;
+  }
+
+  function getDepartmentCalcTargetRow(snapshot = state.snapshot) {
+    if (mode === "department") {
+      return getDepartmentRow(snapshot, departmentId);
+    }
+    if (mode === "main") {
+      return getSelectedMainCalcRow(snapshot);
+    }
+    return null;
+  }
+
   function hasDepartmentPendingLocalChanges() {
     if (mode !== "department") {
       return false;
@@ -7261,6 +7488,13 @@ function buildInitialPhotoLightboxState() {
             ${mainTableTelegramFormContent.html}
           </div>
         </section>
+
+        ${renderMainDepartmentCalcPanel({
+          previewRecord: activeMainTableSavedRecord,
+          snapshot: displayedMainTableSnapshot,
+          rows: displayedMainTableRows,
+          headerDateTime: displayedMainTableHeaderDateTime || undefined
+        })}
 
         <div class="layout-grid split">
           <div class="info-stack">
@@ -8424,9 +8658,98 @@ function buildInitialPhotoLightboxState() {
     `;
   }
 
+  function renderTransferCalcPanel(row, options = {}) {
+    const bodyRows = [
+      {
+        label: "Õ†Õ¥Ö€Õ½ Õ§ Õ¥Õ¯Õ¥Õ»",
+        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.incomingKey, role: "input" }))
+      },
+      {
+        label: "Ô´Õ¸Ö‚Ö€Õ½ Õ§ Õ£Õ¶Õ¡ÖÕ¥Õ»",
+        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.outgoingKey, role: "input" }))
+      },
+      {
+        label: "ÔµÕ²Õ¥Õ¬ Õ§",
+        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.currentKey, role: "linked" }))
+      },
+      {
+        label: "Õ€Õ¡Õ·Õ¾Õ¡Ö€Õ¯",
+        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.outputKey, role: "output" }))
+      }
+    ];
+
+    const bodyHtml = bodyRows.map((definition) => `
+      <tr>
+        <th scope="row">${escapeHtml(definition.label)}</th>
+        ${definition.cells.map((cell) => {
+          if (cell.role === "input") {
+            return `
+              <td class="qh-calc-cell">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  value="${escapeHtml(getTransferCalcDisplayValue(row, cell.key) || "0")}"
+                  data-transfer-calc-key="${escapeHtml(cell.key)}"
+                  aria-label="${escapeHtml(definition.label)}"
+                >
+              </td>
+            `;
+          }
+
+          if (cell.role === "linked") {
+            return `
+              <td class="qh-calc-cell qh-calc-cell--linked">
+                <strong data-transfer-calc-base="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(getNumber(state.snapshot, row, cell.key)) || "0")}</strong>
+              </td>
+            `;
+          }
+
+          return `
+            <td class="qh-calc-cell qh-calc-cell--output">
+              <strong data-transfer-calc-output="${escapeHtml(cell.key)}">${escapeHtml(getTransferCalcDisplayValue(row, cell.key) || "0")}</strong>
+            </td>
+          `;
+        }).join("")}
+      </tr>
+    `).join("");
+
+    const isEmbedded = Boolean(options.embedded);
+    const panelClass = isEmbedded ? "department-calc-section department-calc-section--transfer" : "panel qh-calc-panel";
+    const titleTag = isEmbedded ? "h3" : "h2";
+    const buttonHtml = options.showButton === false ? "" : `
+          <div class="qh-calc-actions">
+            <button type="button" id="transferCalcApplyBtn">Õ€Õ¡Õ·Õ¾Õ¥Õ¬ Ö‡ Õ¿Õ¥Õ²Õ¡Õ¤Ö€Õ¥Õ¬</button>
+          </div>
+    `;
+
+    return `
+      <div class="${panelClass}">
+        <${titleTag}>ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­Õ¸Ö‚Õ©ÕµÕ¸Ö‚Õ¶</${titleTag}>
+        <div class="qh-calc-wrap" id="transferCalcPanel">
+          <table class="qh-calc-table">
+            <thead>
+              <tr>
+                <th></th>
+                ${TRANSFER_CALC_COLUMNS.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyHtml}
+            </tbody>
+          </table>
+          <div id="transferCalcStatus" class="qh-calc-status"></div>
+          ${buttonHtml}
+        </div>
+      </div>
+    `;
+  }
+
   function renderDepartmentCombinedCalcPanel(row) {
     const qhSection = renderQhCalcPanel(row, { embedded: true, showButton: false });
     const leaveSection = renderLeaveCalcPanel(row, { embedded: true, showButton: false });
+    const transferSection = renderTransferCalcPanel(row, { embedded: true, showButton: false });
     const introHtml = qhSection
       ? `<p class="department-calc-intro">Մուտքագրեք ընդունված, դուրսգրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը, և հաշվարկները կկատարվեն ավտոմատ։ Սեղմեք «Հաշվել և տեղադրել» կոճակը, տվյալները կտեղադրվեն բաժանմունքի սանդղակում, որից հետո սեղմեք «Պահպանել» կոճակը։</p>`
       : "";
@@ -8437,11 +8760,228 @@ function buildInitialPhotoLightboxState() {
         <div class="department-calc-grid">
           ${qhSection}
           ${leaveSection}
+          ${transferSection}
         </div>
         <div class="qh-calc-actions">
           <button type="button" id="departmentCalcApplyBtn">Հաշվել և տեղադրել</button>
         </div>
       </div>
+    `;
+  }
+
+  function renderMainDepartmentCalcPanel(displayContext = getMainTableDisplaySnapshotContext()) {
+    const rows = Array.isArray(displayContext?.rows)
+      ? displayContext.rows.filter((row) => row && typeof row.id === "string")
+      : [];
+
+    if (!rows.length) {
+      return `
+        <section class="panel no-print main-department-calc-panel">
+          <h2>Õ€Õ¡Õ·Õ¾Õ«Õ¹ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„Õ¶Õ¥Ö€Õ« Õ°Õ¡Õ´Õ¡Ö€</h2>
+          <p>ÕÕ¡Ö‚Õ¥Õ¹Õ¸Ö‚Õ©ÕµÕ¡Õ¶ Õ°Õ¡Õ´Õ¡Ö€ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„Õ¶Õ¥Ö€ Õ¹Õ¯Õ¡Õ¶Ö‰</p>
+        </section>
+      `;
+    }
+
+    const selectedId = getSelectedMainCalcDepartmentId(rows);
+    const row = rows.find((item) => item.id === selectedId) || rows[0];
+    const tableHtml = row
+      ? renderTable(
+          displayContext.snapshot,
+          [row],
+          {
+            interactive: false,
+            viewMode: "department",
+            headerDateTime: displayContext?.headerDateTime || getCurrentDateTimeParts()
+          }
+        )
+          .replace(' id="sheetTable"', "")
+          .replace(' id="sheetBody"', "")
+      : "";
+
+    return `
+      <section class="panel no-print main-department-calc-panel">
+        <div class="main-department-calc-panel__head">
+          <div>
+            <h2>Õ€Õ¡Õ·Õ¾Õ«Õ¹ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„Õ¶Õ¥Ö€Õ« Õ°Õ¡Õ´Õ¡Ö€</h2>
+            <p class="main-department-calc-panel__note">ÕˆÕ¶Õ¿Ö€Õ¥Ö„ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„Õ¨ Ö‡ Õ´Õ¸Ö‚Õ¿Ö„Õ¡Õ£Ö€Õ¥Ö„ Õ¨Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´, Õ¤Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´, Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ Ö‡ Õ¿Õ¥Õ²Õ¡ÖƒÕ¸Õ­Õ¸Ö‚Õ©ÕµÕ¡Õ¶ Õ¿Õ¾ÕµÕ¡Õ¬Õ¶Õ¥Ö€Õ¨Ö‰</p>
+          </div>
+          <label class="main-department-calc-panel__select">
+            <span>Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„</span>
+            <select id="mainCalcDepartmentSelect">
+              ${buildMainTablePhotoDepartmentOptions(row.id)}
+            </select>
+          </label>
+        </div>
+        <div class="main-department-calc-panel__preview">
+          <div class="table-wrap main-department-calc-panel__preview-wrap">
+            ${tableHtml}
+          </div>
+        </div>
+        ${renderDepartmentCombinedCalcPanel(row)}
+      </section>
+    `;
+  }
+
+  function renderTransferCalcPanel(row, options = {}) {
+    const bodyRows = [
+      {
+        label: "Ներս է եկել",
+        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.incomingKey, role: "input" }))
+      },
+      {
+        label: "Դուրս է գնացել",
+        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.outgoingKey, role: "input" }))
+      },
+      {
+        label: "Եղել է",
+        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.currentKey, role: "linked" }))
+      },
+      {
+        label: "Հաշվարկ",
+        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.outputKey, role: "output" }))
+      }
+    ];
+
+    const bodyHtml = bodyRows.map((definition) => `
+      <tr>
+        <th scope="row">${escapeHtml(definition.label)}</th>
+        ${definition.cells.map((cell) => {
+          if (cell.role === "input") {
+            return `
+              <td class="qh-calc-cell">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  value="${escapeHtml(getTransferCalcDisplayValue(row, cell.key) || "0")}"
+                  data-transfer-calc-key="${escapeHtml(cell.key)}"
+                  aria-label="${escapeHtml(definition.label)}"
+                >
+              </td>
+            `;
+          }
+
+          if (cell.role === "linked") {
+            return `
+              <td class="qh-calc-cell qh-calc-cell--linked">
+                <strong data-transfer-calc-base="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(getNumber(state.snapshot, row, cell.key)) || "0")}</strong>
+              </td>
+            `;
+          }
+
+          return `
+            <td class="qh-calc-cell qh-calc-cell--output">
+              <strong data-transfer-calc-output="${escapeHtml(cell.key)}">${escapeHtml(getTransferCalcDisplayValue(row, cell.key) || "0")}</strong>
+            </td>
+          `;
+        }).join("")}
+      </tr>
+    `).join("");
+
+    const isEmbedded = Boolean(options.embedded);
+    const panelClass = isEmbedded ? "department-calc-section department-calc-section--transfer" : "panel qh-calc-panel";
+    const titleTag = isEmbedded ? "h3" : "h2";
+    const buttonHtml = options.showButton === false ? "" : `
+          <div class="qh-calc-actions">
+            <button type="button" id="transferCalcApplyBtn">Հաշվել և տեղադրել</button>
+          </div>
+    `;
+
+    return `
+      <div class="${panelClass}">
+        <${titleTag}>Տեղափոխություն</${titleTag}>
+        <div class="qh-calc-wrap" id="transferCalcPanel">
+          <table class="qh-calc-table">
+            <thead>
+              <tr>
+                <th></th>
+                ${TRANSFER_CALC_COLUMNS.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyHtml}
+            </tbody>
+          </table>
+          <div id="transferCalcStatus" class="qh-calc-status"></div>
+          ${buttonHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDepartmentCombinedCalcPanel(row) {
+    const qhSection = renderQhCalcPanel(row, { embedded: true, showButton: false });
+    const leaveSection = renderLeaveCalcPanel(row, { embedded: true, showButton: false });
+    const transferSection = renderTransferCalcPanel(row, { embedded: true, showButton: false });
+
+    return `
+      <div class="panel department-calc-combined-panel">
+        <p class="department-calc-intro">Մուտքագրեք ընդունված, դուրսգրված, արձակուրդ գնացող, արձակուրդից վերադարձած և տեղափոխված հիվանդների քանակը, հետո սեղմեք «Հաշվել և տեղադրել»։</p>
+        <div class="department-calc-grid">
+          ${qhSection}
+          ${leaveSection}
+          ${transferSection}
+        </div>
+        <div class="qh-calc-actions">
+          <button type="button" id="departmentCalcApplyBtn">Հաշվել և տեղադրել</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMainDepartmentCalcPanel(displayContext = getMainTableDisplaySnapshotContext()) {
+    const rows = Array.isArray(displayContext?.rows)
+      ? displayContext.rows.filter((row) => row && typeof row.id === "string")
+      : [];
+
+    if (!rows.length) {
+      return `
+        <section class="panel no-print main-department-calc-panel">
+          <h2>Հաշվիչ գլխավոր էջում</h2>
+          <p>Հաշվիչի համար բաժանմունքներ չկան։</p>
+        </section>
+      `;
+    }
+
+    const selectedId = getSelectedMainCalcDepartmentId(rows);
+    const row = rows.find((item) => item.id === selectedId) || rows[0];
+    const tableHtml = row
+      ? renderTable(
+          displayContext.snapshot,
+          [row],
+          {
+            interactive: false,
+            viewMode: "department",
+            headerDateTime: displayContext?.headerDateTime || getCurrentDateTimeParts()
+          }
+        )
+          .replace(' id="sheetTable"', "")
+          .replace(' id="sheetBody"', "")
+      : "";
+
+    return `
+      <section class="panel no-print main-department-calc-panel">
+        <div class="main-department-calc-panel__head">
+          <div>
+            <h2>Հաշվիչ գլխավոր էջում</h2>
+            <p class="main-department-calc-panel__note">Ընտրեք բաժանմունքը, հետո մուտքագրեք ընդունում, դուրսգրում, արձակուրդ և տեղափոխություն։</p>
+          </div>
+          <label class="main-department-calc-panel__select">
+            <span>Բաժանմունք</span>
+            <select id="mainCalcDepartmentSelect">
+              ${buildMainTablePhotoDepartmentOptions(row.id)}
+            </select>
+          </label>
+        </div>
+        <div class="main-department-calc-panel__preview">
+          <div class="table-wrap main-department-calc-panel__preview-wrap">
+            ${tableHtml}
+          </div>
+        </div>
+        ${renderDepartmentCombinedCalcPanel(row)}
+      </section>
     `;
   }
 
@@ -8595,6 +9135,11 @@ function buildInitialPhotoLightboxState() {
     const rows = mode === "department"
       ? [getCurrentRow()].filter(Boolean)
       : (mainDisplayContext ? mainDisplayContext.rows : state.snapshot.rows);
+    const calcTargetRowId = mode === "department"
+      ? departmentId
+      : mode === "main" && activeSnapshot && Array.isArray(activeSnapshot.rows)
+        ? getSelectedMainCalcDepartmentId(activeSnapshot.rows)
+        : "";
     rows.forEach((row) => {
       const presentEl = body.querySelector(`[data-output="presentTotal"][data-row="${row.id}"]`);
       if (presentEl) {
@@ -8619,7 +9164,7 @@ function buildInitialPhotoLightboxState() {
         }
       });
 
-      if (isQhCalcDepartment(row)) {
+      if (row.id === calcTargetRowId && isQhCalcDepartment(row)) {
         [...QH_CALC_INPUT_KEYS, ...QH_CALC_OPTIONAL_INPUT_KEYS].forEach((key) => {
           document.querySelectorAll(`[data-qh-calc-key="${key}"]`).forEach((element) => {
             if (element instanceof HTMLInputElement) {
@@ -8650,26 +9195,37 @@ function buildInitialPhotoLightboxState() {
         });
       }
 
-      LEAVE_CALC_INPUT_KEYS.forEach((key) => {
-        document.querySelectorAll(`[data-leave-calc-key="${key}"]`).forEach((element) => {
-          if (element instanceof HTMLInputElement) {
-            element.value = getDisplayValue(getLeaveCalcSourceValue(row, key)) || "0";
-          }
+      if (row.id === calcTargetRowId) {
+        LEAVE_CALC_INPUT_KEYS.forEach((key) => {
+          document.querySelectorAll(`[data-leave-calc-key="${key}"]`).forEach((element) => {
+            if (element instanceof HTMLInputElement) {
+              element.value = getDisplayValue(getLeaveCalcSourceValue(row, key)) || "0";
+            }
+          });
         });
-      });
 
-      LEAVE_CALC_COLUMNS.forEach((column) => {
-        document.querySelectorAll(`[data-leave-calc-base="${column.leaveKey}"]`).forEach((element) => {
-          element.textContent = getDisplayValue(getNumber(activeSnapshot, row, column.leaveKey)) || "0";
+        LEAVE_CALC_COLUMNS.forEach((column) => {
+          document.querySelectorAll(`[data-leave-calc-base="${column.leaveKey}"]`).forEach((element) => {
+            element.textContent = getDisplayValue(getNumber(activeSnapshot, row, column.leaveKey)) || "0";
+          });
+          document.querySelectorAll(`[data-leave-calc-output="${column.leaveKey}"]`).forEach((element) => {
+            element.textContent = getDisplayValue(calcLeaveRemainingValue(row, column.type)) || "0";
+          });
+          document.querySelectorAll(`[data-leave-calc-output="${column.presentKey}"]`).forEach((element) => {
+            element.textContent = getDisplayValue(calcLeavePresentValue(row, column.type)) || "0";
+          });
         });
-        document.querySelectorAll(`[data-leave-calc-output="${column.leaveKey}"]`).forEach((element) => {
-          element.textContent = getDisplayValue(calcLeaveRemainingValue(row, column.type)) || "0";
+        refreshLeaveCalcDisplay(row);
+
+        TRANSFER_CALC_INPUT_KEYS.forEach((key) => {
+          document.querySelectorAll(`[data-transfer-calc-key="${key}"]`).forEach((element) => {
+            if (element instanceof HTMLInputElement) {
+              element.value = getTransferCalcDisplayValue(row, key, activeSnapshot) || "0";
+            }
+          });
         });
-        document.querySelectorAll(`[data-leave-calc-output="${column.presentKey}"]`).forEach((element) => {
-          element.textContent = getDisplayValue(calcLeavePresentValue(row, column.type)) || "0";
-        });
-      });
-      refreshLeaveCalcDisplay(row);
+        refreshTransferCalcDisplay(row, activeSnapshot);
+      }
     });
 
     Object.keys(config.linkedCells).forEach((linkedKey) => {
@@ -8722,6 +9278,75 @@ function buildInitialPhotoLightboxState() {
         cell.classList.toggle("transfer-mismatch-cell", hasMismatch);
       });
     });
+  }
+
+  function getTransferCalcSourceValue(row, key) {
+    if (!row) {
+      return null;
+    }
+    const value = row.values && typeof row.values === "object"
+      ? row.values[key]
+      : null;
+    return config.normalizeCellValue(value);
+  }
+
+  function calcTransferRemainingValue(row, type, snapshot = state.snapshot) {
+    const column = TRANSFER_CALC_COLUMNS.find((item) => item.type === type);
+    if (!row || !column) {
+      return null;
+    }
+    const baseCurrent = getNumber(snapshot, row, column.currentKey) || 0;
+    const incoming = getTransferCalcSourceValue(row, column.incomingKey) || 0;
+    const outgoing = getTransferCalcSourceValue(row, column.outgoingKey) || 0;
+    return baseCurrent + incoming - outgoing;
+  }
+
+  function getTransferCalcDisplayValue(row, key, snapshot = state.snapshot) {
+    if (!row) {
+      return "";
+    }
+    const outputColumn = TRANSFER_CALC_COLUMNS.find((item) => item.outputKey === key);
+    if (outputColumn) {
+      return getDisplayValue(calcTransferRemainingValue(row, outputColumn.type, snapshot));
+    }
+    const directValue = getTransferCalcSourceValue(row, key);
+    if (TRANSFER_CALC_INPUT_KEYS.has(key) && (directValue === null || directValue === "" || typeof directValue === "undefined")) {
+      return "0";
+    }
+    return getDisplayValue(directValue);
+  }
+
+  function getTransferCalcInvalidColumns(row, snapshot = state.snapshot) {
+    if (!row) {
+      return [];
+    }
+    return TRANSFER_CALC_COLUMNS.filter((column) => (calcTransferRemainingValue(row, column.type, snapshot) || 0) < 0);
+  }
+
+  function refreshTransferCalcDisplay(row, snapshot = state.snapshot) {
+    if (!row) {
+      return;
+    }
+    TRANSFER_CALC_COLUMNS.forEach((column) => {
+      document.querySelectorAll(`[data-transfer-calc-base="${column.currentKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(getNumber(snapshot, row, column.currentKey)) || "0";
+      });
+      document.querySelectorAll(`[data-transfer-calc-output="${column.outputKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(calcTransferRemainingValue(row, column.type, snapshot)) || "0";
+      });
+    });
+
+    const statusEl = document.getElementById("transferCalcStatus");
+    if (statusEl) {
+      const invalidColumns = getTransferCalcInvalidColumns(row, snapshot);
+      if (invalidColumns.length) {
+        statusEl.textContent = `Փոխանցումների հաշվարկը չի կարող կիրառվել․ ${invalidColumns.map((column) => column.label).join(", ")} սյունակներում կստացվի բացասական արժեք։`;
+        statusEl.className = "qh-calc-status qh-calc-status--invalid";
+      } else {
+        statusEl.textContent = "";
+        statusEl.className = "qh-calc-status";
+      }
+    }
   }
 
   function refreshTableData() {
@@ -10425,7 +11050,7 @@ function buildInitialPhotoLightboxState() {
     const department = config.getDepartmentById(departmentIdToDelete);
     const departmentName = department?.department || record?.departmentName || departmentIdToDelete || `feedback ${feedbackId}`;
 
-    if (!Number.isFinite(feedbackId) || !departmentIdToDelete) {
+    if (!Number.isFinite(feedbackId)) {
       setInfo("У этого фото нет корректной привязки к отделению для удаления.", true);
       return;
     }
@@ -10443,7 +11068,7 @@ function buildInitialPhotoLightboxState() {
     button.disabled = true;
     setInfo(`Удаляю фото: ${departmentName}...`, false);
     try {
-      const result = await sync.deleteDepartmentFeedback(departmentIdToDelete, feedbackId);
+      const result = await sync.deleteDepartmentFeedback(departmentIdToDelete || "", feedbackId);
       removeMainTablePhotoGalleryRecord(feedbackId);
       if (state.photoLightbox?.open && Number(state.photoLightbox.sourceId) === feedbackId) {
         closePhotoLightbox();
@@ -11847,6 +12472,9 @@ function buildInitialPhotoLightboxState() {
     const qhCalcPanel = document.getElementById("qhCalcPanel");
     const qhCalcApplyBtn = document.getElementById("qhCalcApplyBtn");
     const departmentCalcApplyBtn = document.getElementById("departmentCalcApplyBtn");
+    const transferCalcPanel = document.getElementById("transferCalcPanel");
+    const transferCalcApplyBtn = document.getElementById("transferCalcApplyBtn");
+    const mainCalcDepartmentSelect = document.getElementById("mainCalcDepartmentSelect");
 
     bindUpdateAudioUnlock();
 
@@ -12273,7 +12901,7 @@ function buildInitialPhotoLightboxState() {
       window.__sharshPhotoDraftGuardBound = true;
     }
 
-    if (mode === "department" && qhCalcPanel) {
+    if (qhCalcPanel) {
       qhCalcPanel.addEventListener("input", (event) => {
         const input = event.target;
         if (!(input instanceof HTMLInputElement)) {
@@ -12285,7 +12913,7 @@ function buildInitialPhotoLightboxState() {
           return;
         }
 
-        const row = getCurrentRow();
+        const row = getDepartmentCalcTargetRow();
         if (!row) {
           return;
         }
@@ -12297,12 +12925,16 @@ function buildInitialPhotoLightboxState() {
           syncDepartmentRowInput(row.id, key, sanitized.value);
         }
         refreshQhCalcDisplay(row);
-        queueDepartmentSave();
+        if (mode === "department") {
+          queueDepartmentSave();
+        } else if (mode === "main") {
+          refreshMainTableSaveState();
+        }
       });
     }
 
     const leaveCalcPanel = document.getElementById("leaveCalcPanel");
-    if (mode === "department" && leaveCalcPanel) {
+    if (leaveCalcPanel) {
       leaveCalcPanel.addEventListener("input", (event) => {
         const input = event.target;
         if (!(input instanceof HTMLInputElement)) {
@@ -12314,7 +12946,7 @@ function buildInitialPhotoLightboxState() {
           return;
         }
 
-        const row = getCurrentRow();
+        const row = getDepartmentCalcTargetRow();
         if (!row) {
           return;
         }
@@ -12323,26 +12955,72 @@ function buildInitialPhotoLightboxState() {
         input.value = sanitized.text;
         row.values[key] = sanitized.value;
         refreshLeaveCalcDisplay(row);
-        queueDepartmentSave();
+        if (mode === "department") {
+          queueDepartmentSave();
+        } else if (mode === "main") {
+          refreshMainTableSaveState();
+        }
       });
     }
 
-    if (mode === "department" && qhCalcApplyBtn) {
+    if (transferCalcPanel) {
+      transferCalcPanel.addEventListener("input", (event) => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement)) {
+          return;
+        }
+
+        const key = input.dataset.transferCalcKey;
+        if (!key) {
+          return;
+        }
+
+        const row = getDepartmentCalcTargetRow();
+        if (!row) {
+          return;
+        }
+
+        const sanitized = sanitizeNumericInput(input.value);
+        input.value = sanitized.text;
+        row.values[key] = sanitized.value;
+        refreshTransferCalcDisplay(row);
+        if (mode === "department") {
+          queueDepartmentSave();
+        } else if (mode === "main") {
+          refreshMainTableSaveState();
+        }
+      });
+    }
+
+    if (qhCalcApplyBtn) {
       qhCalcApplyBtn.addEventListener("click", () => {
         applyQhCalcToDepartment();
       });
     }
 
     const leaveCalcApplyBtn = document.getElementById("leaveCalcApplyBtn");
-    if (mode === "department" && leaveCalcApplyBtn) {
+    if (leaveCalcApplyBtn) {
       leaveCalcApplyBtn.addEventListener("click", () => {
         applyLeaveCalcToDepartment();
       });
     }
 
-    if (mode === "department" && departmentCalcApplyBtn) {
+    if (transferCalcApplyBtn) {
+      transferCalcApplyBtn.addEventListener("click", () => {
+        applyTransferCalcToDepartment();
+      });
+    }
+
+    if (departmentCalcApplyBtn) {
       departmentCalcApplyBtn.addEventListener("click", () => {
         applyDepartmentCombinedCalc();
+      });
+    }
+
+    if (mainCalcDepartmentSelect instanceof HTMLSelectElement) {
+      mainCalcDepartmentSelect.addEventListener("change", () => {
+        state.selectedMainCalcDepartmentId = String(mainCalcDepartmentSelect.value || "").trim();
+        renderPage();
       });
     }
 

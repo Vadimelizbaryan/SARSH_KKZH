@@ -1579,11 +1579,16 @@
       throw new Error("Удаление отправленных данных доступно только в онлайн-режиме владельца.");
     }
 
-    const snapshot = await postRemote({
+    const payload = {
       type: "delete_department_feedback",
-      departmentId: String(departmentId || ""),
       feedbackId: Number(feedbackId)
-    });
+    };
+    const normalizedDepartmentId = String(departmentId || "").trim();
+    if (normalizedDepartmentId) {
+      payload.departmentId = normalizedDepartmentId;
+    }
+
+    const snapshot = await postRemote(payload);
 
     return {
       snapshot,
