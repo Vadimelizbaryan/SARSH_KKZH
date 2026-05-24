@@ -8661,19 +8661,19 @@ function buildInitialPhotoLightboxState() {
   function renderTransferCalcPanel(row, options = {}) {
     const bodyRows = [
       {
-        label: "Õ†Õ¥Ö€Õ½ Õ§ Õ¥Õ¯Õ¥Õ»",
+        label: "\u0546\u0565\u0580\u057d \u0567 \u0565\u056f\u0565\u056c",
         cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.incomingKey, role: "input" }))
       },
       {
-        label: "Ô´Õ¸Ö‚Ö€Õ½ Õ§ Õ£Õ¶Õ¡ÖÕ¥Õ»",
+        label: "\u0534\u0578\u0582\u0580\u057d \u0567 \u0563\u0576\u0561\u0581\u0565\u056c",
         cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.outgoingKey, role: "input" }))
       },
       {
-        label: "ÔµÕ²Õ¥Õ¬ Õ§",
+        label: "\u0535\u0572\u0565\u056c \u0567",
         cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.currentKey, role: "linked" }))
       },
       {
-        label: "Õ€Õ¡Õ·Õ¾Õ¡Ö€Õ¯",
+        label: "\u0540\u0561\u0577\u057e\u0561\u0580\u056f",
         cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.outputKey, role: "output" }))
       }
     ];
@@ -8720,13 +8720,13 @@ function buildInitialPhotoLightboxState() {
     const titleTag = isEmbedded ? "h3" : "h2";
     const buttonHtml = options.showButton === false ? "" : `
           <div class="qh-calc-actions">
-            <button type="button" id="transferCalcApplyBtn">Õ€Õ¡Õ·Õ¾Õ¥Õ¬ Ö‡ Õ¿Õ¥Õ²Õ¡Õ¤Ö€Õ¥Õ¬</button>
+            <button type="button" id="transferCalcApplyBtn">\u0540\u0561\u0577\u057e\u0565\u056c \u0587 \u057f\u0565\u0572\u0561\u0564\u0580\u0565\u056c</button>
           </div>
     `;
 
     return `
       <div class="${panelClass}">
-        <${titleTag}>ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­Õ¸Ö‚Õ©ÕµÕ¸Ö‚Õ¶</${titleTag}>
+        <${titleTag}>\u054f\u0565\u0572\u0561\u0583\u0578\u056d\u0578\u0582\u0569\u0575\u0578\u0582\u0576</${titleTag}>
         <div class="qh-calc-wrap" id="transferCalcPanel">
           <table class="qh-calc-table">
             <thead>
@@ -8751,7 +8751,7 @@ function buildInitialPhotoLightboxState() {
     const leaveSection = renderLeaveCalcPanel(row, { embedded: true, showButton: false });
     const transferSection = renderTransferCalcPanel(row, { embedded: true, showButton: false });
     const introHtml = qhSection
-      ? `<p class="department-calc-intro">Մուտքագրեք ընդունված, դուրսգրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը, և հաշվարկները կկատարվեն ավտոմատ։ Սեղմեք «Հաշվել և տեղադրել» կոճակը, տվյալները կտեղադրվեն բաժանմունքի սանդղակում, որից հետո սեղմեք «Պահպանել» կոճակը։</p>`
+      ? `<p class="department-calc-intro">\u0544\u0578\u0582\u057f\u0584\u0561\u0563\u0580\u0565\u0584 \u0568\u0576\u0564\u0578\u0582\u0576\u057e\u0561\u056e, \u0564\u0578\u0582\u0580\u057d\u0563\u0580\u057e\u0561\u056e, \u0561\u0580\u0571\u0561\u056f\u0578\u0582\u0580\u0564 \u0563\u0576\u0561\u0581\u0578\u0572, \u0561\u0580\u0571\u0561\u056f\u0578\u0582\u0580\u0564\u056b\u0581 \u057e\u0565\u0580\u0561\u0564\u0561\u0580\u0571\u0561\u056e \u0587 \u057f\u0565\u0572\u0561\u0583\u0578\u056d\u057e\u0561\u056e \u0570\u056b\u057e\u0561\u0576\u0564\u0576\u0565\u0580\u056b \u0584\u0561\u0576\u0561\u056f\u0568, \u0570\u0565\u057f\u0578 \u057d\u0565\u0572\u0574\u0565\u0584 \xab\u0540\u0561\u0577\u057e\u0565\u056c \u0587 \u057f\u0565\u0572\u0561\u0564\u0580\u0565\u056c\xbb\u0589</p>`
       : "";
 
     return `
@@ -8763,7 +8763,7 @@ function buildInitialPhotoLightboxState() {
           ${transferSection}
         </div>
         <div class="qh-calc-actions">
-          <button type="button" id="departmentCalcApplyBtn">Հաշվել և տեղադրել</button>
+          <button type="button" id="departmentCalcApplyBtn">\u0540\u0561\u0577\u057e\u0565\u056c \u0587 \u057f\u0565\u0572\u0561\u0564\u0580\u0565\u056c</button>
         </div>
       </div>
     `;
@@ -8777,8 +8777,8 @@ function buildInitialPhotoLightboxState() {
     if (!rows.length) {
       return `
         <section class="panel no-print main-department-calc-panel">
-          <h2>Õ€Õ¡Õ·Õ¾Õ«Õ¹ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„Õ¶Õ¥Ö€Õ« Õ°Õ¡Õ´Õ¡Ö€</h2>
-          <p>ÕÕ¡Ö‚Õ¥Õ¹Õ¸Ö‚Õ©ÕµÕ¡Õ¶ Õ°Õ¡Õ´Õ¡Ö€ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„Õ¶Õ¥Ö€ Õ¹Õ¯Õ¡Õ¶Ö‰</p>
+          <h2>\u0540\u0561\u0577\u057e\u056b\u0579 \u0563\u056c\u056d\u0561\u057e\u0578\u0580 \u0567\u057b\u0578\u0582\u0574</h2>
+          <p>\u0540\u0561\u0577\u057e\u056b\u0579\u056b \u0570\u0561\u0574\u0561\u0580 \u0562\u0561\u056a\u0561\u0576\u0574\u0578\u0582\u0576\u0584\u0576\u0565\u0580 \u0579\u056f\u0561\u0576\u0589</p>
         </section>
       `;
     }
@@ -8803,173 +8803,11 @@ function buildInitialPhotoLightboxState() {
       <section class="panel no-print main-department-calc-panel">
         <div class="main-department-calc-panel__head">
           <div>
-            <h2>Õ€Õ¡Õ·Õ¾Õ«Õ¹ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„Õ¶Õ¥Ö€Õ« Õ°Õ¡Õ´Õ¡Ö€</h2>
-            <p class="main-department-calc-panel__note">ÕˆÕ¶Õ¿Ö€Õ¥Ö„ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„Õ¨ Ö‡ Õ´Õ¸Ö‚Õ¿Ö„Õ¡Õ£Ö€Õ¥Ö„ Õ¨Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´, Õ¤Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´, Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ Ö‡ Õ¿Õ¥Õ²Õ¡ÖƒÕ¸Õ­Õ¸Ö‚Õ©ÕµÕ¡Õ¶ Õ¿Õ¾ÕµÕ¡Õ¬Õ¶Õ¥Ö€Õ¨Ö‰</p>
+            <h2>\u0540\u0561\u0577\u057e\u056b\u0579 \u0563\u056c\u056d\u0561\u057e\u0578\u0580 \u0567\u057b\u0578\u0582\u0574</h2>
+            <p class="main-department-calc-panel__note">\u0538\u0576\u057f\u0580\u0565\u0584 \u0562\u0561\u056a\u0561\u0576\u0574\u0578\u0582\u0576\u0584\u0568, \u0570\u0565\u057f\u0578 \u0574\u0578\u0582\u057f\u0584\u0561\u0563\u0580\u0565\u0584 \u0568\u0576\u0564\u0578\u0582\u0576\u0578\u0582\u0574, \u0564\u0578\u0582\u0580\u057d\u0563\u0580\u0578\u0582\u0574, \u0561\u0580\u0571\u0561\u056f\u0578\u0582\u0580\u0564 \u0587 \u057f\u0565\u0572\u0561\u0583\u0578\u056d\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0589</p>
           </div>
           <label class="main-department-calc-panel__select">
-            <span>Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„</span>
-            <select id="mainCalcDepartmentSelect">
-              ${buildMainTablePhotoDepartmentOptions(row.id)}
-            </select>
-          </label>
-        </div>
-        <div class="main-department-calc-panel__preview">
-          <div class="table-wrap main-department-calc-panel__preview-wrap">
-            ${tableHtml}
-          </div>
-        </div>
-        ${renderDepartmentCombinedCalcPanel(row)}
-      </section>
-    `;
-  }
-
-  function renderTransferCalcPanel(row, options = {}) {
-    const bodyRows = [
-      {
-        label: "Ներս է եկել",
-        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.incomingKey, role: "input" }))
-      },
-      {
-        label: "Դուրս է գնացել",
-        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.outgoingKey, role: "input" }))
-      },
-      {
-        label: "Եղել է",
-        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.currentKey, role: "linked" }))
-      },
-      {
-        label: "Հաշվարկ",
-        cells: TRANSFER_CALC_COLUMNS.map((column) => ({ key: column.outputKey, role: "output" }))
-      }
-    ];
-
-    const bodyHtml = bodyRows.map((definition) => `
-      <tr>
-        <th scope="row">${escapeHtml(definition.label)}</th>
-        ${definition.cells.map((cell) => {
-          if (cell.role === "input") {
-            return `
-              <td class="qh-calc-cell">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputmode="numeric"
-                  value="${escapeHtml(getTransferCalcDisplayValue(row, cell.key) || "0")}"
-                  data-transfer-calc-key="${escapeHtml(cell.key)}"
-                  aria-label="${escapeHtml(definition.label)}"
-                >
-              </td>
-            `;
-          }
-
-          if (cell.role === "linked") {
-            return `
-              <td class="qh-calc-cell qh-calc-cell--linked">
-                <strong data-transfer-calc-base="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(getNumber(state.snapshot, row, cell.key)) || "0")}</strong>
-              </td>
-            `;
-          }
-
-          return `
-            <td class="qh-calc-cell qh-calc-cell--output">
-              <strong data-transfer-calc-output="${escapeHtml(cell.key)}">${escapeHtml(getTransferCalcDisplayValue(row, cell.key) || "0")}</strong>
-            </td>
-          `;
-        }).join("")}
-      </tr>
-    `).join("");
-
-    const isEmbedded = Boolean(options.embedded);
-    const panelClass = isEmbedded ? "department-calc-section department-calc-section--transfer" : "panel qh-calc-panel";
-    const titleTag = isEmbedded ? "h3" : "h2";
-    const buttonHtml = options.showButton === false ? "" : `
-          <div class="qh-calc-actions">
-            <button type="button" id="transferCalcApplyBtn">Հաշվել և տեղադրել</button>
-          </div>
-    `;
-
-    return `
-      <div class="${panelClass}">
-        <${titleTag}>Տեղափոխություն</${titleTag}>
-        <div class="qh-calc-wrap" id="transferCalcPanel">
-          <table class="qh-calc-table">
-            <thead>
-              <tr>
-                <th></th>
-                ${TRANSFER_CALC_COLUMNS.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
-              </tr>
-            </thead>
-            <tbody>
-              ${bodyHtml}
-            </tbody>
-          </table>
-          <div id="transferCalcStatus" class="qh-calc-status"></div>
-          ${buttonHtml}
-        </div>
-      </div>
-    `;
-  }
-
-  function renderDepartmentCombinedCalcPanel(row) {
-    const qhSection = renderQhCalcPanel(row, { embedded: true, showButton: false });
-    const leaveSection = renderLeaveCalcPanel(row, { embedded: true, showButton: false });
-    const transferSection = renderTransferCalcPanel(row, { embedded: true, showButton: false });
-
-    return `
-      <div class="panel department-calc-combined-panel">
-        <p class="department-calc-intro">Մուտքագրեք ընդունված, դուրսգրված, արձակուրդ գնացող, արձակուրդից վերադարձած և տեղափոխված հիվանդների քանակը, հետո սեղմեք «Հաշվել և տեղադրել»։</p>
-        <div class="department-calc-grid">
-          ${qhSection}
-          ${leaveSection}
-          ${transferSection}
-        </div>
-        <div class="qh-calc-actions">
-          <button type="button" id="departmentCalcApplyBtn">Հաշվել և տեղադրել</button>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderMainDepartmentCalcPanel(displayContext = getMainTableDisplaySnapshotContext()) {
-    const rows = Array.isArray(displayContext?.rows)
-      ? displayContext.rows.filter((row) => row && typeof row.id === "string")
-      : [];
-
-    if (!rows.length) {
-      return `
-        <section class="panel no-print main-department-calc-panel">
-          <h2>Հաշվիչ գլխավոր էջում</h2>
-          <p>Հաշվիչի համար բաժանմունքներ չկան։</p>
-        </section>
-      `;
-    }
-
-    const selectedId = getSelectedMainCalcDepartmentId(rows);
-    const row = rows.find((item) => item.id === selectedId) || rows[0];
-    const tableHtml = row
-      ? renderTable(
-          displayContext.snapshot,
-          [row],
-          {
-            interactive: false,
-            viewMode: "department",
-            headerDateTime: displayContext?.headerDateTime || getCurrentDateTimeParts()
-          }
-        )
-          .replace(' id="sheetTable"', "")
-          .replace(' id="sheetBody"', "")
-      : "";
-
-    return `
-      <section class="panel no-print main-department-calc-panel">
-        <div class="main-department-calc-panel__head">
-          <div>
-            <h2>Հաշվիչ գլխավոր էջում</h2>
-            <p class="main-department-calc-panel__note">Ընտրեք բաժանմունքը, հետո մուտքագրեք ընդունում, դուրսգրում, արձակուրդ և տեղափոխություն։</p>
-          </div>
-          <label class="main-department-calc-panel__select">
-            <span>Բաժանմունք</span>
+            <span>\u0532\u0561\u056a\u0561\u0576\u0574\u0578\u0582\u0576\u0584</span>
             <select id="mainCalcDepartmentSelect">
               ${buildMainTablePhotoDepartmentOptions(row.id)}
             </select>
@@ -8986,6 +8824,9 @@ function buildInitialPhotoLightboxState() {
   }
 
   function renderSavedMainTableArchivePage() {
+
+
+
     const record = getMainTableSavedRecordByKey(savedMainKeyFromQuery);
     if (!record) {
       renderArchiveNotFoundPage("Сохранённая таблица не найдена", "Для этого снимка сохранённой главной таблицы в текущем браузере данных нет.");
