@@ -2,6 +2,7 @@
   const config = window.SHARSH_CONFIG;
   const runtime = window.SHARSH_RUNTIME_CONFIG || {};
   const runtimeMeta = window.SHARSH_RUNTIME_CONFIG_META || {};
+  const sync = window.SHARSH_SYNC || null;
 
   if (!config || !runtimeMeta) {
     return;
@@ -195,6 +196,36 @@
     updateGeneratedLinks();
   }
 
+  async function loadServerPreferencesIntoForm() {
+    if (!sync || typeof sync.loadRuntimePreferences !== "function" || !sync.hasRemoteSync?.()) {
+      return;
+    }
+
+    try {
+      const preferences = await sync.loadRuntimePreferences();
+      if (fields.autoRotateImages) {
+        fields.autoRotateImages.checked = Boolean(preferences?.autoRotateImages);
+      }
+    } catch (_error) {
+      // Keep local checkbox value when server preferences are unavailable.
+    }
+  }
+
+  async function saveServerPreferences() {
+    if (!sync || typeof sync.saveRuntimePreferences !== "function") {
+      return;
+    }
+
+    const runtimeConfig = buildFormConfig();
+    if (runtimeConfig.syncMode !== "supabase-function") {
+      return;
+    }
+
+    await sync.saveRuntimePreferences({
+      autoRotateImages: Boolean(runtimeConfig.autoRotateImages)
+    });
+  }
+
   function clearBrowserConfig() {
     runtimeMeta.clearStoredConfig();
 
@@ -261,6 +292,7 @@
     }
 
     prefillFields();
+    await loadServerPreferencesIntoForm();
     updateSourceLabel();
     updateGeneratedLinks();
     setStatus("Введите значения Supabase, проверьте подключение, затем откройте главную ссылку.", false);
@@ -277,8 +309,17 @@
       testButton.addEventListener("click", testConnection);
     }
     if (saveButton) {
-      saveButton.addEventListener("click", () => {
+      saveButton.addEventListener("click", async () => {
         saveBrowserConfig();
+        try {
+          await saveServerPreferences();
+        } catch (error) {
+          setStatus(
+            error instanceof Error ? `Настройки в браузере сохранены, но сервер не принял переключатель автоповорота: ${error.message}` : "Настройки в браузере сохранены, но сервер не принял переключатель автоповорота.",
+            true
+          );
+          return;
+        }
         updateSourceLabel();
       });
     }

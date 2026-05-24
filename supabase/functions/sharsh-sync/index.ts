@@ -87,6 +87,7 @@ const CIVIL_REFERRAL_VALUE_KEYS = [
 ] as const;
 const CIVIL_REFERRAL_HASH_KEYS = CIVIL_REFERRAL_VALUE_KEYS.filter((key) => key !== "dischargeDate");
 const MAIN_ARCHIVE_SOURCE = "remote";
+const TELEGRAM_PHOTO_AUTOROTATE_META_KEY = "pref:telegram_photo_auto_rotate";
 
 const PHOTO_FIELD_MAPPINGS = [
   { cell: 1, key: "beenTotal", label: "been / total" },
@@ -211,6 +212,63 @@ function sanitizeValues(values: Record<string, unknown> | null | undefined) {
 
 function safeNumber(value: unknown) {
   return sanitizeNumber(value) || 0;
+}
+
+function parseMetaBoolean(value: unknown, fallback = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  return fallback;
+}
+
+async function loadRuntimePreferences(supabase: ReturnType<typeof createClient>) {
+  const { data, error } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date")
+    .eq("report_key", TELEGRAM_PHOTO_AUTOROTATE_META_KEY)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    autoRotateImages: parseMetaBoolean(data?.report_date, false)
+  };
+}
+
+async function saveRuntimePreferences(
+  supabase: ReturnType<typeof createClient>,
+  preferences: Record<string, unknown> | null | undefined
+) {
+  const autoRotateImages = parseMetaBoolean(preferences?.autoRotateImages, false);
+  const { error } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: TELEGRAM_PHOTO_AUTOROTATE_META_KEY,
+      report_date: autoRotateImages ? "1" : "0",
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  return await loadRuntimePreferences(supabase);
 }
 
 function sanitizeNightShiftRows(rows: unknown) {
@@ -2512,6 +2570,14 @@ Deno.serve(async (request) => {
       }
 
       return jsonResponse(await loadSnapshot(supabase));
+    }
+
+    if (type === "get_runtime_preferences") {
+      return jsonResponse(await loadRuntimePreferences(supabase));
+    }
+
+    if (type === "save_runtime_preferences") {
+      return jsonResponse(await saveRuntimePreferences(supabase, payload.preferences));
     }
 
     if (type === "verify_access_code") {

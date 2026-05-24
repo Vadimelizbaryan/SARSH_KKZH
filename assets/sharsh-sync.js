@@ -1411,6 +1411,67 @@
     return Array.isArray(payload?.records) ? payload.records : [];
   }
 
+  async function loadRuntimePreferences() {
+    if (!hasRemoteSync()) {
+      return {
+        autoRotateImages: Boolean(runtime.autoRotateImages)
+      };
+    }
+
+    ensureOwnerAuth();
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "get_runtime_preferences"
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось загрузить настройки");
+    }
+
+    return {
+      autoRotateImages: Boolean(payload?.autoRotateImages)
+    };
+  }
+
+  async function saveRuntimePreferences(preferences) {
+    if (!hasRemoteSync()) {
+      return {
+        autoRotateImages: Boolean(preferences?.autoRotateImages)
+      };
+    }
+
+    ensureOwnerAuth();
+    const response = await fetch(getSyncEndpoint(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: "save_runtime_preferences",
+        preferences: {
+          autoRotateImages: Boolean(preferences?.autoRotateImages)
+        }
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      throw buildResponseError(response, payload, "Не удалось сохранить настройки");
+    }
+
+    return {
+      autoRotateImages: Boolean(payload?.autoRotateImages)
+    };
+  }
+
   async function saveOcrFeedback(feedback) {
     if (!hasRemoteSync() || !feedback || typeof feedback !== "object") {
       return { ok: false };
@@ -1734,8 +1795,10 @@
     saveOcrFeedback,
     updateOcrFeedbackImage,
     listTelegramFormFeedback,
+    loadRuntimePreferences,
     reassignOcrFeedbackDepartment,
     deleteDepartmentFeedback,
+    saveRuntimePreferences,
     saveReportDate,
     notifyOwnerLogin,
     sendMainPdfsToTelegram,

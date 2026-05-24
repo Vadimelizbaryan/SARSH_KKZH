@@ -25,6 +25,7 @@ const TELEGRAM_GPS_SCENARIO_META_KEY = "telegram_gps_scenario_enabled";
 const TELEGRAM_DAILY_REMINDER_META_PREFIX = "telegram_daily_reminder_sent";
 const TELEGRAM_MAIN_PDFS_META_KEY = "telegram_main_pdfs_sent";
 const TELEGRAM_PENDING_PHOTO_APPROVALS_META_KEY = "telegram_pending_photo_approvals";
+const TELEGRAM_PHOTO_AUTOROTATE_META_KEY = "pref:telegram_photo_auto_rotate";
 const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
 const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է միայն բոտի ադմինիստրատորին։";
 const TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT = "Գիշերային ընդունում";
@@ -1347,7 +1348,7 @@ async function buildJimpRotatedImageBytes(
 async function inspectTelegramPhotoOrientation(
   dataUrl: string,
   fileName: string,
-  options: { requireAdvice?: boolean } = {}
+  options: { requireAdvice?: boolean; enabled?: boolean } = {}
 ) {
   if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
     return {
@@ -1359,6 +1360,15 @@ async function inspectTelegramPhotoOrientation(
   }
 
   try {
+    if (options.enabled === false) {
+      return {
+        dataUrl,
+        fileName,
+        orientationAdvice: null as null | ReturnType<typeof sanitizePhotoOrientationAdvice>,
+        orientationNotes: [] as string[]
+      };
+    }
+
     const { bytes } = parseImageDataUrl(dataUrl);
     const image = await Jimp.read(Buffer.from(bytes));
     const width = Number(image.bitmap.width || 0);
@@ -1411,6 +1421,48 @@ async function inspectTelegramPhotoOrientation(
       orientationAdvice: null as null | ReturnType<typeof sanitizePhotoOrientationAdvice>,
       orientationNotes: [] as string[]
     };
+  }
+}
+
+function parseMetaBoolean(value: unknown, fallback = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  return fallback;
+}
+
+async function isTelegramPhotoAutoRotateEnabled(
+  supabase: ReturnType<typeof createClient>
+) {
+  try {
+    const { data, error } = await supabase
+      .from("sharsh_report_meta")
+      .select("report_date")
+      .eq("report_key", TELEGRAM_PHOTO_AUTOROTATE_META_KEY)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return parseMetaBoolean(data?.report_date, false);
+  } catch (error) {
+    console.warn("Telegram photo auto-rotate preference load failed:", sanitizePublicErrorMessage(error));
+    return false;
   }
 }
 
@@ -9319,10 +9371,14 @@ async function handleTelegramPhoto(
   }
 
   const downloadedPhoto = await downloadTelegramImageAsDataUrl(fileId);
+  const shouldAutoRotatePhoto = await isTelegramPhotoAutoRotateEnabled(supabase);
   const preparedPhoto = await inspectTelegramPhotoOrientation(
     downloadedPhoto.dataUrl,
     downloadedPhoto.fileName,
-    { requireAdvice: false }
+    {
+      requireAdvice: false,
+      enabled: shouldAutoRotatePhoto
+    }
   );
   const dataUrl = preparedPhoto.dataUrl;
   const fileName = preparedPhoto.fileName;

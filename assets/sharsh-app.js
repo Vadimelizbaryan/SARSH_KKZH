@@ -2175,34 +2175,31 @@ function buildInitialPhotoLightboxState() {
   function getMainTablePhotoGalleryItems(rows) {
     const records = ensureMainTablePhotoGalleryRecordsLoaded();
     const todayDateKey = getArchiveDateKey();
-    const byId = new Map(
-      records
-        .map((record) => normalizeMainTablePhotoGalleryRecord(record))
-        .filter((record) => getArchiveDateKeyForTimestamp(record?.createdAt) === todayDateKey)
-        .filter(Boolean)
-        .map((record) => [record.id, record])
+    const rowsById = new Map(
+      (Array.isArray(rows) ? rows : [])
+        .filter((row) => row && typeof row.id === "string")
+        .map((row) => [row.id, row])
     );
 
-    return (Array.isArray(rows) ? rows : [])
-      .filter((row) => row && Number.isFinite(Number(row.photoFeedbackId)))
-      .map((row) => {
-        const feedbackId = Number(row.photoFeedbackId);
-        const record = byId.get(feedbackId);
-        if (!record) {
-          return null;
-        }
+    return records
+      .map((record) => normalizeMainTablePhotoGalleryRecord(record))
+      .filter(Boolean)
+      .filter((record) => !isTelegramFormFeedbackImageName(record.imageName))
+      .filter((record) => getArchiveDateKeyForTimestamp(record.createdAt) === todayDateKey)
+      .map((record) => {
+        const boundRow = rowsById.get(record.departmentId) || null;
         return {
           ...record,
-          feedbackId,
-          departmentId: row.id,
-          rowId: row.id,
-          departmentName: row.department || record.departmentName || row.id,
-          updatedAt: getRowEffectiveUpdatedAt(row),
-          workflowStatus: row.photoWorkflowStatus || "",
-          freshness: getRowFreshnessMeta(row)
+          feedbackId: record.id,
+          rowId: boundRow?.id || record.departmentId,
+          departmentId: boundRow?.id || record.departmentId,
+          departmentName: boundRow?.department || record.departmentName || record.departmentId || "Неизвестное отделение",
+          updatedAt: boundRow ? getRowEffectiveUpdatedAt(boundRow) : record.createdAt,
+          workflowStatus: boundRow?.photoWorkflowStatus || "",
+          freshness: boundRow ? getRowFreshnessMeta(boundRow) : null
         };
       })
-      .filter(Boolean);
+      .sort((left, right) => getTimestampSortValue(right.createdAt) - getTimestampSortValue(left.createdAt));
   }
 
   function buildMainTableTelegramFormItems() {
@@ -2680,23 +2677,8 @@ function buildInitialPhotoLightboxState() {
       return;
     }
 
-    const neededFeedbackIds = new Set(
-      (Array.isArray(displayContext?.rows) ? displayContext.rows : [])
-        .map((row) => Number(row?.photoFeedbackId))
-        .filter((value) => Number.isFinite(value))
-    );
-    if (!neededFeedbackIds.size) {
-      state.mainTablePhotoGallery.loaded = true;
-      state.mainTablePhotoGallery.error = "";
+    if (state.mainTablePhotoGallery.loaded && ensureMainTablePhotoGalleryRecordsLoaded().length) {
       refreshMainTablePhotoGalleryUi(displayContext);
-      return;
-    }
-
-    const loadedRecords = ensureMainTablePhotoGalleryRecordsLoaded();
-    const hasAllNeeded = Array.from(neededFeedbackIds).every((id) => loadedRecords.some((record) => Number(record?.id) === id));
-    if (state.mainTablePhotoGallery.loaded && hasAllNeeded) {
-      refreshMainTablePhotoGalleryUi(displayContext);
-      return;
     }
 
     state.mainTablePhotoGallery.isLoading = true;
@@ -2704,10 +2686,7 @@ function buildInitialPhotoLightboxState() {
     refreshMainTablePhotoGalleryUi(displayContext);
 
     try {
-      const records = await sync.listOcrFeedback(
-        Math.max(neededFeedbackIds.size, 1),
-        Array.from(neededFeedbackIds)
-      );
+      const records = await sync.listOcrFeedback(120);
       const fetchedRecords = (Array.isArray(records) ? records : [])
         .map(normalizeMainTablePhotoGalleryRecord)
         .filter(Boolean);
