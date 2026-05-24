@@ -7203,7 +7203,7 @@ function buildInitialPhotoLightboxState() {
         </section>
 
         <section class="panel no-print main-table-telegram-form-panel">
-          <h2>Ð¢Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Telegram Web Ñ„Ð¾Ñ€Ð¼ Ð·Ð° ÑÐµÐ³Ð¾Ð´Ð½Ñ</h2>
+          <h2>Таблицы Telegram Web форм за сегодня</h2>
           <p id="mainTableTelegramFormSummaryText">${escapeHtml(mainTableTelegramFormContent.summary)}</p>
           <div class="archive-list" id="mainTableTelegramFormList">
             ${mainTableTelegramFormContent.html}
