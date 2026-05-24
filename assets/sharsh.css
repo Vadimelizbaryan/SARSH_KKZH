@@ -512,12 +512,12 @@ a {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 16px;
-  max-width: min(92vw, 1400px);
-  max-height: 88vh;
+  gap: 10px;
+  max-width: min(96vw, 1580px);
+  max-height: 92vh;
   overflow: auto;
-  padding: 14px;
-  border-radius: 22px;
+  padding: 10px 12px 12px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.97);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
 }
@@ -525,15 +525,15 @@ a {
 .photo-lightbox-dialog img {
   display: block;
   max-width: min(88vw, 1320px);
-  max-height: min(56vh, 720px);
+  max-height: min(28vh, 300px);
   width: auto;
   height: auto;
-  border-radius: 14px;
+  border-radius: 12px;
 }
 
 .photo-lightbox-ocr {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .photo-lightbox-ocr__head {
@@ -546,7 +546,7 @@ a {
 
 .photo-lightbox-ocr__head h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .photo-lightbox-close {
@@ -623,12 +623,14 @@ a {
 
 .photo-lightbox-save-actions {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 #photoLightboxSaveBtn {
   justify-self: start;
-  min-width: 180px;
+  min-width: 148px;
+  min-height: 34px;
+  padding: 6px 12px;
 }
 
 #photoLightboxSaveBtn.save-ready {
@@ -651,17 +653,20 @@ a {
 }
 
 .photo-lightbox-save-hint {
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .photo-lightbox-department-table {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .photo-lightbox-department-table__wrap {
   overflow-x: auto;
+  border: 1px solid #111111;
+  border-radius: 14px;
+  background: #ffffff;
 }
 
 .photo-lightbox-department-table .sheet,
@@ -669,20 +674,39 @@ a {
   color: #111111 !important;
 }
 
+.photo-lightbox-department-table .sheet {
+  min-width: 940px;
+}
+
+.photo-lightbox-department-table .sheet col.dept-col {
+  width: 136px;
+}
+
+.photo-lightbox-department-table .sheet col.num-col {
+  width: 42px;
+}
+
+.photo-lightbox-department-table .sheet col.wide-col {
+  width: 54px;
+}
+
 .photo-lightbox-department-table .sheet th,
 .photo-lightbox-department-table .sheet td {
   background: #ffffff !important;
   border-color: #111111 !important;
+  font-size: 9px;
 }
 
 .photo-lightbox-department-table .sheet thead th {
   background: #111111 !important;
   color: #ffffff !important;
+  padding: 4px 3px;
 }
 
 .photo-lightbox-department-table .sheet .dept-cell {
   background: #ffffff !important;
   color: #111111 !important;
+  padding: 4px 5px;
 }
 
 .photo-lightbox-department-table .sheet .single-total-row td,
@@ -711,7 +735,7 @@ a {
 
 .photo-import-mini-table {
   width: 100%;
-  min-width: 920px;
+  min-width: 820px;
   border-collapse: collapse;
   table-layout: fixed;
   color: #111111;
@@ -721,13 +745,13 @@ a {
 .photo-import-mini-table td {
   border: 1px solid #111111;
   text-align: center;
-  padding: 7px 5px;
+  padding: 5px 4px;
 }
 
 .photo-import-mini-table thead tr:first-child th {
   background: #111111;
   color: #ffffff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -736,7 +760,7 @@ a {
 .photo-import-mini-table thead tr:last-child th {
   background: #ffffff;
   color: #111111;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
 }
 
@@ -753,7 +777,7 @@ a {
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 19px;
+  font-size: 14px;
   line-height: 1.05;
   font-weight: 800;
   text-align: center;
@@ -807,8 +831,8 @@ a {
 .photo-import-mini-table-status {
   margin-top: 8px;
   border: 1px solid #111111;
-  padding: 8px 10px;
-  font-size: 12px;
+  padding: 6px 8px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.35;
   background: #ffffff;

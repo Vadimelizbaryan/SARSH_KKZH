@@ -5568,7 +5568,7 @@ function buildInitialPhotoLightboxState() {
         ? state.photoImport.recognizedValues
         : null);
 
-    if (mode !== "department" || !row || !values) {
+    if (!row || !values) {
       return {
         applicable: false,
         checks: [],
