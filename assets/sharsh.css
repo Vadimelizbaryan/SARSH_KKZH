@@ -512,11 +512,11 @@ a {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   max-width: min(96vw, 1580px);
-  max-height: 92vh;
+  max-height: 90vh;
   overflow: auto;
-  padding: 10px 12px 12px;
+  padding: 8px 10px 10px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.97);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
@@ -525,7 +525,7 @@ a {
 .photo-lightbox-dialog img {
   display: block;
   max-width: min(88vw, 1320px);
-  max-height: min(28vh, 300px);
+  max-height: min(22vh, 220px);
   width: auto;
   height: auto;
   border-radius: 12px;
@@ -533,7 +533,7 @@ a {
 
 .photo-lightbox-ocr {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .photo-lightbox-ocr__head {
@@ -546,20 +546,20 @@ a {
 
 .photo-lightbox-ocr__head h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .photo-lightbox-close {
   position: absolute;
   top: -12px;
   right: -12px;
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   border: 0;
   border-radius: 999px;
   background: #111111;
   color: #ffffff;
-  font-size: 28px;
+  font-size: 24px;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
@@ -568,14 +568,14 @@ a {
 .photo-lightbox-rotate {
   position: absolute;
   top: -12px;
-  right: 40px;
-  width: 42px;
-  height: 42px;
+  right: 34px;
+  width: 38px;
+  height: 38px;
   border: 0;
   border-radius: 999px;
   background: #111111;
   color: #ffffff;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
@@ -584,18 +584,18 @@ a {
 .photo-lightbox-recheck {
   position: absolute;
   top: -12px;
-  right: 92px;
-  min-width: 144px;
-  height: 42px;
+  right: 82px;
+  min-width: 128px;
+  height: 38px;
   border: 0;
   border-radius: 999px;
   background: #111111;
   color: #ffffff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  padding: 0 16px;
+  padding: 0 14px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
 
@@ -623,14 +623,15 @@ a {
 
 .photo-lightbox-save-actions {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 #photoLightboxSaveBtn {
   justify-self: start;
-  min-width: 148px;
-  min-height: 34px;
-  padding: 6px 12px;
+  min-width: 132px;
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 13px;
 }
 
 #photoLightboxSaveBtn.save-ready {
@@ -653,13 +654,13 @@ a {
 }
 
 .photo-lightbox-save-hint {
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 10px;
+  line-height: 1.25;
 }
 
 .photo-lightbox-department-table {
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .photo-lightbox-department-table__wrap {
@@ -675,38 +676,38 @@ a {
 }
 
 .photo-lightbox-department-table .sheet {
-  min-width: 940px;
+  min-width: 760px;
 }
 
 .photo-lightbox-department-table .sheet col.dept-col {
-  width: 136px;
+  width: 112px;
 }
 
 .photo-lightbox-department-table .sheet col.num-col {
-  width: 42px;
+  width: 34px;
 }
 
 .photo-lightbox-department-table .sheet col.wide-col {
-  width: 54px;
+  width: 42px;
 }
 
 .photo-lightbox-department-table .sheet th,
 .photo-lightbox-department-table .sheet td {
   background: #ffffff !important;
   border-color: #111111 !important;
-  font-size: 9px;
+  font-size: 8px;
 }
 
 .photo-lightbox-department-table .sheet thead th {
   background: #111111 !important;
   color: #ffffff !important;
-  padding: 4px 3px;
+  padding: 3px 2px;
 }
 
 .photo-lightbox-department-table .sheet .dept-cell {
   background: #ffffff !important;
   color: #111111 !important;
-  padding: 4px 5px;
+  padding: 3px 4px;
 }
 
 .photo-lightbox-department-table .sheet .single-total-row td,
@@ -733,6 +734,11 @@ a {
   background: #ffffff;
 }
 
+.photo-lightbox .photo-import-mini-table-wrap {
+  border-width: 1px;
+  border-radius: 14px;
+}
+
 .photo-import-mini-table {
   width: 100%;
   min-width: 820px;
@@ -746,6 +752,37 @@ a {
   border: 1px solid #111111;
   text-align: center;
   padding: 5px 4px;
+}
+
+.photo-lightbox .photo-import-mini-table {
+  min-width: 720px;
+}
+
+.photo-lightbox .photo-import-mini-table th,
+.photo-lightbox .photo-import-mini-table td {
+  padding: 3px 2px;
+}
+
+.photo-lightbox .photo-import-mini-table thead tr:first-child th {
+  font-size: 9px;
+}
+
+.photo-lightbox .photo-import-mini-table thead tr:last-child th {
+  font-size: 8px;
+  padding: 3px 2px;
+}
+
+.photo-lightbox .photo-import-mini-table__cell {
+  min-height: 44px;
+  padding: 3px 2px;
+}
+
+.photo-lightbox .photo-import-mini-table__cell span {
+  font-size: 9px;
+}
+
+.photo-lightbox .photo-import-mini-table__cell strong {
+  font-size: 12px;
 }
 
 .photo-import-mini-table thead tr:first-child th {
