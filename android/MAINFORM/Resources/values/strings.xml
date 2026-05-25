@@ -1,8 +1,10 @@
 <resources>
     <string name="app_name">MAINFORM</string>
     <string name="select_department">Отделение</string>
+    <string name="confirm_department">Выбрать</string>
     <string name="refresh">Обновить данные</string>
     <string name="choose_image">Фото бланка</string>
+    <string name="clear_image">Очистить фото</string>
     <string name="choose_department_title">Выберите отделение</string>
     <string name="no_department_selected">Отделение не выбрано. Нажмите «Отделение» и выберите нужную форму.</string>
     <string name="loading_department">Открыто: %1$s</string>
@@ -14,4 +16,14 @@
     <string name="update_now">Скачать обновление</string>
     <string name="update_later">Позже</string>
     <string name="update_open_failed">Не удалось открыть ссылку обновления.</string>
+    <string name="select_department_first">Сначала выберите отделение.</string>
+    <string name="photo_not_selected">Фото бланка не выбрано.</string>
+    <string name="photo_checking">Проверяю фото бланка…</string>
+    <string name="photo_ready">Фото готово к отправке.</string>
+    <string name="photo_match_failed">Отделение не опознано, сделайте повторное фото.</string>
+    <string name="photo_mismatch">Фото не соответствует выбранному отделению.</string>
+    <string name="photo_processing_failed">Не удалось обработать фото бланка.</string>
+    <string name="photo_preview_title">Текущее фото бланка</string>
+    <string name="photo_cleared">Фото очищено.</string>
+    <string name="photo_required_for_submit">Для отправки нужен снимок бланка этого отделения.</string>
 </resources>

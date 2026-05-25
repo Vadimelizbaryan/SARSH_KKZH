@@ -49,6 +49,61 @@
         android:textColor="#2E2E2E"
         android:textSize="14sp" />
 
+    <LinearLayout
+        android:id="@+id/photoControlsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFF9F0"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="4dp">
+
+        <Button
+            android:id="@+id/buttonPhoto"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:backgroundTint="#F0B541"
+            android:text="@string/choose_image"
+            android:textAllCaps="false"
+            android:textColor="#1A1A1A" />
+
+        <Button
+            android:id="@+id/buttonClearPhoto"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:layout_marginStart="8dp"
+            android:backgroundTint="#FFFFFF"
+            android:text="@string/clear_image"
+            android:textAllCaps="false"
+            android:textColor="#1A1A1A" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/textPhotoStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFF9F0"
+        android:paddingHorizontal="12dp"
+        android:paddingBottom="8dp"
+        android:text="@string/photo_not_selected"
+        android:textColor="#8A4A00"
+        android:textSize="13sp"
+        android:visibility="visible" />
+
+    <ImageView
+        android:id="@+id/imagePhotoPreview"
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:adjustViewBounds="true"
+        android:background="#FFF9F0"
+        android:contentDescription="@string/photo_preview_title"
+        android:paddingHorizontal="12dp"
+        android:paddingBottom="8dp"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
+
     <ProgressBar
         android:id="@+id/progressBar"
         style="?android:attr/progressBarStyleHorizontal"

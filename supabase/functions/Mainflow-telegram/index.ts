@@ -3092,6 +3092,77 @@ async function verifyDepartmentFormAccess(
   };
 }
 
+function sanitizeAndroidPhotoDataUrl(value: unknown): string {
+  return typeof value === "string" && value.startsWith("data:image/") ? value : "";
+}
+
+function sanitizeAndroidPhotoName(value: unknown): string {
+  return typeof value === "string" ? value.trim().slice(0, 255) : "";
+}
+
+function sanitizeAndroidPhotoDetectedDepartmentId(value: unknown): DepartmentId | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  return parseDepartmentId(value);
+}
+
+async function handleAndroidPhotoCheck(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const departmentId = parseDepartmentId(typeof payload?.departmentId === "string" ? payload.departmentId : "");
+    if (!departmentId) {
+      return jsonResponse({ ok: false, error: "Department is required." }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const access = await verifyDepartmentFormAccess(supabase, payload, departmentId);
+    if (!access.ok) {
+      return jsonResponse({ ok: false, error: access.error }, access.status);
+    }
+
+    const imageDataUrl = sanitizeAndroidPhotoDataUrl(payload?.imageDataUrl);
+    const imageName = sanitizeAndroidPhotoName(payload?.imageName) || "android-photo.jpg";
+    if (!imageDataUrl) {
+      return jsonResponse({ ok: false, error: "Photo is required." }, 400);
+    }
+
+    const shouldAutoRotatePhoto = await isTelegramPhotoAutoRotateEnabled(supabase);
+    const preparedPhoto = await inspectTelegramPhotoOrientation(
+      imageDataUrl,
+      imageName,
+      {
+        requireAdvice: false,
+        enabled: shouldAutoRotatePhoto
+      }
+    );
+    const detection = await detectDepartmentFromPhoto(preparedPhoto.dataUrl);
+    const detectedDepartmentId = detection.departmentId || "";
+    const matched = detectedDepartmentId === departmentId;
+    const message = matched
+      ? "Фото готово к отправке."
+      : detectedDepartmentId
+        ? "Фото не соответствует выбранному отделению."
+        : "Отделение не опознано, сделайте повторное фото.";
+
+    return jsonResponse({
+      ok: true,
+      matched,
+      detectedDepartmentId,
+      normalizedImageDataUrl: preparedPhoto.dataUrl,
+      normalizedImageName: preparedPhoto.fileName,
+      message
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_photo_check_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
 async function approveTelegramColleague(
   supabase: ReturnType<typeof createClient>,
   targetChatId: string
@@ -5200,13 +5271,19 @@ async function insertTelegramWebFormFeedback(
   values: Record<string, number | null>,
   userId: number | null,
   userName: string,
-  patientNotes?: DepartmentPatientNotes
+  patientNotes?: DepartmentPatientNotes,
+  photoOptions?: {
+    imageName?: string;
+    imageDataUrl?: string | null;
+    notes?: string[];
+  } | null
 ) {
   const notes = [
     "Telegram Web App form submission.",
     userId ? `Telegram user id: ${userId}` : "",
     userName ? `Telegram user: ${userName}` : "",
-    ...(patientNotes ? buildDepartmentPatientNotesTextLines(patientNotes) : []).map((line) => `Patient note: ${line}`)
+    ...(patientNotes ? buildDepartmentPatientNotesTextLines(patientNotes) : []).map((line) => `Patient note: ${line}`),
+    ...((photoOptions?.notes || []).filter(Boolean))
   ].filter(Boolean);
 
   return await insertAcceptedFeedback(
@@ -5214,8 +5291,10 @@ async function insertTelegramWebFormFeedback(
     departmentId,
     reportDate,
     null,
-    "telegram-web-app-form",
-    null,
+    String(photoOptions?.imageName || "telegram-web-app-form"),
+    typeof photoOptions?.imageDataUrl === "string" && photoOptions.imageDataUrl.startsWith("data:image/")
+      ? photoOptions.imageDataUrl
+      : null,
     values,
     DEPARTMENT_SHEET_VALUE_KEYS,
     notes
@@ -7818,6 +7897,17 @@ async function handleTelegramWebFormSubmit(request: Request) {
       return jsonResponse({ ok: false, error: access.error }, access.status);
     }
     const accessContext = access.context;
+    const photoImageDataUrl = sanitizeAndroidPhotoDataUrl(payload?.photoImageDataUrl);
+    const photoImageName = sanitizeAndroidPhotoName(payload?.photoImageName) || "android-photo.jpg";
+    const photoDetectedDepartmentId = sanitizeAndroidPhotoDetectedDepartmentId(payload?.photoDetectedDepartmentId);
+    if (accessContext.mode === "android") {
+      if (!photoImageDataUrl) {
+        return jsonResponse({ ok: false, error: "Для отправки нужен снимок бланка этого отделения." }, 400);
+      }
+      if (!photoDetectedDepartmentId || photoDetectedDepartmentId !== departmentId) {
+        return jsonResponse({ ok: false, error: "Отделение не опознано, сделайте повторное фото." }, 400);
+      }
+    }
 
     const snapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
     const reportDate = sanitizeReportDate(payload?.reportDate) || snapshot.reportDate || DEFAULT_DATE;
@@ -7843,7 +7933,14 @@ async function handleTelegramWebFormSubmit(request: Request) {
       values,
       accessContext.userId,
       accessContext.userName,
-      patientNotes
+      patientNotes,
+      accessContext.mode === "android"
+        ? {
+          imageName: photoImageName,
+          imageDataUrl: photoImageDataUrl,
+          notes: "Submitted via Android MAINFORM"
+        }
+        : undefined
     );
     const pairedPhotoFeedback = await loadLatestDepartmentPhotoFeedback(
       supabase as ReturnType<typeof createClient>,
@@ -7955,6 +8052,17 @@ async function handleTelegramQhFormSubmit(request: Request) {
       return jsonResponse({ ok: false, error: access.error }, access.status);
     }
     const accessContext = access.context;
+    const photoImageDataUrl = sanitizeAndroidPhotoDataUrl(payload?.photoImageDataUrl);
+    const photoImageName = sanitizeAndroidPhotoName(payload?.photoImageName) || "android-photo.jpg";
+    const photoDetectedDepartmentId = sanitizeAndroidPhotoDetectedDepartmentId(payload?.photoDetectedDepartmentId);
+    if (accessContext.mode === "android") {
+      if (!photoImageDataUrl) {
+        return jsonResponse({ ok: false, error: "Для отправки нужен снимок бланка этого отделения." }, 400);
+      }
+      if (!photoDetectedDepartmentId || photoDetectedDepartmentId !== departmentId) {
+        return jsonResponse({ ok: false, error: "Отделение не опознано, сделайте повторное фото." }, 400);
+      }
+    }
 
     const reportDate = sanitizeReportDate(payload?.reportDate) || DEFAULT_DATE;
     const directValuesPayload = payload?.values && typeof payload.values === "object" && !Array.isArray(payload.values)
@@ -7996,7 +8104,14 @@ async function handleTelegramQhFormSubmit(request: Request) {
       values,
       accessContext.userId,
       accessContext.userName,
-      createEmptyDepartmentPatientNotes()
+      createEmptyDepartmentPatientNotes(),
+      accessContext.mode === "android"
+        ? {
+          imageName: photoImageName,
+          imageDataUrl: photoImageDataUrl,
+          notes: "Submitted via Android MAINFORM"
+        }
+        : undefined
     );
     const pairedPhotoFeedback = await loadLatestDepartmentPhotoFeedback(
       supabase as ReturnType<typeof createClient>,
@@ -10524,6 +10639,9 @@ Deno.serve(async (request) => {
   }
   if (postUrl.searchParams.get("action") === "web-qh-form-submit") {
     return await handleTelegramQhFormSubmit(request);
+  }
+  if (postUrl.searchParams.get("action") === "android-photo-check") {
+    return await handleAndroidPhotoCheck(request);
   }
   if (postUrl.searchParams.get("action") === "night-form-load") {
     return await handleTelegramShiftFormLoad(request, "night");

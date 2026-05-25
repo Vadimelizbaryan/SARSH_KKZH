@@ -248,6 +248,43 @@
     return (getQuery().get("androidDeviceName") || "").trim();
   }
 
+  function getAndroidRuntimeState() {
+    return window.MAINFORM_ANDROID && typeof window.MAINFORM_ANDROID === "object"
+      ? window.MAINFORM_ANDROID
+      : null;
+  }
+
+  function getAndroidPhotoState() {
+    const state = getAndroidRuntimeState();
+    return state && state.photo && typeof state.photo === "object" ? state.photo : null;
+  }
+
+  function isAndroidMode() {
+    return Boolean(getAndroidDeviceId());
+  }
+
+  function hasRequiredAndroidPhoto() {
+    if (!isAndroidMode()) {
+      return true;
+    }
+    const photo = getAndroidPhotoState();
+    return Boolean(photo && photo.exists && photo.matched && photo.imageDataUrl);
+  }
+
+  function getAndroidPhotoMessage() {
+    if (!isAndroidMode()) {
+      return "";
+    }
+    const photo = getAndroidPhotoState();
+    if (!photo || !photo.exists) {
+      return "Для отправки нужен снимок бланка этого отделения.";
+    }
+    if (photo.matched) {
+      return photo.message || "Фото готово к отправке.";
+    }
+    return photo.message || "Отделение не опознано, сделайте повторное фото.";
+  }
+
   function getInitData() {
     return telegram && typeof telegram.initData === "string" ? telegram.initData : "";
   }
@@ -820,7 +857,7 @@
 
     const submit = root.querySelector("[data-submit]");
     if (submit) {
-      submit.disabled = !validation.isValid || !hasSubmitAccess() || (pendingCalculatorInput && !calculatorsApplied);
+      submit.disabled = !validation.isValid || !hasSubmitAccess() || !hasRequiredAndroidPhoto() || (pendingCalculatorInput && !calculatorsApplied);
     }
   }
 
@@ -892,6 +929,14 @@
     if (!validation.isValid) {
       return;
     }
+    if (!hasRequiredAndroidPhoto()) {
+      if (message) {
+        message.className = "tg-form-message error";
+        message.textContent = getAndroidPhotoMessage();
+      }
+      refreshUi();
+      return;
+    }
 
     const submit = root.querySelector("[data-submit]");
     const message = root.querySelector("[data-message]");
@@ -916,7 +961,10 @@
           reportDate: getReportDate(),
           values: validation.finalValues,
           qhValues: { ...state },
-          preservedValues: getPreservedValues()
+          preservedValues: getPreservedValues(),
+          photoImageDataUrl: getAndroidPhotoState() && getAndroidPhotoState().imageDataUrl ? getAndroidPhotoState().imageDataUrl : "",
+          photoImageName: getAndroidPhotoState() && getAndroidPhotoState().imageName ? getAndroidPhotoState().imageName : "",
+          photoDetectedDepartmentId: getAndroidPhotoState() && getAndroidPhotoState().detectedDepartmentId ? getAndroidPhotoState().detectedDepartmentId : ""
         })
       });
       const payload = await response.json().catch(() => null);
@@ -951,6 +999,20 @@
   bindEvents();
   refreshUi();
   syncFieldLockState();
+  const initialAndroidMessage = root && root.querySelector ? root.querySelector("[data-message]") : null;
+  if (initialAndroidMessage && isAndroidMode()) {
+    initialAndroidMessage.className = `tg-form-message${hasRequiredAndroidPhoto() ? "" : " error"}`;
+    initialAndroidMessage.textContent = getAndroidPhotoMessage();
+    refreshUi();
+  }
+  window.addEventListener("mainform-android-state-changed", () => {
+    const currentMessage = root && root.querySelector ? root.querySelector("[data-message]") : null;
+    if (currentMessage && isAndroidMode()) {
+      currentMessage.className = `tg-form-message${hasRequiredAndroidPhoto() ? "" : " error"}`;
+      currentMessage.textContent = getAndroidPhotoMessage();
+    }
+    refreshUi();
+  });
 
   if (telegram) {
     telegram.ready();
