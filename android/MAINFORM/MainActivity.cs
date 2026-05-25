@@ -102,7 +102,16 @@ public class MainActivity : Activity
 
         if (refreshButton is not null)
         {
-            refreshButton.Click += (_, _) => _webView?.Reload();
+            refreshButton.Click += (_, _) =>
+            {
+                if (_selectedDepartment is not null)
+                {
+                    _ = LoadDepartmentFormAsync(_selectedDepartment, clearPhoto: false);
+                    return;
+                }
+
+                _webView?.Reload();
+            };
         }
 
         if (_photoButton is not null)
@@ -207,6 +216,7 @@ public class MainActivity : Activity
         webSettings.AllowFileAccess = true;
         webSettings.AllowContentAccess = true;
         webSettings.DatabaseEnabled = true;
+        webSettings.CacheMode = CacheModes.NoCache;
         webSettings.LoadWithOverviewMode = true;
         webSettings.UseWideViewPort = true;
         webSettings.BuiltInZoomControls = true;
@@ -314,6 +324,7 @@ public class MainActivity : Activity
         try
         {
             var formUrl = await FetchDepartmentFormUrlAsync(option.DepartmentId);
+            formUrl = AppendCacheBuster(formUrl);
             RunOnUiThread(() =>
             {
                 _pageReady = false;
@@ -321,6 +332,7 @@ public class MainActivity : Activity
                 {
                     _currentPageText.Text = GetString(Resource.String.loading_department, option.Name);
                 }
+                _webView?.ClearCache(true);
                 _webView?.LoadUrl(formUrl);
             });
         }
@@ -386,6 +398,17 @@ public class MainActivity : Activity
         }
 
         return formUrl;
+    }
+
+    private static string AppendCacheBuster(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return url;
+        }
+
+        var separator = url.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+        return $"{url}{separator}_ts={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
     }
 
     private void StartNativePhotoChooser()
