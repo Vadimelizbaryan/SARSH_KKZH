@@ -1221,12 +1221,16 @@ function getTelegramWebFormUrl(
   departmentId: DepartmentId,
   reportDate: string,
   carryoverValues?: Record<string, number | null>,
-  androidAccess?: { deviceId?: string; deviceName?: string } | null
+  androidAccess?: { deviceId?: string; deviceName?: string } | null,
+  options: { autoRotateImages?: boolean | null } = {}
 ) {
   const params = new URLSearchParams();
   params.set("ui", "20260525androidsubmit1");
   params.set("department", departmentId);
   params.set("date", reportDate);
+  if (typeof options.autoRotateImages === "boolean") {
+    params.set("ar", options.autoRotateImages ? "1" : "0");
+  }
   const androidDeviceId = sanitizeAndroidDeviceId(androidAccess?.deviceId || "");
   const androidDeviceName = sanitizeAndroidDeviceName(androidAccess?.deviceName || "");
   if (androidDeviceId) {
@@ -7204,7 +7208,14 @@ async function sendTelegramWebFormForDepartment(
   const reportDate = detectReportDateFromHint(text) || getYerevanReportDateText();
   const meta = DEPARTMENTS[departmentId];
   const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
-  const formUrl = getTelegramWebFormUrl(departmentId, reportDate, carryoverValues);
+  const autoRotateImages = await isTelegramPhotoAutoRotateEnabled(supabase as ReturnType<typeof createClient>);
+  const formUrl = getTelegramWebFormUrl(
+    departmentId,
+    reportDate,
+    carryoverValues,
+    null,
+    { autoRotateImages }
+  );
   const row = snapshot.rows.find((item) => item.id === departmentId);
   const currentValues = row ? row.values : sanitizeValues(null);
   const caption = [
@@ -7252,7 +7263,14 @@ async function sendTelegramWebFormPromptAfterPhoto(
   const effectiveReportDate = reportDate || snapshot.reportDate || DEFAULT_DATE;
   const meta = DEPARTMENTS[departmentId];
   const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
-  const formUrl = getTelegramWebFormUrl(departmentId, effectiveReportDate, carryoverValues);
+  const autoRotateImages = await isTelegramPhotoAutoRotateEnabled(supabase as ReturnType<typeof createClient>);
+  const formUrl = getTelegramWebFormUrl(
+    departmentId,
+    effectiveReportDate,
+    carryoverValues,
+    null,
+    { autoRotateImages }
+  );
 
   await sendTelegramMessageWithReplyMarkup(
     chatId,
@@ -10462,11 +10480,13 @@ Deno.serve(async (request) => {
         const snapshot = await loadSnapshot(supabase);
         const reportDate = snapshot.reportDate || getYerevanReportDateText();
         const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
+        const autoRotateImages = await isTelegramPhotoAutoRotateEnabled(supabase);
         const formUrl = getTelegramWebFormUrl(
           departmentId,
           reportDate,
           carryoverValues,
-          { deviceId, deviceName }
+          { deviceId, deviceName },
+          { autoRotateImages }
         );
 
         return jsonResponse({
@@ -10474,6 +10494,7 @@ Deno.serve(async (request) => {
           departmentId,
           reportDate,
           deviceId,
+          autoRotateImages,
           url: formUrl
         });
       } catch (error) {
