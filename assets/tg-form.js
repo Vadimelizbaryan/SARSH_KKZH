@@ -327,9 +327,13 @@
     }
   }
 
+  function getPatientNoteRows(notes, sectionKey) {
+    return Array.isArray(notes && notes[sectionKey]) ? notes[sectionKey] : [];
+  }
+
   function countPatientNotes(notes) {
     return patientNoteSections.reduce((total, section) => (
-      total + (notes[section.key] || []).filter((value) => String(value).trim()).length
+      total + getPatientNoteRows(notes, section.key).filter((value) => String(value).trim()).length
     ), 0);
   }
 
@@ -361,7 +365,7 @@
     const notes = loadPatientNotes(department, reportDate);
     const filledCount = countPatientNotes(notes);
     const sections = patientNoteSections.map((section) => {
-      const rows = notes[section.key] || [];
+      const rows = getPatientNoteRows(notes, section.key);
       const inputs = Array.from({ length: section.rows }, (_, index) => `
         <label class="tg-patient-note-row">
           <span>${index + 1}.</span>
@@ -822,7 +826,7 @@
     const notes = loadPatientNotes(department, reportDate);
     const filledCount = countPatientNotes(notes);
     const sections = patientNoteSections.map((section) => {
-      const rows = notes[section.key] || [];
+      const rows = getPatientNoteRows(notes, section.key);
       const inputs = Array.from({ length: section.rows }, (_, index) => `
         <label class="tg-patient-note-row">
           <span>${index + 1}.</span>
