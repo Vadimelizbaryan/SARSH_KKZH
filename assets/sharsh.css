@@ -525,10 +525,11 @@ a {
 .photo-lightbox-dialog img {
   display: block;
   justify-self: center;
-  width: min(92vw, 1320px);
+  width: min(94vw, 1480px);
   max-width: 100%;
-  max-height: min(38vh, 460px);
+  max-height: min(58vh, 760px);
   height: auto;
+  object-fit: contain;
   border-radius: 12px;
 }
 
