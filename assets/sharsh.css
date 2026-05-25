@@ -1266,6 +1266,84 @@ a {
   }
 }
 
+@media (max-width: 640px) {
+  .department-calc-combined-panel {
+    gap: 8px;
+  }
+
+  .department-calc-intro {
+    font-size: 0.72rem;
+    line-height: 1.28;
+  }
+
+  .department-calc-grid {
+    gap: 8px;
+  }
+
+  .department-calc-section h3 {
+    font-size: 0.92rem;
+  }
+
+  .department-calc-section .qh-calc-wrap {
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .qh-calc-table {
+    width: max-content;
+    min-width: 640px;
+    display: table;
+    white-space: normal;
+  }
+
+  .department-calc-section--leave .qh-calc-table {
+    min-width: 420px;
+  }
+
+  .qh-calc-table th,
+  .qh-calc-table td {
+    padding: 3px 4px;
+  }
+
+  .qh-calc-table thead th {
+    font-size: 0.74rem;
+    line-height: 1.05;
+  }
+
+  .qh-calc-table tbody th {
+    width: 132px;
+    min-width: 132px;
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+
+  .qh-calc-cell {
+    min-height: 42px;
+    min-width: 46px;
+  }
+
+  .qh-calc-cell input {
+    min-height: 28px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+
+  .qh-calc-cell strong {
+    font-size: 14px;
+  }
+
+  .qh-calc-status {
+    font-size: 9px;
+    padding: 5px 7px;
+  }
+
+  .qh-calc-actions button {
+    min-height: 28px;
+    padding: 5px 10px;
+    font-size: 0.76rem;
+  }
+}
+
 .recognized-cell {
   background: rgba(31, 141, 73, 0.1) !important;
 }
