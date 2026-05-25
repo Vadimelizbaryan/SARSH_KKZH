@@ -129,6 +129,7 @@
   const calculatorRows = [
     { label: "Ընդունվել է", cells: calculatorColumns.map((column) => ({ key: column.incomingKey, role: "input" })) },
     { label: "Դուրս է գրվել", cells: calculatorColumns.map((column) => ({ key: column.dischargedKey, role: "input" })) },
+    { label: "Եղել է", cells: calculatorColumns.map((column) => ({ key: column.currentKey, role: "linked" })) },
     { label: "Հաշվարկ", cells: calculatorColumns.map((column) => ({ key: column.outputKey, role: "output" })) }
   ];
 
@@ -522,37 +523,40 @@
     };
   }
 
-  function renderCalculatorEditableRow(row) {
+  function renderCalculatorRow(row) {
     return `
       <tr>
         <th scope="row" class="tg-qh-row-title">${escapeHtml(row.label)}</th>
-        ${row.cells.map((cell) => `
-          <td class="tg-qh-cell">
-            <input
-              class="tg-form-input tg-qh-input"
-              data-calc-key="${escapeHtml(cell.key)}"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              type="text"
-              autocomplete="off"
-              maxlength="4"
-              value="${escapeHtml(calculatorState[cell.key] || 0)}"
-            >
-          </td>
-        `).join("")}
-      </tr>
-    `;
-  }
-
-  function renderCalculatorOutputRow() {
-    return `
-      <tr class="tg-qh-output-row">
-        <th scope="row" class="tg-qh-row-title">Հաշվարկ</th>
-        ${calculatorColumns.map((column) => `
-          <td class="tg-qh-cell tg-qh-cell--output">
-            <span class="tg-form-control-value tg-qh-output" data-calc-output="${escapeHtml(column.outputKey)}">0</span>
-          </td>
-        `).join("")}
+        ${row.cells.map((cell) => {
+          if (cell.role === "input") {
+            return `
+              <td class="tg-qh-cell">
+                <input
+                  class="tg-form-input tg-qh-input"
+                  data-calc-key="${escapeHtml(cell.key)}"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  type="text"
+                  autocomplete="off"
+                  maxlength="4"
+                  value="${escapeHtml(calculatorState[cell.key] || 0)}"
+                >
+              </td>
+            `;
+          }
+          if (cell.role === "linked") {
+            return `
+              <td class="tg-qh-cell tg-qh-cell--output">
+                <span class="tg-form-control-value tg-qh-output" data-calc-base="${escapeHtml(cell.key)}">0</span>
+              </td>
+            `;
+          }
+          return `
+            <td class="tg-qh-cell tg-qh-cell--output">
+              <span class="tg-form-control-value tg-qh-output" data-calc-output="${escapeHtml(cell.key)}">0</span>
+            </td>
+          `;
+        }).join("")}
       </tr>
     `;
   }
@@ -658,8 +662,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  ${calculatorRows.slice(0, 2).map(renderCalculatorEditableRow).join("")}
-                  ${renderCalculatorOutputRow()}
+                  ${calculatorRows.map(renderCalculatorRow).join("")}
                 </tbody>
               </table>
             </div>
@@ -716,7 +719,11 @@
     const calculatorResult = getCalculatorResult(values);
 
     calculatorColumns.forEach((column) => {
+      const baseTarget = root.querySelector(`[data-calc-base="${column.currentKey}"]`);
       const target = root.querySelector(`[data-calc-output="${column.outputKey}"]`);
+      if (baseTarget) {
+        baseTarget.textContent = String(toNumber(values[column.currentKey]));
+      }
       if (target) {
         target.textContent = String(calculatorResult.remainingByType[column.type] || 0);
       }
