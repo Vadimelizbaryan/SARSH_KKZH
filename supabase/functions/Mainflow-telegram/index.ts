@@ -1224,7 +1224,7 @@ function getTelegramWebFormUrl(
   androidAccess?: { deviceId?: string; deviceName?: string } | null
 ) {
   const params = new URLSearchParams();
-  params.set("ui", "20260525qhapply1");
+  params.set("ui", "20260525androidsubmit1");
   params.set("department", departmentId);
   params.set("date", reportDate);
   const androidDeviceId = sanitizeAndroidDeviceId(androidAccess?.deviceId || "");
