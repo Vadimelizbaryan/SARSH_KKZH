@@ -9,4 +9,9 @@
     <string name="loading_department_form">Загружается форма: %1$s</string>
     <string name="department_form_load_failed">Не удалось загрузить форму отделения.</string>
     <string name="department_form_invalid_response">Сервер вернул некорректный ответ.</string>
+    <string name="update_available_title">Доступно обновление</string>
+    <string name="update_available_message">Установлена версия %1$s. Доступна версия %2$s. Скачать обновление сейчас?</string>
+    <string name="update_now">Скачать обновление</string>
+    <string name="update_later">Позже</string>
+    <string name="update_open_failed">Не удалось открыть ссылку обновления.</string>
 </resources>

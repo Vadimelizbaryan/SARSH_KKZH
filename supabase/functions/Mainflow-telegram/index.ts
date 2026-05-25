@@ -16,6 +16,9 @@ const TELEGRAM_RETRY_BASE_DELAY_MS = 700;
 const TELEGRAM_COLLEAGUES_META_KEY = "telegram_colleagues_access";
 const TELEGRAM_COLLEAGUE_CHATS_META_KEY = "telegram_colleague_chats";
 const TELEGRAM_PENDING_COLLEAGUE_CHATS_META_KEY = "telegram_pending_colleague_chats";
+const ANDROID_APPROVED_DEVICES_META_KEY = "android_approved_devices";
+const ANDROID_PENDING_DEVICES_META_KEY = "android_pending_devices";
+const ANDROID_BLOCKED_DEVICES_META_KEY = "android_blocked_devices";
 const TELEGRAM_WORKPLACE_LOCATION_META_KEY = "telegram_workplace_location";
 const TELEGRAM_WORKPLACE_SETUP_PENDING_META_KEY = "telegram_workplace_setup_pending";
 const TELEGRAM_COLLEAGUE_PRESENCE_META_KEY = "telegram_colleague_presence";
@@ -2136,6 +2139,17 @@ type TelegramPendingPhotoApproval = {
   createdAt: string;
 };
 
+type AndroidDeviceAccessRecord = {
+  deviceId: string;
+  deviceName: string;
+  requestedAt: string;
+  updatedAt: string;
+  approvedAt: string;
+  blockedAt: string;
+  lastSeenAt: string;
+  lastDepartmentId: string;
+};
+
 type TelegramPhotoHandlingOptions = {
   approved?: boolean;
   skipAdminPhotoCopy?: boolean;
@@ -2323,6 +2337,54 @@ function parseTelegramPendingPhotoApprovals(raw: unknown): TelegramPendingPhotoA
   }
 }
 
+function sanitizeAndroidDeviceId(value: unknown) {
+  const normalized = typeof value === "string" || typeof value === "number"
+    ? String(value).trim()
+    : "";
+  return normalized.slice(0, 128);
+}
+
+function sanitizeAndroidDeviceName(value: unknown) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return normalized.slice(0, 160);
+}
+
+function parseAndroidDeviceAccessRecords(raw: unknown): AndroidDeviceAccessRecord[] {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") {
+          return null;
+        }
+        const record = item as Record<string, unknown>;
+        const deviceId = sanitizeAndroidDeviceId(record.deviceId);
+        if (!deviceId) {
+          return null;
+        }
+        return {
+          deviceId,
+          deviceName: sanitizeAndroidDeviceName(record.deviceName),
+          requestedAt: typeof record.requestedAt === "string" ? record.requestedAt : "",
+          updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
+          approvedAt: typeof record.approvedAt === "string" ? record.approvedAt : "",
+          blockedAt: typeof record.blockedAt === "string" ? record.blockedAt : "",
+          lastSeenAt: typeof record.lastSeenAt === "string" ? record.lastSeenAt : "",
+          lastDepartmentId: typeof record.lastDepartmentId === "string" ? record.lastDepartmentId : ""
+        };
+      })
+      .filter((item): item is AndroidDeviceAccessRecord => item !== null);
+  } catch (_error) {
+    return [];
+  }
+}
+
 async function loadTelegramColleagueChats(supabase: ReturnType<typeof createClient>) {
   const { data, error } = await supabase
     .from("sharsh_report_meta")
@@ -2385,6 +2447,75 @@ async function saveTelegramPendingColleagueChats(
   if (error) {
     throw error;
   }
+}
+
+async function loadAndroidDeviceAccessRecords(
+  supabase: ReturnType<typeof createClient>,
+  reportKey: string
+) {
+  const { data, error } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date")
+    .eq("report_key", reportKey)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return parseAndroidDeviceAccessRecords(data?.report_date);
+}
+
+async function saveAndroidDeviceAccessRecords(
+  supabase: ReturnType<typeof createClient>,
+  reportKey: string,
+  records: AndroidDeviceAccessRecord[]
+) {
+  const uniqueRecords = Array.from(new Map(records.map((item) => [item.deviceId, item])).values());
+  const { error } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: reportKey,
+      report_date: JSON.stringify(uniqueRecords),
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function loadApprovedAndroidDevices(supabase: ReturnType<typeof createClient>) {
+  return await loadAndroidDeviceAccessRecords(supabase, ANDROID_APPROVED_DEVICES_META_KEY);
+}
+
+async function saveApprovedAndroidDevices(
+  supabase: ReturnType<typeof createClient>,
+  records: AndroidDeviceAccessRecord[]
+) {
+  await saveAndroidDeviceAccessRecords(supabase, ANDROID_APPROVED_DEVICES_META_KEY, records);
+}
+
+async function loadPendingAndroidDevices(supabase: ReturnType<typeof createClient>) {
+  return await loadAndroidDeviceAccessRecords(supabase, ANDROID_PENDING_DEVICES_META_KEY);
+}
+
+async function savePendingAndroidDevices(
+  supabase: ReturnType<typeof createClient>,
+  records: AndroidDeviceAccessRecord[]
+) {
+  await saveAndroidDeviceAccessRecords(supabase, ANDROID_PENDING_DEVICES_META_KEY, records);
+}
+
+async function loadBlockedAndroidDevices(supabase: ReturnType<typeof createClient>) {
+  return await loadAndroidDeviceAccessRecords(supabase, ANDROID_BLOCKED_DEVICES_META_KEY);
+}
+
+async function saveBlockedAndroidDevices(
+  supabase: ReturnType<typeof createClient>,
+  records: AndroidDeviceAccessRecord[]
+) {
+  await saveAndroidDeviceAccessRecords(supabase, ANDROID_BLOCKED_DEVICES_META_KEY, records);
 }
 
 async function loadTelegramWorkplaceLocation(supabase: ReturnType<typeof createClient>) {
@@ -2547,6 +2678,21 @@ function buildColleagueApprovalReplyMarkup(chatId: string) {
   };
 }
 
+function buildAndroidDeviceApprovalReplyMarkup(deviceId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Հաստատել", callback_data: `approve_android_device:${deviceId}` },
+        { text: "Մերժել", callback_data: `reject_android_device:${deviceId}` }
+      ]
+    ]
+  };
+}
+
+function getAndroidDeviceDisplayName(record: AndroidDeviceAccessRecord) {
+  return record.deviceName || `MAINFORM ${record.deviceId.slice(0, 8)}`;
+}
+
 function buildWorkplaceLocationReplyMarkup(gpsEnabled = false) {
   const keyboard = gpsEnabled
     ? [
@@ -2635,6 +2781,220 @@ async function requestTelegramColleagueApproval(
       "Մի փոքր պահակություն մուտքի մոտ. տվյալները սիրում են կարգուկանոն, իսկ ես՝ հանգիստ ու գեղեցիկ ընթացք։"
     ].join("\n")
   );
+}
+
+async function requestAndroidDeviceApproval(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string,
+  deviceName: string,
+  departmentId: DepartmentId
+) {
+  const pendingDevices = await loadPendingAndroidDevices(supabase);
+  const alreadyPending = pendingDevices.some((item) => item.deviceId === deviceId);
+  const now = new Date().toISOString();
+  const nextRecord: AndroidDeviceAccessRecord = {
+    deviceId,
+    deviceName,
+    requestedAt: pendingDevices.find((item) => item.deviceId === deviceId)?.requestedAt || now,
+    updatedAt: now,
+    approvedAt: "",
+    blockedAt: "",
+    lastSeenAt: now,
+    lastDepartmentId: departmentId
+  };
+
+  await savePendingAndroidDevices(
+    supabase,
+    [nextRecord, ...pendingDevices.filter((item) => item.deviceId !== deviceId)]
+  );
+
+  if (alreadyPending) {
+    return nextRecord;
+  }
+
+  const department = DEPARTMENTS[departmentId];
+  const messageText = [
+    "MAINFORM Android հավելվածը խնդրում է մուտքի թույլտվություն։",
+    `Սարք: ${getAndroidDeviceDisplayName(nextRecord)}`,
+    `ID: ${deviceId}`,
+    `Բաժանմունք: ${department.marker} ${department.department}`,
+    "",
+    "Եթե հաստատեք, այս սարքը հաջորդ անգամ նույն MAINFORM.apk-ից կաշխատի առանց նոր հարցման։"
+  ].join("\n");
+
+  const adminChatIds = getTelegramAdminChatIds();
+  if (!adminChatIds.length) {
+    throw new Error("Telegram admin chats are not configured.");
+  }
+
+  for (const adminChatId of adminChatIds) {
+    await sendTelegramMessageWithReplyMarkup(
+      adminChatId,
+      messageText,
+      buildAndroidDeviceApprovalReplyMarkup(deviceId)
+    ).catch((error) => {
+      console.error("Failed to send Android device access request:", sanitizePublicErrorMessage(error));
+    });
+  }
+
+  return nextRecord;
+}
+
+async function approveAndroidDevice(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  if (!normalizedDeviceId) {
+    throw new Error("Android device id is missing.");
+  }
+
+  const [pendingDevices, approvedDevices, blockedDevices] = await Promise.all([
+    loadPendingAndroidDevices(supabase),
+    loadApprovedAndroidDevices(supabase),
+    loadBlockedAndroidDevices(supabase)
+  ]);
+  const sourceRecord = pendingDevices.find((item) => item.deviceId === normalizedDeviceId)
+    || approvedDevices.find((item) => item.deviceId === normalizedDeviceId)
+    || blockedDevices.find((item) => item.deviceId === normalizedDeviceId);
+
+  if (!sourceRecord) {
+    throw new Error("Android device request not found.");
+  }
+
+  const now = new Date().toISOString();
+  const approvedRecord: AndroidDeviceAccessRecord = {
+    ...sourceRecord,
+    updatedAt: now,
+    approvedAt: sourceRecord.approvedAt || now,
+    blockedAt: "",
+    lastSeenAt: sourceRecord.lastSeenAt || now
+  };
+
+  await Promise.all([
+    saveApprovedAndroidDevices(
+      supabase,
+      [approvedRecord, ...approvedDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    ),
+    savePendingAndroidDevices(
+      supabase,
+      pendingDevices.filter((item) => item.deviceId !== normalizedDeviceId)
+    ),
+    saveBlockedAndroidDevices(
+      supabase,
+      blockedDevices.filter((item) => item.deviceId !== normalizedDeviceId)
+    )
+  ]);
+
+  return approvedRecord;
+}
+
+async function rejectAndroidDevice(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  if (!normalizedDeviceId) {
+    throw new Error("Android device id is missing.");
+  }
+
+  const [pendingDevices, blockedDevices] = await Promise.all([
+    loadPendingAndroidDevices(supabase),
+    loadBlockedAndroidDevices(supabase)
+  ]);
+  const sourceRecord = pendingDevices.find((item) => item.deviceId === normalizedDeviceId)
+    || blockedDevices.find((item) => item.deviceId === normalizedDeviceId);
+
+  if (!sourceRecord) {
+    throw new Error("Android device request not found.");
+  }
+
+  const now = new Date().toISOString();
+  const blockedRecord: AndroidDeviceAccessRecord = {
+    ...sourceRecord,
+    updatedAt: now,
+    approvedAt: "",
+    blockedAt: now
+  };
+
+  await Promise.all([
+    savePendingAndroidDevices(
+      supabase,
+      pendingDevices.filter((item) => item.deviceId !== normalizedDeviceId)
+    ),
+    saveBlockedAndroidDevices(
+      supabase,
+      [blockedRecord, ...blockedDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    )
+  ]);
+
+  return blockedRecord;
+}
+
+async function getAndroidDeviceAccessState(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string,
+  deviceName: string,
+  departmentId: DepartmentId
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  const normalizedDeviceName = sanitizeAndroidDeviceName(deviceName) || "Android MAINFORM";
+  if (!normalizedDeviceId) {
+    return { status: "missing" as const, record: null };
+  }
+
+  const [approvedDevices, pendingDevices, blockedDevices] = await Promise.all([
+    loadApprovedAndroidDevices(supabase),
+    loadPendingAndroidDevices(supabase),
+    loadBlockedAndroidDevices(supabase)
+  ]);
+
+  const approvedRecord = approvedDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (approvedRecord) {
+    const now = new Date().toISOString();
+    const nextApprovedRecord: AndroidDeviceAccessRecord = {
+      ...approvedRecord,
+      deviceName: normalizedDeviceName,
+      updatedAt: now,
+      lastSeenAt: now,
+      lastDepartmentId: departmentId
+    };
+    await saveApprovedAndroidDevices(
+      supabase,
+      [nextApprovedRecord, ...approvedDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    );
+    return { status: "approved" as const, record: nextApprovedRecord };
+  }
+
+  const blockedRecord = blockedDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (blockedRecord) {
+    return { status: "blocked" as const, record: blockedRecord };
+  }
+
+  const pendingRecord = pendingDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (pendingRecord) {
+    const now = new Date().toISOString();
+    const nextPendingRecord: AndroidDeviceAccessRecord = {
+      ...pendingRecord,
+      deviceName: normalizedDeviceName,
+      updatedAt: now,
+      lastSeenAt: now,
+      lastDepartmentId: departmentId
+    };
+    await savePendingAndroidDevices(
+      supabase,
+      [nextPendingRecord, ...pendingDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    );
+    return { status: "pending" as const, record: nextPendingRecord };
+  }
+
+  const createdPendingRecord = await requestAndroidDeviceApproval(
+    supabase,
+    normalizedDeviceId,
+    normalizedDeviceName,
+    departmentId
+  );
+  return { status: "pending" as const, record: createdPendingRecord };
 }
 
 async function approveTelegramColleague(
@@ -8705,6 +9065,40 @@ async function handleTelegramCallbackQuery(
     return;
   }
 
+  const androidDeviceMatch = data.match(/^(approve_android_device|reject_android_device):(.+)$/);
+  if (androidDeviceMatch) {
+    const action = androidDeviceMatch[1];
+    const targetDeviceId = sanitizeAndroidDeviceId(androidDeviceMatch[2]);
+    if (!targetDeviceId) {
+      await answerTelegramCallbackQuery(callbackQueryId, "Սարքի նույնականացուցիչը չի գտնվել։").catch(() => null);
+      return;
+    }
+
+    if (action === "approve_android_device") {
+      const device = await approveAndroidDevice(supabase, targetDeviceId);
+      await answerTelegramCallbackQuery(callbackQueryId, "MAINFORM սարքը հաստատված է։").catch(() => null);
+      if (callbackMessageChatId !== null) {
+        await clearTelegramInlineKeyboard(callbackMessageChatId, callbackMessageId).catch(() => null);
+        await sendTelegramMessage(
+          callbackMessageChatId,
+          `MAINFORM սարքը հաստատված է: ${getAndroidDeviceDisplayName(device)}.`
+        ).catch(() => null);
+      }
+      return;
+    }
+
+    const device = await rejectAndroidDevice(supabase, targetDeviceId);
+    await answerTelegramCallbackQuery(callbackQueryId, "MAINFORM սարքի մուտքը մերժվեց։").catch(() => null);
+    if (callbackMessageChatId !== null) {
+      await clearTelegramInlineKeyboard(callbackMessageChatId, callbackMessageId).catch(() => null);
+      await sendTelegramMessage(
+        callbackMessageChatId,
+        `MAINFORM սարքի մուտքը մերժվեց: ${getAndroidDeviceDisplayName(device)}.`
+      ).catch(() => null);
+    }
+    return;
+  }
+
   const match = data.match(/^(approve_colleague|reject_colleague):(.+)$/);
   if (!match) {
     await answerTelegramCallbackQuery(callbackQueryId, "Գործողությունը չճանաչվեց։").catch(() => null);
@@ -9960,8 +10354,40 @@ Deno.serve(async (request) => {
         if (!departmentId) {
           return jsonResponse({ ok: false, error: "Department is required." }, 400);
         }
+        const deviceId = sanitizeAndroidDeviceId(currentUrl.searchParams.get("deviceId"));
+        const deviceName = sanitizeAndroidDeviceName(currentUrl.searchParams.get("deviceName"));
+        if (!deviceId) {
+          return jsonResponse({ ok: false, error: "Device id is required." }, 400);
+        }
 
         const supabase = createSupabaseAdmin();
+        const accessState = await getAndroidDeviceAccessState(
+          supabase,
+          deviceId,
+          deviceName,
+          departmentId
+        );
+        if (accessState.status === "missing") {
+          return jsonResponse({
+            ok: false,
+            error: "device_required",
+            message: "Устройство не идентифицировано. Откройте форму заново."
+          }, 400);
+        }
+        if (accessState.status === "blocked") {
+          return jsonResponse({
+            ok: false,
+            error: "access_denied",
+            message: "Доступ для этого устройства отклонён через Telegram-бот."
+          }, 403);
+        }
+        if (accessState.status !== "approved") {
+          return jsonResponse({
+            ok: false,
+            error: "pending_approval",
+            message: "Запрос доступа отправлен владельцу в Telegram. После подтверждения нажмите «Обновить данные»."
+          }, 202);
+        }
         const snapshot = await loadSnapshot(supabase);
         const reportDate = snapshot.reportDate || getYerevanReportDateText();
         const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
@@ -9971,6 +10397,7 @@ Deno.serve(async (request) => {
           ok: true,
           departmentId,
           reportDate,
+          deviceId,
           url: formUrl
         });
       } catch (error) {

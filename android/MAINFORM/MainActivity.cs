@@ -13,11 +13,13 @@ namespace MAINFORM;
 [Activity(Label = "@string/app_name", MainLauncher = true, Exported = true)]
 public class MainActivity : Activity
 {
-    private const string BaseSiteUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/";
     private const string AndroidFormBootstrapUrl =
         "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-form-url";
+    private const string AndroidReleaseManifestUrl =
+        "https://vadimelizbaryan.github.io/SARSH_KKZH/android/releases/latest.json";
     private const string PreferenceName = "mainform_preferences";
     private const string SelectedDepartmentKey = "selected_department_slug";
+    private const string DeviceIdKey = "android_device_id";
     private const int FileChooserRequestCode = 1101;
 
     private static readonly HttpClient BootstrapHttpClient = new()
@@ -52,6 +54,7 @@ public class MainActivity : Activity
     private ISharedPreferences? _preferences;
     private IValueCallback? _fileChooserCallback;
     private Android.Net.Uri? _pendingCameraUri;
+    private bool _updatePromptShown;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -83,11 +86,13 @@ public class MainActivity : Activity
         if (selectedDepartment is null)
         {
             _currentPageText!.Text = GetString(Resource.String.no_department_selected);
+            _ = CheckForAppUpdateAsync();
             ShowDepartmentPicker();
             return;
         }
 
         _ = LoadDepartmentFormAsync(selectedDepartment);
+        _ = CheckForAppUpdateAsync();
     }
 
     public override void OnBackPressed()
@@ -224,26 +229,32 @@ public class MainActivity : Activity
             RunOnUiThread(() =>
             {
                 UpdateProgress(0);
-                Toast.MakeText(
-                    this,
-                    string.IsNullOrWhiteSpace(error.Message)
-                        ? GetString(Resource.String.department_form_load_failed)
-                        : error.Message,
-                    ToastLength.Long
-                )?.Show();
+                var message = string.IsNullOrWhiteSpace(error.Message)
+                    ? GetString(Resource.String.department_form_load_failed)
+                    : error.Message;
+                _currentPageText!.Text = message;
+                Toast.MakeText(this, message, ToastLength.Long)?.Show();
             });
         }
     }
 
     private async Task<string> FetchDepartmentFormUrlAsync(string departmentId)
     {
-        var requestUrl = $"{AndroidFormBootstrapUrl}&departmentId={Uri.EscapeDataString(departmentId)}";
+        var requestUrl =
+            $"{AndroidFormBootstrapUrl}&departmentId={Uri.EscapeDataString(departmentId)}" +
+            $"&deviceId={Uri.EscapeDataString(GetOrCreateDeviceId())}" +
+            $"&deviceName={Uri.EscapeDataString(BuildDeviceName())}";
         using var response = await BootstrapHttpClient.GetAsync(requestUrl);
         var responseText = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(GetString(Resource.String.department_form_load_failed));
+            var bootstrapError = TryGetBootstrapMessage(responseText);
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(bootstrapError)
+                    ? GetString(Resource.String.department_form_load_failed)
+                    : bootstrapError
+            );
         }
 
         using var json = JsonDocument.Parse(responseText);
@@ -253,14 +264,11 @@ public class MainActivity : Activity
 
         if (!isOk)
         {
-            var errorMessage = root.TryGetProperty("error", out var errorElement) &&
-                               errorElement.ValueKind == JsonValueKind.String
-                ? errorElement.GetString()
-                : null;
+            var bootstrapError = TryGetBootstrapMessage(responseText);
             throw new InvalidOperationException(
-                string.IsNullOrWhiteSpace(errorMessage)
+                string.IsNullOrWhiteSpace(bootstrapError)
                     ? GetString(Resource.String.department_form_load_failed)
-                    : errorMessage
+                    : bootstrapError
             );
         }
 
@@ -275,6 +283,160 @@ public class MainActivity : Activity
         }
 
         return formUrl;
+    }
+
+    private async Task CheckForAppUpdateAsync()
+    {
+        if (_updatePromptShown)
+        {
+            return;
+        }
+
+        try
+        {
+            using var response = await BootstrapHttpClient.GetAsync(AndroidReleaseManifestUrl);
+            if (!response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            var responseText = await response.Content.ReadAsStringAsync();
+            using var json = JsonDocument.Parse(responseText);
+            var root = json.RootElement;
+            var latestVersionCode = root.TryGetProperty("versionCode", out var versionCodeElement) &&
+                                    versionCodeElement.TryGetInt64(out var parsedVersionCode)
+                ? parsedVersionCode
+                : 0L;
+            var latestVersionName = root.TryGetProperty("versionName", out var versionNameElement) &&
+                                    versionNameElement.ValueKind == JsonValueKind.String
+                ? versionNameElement.GetString()
+                : null;
+            var apkUrl = root.TryGetProperty("apkUrl", out var apkUrlElement) &&
+                         apkUrlElement.ValueKind == JsonValueKind.String
+                ? apkUrlElement.GetString()
+                : null;
+
+            if (latestVersionCode <= 0 || string.IsNullOrWhiteSpace(apkUrl))
+            {
+                return;
+            }
+
+            var packageInfo = PackageManager.GetPackageInfo(PackageName, 0);
+            var currentVersionCode = Build.VERSION.SdkInt >= BuildVersionCodes.P
+                ? packageInfo.LongVersionCode
+                : packageInfo.VersionCode;
+            var currentVersionName = packageInfo.VersionName ?? "1.0";
+
+            if (latestVersionCode <= currentVersionCode)
+            {
+                return;
+            }
+
+            _updatePromptShown = true;
+            RunOnUiThread(() =>
+            {
+                new AlertDialog.Builder(this)
+                    .SetTitle(Resource.String.update_available_title)
+                    .SetMessage(
+                        GetString(
+                            Resource.String.update_available_message,
+                            currentVersionName,
+                            latestVersionName ?? latestVersionCode.ToString()
+                        )
+                    )
+                    .SetPositiveButton(Resource.String.update_now, (_, _) => OpenExternalUrl(apkUrl))
+                    .SetNegativeButton(Resource.String.update_later, (_, _) => { })
+                    .Show();
+            });
+        }
+        catch
+        {
+            // Silent check: ignore transient network errors.
+        }
+    }
+
+    private string GetOrCreateDeviceId()
+    {
+        var androidId = Settings.Secure.GetString(ContentResolver, Settings.Secure.AndroidId);
+        if (!string.IsNullOrWhiteSpace(androidId))
+        {
+            return androidId.Trim();
+        }
+
+        var existing = _preferences?.GetString(DeviceIdKey, null);
+        if (!string.IsNullOrWhiteSpace(existing))
+        {
+            return existing.Trim();
+        }
+
+        var generated = Guid.NewGuid().ToString("N");
+        _preferences?
+            .Edit()?
+            .PutString(DeviceIdKey, generated)?
+            .Apply();
+        return generated;
+    }
+
+    private static string BuildDeviceName()
+    {
+        var manufacturer = (Android.OS.Build.Manufacturer ?? string.Empty).Trim();
+        var model = (Android.OS.Build.Model ?? string.Empty).Trim();
+        var device = string.Join(
+            " ",
+            new[] { manufacturer, model }
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+        ).Trim();
+
+        return string.IsNullOrWhiteSpace(device) ? "Android MAINFORM" : device;
+    }
+
+    private static string? TryGetBootstrapMessage(string? responseText)
+    {
+        if (string.IsNullOrWhiteSpace(responseText))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var json = JsonDocument.Parse(responseText);
+            var root = json.RootElement;
+            if (root.TryGetProperty("message", out var messageElement) &&
+                messageElement.ValueKind == JsonValueKind.String)
+            {
+                return messageElement.GetString();
+            }
+
+            if (root.TryGetProperty("error", out var errorElement) &&
+                errorElement.ValueKind == JsonValueKind.String)
+            {
+                return errorElement.GetString();
+            }
+        }
+        catch
+        {
+            // Ignore invalid JSON.
+        }
+
+        return null;
+    }
+
+    private void OpenExternalUrl(string? targetUrl)
+    {
+        if (string.IsNullOrWhiteSpace(targetUrl))
+        {
+            return;
+        }
+
+        try
+        {
+            StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse(targetUrl)));
+        }
+        catch
+        {
+            Toast.MakeText(this, Resource.String.update_open_failed, ToastLength.Long)?.Show();
+        }
     }
 
     internal void UpdateProgress(int progress)

@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>com.sarsh.mainform</ApplicationId>
-    <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>2</ApplicationVersion>
+    <ApplicationDisplayVersion>1.1</ApplicationDisplayVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Xamarin.AndroidX.Core" Version="1.13.1.1" />
