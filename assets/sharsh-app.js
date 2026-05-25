@@ -5380,9 +5380,190 @@ function buildInitialPhotoLightboxState() {
     return true;
   }
 
+  function applyStandardDepartmentCombinedCalc(options = {}) {
+    const shouldRefresh = options.refresh !== false;
+    const shouldSave = options.save !== false;
+    const shouldAnnounce = options.announce !== false;
+    const row = getDepartmentCalcTargetRow();
+    if (!row) {
+      return false;
+    }
+
+    const originalPresentTotal = calcPresentTotal(state.snapshot, row) || 0;
+    const originalMilitary = (getNumber(state.snapshot, row, "currentShar") || 0)
+      + (getNumber(state.snapshot, row, "currentSpa") || 0)
+      + (getNumber(state.snapshot, row, "currentPaym") || 0);
+    const originalSeries = getNumber(state.snapshot, row, "currentShar") || 0;
+
+    const incomingByType = Object.fromEntries(
+      QH_CALC_COLUMNS.map((column) => [column.type, getQhCalcSourceValue(row, column.incomingKey) || 0])
+    );
+    const dischargedByType = Object.fromEntries(
+      QH_CALC_COLUMNS.map((column) => [column.type, getQhCalcSourceValue(row, column.dischargedKey) || 0])
+    );
+    const remainingByType = Object.fromEntries(
+      QH_CALC_COLUMNS.map((column) => [
+        column.type,
+        (getNumber(state.snapshot, row, column.currentKey) || 0)
+          + incomingByType[column.type]
+          - dischargedByType[column.type]
+      ])
+    );
+    const invalidCurrentColumns = QH_CALC_COLUMNS.filter((column) => remainingByType[column.type] < 0);
+    if (invalidCurrentColumns.length) {
+      setInfo(`Ընդունում/Դուրսգրում հաշվարկը չի կարող կիրառվել․ ${invalidCurrentColumns.map((column) => column.label).join(", ")} սյունակներում ստացվել է բացասական արժեք։`, true);
+      return false;
+    }
+
+    const leaveRemainingByType = Object.fromEntries(
+      LEAVE_CALC_COLUMNS.map((column) => [
+        column.type,
+        (getNumber(state.snapshot, row, column.leaveKey) || 0)
+          + (getLeaveCalcSourceValue(row, column.sentKey) || 0)
+          - (getLeaveCalcSourceValue(row, column.returnedKey) || 0)
+      ])
+    );
+    const leavePresentByType = Object.fromEntries(
+      LEAVE_CALC_COLUMNS.map((column) => {
+        const currentAfterAdmission = column.type === "sharq"
+          ? remainingByType.soldier
+          : (column.type === "spa" ? remainingByType.officer : remainingByType.contract);
+        return [
+          column.type,
+          currentAfterAdmission
+            - (getLeaveCalcSourceValue(row, column.sentKey) || 0)
+            + (getLeaveCalcSourceValue(row, column.returnedKey) || 0)
+        ];
+      })
+    );
+    const invalidLeaveColumns = LEAVE_CALC_COLUMNS.filter((column) =>
+      leaveRemainingByType[column.type] < 0 || leavePresentByType[column.type] < 0
+    );
+    if (invalidLeaveColumns.length) {
+      setInfo(`Բուժական արձակուրդի հաշվարկը չի կարող կիրառվել․ ${invalidLeaveColumns.map((column) => column.label).join(", ")} սյունակներում ստացվել է բացասական արժեք։`, true);
+      return false;
+    }
+
+    const transferBaseByType = {
+      soldier: leavePresentByType.sharq,
+      officer: leavePresentByType.spa,
+      contract: leavePresentByType.paym,
+      zh: remainingByType.zh,
+      family: remainingByType.family,
+      reserve: remainingByType.reserve,
+      civil: remainingByType.civil
+    };
+    const transferIncomingByType = Object.fromEntries(
+      TRANSFER_CALC_COLUMNS.map((column) => [column.type, getTransferCalcSourceValue(row, column.incomingKey) || 0])
+    );
+    const transferOutgoingByType = Object.fromEntries(
+      TRANSFER_CALC_COLUMNS.map((column) => [column.type, getTransferCalcSourceValue(row, column.outgoingKey) || 0])
+    );
+    const transferRemainingByType = Object.fromEntries(
+      TRANSFER_CALC_COLUMNS.map((column) => [
+        column.type,
+        (transferBaseByType[column.type] || 0)
+          + transferIncomingByType[column.type]
+          - transferOutgoingByType[column.type]
+      ])
+    );
+    const invalidTransferColumns = TRANSFER_CALC_COLUMNS.filter((column) => transferRemainingByType[column.type] < 0);
+    if (invalidTransferColumns.length) {
+      setInfo(`Տեղափոխության հաշվարկը չի կարող կիրառվել․ ${invalidTransferColumns.map((column) => column.label).join(", ")} սյունակներում ստացվել է բացասական արժեք։`, true);
+      return false;
+    }
+
+    row.values.beenTotal = originalPresentTotal;
+    row.values.beenSoldier = originalMilitary;
+    row.values.beenSeries = originalSeries;
+    row.values.admittedTotal = QH_CALC_COLUMNS.reduce((sum, column) => sum + incomingByType[column.type], 0);
+    row.values.admittedSoldier = incomingByType.soldier + incomingByType.officer + incomingByType.contract;
+    row.values.admittedSeries = incomingByType.soldier;
+    row.values.dgTotal = QH_CALC_COLUMNS.reduce((sum, column) => sum + dischargedByType[column.type], 0);
+    row.values.dgSoldier = dischargedByType.soldier + dischargedByType.officer + dischargedByType.contract;
+    row.values.dgSeries = dischargedByType.soldier;
+
+    row.values.currentShar = transferRemainingByType.soldier;
+    row.values.currentSpa = transferRemainingByType.officer;
+    row.values.currentPaym = transferRemainingByType.contract;
+    row.values.currentZh = transferRemainingByType.zh;
+    row.values.family = transferRemainingByType.family;
+    row.values.officer = transferRemainingByType.reserve;
+    row.values.civil = transferRemainingByType.civil;
+
+    row.values.leaveSharq = leaveRemainingByType.sharq;
+    row.values.leaveSpa = leaveRemainingByType.spa;
+    row.values.leavePaym = leaveRemainingByType.paym;
+
+    row.values.transferToDepartment = TRANSFER_CALC_COLUMNS.reduce((sum, column) => sum + transferIncomingByType[column.type], 0);
+    row.values.transferFromDepartment = TRANSFER_CALC_COLUMNS.reduce((sum, column) => sum + transferOutgoingByType[column.type], 0);
+
+    [
+      ["beenTotal", row.values.beenTotal],
+      ["beenSoldier", row.values.beenSoldier],
+      ["beenSeries", row.values.beenSeries],
+      ["admittedTotal", row.values.admittedTotal],
+      ["admittedSoldier", row.values.admittedSoldier],
+      ["admittedSeries", row.values.admittedSeries],
+      ["dgTotal", row.values.dgTotal],
+      ["dgSoldier", row.values.dgSoldier],
+      ["dgSeries", row.values.dgSeries],
+      ["currentShar", row.values.currentShar],
+      ["currentSpa", row.values.currentSpa],
+      ["currentPaym", row.values.currentPaym],
+      ["currentZh", row.values.currentZh],
+      ["family", row.values.family],
+      ["officer", row.values.officer],
+      ["civil", row.values.civil],
+      ["leaveSharq", row.values.leaveSharq],
+      ["leaveSpa", row.values.leaveSpa],
+      ["leavePaym", row.values.leavePaym],
+      ["transferToDepartment", row.values.transferToDepartment],
+      ["transferFromDepartment", row.values.transferFromDepartment]
+    ].forEach(([key, value]) => {
+      syncDepartmentRowInput(row.id, key, value);
+    });
+
+    QH_CALC_COLUMNS.forEach((column) => {
+      row.values[column.incomingKey] = 0;
+      row.values[column.dischargedKey] = 0;
+    });
+    LEAVE_CALC_COLUMNS.forEach((column) => {
+      row.values[column.sentKey] = 0;
+      row.values[column.returnedKey] = 0;
+    });
+    TRANSFER_CALC_COLUMNS.forEach((column) => {
+      row.values[column.incomingKey] = 0;
+      row.values[column.outgoingKey] = 0;
+    });
+
+    if (shouldRefresh) {
+      refreshTableData();
+      if (mode === "main") {
+        renderPage();
+      }
+    }
+    if (shouldSave) {
+      if (mode === "department") {
+        queueDepartmentSave();
+      } else if (mode === "main") {
+        refreshMainTableSaveState();
+      }
+    }
+    if (shouldAnnounce) {
+      setInfo("Հաշվարկները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
+    }
+    return true;
+  }
+
   function applyDepartmentCombinedCalc() {
     const row = getDepartmentCalcTargetRow();
     if (!row) {
+      return;
+    }
+
+    if (!isQhCalcDepartment(row)) {
+      applyStandardDepartmentCombinedCalc();
       return;
     }
 
