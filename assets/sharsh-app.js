@@ -229,6 +229,26 @@
     QH_CALC_COLUMNS.flatMap((column) => [column.incomingKey, column.dischargedKey])
   );
   const QH_CALC_OPTIONAL_INPUT_KEYS = new Set(QH_CALC_COLUMNS.map((column) => column.baseKey));
+  function getEffectiveQhCalcFieldRows(row = null) {
+    if (isQhCalcDepartment(row)) {
+      return QH_CALC_FIELD_ROWS;
+    }
+
+    return QH_CALC_FIELD_ROWS.map((definition, rowIndex) => {
+      if (rowIndex !== 2) {
+        return definition;
+      }
+
+      return {
+        ...definition,
+        cells: QH_CALC_COLUMNS.map((column) => ({
+          key: column.currentKey,
+          marker: column.baseMarker,
+          role: "linked"
+        }))
+      };
+    });
+  }
   const LEAVE_CALC_COLUMNS = [
     {
       type: "sharq",
@@ -4941,12 +4961,16 @@ function buildInitialPhotoLightboxState() {
     if (!row) {
       return null;
     }
+    const column = getQhCalcColumnByKey(key);
+    if (column && column.baseKey === key && !isQhCalcDepartment(row)) {
+      return config.normalizeCellValue(getEffectiveValue(snapshot, row, column.currentKey));
+    }
+
     const directValue = config.normalizeCellValue(getEffectiveValue(snapshot, row, key));
     if (directValue !== null || !key) {
       return directValue;
     }
 
-    const column = getQhCalcColumnByKey(key);
     if (column && column.baseKey === key) {
       return config.normalizeCellValue(getEffectiveValue(snapshot, row, column.currentKey));
     }
@@ -5073,6 +5097,27 @@ function buildInitialPhotoLightboxState() {
     if (!row) {
       return;
     }
+
+    [
+      "currentShar",
+      "currentSpa",
+      "currentPaym",
+      "currentZh",
+      "family",
+      "officer",
+      "civil",
+      "qhBaseSoldier",
+      "qhBaseOfficer",
+      "qhBaseContract",
+      "qhBaseZh",
+      "qhBaseFamily",
+      "qhBaseReserve",
+      "qhBaseCivil"
+    ].forEach((key) => {
+      document.querySelectorAll(`[data-qh-base="${key}"]`).forEach((element) => {
+        element.textContent = getQhCalcDisplayValue(row, key);
+      });
+    });
 
     [
       "currentShar",
@@ -8243,7 +8288,8 @@ function buildInitialPhotoLightboxState() {
       return "";
     }
 
-    const bodyRows = QH_CALC_FIELD_ROWS.map((definition, rowIndex) => `
+    const fieldRows = getEffectiveQhCalcFieldRows(row);
+    const bodyRows = fieldRows.map((definition, rowIndex) => `
       <tr>
         <th scope="row">${escapeHtml(definition.label)}</th>
         ${definition.cells.map((cell, columnIndex) => {
@@ -8255,9 +8301,17 @@ function buildInitialPhotoLightboxState() {
             `;
           }
 
-          if (cell.role === "linked" || cell.role === "input") {
+          if (cell.role === "linked") {
             return `
-              <td class="qh-calc-cell${cell.role === "linked" ? " qh-calc-cell--linked" : ""}">
+              <td class="qh-calc-cell qh-calc-cell--output qh-calc-cell--linked">
+                <strong data-qh-base="${escapeHtml(cell.key)}">${escapeHtml(getQhCalcDisplayValue(row, cell.key) || "0")}</strong>
+              </td>
+            `;
+          }
+
+          if (cell.role === "input") {
+            return `
+              <td class="qh-calc-cell">
                 <input
                   type="number"
                   min="0"
@@ -8996,7 +9050,7 @@ function buildInitialPhotoLightboxState() {
         }
       });
 
-      if (row.id === calcTargetRowId && isQhCalcDepartment(row)) {
+      if (row.id === calcTargetRowId) {
         [...QH_CALC_INPUT_KEYS, ...QH_CALC_OPTIONAL_INPUT_KEYS].forEach((key) => {
           document.querySelectorAll(`[data-qh-calc-key="${key}"]`).forEach((element) => {
             if (element instanceof HTMLInputElement) {
@@ -9025,6 +9079,8 @@ function buildInitialPhotoLightboxState() {
             element.textContent = getQhCalcDisplayValue(row, key);
           });
         });
+
+        refreshQhCalcDisplay(row);
       }
 
       if (row.id === calcTargetRowId) {
