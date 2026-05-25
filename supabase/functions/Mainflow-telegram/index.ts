@@ -1220,6 +1220,7 @@ function getTelegramWebFormUrl(
   carryoverValues?: Record<string, number | null>
 ) {
   const params = new URLSearchParams();
+  params.set("ui", "20260525qhapply1");
   params.set("department", departmentId);
   params.set("date", reportDate);
   if (carryoverValues) {

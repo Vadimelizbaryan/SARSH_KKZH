@@ -211,6 +211,7 @@
     return accumulator;
   }, {});
   let fullEditUnlocked = false;
+  let calculatorsApplied = false;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -552,8 +553,36 @@
             </div>
           </section>
         </div>
+        <div class="tg-form-status" data-calc-status></div>
+        <button class="tg-form-submit tg-calc-apply" data-apply-calculators type="button">Հաշվել և տեղադրել</button>
       </section>
     `;
+  }
+
+  function hasPendingCalculatorInput() {
+    const hasMainInput = columns.some((column) => toNumber(state[column.incomingKey]) > 0 || toNumber(state[column.dischargedKey]) > 0);
+    const hasLeaveInput = leaveColumns.some((column) => toNumber(leaveState[column.sentKey]) > 0 || toNumber(leaveState[column.returnedKey]) > 0);
+    return hasMainInput || hasLeaveInput;
+  }
+
+  function applyCombinedCalculator() {
+    const validation = getValidationState();
+    if (validation.hasNegativeRemaining) {
+      refreshUi();
+      return;
+    }
+    calculatorsApplied = true;
+    writeFieldValues(validation.finalValues);
+    refreshUi();
+  }
+
+  function writeFieldValues(values) {
+    Object.entries(values).forEach(([key, value]) => {
+      const target = root ? root.querySelector(`[data-field="${key}"]`) : null;
+      if (target) {
+        target.value = String(toNumber(value));
+      }
+    });
   }
 
   function renderFieldCard(field) {
@@ -728,6 +757,30 @@
     });
 
     const status = root.querySelector("[data-status]");
+    const calcStatus = root.querySelector("[data-calc-status]");
+    const applyButton = root.querySelector("[data-apply-calculators]");
+    const pendingCalculatorInput = hasPendingCalculatorInput();
+    if (calcStatus) {
+      calcStatus.className = `tg-form-status${validation.hasNegativeRemaining ? " bad" : ""}`;
+      calcStatus.innerHTML = validation.hasNegativeRemaining
+        ? `
+          <div class="tg-form-status-head">
+            <strong>Ստուգեք հաշվարկը</strong>
+            <span>Բացասական արժեք է ստացվում հաշվարկում։ Ստուգեք մուտքային դաշտերը և նորից սեղմեք «Հաշվել և տեղադրել»։</span>
+          </div>
+        `
+        : `
+          <div class="tg-form-status-head">
+            <strong>${pendingCalculatorInput && !calculatorsApplied ? "Հաշվարկը պատրաստ է" : "Հաշվարկը կիրառված է"}</strong>
+            <span>${pendingCalculatorInput && !calculatorsApplied
+              ? "Սեղմեք «Հաշվել և տեղադրել», և հաշվարկված տվյալները կկիրառվեն ձևի բջիջներում։"
+              : "Ձևի բջիջները թարմացվել են հաշվարկված տվյալներով։ Կարող եք ստուգել և ուղարկել ձևը։"}</span>
+          </div>
+        `;
+    }
+    if (applyButton) {
+      applyButton.disabled = validation.hasNegativeRemaining;
+    }
     if (status) {
       status.className = `tg-form-status${validation.isValid ? "" : " bad"}`;
       status.innerHTML = `
@@ -755,7 +808,7 @@
 
     const submit = root.querySelector("[data-submit]");
     if (submit) {
-      submit.disabled = !validation.isValid || !getInitData();
+      submit.disabled = !validation.isValid || !getInitData() || (pendingCalculatorInput && !calculatorsApplied);
     }
   }
 
@@ -773,6 +826,7 @@
         }
         state[key] = toNumber(input.value);
         input.value = String(state[key]);
+        calculatorsApplied = false;
         refreshUi();
       });
     });
@@ -785,6 +839,7 @@
         }
         leaveState[key] = toNumber(input.value);
         input.value = String(leaveState[key]);
+        calculatorsApplied = false;
         refreshUi();
       });
     });
@@ -795,9 +850,15 @@
           return;
         }
         input.value = String(toNumber(input.value));
+        calculatorsApplied = false;
         refreshUi();
       });
     });
+
+    const applyCalculators = root.querySelector("[data-apply-calculators]");
+    if (applyCalculators) {
+      applyCalculators.addEventListener("click", applyCombinedCalculator);
+    }
 
     const fullEditToggle = root.querySelector("[data-full-edit-toggle]");
     if (fullEditToggle) {
