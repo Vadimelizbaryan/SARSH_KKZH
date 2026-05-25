@@ -2848,19 +2848,10 @@ function buildInitialPhotoLightboxState() {
     refreshMainTablePhotoGalleryUi(displayContext);
 
     try {
-      const loadedRecords = ensureMainTablePhotoGalleryRecordsLoaded();
       const records = await sync.listOcrFeedback(120);
-      const fetchedRecords = (Array.isArray(records) ? records : [])
+      state.mainTablePhotoGallery.records = (Array.isArray(records) ? records : [])
         .map(normalizeMainTablePhotoGalleryRecord)
         .filter(Boolean);
-      const mergedById = new Map();
-      [...fetchedRecords, ...loadedRecords].forEach((record) => {
-        const recordId = Number(record?.id);
-        if (Number.isFinite(recordId) && !mergedById.has(recordId)) {
-          mergedById.set(recordId, record);
-        }
-      });
-      state.mainTablePhotoGallery.records = Array.from(mergedById.values());
       state.mainTablePhotoGallery.loaded = true;
       state.mainTablePhotoGallery.error = "";
     } catch (error) {
