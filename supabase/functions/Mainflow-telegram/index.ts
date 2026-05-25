@@ -1220,12 +1220,22 @@ function getPublicSiteBaseUrl() {
 function getTelegramWebFormUrl(
   departmentId: DepartmentId,
   reportDate: string,
-  carryoverValues?: Record<string, number | null>
+  carryoverValues?: Record<string, number | null>,
+  androidAccess?: { deviceId?: string; deviceName?: string } | null
 ) {
   const params = new URLSearchParams();
   params.set("ui", "20260525qhapply1");
   params.set("department", departmentId);
   params.set("date", reportDate);
+  const androidDeviceId = sanitizeAndroidDeviceId(androidAccess?.deviceId || "");
+  const androidDeviceName = sanitizeAndroidDeviceName(androidAccess?.deviceName || "");
+  if (androidDeviceId) {
+    params.set("androidApp", "1");
+    params.set("androidDeviceId", androidDeviceId);
+    if (androidDeviceName) {
+      params.set("androidDeviceName", androidDeviceName);
+    }
+  }
   if (carryoverValues) {
     params.set("c1", String(carryoverValues.beenTotal ?? 0));
     params.set("c2", String(carryoverValues.beenSoldier ?? 0));
@@ -2995,6 +3005,87 @@ async function getAndroidDeviceAccessState(
     departmentId
   );
   return { status: "pending" as const, record: createdPendingRecord };
+}
+
+type DepartmentFormAccessContext = {
+  mode: "telegram" | "android";
+  telegramUser: Awaited<ReturnType<typeof verifyTelegramWebAppInitData>> | null;
+  userId: number | null;
+  userName: string;
+};
+
+async function verifyDepartmentFormAccess(
+  supabase: ReturnType<typeof createClient>,
+  payload: Record<string, unknown> | null,
+  departmentId: DepartmentId
+): Promise<{ ok: true; context: DepartmentFormAccessContext } | { ok: false; status: number; error: string }> {
+  const initData = String(payload?.initData || "");
+  if (initData) {
+    const verifiedUser = await verifyTelegramWebAppInitData(initData);
+    if (!verifiedUser) {
+      return { ok: false, status: 403, error: "Telegram Web App authorization failed." };
+    }
+    if (!await isTelegramUserAllowedByRuntimeState(supabase, verifiedUser.userId)) {
+      return {
+        ok: false,
+        status: 403,
+        error: "Բոտը ժամանակավորապես անջատված է կոլեգաների համար։ Խնդրում ենք դիմել ադմինիստրատորին։"
+      };
+    }
+    return {
+      ok: true,
+      context: {
+        mode: "telegram",
+        telegramUser: verifiedUser,
+        userId: verifiedUser.userId,
+        userName: [
+          verifiedUser.firstName,
+          verifiedUser.lastName,
+          verifiedUser.username ? `@${verifiedUser.username}` : ""
+        ].filter(Boolean).join(" ")
+      }
+    };
+  }
+
+  const deviceId = sanitizeAndroidDeviceId(
+    typeof payload?.androidDeviceId === "string" ? payload.androidDeviceId : ""
+  );
+  const deviceName = sanitizeAndroidDeviceName(
+    typeof payload?.androidDeviceName === "string" ? payload.androidDeviceName : ""
+  ) || "Android MAINFORM";
+  if (!deviceId) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Բացեք ձևը Telegram բոտի կամ հաստատված Android հավելվածի միջոցով։"
+    };
+  }
+
+  const accessState = await getAndroidDeviceAccessState(supabase, deviceId, deviceName, departmentId);
+  if (accessState.status === "blocked") {
+    return {
+      ok: false,
+      status: 403,
+      error: "Այս Android սարքի հասանելիությունը արգելափակված է Telegram բոտի միջոցով։"
+    };
+  }
+  if (accessState.status !== "approved") {
+    return {
+      ok: false,
+      status: 403,
+      error: "Android սարքի մուտքը դեռ չի հաստատվել։ Հաստատեք այն Telegram բոտում և նորից փորձեք։"
+    };
+  }
+
+  return {
+    ok: true,
+    context: {
+      mode: "android",
+      telegramUser: null,
+      userId: null,
+      userName: `Android MAINFORM: ${accessState.record?.deviceName || deviceName}`
+    }
+  };
 }
 
 async function approveTelegramColleague(
@@ -7696,11 +7787,6 @@ function buildDischargeShiftSummaryText(
 async function handleTelegramWebFormSubmit(request: Request) {
   try {
     const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
-    const verifiedUser = await verifyTelegramWebAppInitData(String(payload?.initData || ""));
-    if (!verifiedUser) {
-      return jsonResponse({ ok: false, error: "Telegram Web App authorization failed." }, 403);
-    }
-
     const departmentId = typeof payload?.departmentId === "string" && Object.prototype.hasOwnProperty.call(DEPARTMENTS, payload.departmentId)
       ? payload.departmentId as DepartmentId
       : null;
@@ -7709,12 +7795,11 @@ async function handleTelegramWebFormSubmit(request: Request) {
     }
 
     const supabase = createSupabaseAdmin();
-    if (!await isTelegramUserAllowedByRuntimeState(supabase, verifiedUser.userId)) {
-      return jsonResponse({
-        ok: false,
-        error: "Բոտը ժամանակավորապես անջատված է կոլեգաների համար։ Խնդրում ենք դիմել ադմինիստրատորին։"
-      }, 403);
+    const access = await verifyDepartmentFormAccess(supabase, payload, departmentId);
+    if (!access.ok) {
+      return jsonResponse({ ok: false, error: access.error }, access.status);
     }
+    const accessContext = access.context;
 
     const snapshot = await loadSnapshot(supabase as ReturnType<typeof createClient>);
     const reportDate = sanitizeReportDate(payload?.reportDate) || snapshot.reportDate || DEFAULT_DATE;
@@ -7733,18 +7818,13 @@ async function handleTelegramWebFormSubmit(request: Request) {
       }, 400);
     }
 
-    const userName = [
-      verifiedUser.firstName,
-      verifiedUser.lastName,
-      verifiedUser.username ? `@${verifiedUser.username}` : ""
-    ].filter(Boolean).join(" ");
     const feedbackId = await insertTelegramWebFormFeedback(
       supabase as ReturnType<typeof createClient>,
       departmentId,
       reportDate,
       values,
-      verifiedUser.userId,
-      userName,
+      accessContext.userId,
+      accessContext.userName,
       patientNotes
     );
     const pairedPhotoFeedback = await loadLatestDepartmentPhotoFeedback(
@@ -7791,11 +7871,11 @@ async function handleTelegramWebFormSubmit(request: Request) {
         "Կցում եմ PDF բլանկը՝ Telegram ձևից ստացված արժեքներով։"
       ].join("\n");
 
-    if (verifiedUser.userId) {
+    if (accessContext.telegramUser?.userId) {
       try {
         const pdfBytes = await buildFilledDepartmentPdfBytes(departmentId, values, reportDate, patientNotes);
         await sendTelegramDocument(
-          verifiedUser.userId,
+          accessContext.telegramUser.userId,
           buildDepartmentPdfFileName(departmentId, reportDate, "telegram-form"),
           pdfBytes,
           messageText,
@@ -7803,7 +7883,7 @@ async function handleTelegramWebFormSubmit(request: Request) {
         );
       } catch (error) {
         console.error("Failed to notify Telegram Web App user:", sanitizePublicErrorMessage(error));
-        await sendTelegramMessage(verifiedUser.userId, messageText).catch((fallbackError) => {
+        await sendTelegramMessage(accessContext.telegramUser.userId, messageText).catch((fallbackError) => {
           console.error("Failed to send fallback Telegram Web App message:", sanitizePublicErrorMessage(fallbackError));
         });
       }
@@ -7814,7 +7894,7 @@ async function handleTelegramWebFormSubmit(request: Request) {
       const adminIntro = buildTelegramWebAutoSaveAdminText(
         departmentId,
         reportDate,
-        userName || String(verifiedUser.userId || ""),
+        accessContext.userName || String(accessContext.userId || ""),
         didAutoSave
       );
 
@@ -7822,7 +7902,8 @@ async function handleTelegramWebFormSubmit(request: Request) {
         adminIntro,
         "",
         `OCR feedback: ${feedbackId || "без номера"}`,
-        `Значения Web App: ${buildTelegramWebFormValuesText(values)}`
+        `Значения Web App: ${buildTelegramWebFormValuesText(values)}`,
+        `Источник: ${accessContext.mode === "android" ? accessContext.userName : (accessContext.userName || "Telegram Web App")}`
       ].join("\n"));
     }
     return jsonResponse({
@@ -7843,11 +7924,6 @@ async function handleTelegramWebFormSubmit(request: Request) {
 async function handleTelegramQhFormSubmit(request: Request) {
   try {
     const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
-    const verifiedUser = await verifyTelegramWebAppInitData(String(payload?.initData || ""));
-    if (!verifiedUser) {
-      return jsonResponse({ ok: false, error: "Telegram Web App authorization failed." }, 403);
-    }
-
     const departmentId = typeof payload?.departmentId === "string" && Object.prototype.hasOwnProperty.call(DEPARTMENTS, payload.departmentId)
       ? payload.departmentId as DepartmentId
       : null;
@@ -7856,12 +7932,11 @@ async function handleTelegramQhFormSubmit(request: Request) {
     }
 
     const supabase = createSupabaseAdmin();
-    if (!await isTelegramUserAllowedByRuntimeState(supabase, verifiedUser.userId)) {
-      return jsonResponse({
-        ok: false,
-        error: "Բոտը ժամանակավորապես անջատված է կոլեգաների համար։ Խնդրում ենք դիմել ադմինիստրատորին։"
-      }, 403);
+    const access = await verifyDepartmentFormAccess(supabase, payload, departmentId);
+    if (!access.ok) {
+      return jsonResponse({ ok: false, error: access.error }, access.status);
     }
+    const accessContext = access.context;
 
     const reportDate = sanitizeReportDate(payload?.reportDate) || DEFAULT_DATE;
     const directValuesPayload = payload?.values && typeof payload.values === "object" && !Array.isArray(payload.values)
@@ -7896,18 +7971,13 @@ async function handleTelegramQhFormSubmit(request: Request) {
       }, 400);
     }
 
-    const userName = [
-      verifiedUser.firstName,
-      verifiedUser.lastName,
-      verifiedUser.username ? `@${verifiedUser.username}` : ""
-    ].filter(Boolean).join(" ");
     const feedbackId = await insertTelegramWebFormFeedback(
       supabase as ReturnType<typeof createClient>,
       departmentId,
       reportDate,
       values,
-      verifiedUser.userId,
-      userName,
+      accessContext.userId,
+      accessContext.userName,
       createEmptyDepartmentPatientNotes()
     );
     const pairedPhotoFeedback = await loadLatestDepartmentPhotoFeedback(
@@ -7947,7 +8017,7 @@ async function handleTelegramQhFormSubmit(request: Request) {
       "Կցում եմ PDF բլանկը՝ հաշվարկային ձևից ստացված նոր արժեքներով։"
     ].join("\n");
 
-    if (verifiedUser.userId) {
+    if (accessContext.telegramUser?.userId) {
       try {
         const pdfBytes = await buildFilledDepartmentPdfBytes(
           departmentId,
@@ -7956,7 +8026,7 @@ async function handleTelegramQhFormSubmit(request: Request) {
           createEmptyDepartmentPatientNotes()
         );
         await sendTelegramDocument(
-          verifiedUser.userId,
+          accessContext.telegramUser.userId,
           buildDepartmentPdfFileName(departmentId, reportDate, "telegram-qh-form"),
           pdfBytes,
           messageText,
@@ -7964,7 +8034,7 @@ async function handleTelegramQhFormSubmit(request: Request) {
         );
       } catch (error) {
         console.error("Failed to notify Telegram QH form user:", sanitizePublicErrorMessage(error));
-        await sendTelegramMessage(verifiedUser.userId, messageText).catch((fallbackError) => {
+        await sendTelegramMessage(accessContext.telegramUser.userId, messageText).catch((fallbackError) => {
           console.error("Failed to send fallback Telegram QH form message:", sanitizePublicErrorMessage(fallbackError));
         });
       }
@@ -7975,7 +8045,7 @@ async function handleTelegramQhFormSubmit(request: Request) {
       const adminIntro = buildTelegramWebAutoSaveAdminText(
         departmentId,
         reportDate,
-        userName || String(verifiedUser.userId || ""),
+        accessContext.userName || String(accessContext.userId || ""),
         true
       );
 
@@ -7983,7 +8053,8 @@ async function handleTelegramQhFormSubmit(request: Request) {
         adminIntro,
         "",
         `OCR feedback: ${feedbackId || "без номера"}`,
-        `QH Web App: ${buildTelegramWebFormValuesText(values)}`
+        `QH Web App: ${buildTelegramWebFormValuesText(values)}`,
+        `Источник: ${accessContext.mode === "android" ? accessContext.userName : (accessContext.userName || "Telegram Web App")}`
       ].join("\n"));
     }
 
@@ -10391,7 +10462,12 @@ Deno.serve(async (request) => {
         const snapshot = await loadSnapshot(supabase);
         const reportDate = snapshot.reportDate || getYerevanReportDateText();
         const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
-        const formUrl = getTelegramWebFormUrl(departmentId, reportDate, carryoverValues);
+        const formUrl = getTelegramWebFormUrl(
+          departmentId,
+          reportDate,
+          carryoverValues,
+          { deviceId, deviceName }
+        );
 
         return jsonResponse({
           ok: true,

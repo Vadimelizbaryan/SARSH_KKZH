@@ -203,6 +203,18 @@
     return getQuery().get("date") || (config.DEFAULT_DATE || "05,05,26");
   }
 
+  function getAndroidDeviceId() {
+    return (getQuery().get("androidDeviceId") || "").trim();
+  }
+
+  function getAndroidDeviceName() {
+    return (getQuery().get("androidDeviceName") || "").trim();
+  }
+
+  function hasSubmitAccess() {
+    return Boolean(getInitData() || getAndroidDeviceId());
+  }
+
   function getCarryoverValue(key) {
     const query = getQuery();
     return toNumber(query.get(carryoverQueryParamByKey[key] || ""));
@@ -763,7 +775,7 @@
     updateControl();
 
     const message = root.querySelector("[data-message]");
-    if (message && getInitData()) {
+    if (message && hasSubmitAccess()) {
       message.className = "tg-form-message";
       message.textContent = "Հաշվարկային տվյալները տեղադրվել են ձևի բջիջներում։ Ստուգեք և ուղարկեք։";
     }
@@ -1017,7 +1029,7 @@
     }
     if (status) {
       status.classList.toggle("bad", !validation.isValid);
-      status.innerHTML = getInitData()
+      status.innerHTML = hasSubmitAccess()
         ? `
           <div class="tg-form-status-head">
             <strong>${validation.isValid ? "Բոլոր վերահսկիչները համընկնում են" : "Ստուգեք վերահսկիչ գումարները"}</strong>
@@ -1037,10 +1049,10 @@
               : ""}
           </div>
         `
-        : `<div class="tg-form-status-head"><strong>${escapeHtml("Բացեք ձևը Telegram բոտի կոճակով։")}</strong></div>`;
+        : `<div class="tg-form-status-head"><strong>${escapeHtml("Բացեք ձևը Telegram բոտի կամ Android հավելվածի միջոցով։")}</strong></div>`;
     }
     if (submit) {
-      submit.disabled = !validation.isValid || !getInitData();
+      submit.disabled = !validation.isValid || !hasSubmitAccess();
     }
   }
 
@@ -1064,7 +1076,7 @@
     }
     if (status) {
       status.classList.toggle("bad", !validation.isValid);
-      status.innerHTML = getInitData()
+      status.innerHTML = hasSubmitAccess()
         ? `
           <div class="tg-form-status-head">
             <strong>${validation.isValid ? "Բոլոր վերահսկիչները համընկնում են" : "Ստուգեք վերահսկիչ գումարները"}</strong>
@@ -1084,10 +1096,10 @@
               : ""}
           </div>
         `
-        : `<div class="tg-form-status-head"><strong>${escapeHtml("Բացեք ձևը Telegram բոտի կոճակով։")}</strong></div>`;
+        : `<div class="tg-form-status-head"><strong>${escapeHtml("Բացեք ձևը Telegram բոտի կամ Android հավելվածի միջոցով։")}</strong></div>`;
     }
     if (submit) {
-      submit.disabled = !validation.isValid || !getInitData();
+      submit.disabled = !validation.isValid || !hasSubmitAccess();
     }
   }
 
@@ -1127,6 +1139,8 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           initData: getInitData(),
+          androidDeviceId: getAndroidDeviceId(),
+          androidDeviceName: getAndroidDeviceName(),
           departmentId: department.id,
           reportDate: getReportDate(),
           values,
@@ -1168,7 +1182,7 @@
         <section class="tg-form-card">
           <p class="tg-form-kicker">SARSH_KKZH</p>
           <h1 class="tg-form-title">Բաժանմունքը չի գտնվել</h1>
-          <p class="tg-form-muted">Փակեք պատուհանը և կրկին բացեք ձևը Telegram բոտի կոճակով։</p>
+          <p class="tg-form-muted">Փակեք պատուհանը և կրկին բացեք ձևը Telegram բոտի կամ Android հավելվածի միջոցով։</p>
         </section>
       `;
       return;
@@ -1198,8 +1212,8 @@
           <div class="tg-form-status" data-status></div>
           <div class="tg-form-actions">
             <button class="tg-form-submit" data-submit type="submit">Ստուգել և ուղարկել</button>
-            <div class="tg-form-message${getInitData() ? "" : " error"}" data-message>
-              ${getInitData() ? "Ձևը բացվել է գլխավոր աղյուսակից բերված տվյալներով։" : "Բացեք ձևը Telegram բոտի կոճակով։"}
+            <div class="tg-form-message${hasSubmitAccess() ? "" : " error"}" data-message>
+              ${hasSubmitAccess() ? "Ձևը բացվել է գլխավոր աղյուսակից բերված տվյալներով։" : "Բացեք ձևը Telegram բոտի կամ Android հավելվածի միջոցով։"}
             </div>
           </div>
           <div class="tg-form-downloads">
@@ -1220,7 +1234,7 @@
     `;
 
     const initialMessage = root.querySelector("[data-message]");
-    if (initialMessage && getInitData()) {
+    if (initialMessage && hasSubmitAccess()) {
       initialMessage.textContent = "Բջիջները բերվել են գլխավոր աղյուսակից։ Փոփոխելուց հետո ստուգումը կթարմացվի ավտոմատ։";
     }
 

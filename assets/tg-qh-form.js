@@ -240,8 +240,20 @@
     return getQuery().get("date") || (config.DEFAULT_DATE || "05.05.2026");
   }
 
+  function getAndroidDeviceId() {
+    return (getQuery().get("androidDeviceId") || "").trim();
+  }
+
+  function getAndroidDeviceName() {
+    return (getQuery().get("androidDeviceName") || "").trim();
+  }
+
   function getInitData() {
     return telegram && typeof telegram.initData === "string" ? telegram.initData : "";
+  }
+
+  function hasSubmitAccess() {
+    return Boolean(getInitData() || getAndroidDeviceId());
   }
 
   function getEndpoint() {
@@ -699,8 +711,8 @@
           <div class="tg-form-status" data-status></div>
           <div class="tg-form-actions">
             <button class="tg-form-submit" data-submit type="submit">Ստուգել և ուղարկել</button>
-            <div class="tg-form-message${getInitData() ? "" : " error"}" data-message>
-              ${getInitData() ? "Ստուգեք հաշվարկը և ուղարկեք ձևը գլխավոր աղյուսակ պահպանելու համար։" : "Բացեք ձևը Telegram բոտի կոճակով։"}
+            <div class="tg-form-message${hasSubmitAccess() ? "" : " error"}" data-message>
+              ${hasSubmitAccess() ? "Ստուգեք հաշվարկը և ուղարկեք ձևը գլխավոր աղյուսակ պահպանելու համար։" : "Բացեք ձևը Telegram բոտի կամ Android հավելվածի միջոցով։"}
             </div>
           </div>
           <div class="tg-form-downloads">
@@ -808,7 +820,7 @@
 
     const submit = root.querySelector("[data-submit]");
     if (submit) {
-      submit.disabled = !validation.isValid || !getInitData() || (pendingCalculatorInput && !calculatorsApplied);
+      submit.disabled = !validation.isValid || !hasSubmitAccess() || (pendingCalculatorInput && !calculatorsApplied);
     }
   }
 
@@ -898,6 +910,8 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           initData: getInitData(),
+          androidDeviceId: getAndroidDeviceId(),
+          androidDeviceName: getAndroidDeviceName(),
           departmentId: department.id,
           reportDate: getReportDate(),
           values: validation.finalValues,
