@@ -26,16 +26,6 @@
             android:textColor="#FFFFFF" />
 
         <Button
-            android:id="@+id/buttonOpenMain"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:layout_marginStart="8dp"
-            android:backgroundTint="#FFFFFF"
-            android:text="@string/open_main"
-            android:textAllCaps="false"
-            android:textColor="#1A1A1A" />
-
-        <Button
             android:id="@+id/buttonRefresh"
             android:layout_width="wrap_content"
             android:layout_height="40dp"

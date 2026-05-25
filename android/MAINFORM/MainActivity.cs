@@ -14,7 +14,6 @@ namespace MAINFORM;
 public class MainActivity : Activity
 {
     private const string BaseSiteUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/";
-    private const string MainPageUrl = BaseSiteUrl + "index.html";
     private const string AndroidFormBootstrapUrl =
         "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-form-url";
     private const string PreferenceName = "mainform_preferences";
@@ -65,7 +64,6 @@ public class MainActivity : Activity
         _progressBar = FindViewById<ProgressBar>(Resource.Id.progressBar);
 
         var selectDepartmentButton = FindViewById<Button>(Resource.Id.buttonSelectDepartment);
-        var mainPageButton = FindViewById<Button>(Resource.Id.buttonOpenMain);
         var refreshButton = FindViewById<Button>(Resource.Id.buttonRefresh);
 
         ConfigureWebView();
@@ -73,11 +71,6 @@ public class MainActivity : Activity
         if (selectDepartmentButton is not null)
         {
             selectDepartmentButton.Click += (_, _) => ShowDepartmentPicker();
-        }
-
-        if (mainPageButton is not null)
-        {
-            mainPageButton.Click += (_, _) => OpenMainPage();
         }
 
         if (refreshButton is not null)
@@ -89,7 +82,7 @@ public class MainActivity : Activity
         var selectedDepartment = Departments.FirstOrDefault(item => item.Slug == selectedSlug);
         if (selectedDepartment is null)
         {
-            OpenMainPage();
+            _currentPageText!.Text = GetString(Resource.String.no_department_selected);
             ShowDepartmentPicker();
             return;
         }
@@ -282,12 +275,6 @@ public class MainActivity : Activity
         }
 
         return formUrl;
-    }
-
-    private void OpenMainPage()
-    {
-        _currentPageText!.Text = GetString(Resource.String.loading_main_page);
-        _webView?.LoadUrl(MainPageUrl);
     }
 
     internal void UpdateProgress(int progress)
