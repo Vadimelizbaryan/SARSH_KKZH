@@ -1,3 +1,5 @@
+using System.Net.Http;
+using System.Text.Json;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -13,30 +15,36 @@ public class MainActivity : Activity
 {
     private const string BaseSiteUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/";
     private const string MainPageUrl = BaseSiteUrl + "index.html";
-    private const string DepartmentBaseUrl = BaseSiteUrl + "bgej6lyx/";
+    private const string AndroidFormBootstrapUrl =
+        "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-form-url";
     private const string PreferenceName = "mainform_preferences";
     private const string SelectedDepartmentKey = "selected_department_slug";
     private const int FileChooserRequestCode = 1101;
 
+    private static readonly HttpClient BootstrapHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(30)
+    };
+
     private static readonly DepartmentOption[] Departments =
     [
-        new("Վիրաբուժական", "te9625wg"),
-        new("Դ/Ծ վ/բ բաժանմունք", "1ei6dnv2"),
-        new("Քիթ-կոկորդ բ-ք", "du9wa6oq"),
-        new("Ակնաբուժական", "08xa44ew"),
-        new("Վնասվածքաբանական", "v1914tm9"),
-        new("Կրծքային վ/բ", "c3usp3r9"),
-        new("Ուռոլոգիական", "g5u3jca0"),
-        new("Նեյրովիրաբուժական", "4k6uv2xu"),
-        new("Թռիչքային", "ltndeohl"),
-        new("Թերապիա", "ptf9nvbv"),
-        new("Վերակենդանացման", "9htuxle8"),
-        new("Նյարդաբանական", "ldvp99z7"),
-        new("Գինեկոլոգիական", "zzphaoqo"),
-        new("Անոթային", "4zby7qi3"),
-        new("ԻՆՖ", "c5mv5bh4"),
-        new("ԱՏԴ", "5s7rrwg9"),
-        new("Ք/Հ", "3ofsacp6")
+        new("Վիրաբուժական", "te9625wg", "r4"),
+        new("Դ/Ծ վ/բ բաժանմունք", "1ei6dnv2", "r5"),
+        new("Քիթ-կոկորդ բ-ք", "du9wa6oq", "r6"),
+        new("Ակնաբուժական", "08xa44ew", "r7"),
+        new("Վնասվածքաբանական", "v1914tm9", "r8"),
+        new("Կրծքային վ/բ", "c3usp3r9", "r9"),
+        new("Ուռոլոգիական", "g5u3jca0", "r10"),
+        new("Նեյրովիրաբուժական", "4k6uv2xu", "r11"),
+        new("Թռիչքային", "ltndeohl", "r12"),
+        new("Թերապիա", "ptf9nvbv", "r13"),
+        new("Վերակենդանացման", "9htuxle8", "r14"),
+        new("Նյարդաբանական", "ldvp99z7", "r15"),
+        new("Գինեկոլոգիական", "zzphaoqo", "r16"),
+        new("Անոթային", "4zby7qi3", "r17"),
+        new("ԻՆՖ", "c5mv5bh4", "r19"),
+        new("ԱՏԴ", "5s7rrwg9", "r20"),
+        new("Ք/Հ", "3ofsacp6", "r21")
     ];
 
     private WebView? _webView;
@@ -78,15 +86,15 @@ public class MainActivity : Activity
         }
 
         var selectedSlug = _preferences?.GetString(SelectedDepartmentKey, null);
-        if (string.IsNullOrWhiteSpace(selectedSlug))
+        var selectedDepartment = Departments.FirstOrDefault(item => item.Slug == selectedSlug);
+        if (selectedDepartment is null)
         {
             OpenMainPage();
             ShowDepartmentPicker();
+            return;
         }
-        else
-        {
-            LoadDepartmentPage(selectedSlug);
-        }
+
+        _ = LoadDepartmentFormAsync(selectedDepartment);
     }
 
     public override void OnBackPressed()
@@ -185,8 +193,7 @@ public class MainActivity : Activity
             {
                 if (args.Which >= 0 && args.Which < Departments.Length)
                 {
-                    SaveSelectedDepartment(Departments[args.Which].Slug);
-                    LoadDepartmentPage(Departments[args.Which].Slug);
+                    _ = LoadDepartmentFormAsync(Departments[args.Which]);
                 }
             })
             .SetNegativeButton(Android.Resource.String.Cancel, (_, _) => { })
@@ -201,12 +208,80 @@ public class MainActivity : Activity
             .Apply();
     }
 
-    private void LoadDepartmentPage(string slug)
+    private async Task LoadDepartmentFormAsync(DepartmentOption option)
     {
-        var option = Departments.FirstOrDefault(item => item.Slug == slug);
-        var url = $"{DepartmentBaseUrl}{slug}.html";
-        _currentPageText!.Text = GetString(Resource.String.loading_department, option?.Name ?? slug);
-        _webView?.LoadUrl(url);
+        SaveSelectedDepartment(option.Slug);
+        RunOnUiThread(() =>
+        {
+            _currentPageText!.Text = GetString(Resource.String.loading_department_form, option.Name);
+            UpdateProgress(10);
+        });
+
+        try
+        {
+            var formUrl = await FetchDepartmentFormUrlAsync(option.DepartmentId);
+            RunOnUiThread(() =>
+            {
+                _currentPageText!.Text = GetString(Resource.String.loading_department, option.Name);
+                _webView?.LoadUrl(formUrl);
+            });
+        }
+        catch (Exception error)
+        {
+            RunOnUiThread(() =>
+            {
+                UpdateProgress(0);
+                Toast.MakeText(
+                    this,
+                    string.IsNullOrWhiteSpace(error.Message)
+                        ? GetString(Resource.String.department_form_load_failed)
+                        : error.Message,
+                    ToastLength.Long
+                )?.Show();
+            });
+        }
+    }
+
+    private async Task<string> FetchDepartmentFormUrlAsync(string departmentId)
+    {
+        var requestUrl = $"{AndroidFormBootstrapUrl}&departmentId={Uri.EscapeDataString(departmentId)}";
+        using var response = await BootstrapHttpClient.GetAsync(requestUrl);
+        var responseText = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(GetString(Resource.String.department_form_load_failed));
+        }
+
+        using var json = JsonDocument.Parse(responseText);
+        var root = json.RootElement;
+        var isOk = root.TryGetProperty("ok", out var okElement) &&
+                   okElement.ValueKind == JsonValueKind.True;
+
+        if (!isOk)
+        {
+            var errorMessage = root.TryGetProperty("error", out var errorElement) &&
+                               errorElement.ValueKind == JsonValueKind.String
+                ? errorElement.GetString()
+                : null;
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(errorMessage)
+                    ? GetString(Resource.String.department_form_load_failed)
+                    : errorMessage
+            );
+        }
+
+        var formUrl = root.TryGetProperty("url", out var urlElement) &&
+                      urlElement.ValueKind == JsonValueKind.String
+            ? urlElement.GetString()
+            : null;
+
+        if (string.IsNullOrWhiteSpace(formUrl))
+        {
+            throw new InvalidOperationException(GetString(Resource.String.department_form_invalid_response));
+        }
+
+        return formUrl;
     }
 
     private void OpenMainPage()
@@ -330,5 +405,5 @@ public class MainActivity : Activity
         }
     }
 
-    private sealed record DepartmentOption(string Name, string Slug);
+    private sealed record DepartmentOption(string Name, string Slug, string DepartmentId);
 }

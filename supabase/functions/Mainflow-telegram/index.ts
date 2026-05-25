@@ -9952,6 +9952,36 @@ Deno.serve(async (request) => {
       }
     }
 
+    if (action === "android-form-url") {
+      try {
+        const currentUrl = new URL(request.url);
+        const departmentId = parseDepartmentId(currentUrl.searchParams.get("departmentId"));
+        if (!departmentId) {
+          return jsonResponse({ ok: false, error: "Department is required." }, 400);
+        }
+
+        const supabase = createSupabaseAdmin();
+        const snapshot = await loadSnapshot(supabase);
+        const reportDate = snapshot.reportDate || getYerevanReportDateText();
+        const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
+        const formUrl = getTelegramWebFormUrl(departmentId, reportDate, carryoverValues);
+
+        return jsonResponse({
+          ok: true,
+          departmentId,
+          reportDate,
+          url: formUrl
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "android_form_url_failed",
+          error: getErrorText(error)
+        }, 500);
+      }
+    }
+
     return jsonResponse({
       ok: true,
       service: "Mainflow-telegram",

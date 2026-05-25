@@ -5,7 +5,10 @@
     <string name="refresh">Обновить</string>
     <string name="choose_image">Фото бланка</string>
     <string name="choose_department_title">Выберите отделение</string>
-    <string name="no_department_selected">Отделение не выбрано. Нажмите «Отделение» и выберите нужную страницу.</string>
+    <string name="no_department_selected">Отделение не выбрано. Нажмите «Отделение» и выберите нужную форму.</string>
     <string name="loading_department">Открыто: %1$s</string>
+    <string name="loading_department_form">Загружается форма: %1$s</string>
     <string name="loading_main_page">Открыта главная страница</string>
+    <string name="department_form_load_failed">Не удалось загрузить форму отделения.</string>
+    <string name="department_form_invalid_response">Сервер вернул некорректный ответ.</string>
 </resources>
