@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using Android.Content.PM;
 using Android.App;
 using Android.Content;
 using Android.Graphics;
@@ -27,6 +28,7 @@ public class MainActivity : Activity
     private const string DeviceIdKey = "android_device_id";
     private const int FileChooserRequestCode = 1101;
     private const int NativePhotoRequestCode = 1102;
+    private const int CameraPermissionRequestCode = 1103;
     private const int PhotoMaxDimension = 1600;
     private const int PhotoQuality = 86;
 
@@ -68,6 +70,7 @@ public class MainActivity : Activity
     private ISharedPreferences? _preferences;
     private IValueCallback? _fileChooserCallback;
     private Android.Net.Uri? _pendingCameraUri;
+    private bool _pendingOpenCameraAfterPermission;
     private bool _updatePromptShown;
     private bool _pageReady;
     private DepartmentOption? _selectedDepartment;
@@ -168,6 +171,27 @@ public class MainActivity : Activity
         {
             await ProcessNativePhotoAsync(selectedUri);
         }
+    }
+
+    public override void OnRequestPermissionsResult(int requestCode, string[]? permissions, Permission[]? grantResults)
+    {
+        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode != CameraPermissionRequestCode)
+        {
+            return;
+        }
+
+        var granted = grantResults is { Length: > 0 } && grantResults[0] == Permission.Granted;
+        if (granted && _pendingOpenCameraAfterPermission)
+        {
+            _pendingOpenCameraAfterPermission = false;
+            StartCameraCapture();
+            return;
+        }
+
+        _pendingOpenCameraAfterPermission = false;
+        Toast.MakeText(this, Resource.String.camera_permission_denied, ToastLength.Long)?.Show();
     }
 
     private void ConfigureWebView()
@@ -372,17 +396,71 @@ public class MainActivity : Activity
             return;
         }
 
-        var contentIntent = new Intent(Intent.ActionGetContent);
-        contentIntent.AddCategory(Intent.CategoryOpenable);
-        contentIntent.SetType("image/*");
+        var options = new[]
+        {
+            GetString(Resource.String.photo_source_camera),
+            GetString(Resource.String.photo_source_gallery)
+        };
 
-        var captureIntent = CreateCameraIntent();
-        var initialIntents = captureIntent is null ? Array.Empty<Intent>() : [captureIntent];
+        new AlertDialog.Builder(this)
+            .SetTitle(Resource.String.photo_source_title)
+            .SetItems(options, (_, args) =>
+            {
+                if (args.Which == 0)
+                {
+                    StartCameraCapture();
+                    return;
+                }
 
-        var chooserIntent = Intent.CreateChooser(contentIntent, GetString(Resource.String.choose_image));
-        chooserIntent.PutExtra(Intent.ExtraInitialIntents, initialIntents);
+                StartGalleryPicker();
+            })
+            .SetNegativeButton(Android.Resource.String.Cancel, (_, _) => { })
+            .Show();
+    }
 
-        StartActivityForResult(chooserIntent, NativePhotoRequestCode);
+    private void StartGalleryPicker()
+    {
+        try
+        {
+            var contentIntent = new Intent(Intent.ActionGetContent);
+            contentIntent.AddCategory(Intent.CategoryOpenable);
+            contentIntent.SetType("image/*");
+
+            var chooserIntent = Intent.CreateChooser(contentIntent, GetString(Resource.String.choose_image));
+            StartActivityForResult(chooserIntent, NativePhotoRequestCode);
+        }
+        catch
+        {
+            Toast.MakeText(this, Resource.String.gallery_unavailable, ToastLength.Long)?.Show();
+        }
+    }
+
+    private void StartCameraCapture()
+    {
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.M &&
+            CheckSelfPermission(Android.Manifest.Permission.Camera) != Permission.Granted)
+        {
+            _pendingOpenCameraAfterPermission = true;
+            RequestPermissions([Android.Manifest.Permission.Camera], CameraPermissionRequestCode);
+            return;
+        }
+
+        try
+        {
+            var captureIntent = CreateCameraIntent();
+            if (captureIntent is null)
+            {
+                Toast.MakeText(this, Resource.String.camera_unavailable, ToastLength.Long)?.Show();
+                return;
+            }
+
+            StartActivityForResult(captureIntent, NativePhotoRequestCode);
+        }
+        catch
+        {
+            _pendingCameraUri = null;
+            Toast.MakeText(this, Resource.String.camera_unavailable, ToastLength.Long)?.Show();
+        }
     }
 
     private async Task ProcessNativePhotoAsync(Android.Net.Uri sourceUri)

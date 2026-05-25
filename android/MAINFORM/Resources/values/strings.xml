@@ -26,4 +26,10 @@
     <string name="photo_preview_title">Текущее фото бланка</string>
     <string name="photo_cleared">Фото очищено.</string>
     <string name="photo_required_for_submit">Для отправки нужен снимок бланка этого отделения.</string>
+    <string name="photo_source_title">Добавить фото бланка</string>
+    <string name="photo_source_camera">Сделать фото</string>
+    <string name="photo_source_gallery">Выбрать из галереи</string>
+    <string name="camera_permission_denied">Без разрешения камеры нельзя сделать фото.</string>
+    <string name="camera_unavailable">Камера на устройстве недоступна.</string>
+    <string name="gallery_unavailable">Не удалось открыть галерею.</string>
 </resources>
