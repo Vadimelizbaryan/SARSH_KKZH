@@ -229,6 +229,14 @@
     QH_CALC_COLUMNS.flatMap((column) => [column.incomingKey, column.dischargedKey])
   );
   const QH_CALC_OPTIONAL_INPUT_KEYS = new Set(QH_CALC_COLUMNS.map((column) => column.baseKey));
+  const DEPARTMENT_ADMISSION_LOCK_KEYS = [
+    "admittedTotal",
+    "admittedSoldier",
+    "admittedSeries",
+    "dgTotal",
+    "dgSoldier",
+    "dgSeries"
+  ];
   function getEffectiveQhCalcFieldRows(row = null) {
     if (isQhCalcDepartment(row)) {
       return QH_CALC_FIELD_ROWS;
@@ -5097,6 +5105,17 @@ function buildInitialPhotoLightboxState() {
     return getDisplayValue(value);
   }
 
+  function getDepartmentAdmissionCalcLockSum(row) {
+    if (!row || !row.values) {
+      return 0;
+    }
+    return DEPARTMENT_ADMISSION_LOCK_KEYS.reduce((sum, key) => sum + (Number(row.values[key]) || 0), 0);
+  }
+
+  function isDepartmentAdmissionCalcLocked(row) {
+    return getDepartmentAdmissionCalcLockSum(row) !== 0;
+  }
+
   function syncDepartmentRowInput(rowId, key, value) {
     const input = document.querySelector(`input[data-row="${rowId}"][data-key="${key}"]`);
     if (!(input instanceof HTMLInputElement)) {
@@ -5151,6 +5170,30 @@ function buildInitialPhotoLightboxState() {
         element.textContent = getQhCalcDisplayValue(row, key);
       });
     });
+
+    const calcLocked = isDepartmentAdmissionCalcLocked(row);
+    const lockSum = getDepartmentAdmissionCalcLockSum(row);
+
+    document.querySelectorAll("[data-qh-calc-key], [data-leave-calc-key], [data-transfer-calc-key]").forEach((element) => {
+      if (element instanceof HTMLInputElement) {
+        element.disabled = calcLocked;
+      }
+    });
+
+    ["qhCalcApplyBtn", "leaveCalcApplyBtn", "transferCalcApplyBtn", "departmentCalcApplyBtn"].forEach((id) => {
+      const button = document.getElementById(id);
+      if (button instanceof HTMLButtonElement) {
+        button.disabled = calcLocked;
+      }
+    });
+
+    const status = document.getElementById("qhCalcStatus");
+    if (status) {
+      status.className = `qh-calc-status${calcLocked ? " qh-calc-status--bad" : ""}`;
+      status.textContent = calcLocked
+        ? `Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¢Õ¬Õ¸Õ¯Õ¡Õ¾Õ¸Ö€Õ¾Õ¡Õ® Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ ÕºÕ¥Õ¿Ö„ Õ§ Õ¬Õ«Õ¶Õ« 0, Õ°Õ«Õ´Õ¡Õ ${lockSum}Ö‰`
+        : "Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¡Õ¯Õ¿Õ«Õ¾ Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ 0 Õ§Ö‰";
+    }
   }
 
   function applyQhCalcToDepartment(options = {}) {
@@ -5159,6 +5202,10 @@ function buildInitialPhotoLightboxState() {
     const shouldAnnounce = options.announce !== false;
     const row = getDepartmentCalcTargetRow();
     if (!row) {
+      return;
+    }
+    if (isDepartmentAdmissionCalcLocked(row)) {
+      setInfo("Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¢Õ¬Õ¸Õ¯Õ¡Õ¾Õ¸Ö€Õ¾Õ¡Õ® Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ ÕºÕ¥Õ¿Ö„ Õ§ Õ¬Õ«Õ¶Õ« 0Ö‰", true);
       return;
     }
 
@@ -5260,6 +5307,10 @@ function buildInitialPhotoLightboxState() {
     if (!row) {
       return false;
     }
+    if (isDepartmentAdmissionCalcLocked(row)) {
+      setInfo("Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¢Õ¬Õ¸Õ¯Õ¡Õ¾Õ¸Ö€Õ¾Õ¡Õ® Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ ÕºÕ¥Õ¿Ö„ Õ§ Õ¬Õ«Õ¶Õ« 0Ö‰", true);
+      return false;
+    }
 
     const invalidColumns = LEAVE_CALC_COLUMNS.filter((column) =>
       (calcLeaveRemainingValue(row, column.type) || 0) < 0
@@ -5320,6 +5371,10 @@ function buildInitialPhotoLightboxState() {
     const shouldAnnounce = options.announce !== false;
     const row = getDepartmentCalcTargetRow();
     if (!row) {
+      return false;
+    }
+    if (isDepartmentAdmissionCalcLocked(row)) {
+      setInfo("Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¢Õ¬Õ¸Õ¯Õ¡Õ¾Õ¸Ö€Õ¾Õ¡Õ® Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ ÕºÕ¥Õ¿Ö„ Õ§ Õ¬Õ«Õ¶Õ« 0Ö‰", true);
       return false;
     }
 
@@ -5397,6 +5452,10 @@ function buildInitialPhotoLightboxState() {
     const shouldAnnounce = options.announce !== false;
     const row = getDepartmentCalcTargetRow();
     if (!row) {
+      return false;
+    }
+    if (isDepartmentAdmissionCalcLocked(row)) {
+      setInfo("Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¢Õ¬Õ¸Õ¯Õ¡Õ¾Õ¸Ö€Õ¾Õ¡Õ® Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ ÕºÕ¥Õ¿Ö„ Õ§ Õ¬Õ«Õ¶Õ« 0Ö‰", true);
       return false;
     }
 
@@ -8542,6 +8601,7 @@ function buildInitialPhotoLightboxState() {
     const isEmbedded = Boolean(options.embedded);
     const panelClass = isEmbedded ? "department-calc-section department-calc-section--qh" : "panel qh-calc-panel";
     const titleTag = isEmbedded ? "h3" : "h2";
+    const statusHtml = `<div id="qhCalcStatus" class="qh-calc-status"></div>`;
     const buttonHtml = options.showButton === false ? "" : `
           <div class="qh-calc-actions">
             <button type="button" id="qhCalcApplyBtn">Հաշվել և տեղադրել</button>
@@ -8570,6 +8630,7 @@ function buildInitialPhotoLightboxState() {
               ${bodyRows}
             </tbody>
           </table>
+          ${statusHtml}
           ${buttonHtml}
         </div>
       </div>

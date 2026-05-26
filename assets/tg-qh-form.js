@@ -210,8 +210,24 @@
     accumulator[column.returnedKey] = 0;
     return accumulator;
   }, {});
+  const admissionCalcLockKeys = [
+    "admittedTotal",
+    "admittedSoldier",
+    "admittedSeries",
+    "dgTotal",
+    "dgSoldier",
+    "dgSeries"
+  ];
   let fullEditUnlocked = false;
   let calculatorsApplied = false;
+
+  function getAdmissionDischargeCalcLockSum(values) {
+    return admissionCalcLockKeys.reduce((sum, key) => sum + toNumber(values[key]), 0);
+  }
+
+  function isAdmissionDischargeCalcLocked(values) {
+    return getAdmissionDischargeCalcLockSum(values) !== 0;
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -615,6 +631,10 @@
   }
 
   function applyCombinedCalculator() {
+    if (isAdmissionDischargeCalcLocked(readFieldValues())) {
+      refreshUi();
+      return;
+    }
     const validation = getValidationState();
     if (validation.hasNegativeRemaining) {
       refreshUi();
@@ -772,6 +792,9 @@
 
   function refreshUi(forceFieldSync = false) {
     const validation = getValidationState();
+    const currentValues = readFieldValues();
+    const calcLocked = isAdmissionDischargeCalcLocked(currentValues);
+    const lockSum = getAdmissionDischargeCalcLockSum(currentValues);
     const outputs = outputCells.reduce((accumulator, cell) => {
       accumulator[cell.key] = validation[cell.key];
       return accumulator;
@@ -827,9 +850,23 @@
           </div>
         `;
     }
-    if (applyButton) {
-      applyButton.disabled = validation.hasNegativeRemaining;
+    if (calcLocked && calcStatus) {
+      calcStatus.className = "tg-form-status bad";
+      calcStatus.innerHTML = `
+        <div class="tg-form-status-head">
+          <strong>Հաշվիչը արգելափակված է</strong>
+          <span>${escapeHtml(`4, 5, 6, 7, 8, 9 բջիջների գումարը պետք է լինի 0, հիմա՝ ${lockSum}։`)}</span>
+        </div>
+      `;
     }
+    if (applyButton) {
+      applyButton.disabled = validation.hasNegativeRemaining || calcLocked;
+    }
+    root.querySelectorAll("[data-qh-key], [data-leave-key]").forEach((input) => {
+      if (input instanceof HTMLInputElement) {
+        input.disabled = calcLocked;
+      }
+    });
     if (status) {
       status.className = `tg-form-status${validation.isValid ? "" : " bad"}`;
       status.innerHTML = `
