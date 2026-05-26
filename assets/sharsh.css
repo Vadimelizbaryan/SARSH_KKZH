@@ -551,6 +551,47 @@ a {
   font-size: 14px;
 }
 
+.photo-lightbox-ocr__department-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.photo-lightbox-ocr__department {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.photo-lightbox-ocr__department span {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.photo-lightbox-ocr__department select {
+  min-height: 32px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 4px 10px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+}
+
+.photo-lightbox-reassign {
+  min-height: 32px;
+  padding: 5px 12px;
+  border-radius: 10px;
+}
+
+.photo-lightbox-reassign--ready {
+  background: #0f8b4c;
+  border-color: #0f8b4c;
+  color: #ffffff;
+}
+
 .photo-lightbox-close {
   position: absolute;
   top: -12px;

@@ -513,10 +513,12 @@ function buildInitialPhotoLightboxState() {
       alt: "Фото бланка",
       sourceKind: "",
       sourceId: "",
+      selectedDepartmentId: "",
       recognizedValues: null,
       recognizedKeys: null,
       cellReviews: null,
       isRotating: false,
+      isReassigning: false,
       isRechecking: false,
       isSaving: false,
       status: "",
@@ -2428,7 +2430,17 @@ function buildInitialPhotoLightboxState() {
 
     const displayContext = getMainTableDisplaySnapshotContext();
     const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
-    const boundRow = rows.find((row) => Number(row?.photoFeedbackId) === Number(record.id) || row?.id === record.departmentId) || null;
+    const recordDepartmentId = String(record.departmentId || "").trim();
+    const selectedDepartmentId = String(lightbox?.selectedDepartmentId || "").trim();
+    const preferredDepartmentId = selectedDepartmentId || recordDepartmentId;
+    const boundRow = (
+      preferredDepartmentId
+        ? rows.find((row) => row?.id === preferredDepartmentId) || null
+        : null
+    ) || rows.find((row) => Number(row?.photoFeedbackId) === Number(record.id) || row?.id === recordDepartmentId) || null;
+    const departmentId = String(boundRow?.id || preferredDepartmentId || "").trim();
+    const departmentDefinition = departmentId ? config.getDepartmentById(departmentId) : null;
+    const departmentName = boundRow?.department || departmentDefinition?.department || record.departmentName || departmentId;
     const hasLightboxOverride = Boolean(
       lightbox?.recognizedValues
       && typeof lightbox.recognizedValues === "object"
@@ -2469,6 +2481,9 @@ function buildInitialPhotoLightboxState() {
       displayContext,
       rows,
       boundRow,
+      departmentId,
+      departmentName,
+      departmentChanged: Boolean(departmentId && recordDepartmentId && departmentId !== recordDepartmentId),
       previewValues,
       recognizedKeys,
       recognizedFields,
@@ -8023,7 +8038,7 @@ function buildInitialPhotoLightboxState() {
           const isArchivePreview = Boolean(state.activeMainTableSavedPreviewKey);
           const hasDirtyMainTableRows = getMainTableDirtyRows().length > 0;
           const saveBlockedByControls = !context.validation.applicable || !context.validation.isValid;
-          const saveBlockedByState = isArchivePreview || hasDirtyMainTableRows || state.mainTableSaveInFlight;
+          const saveBlockedByState = isArchivePreview || hasDirtyMainTableRows || state.mainTableSaveInFlight || lightbox.isReassigning;
           const canSave = !saveBlockedByControls && !saveBlockedByState && !lightbox.isSaving;
           const saveHint = isArchivePreview
             ? "Для сохранения OCR вернитесь к текущей таблице."
@@ -8034,18 +8049,34 @@ function buildInitialPhotoLightboxState() {
                 : (saveBlockedByControls
                   ? context.validation.failedChecks.map((item) => item.failureMessage).join(" ")
                   : "Контроль пройден. OCR можно сохранить в строку отделения.")));
+          const reassignMeta = getPhotoLightboxReassignMeta(context, lightbox);
           ocrPreviewHtml = `
             <div class="photo-lightbox-ocr">
               <div class="photo-lightbox-ocr__head">
                 <h3>OCR данные</h3>
+                <div class="photo-lightbox-ocr__department-tools">
+                  <label class="photo-lightbox-ocr__department">
+                    <span>\u041e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435</span>
+                    <select id="photoLightboxDepartmentSelect" ${(lightbox.isSaving || lightbox.isReassigning) ? "disabled" : ""}>
+                      ${buildMainTablePhotoDepartmentOptions(context.departmentId || "")}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    id="photoLightboxReassignBtn"
+                    class="photo-lightbox-reassign${reassignMeta.changed ? " photo-lightbox-reassign--ready" : ""}"
+                    ${reassignMeta.disabled ? "disabled" : ""}
+                  >${escapeHtml(reassignMeta.label)}</button>
+                </div>
               </div>
+              <p id="photoLightboxDepartmentHint" class="hint">${escapeHtml(reassignMeta.hint)}</p>
               ${previewTable}
               <div class="photo-lightbox-save-actions">
                 <button
                   type="button"
                   id="photoLightboxSaveBtn"
                   class="${canSave ? "save-ready" : "save-blocked"}"
-                  ${(canSave && !lightbox.isSaving) ? "" : "disabled"}
+                  ${(canSave && !lightbox.isSaving && !lightbox.isReassigning) ? "" : "disabled"}
                 >${lightbox.isSaving ? "Сохраняю..." : "Сохранить"}</button>
                 <span id="photoLightboxSaveHint" class="photo-lightbox-save-hint${(!canSave && saveBlockedByControls) || lightbox.statusIsError ? " warning-note" : ""}">${escapeHtml(saveHint)}</span>
               </div>
@@ -8059,7 +8090,7 @@ function buildInitialPhotoLightboxState() {
             type="button"
             class="photo-lightbox-recheck"
             id="photoLightboxRecheck"
-            ${(lightbox.isRechecking || lightbox.isSaving) ? "disabled" : ""}
+            ${(lightbox.isRechecking || lightbox.isSaving || lightbox.isReassigning) ? "disabled" : ""}
           >${lightbox.isRechecking ? "Проверяю..." : "Перепроверить"}</button>
         `;
       }
@@ -8076,7 +8107,7 @@ function buildInitialPhotoLightboxState() {
             id="photoLightboxRotate"
             aria-label="Повернуть фото"
             title="Повернуть фото"
-            ${(lightbox.isRotating || lightbox.isSaving) ? "disabled" : ""}
+            ${(lightbox.isRotating || lightbox.isSaving || lightbox.isReassigning) ? "disabled" : ""}
           >↻</button>
           <button type="button" class="photo-lightbox-close" id="photoLightboxClose" aria-label="Закрыть просмотр">×</button>
           <img src="${escapeHtml(lightbox.imageDataUrl)}" alt="${escapeHtml(lightbox.alt || "Фото бланка")}">
@@ -8351,9 +8382,11 @@ function buildInitialPhotoLightboxState() {
     const isArchivePreview = Boolean(state.activeMainTableSavedPreviewKey);
     const hasDirtyMainTableRows = getMainTableDirtyRows().length > 0;
     const saveBlockedByControls = !context?.validation?.applicable || !context.validation.isValid;
-    const saveBlockedByState = isArchivePreview || hasDirtyMainTableRows || state.mainTableSaveInFlight;
+    const saveBlockedByState = isArchivePreview || hasDirtyMainTableRows || state.mainTableSaveInFlight || lightbox.isReassigning;
     const canSave = !saveBlockedByControls && !saveBlockedByState && !lightbox.isSaving;
-    const saveHint = isArchivePreview
+    const saveHint = lightbox.isReassigning
+      ? "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0434\u043e\u0436\u0434\u0438\u0442\u0435\u0441\u044c, \u043f\u043e\u043a\u0430 \u0444\u043e\u0442\u043e \u043f\u0435\u0440\u0435\u043d\u043e\u0441\u0438\u0442\u0441\u044f \u0432 \u043d\u043e\u0432\u043e\u0435 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435."
+      : isArchivePreview
       ? "\u0414\u043b\u044f \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f OCR \u0432\u0435\u0440\u043d\u0438\u0442\u0435\u0441\u044c \u043a \u0442\u0435\u043a\u0443\u0449\u0435\u0439 \u0442\u0430\u0431\u043b\u0438\u0446\u0435."
       : (hasDirtyMainTableRows
         ? "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u0435 \u0438\u043b\u0438 \u0441\u043d\u0438\u043c\u0438\u0442\u0435 \u0440\u0443\u0447\u043d\u044b\u0435 \u043f\u0440\u0430\u0432\u043a\u0438 \u0432 \u0433\u043b\u0430\u0432\u043d\u043e\u0439 \u0442\u0430\u0431\u043b\u0438\u0446\u0435."
@@ -8361,12 +8394,35 @@ function buildInitialPhotoLightboxState() {
           ? "\u0413\u043b\u0430\u0432\u043d\u0430\u044f \u0442\u0430\u0431\u043b\u0438\u0446\u0430 \u0443\u0436\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u0442\u0441\u044f. \u041f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435."
           : (saveBlockedByControls
             ? context.validation.failedChecks.map((item) => item.failureMessage).join(" ")
-            : "\u041a\u043e\u043d\u0442\u0440\u043e\u043b\u044c \u043f\u0440\u043e\u0439\u0434\u0435\u043d. OCR \u043c\u043e\u0436\u043d\u043e \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0432 \u0441\u0442\u0440\u043e\u043a\u0443 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u044f.")));
+            : (context?.departmentChanged
+              ? `\u041a\u043e\u043d\u0442\u0440\u043e\u043b\u044c \u043f\u0440\u043e\u0439\u0434\u0435\u043d. \u041c\u043e\u0436\u043d\u043e \u0441\u0440\u0430\u0437\u0443 \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0432 ${context.departmentName}.`
+              : "\u041a\u043e\u043d\u0442\u0440\u043e\u043b\u044c \u043f\u0440\u043e\u0439\u0434\u0435\u043d. OCR \u043c\u043e\u0436\u043d\u043e \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0432 \u0441\u0442\u0440\u043e\u043a\u0443 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u044f."))));
     return {
       saveBlockedByControls,
       saveBlockedByState,
       canSave,
       saveHint
+    };
+  }
+
+  function getPhotoLightboxReassignMeta(context, lightbox = state.photoLightbox || buildInitialPhotoLightboxState()) {
+    const recordDepartmentId = String(context?.record?.departmentId || "").trim();
+    const selectedDepartmentId = String(context?.departmentId || "").trim();
+    const changed = Boolean(selectedDepartmentId && recordDepartmentId && selectedDepartmentId !== recordDepartmentId);
+    const canUseRemoteReassign = sync.hasRemoteSync?.() && typeof sync.reassignOcrFeedbackDepartment === "function";
+    const disabled = !changed || !canUseRemoteReassign || lightbox.isSaving || lightbox.isReassigning;
+    const label = lightbox.isReassigning
+      ? "\u041f\u0435\u0440\u0435\u043d\u043e\u0448\u0443..."
+      : (changed ? "\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435" : "\u041e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u0432\u0435\u0440\u043d\u043e");
+    const hint = changed
+      ? `\u0412\u044b\u0431\u0440\u0430\u043d\u043e \u043d\u043e\u0432\u043e\u0435 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435: ${context?.departmentName || selectedDepartmentId}. \u041c\u043e\u0436\u043d\u043e \u043d\u0430\u0436\u0430\u0442\u044c \u00ab\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435\u00bb \u0438\u043b\u0438 \u0441\u0440\u0430\u0437\u0443 \u00ab\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c\u00bb.`
+      : "\u0415\u0441\u043b\u0438 OCR \u043e\u0448\u0438\u0431\u0441\u044f \u0441 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435\u043c, \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043d\u0443\u0436\u043d\u043e\u0435 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u0437\u0434\u0435\u0441\u044c.";
+    return {
+      changed,
+      disabled,
+      label,
+      hint,
+      canUseRemoteReassign
     };
   }
 
@@ -8448,6 +8504,28 @@ function buildInitialPhotoLightboxState() {
       saveHint.className = `photo-lightbox-save-hint${(!saveMeta.canSave && saveMeta.saveBlockedByControls) || lightbox.statusIsError ? " warning-note" : ""}`;
     }
 
+    const departmentSelect = document.getElementById("photoLightboxDepartmentSelect");
+    if (departmentSelect instanceof HTMLSelectElement) {
+      if (departmentSelect.value !== (context.departmentId || "")) {
+        departmentSelect.value = context.departmentId || "";
+      }
+      departmentSelect.disabled = lightbox.isSaving || lightbox.isReassigning;
+    }
+
+    const reassignMeta = getPhotoLightboxReassignMeta(context, lightbox);
+    const reassignButton = document.getElementById("photoLightboxReassignBtn");
+    if (reassignButton instanceof HTMLButtonElement) {
+      reassignButton.disabled = reassignMeta.disabled;
+      reassignButton.className = `photo-lightbox-reassign${reassignMeta.changed ? " photo-lightbox-reassign--ready" : ""}`;
+      reassignButton.textContent = reassignMeta.label;
+    }
+
+    const departmentHint = document.getElementById("photoLightboxDepartmentHint");
+    if (departmentHint) {
+      departmentHint.textContent = reassignMeta.hint;
+      departmentHint.className = `hint${reassignMeta.changed ? "" : ""}`;
+    }
+
     const statusText = document.getElementById("photoLightboxStatusText");
     if (statusText) {
       statusText.textContent = lightbox.status || "";
@@ -8508,6 +8586,92 @@ function buildInitialPhotoLightboxState() {
     };
     refreshPhotoLightboxPreviewUi(getMainTablePhotoLightboxContext(state.photoLightbox));
     return sanitized;
+  }
+
+  function handlePhotoLightboxDepartmentChange(nextDepartmentId) {
+    const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+    const context = getMainTablePhotoLightboxContext(lightbox);
+    if (!lightbox.open || !context?.record) {
+      return;
+    }
+
+    const normalizedDepartmentId = String(nextDepartmentId || "").trim();
+    if (!normalizedDepartmentId) {
+      return;
+    }
+
+    state.photoLightbox = {
+      ...lightbox,
+      selectedDepartmentId: normalizedDepartmentId,
+      status: context.record.departmentId !== normalizedDepartmentId
+        ? `\u0412\u044b\u0431\u0440\u0430\u043d\u043e \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435 ${config.getDepartmentById(normalizedDepartmentId)?.department || normalizedDepartmentId}.`
+        : lightbox.status,
+      statusIsError: false
+    };
+    renderPage();
+  }
+
+  async function persistPhotoLightboxDepartmentAssignment(lightbox = state.photoLightbox || buildInitialPhotoLightboxState()) {
+    const context = getMainTablePhotoLightboxContext(lightbox);
+    const nextDepartmentId = String(context?.departmentId || "").trim();
+    const currentDepartmentId = String(context?.record?.departmentId || "").trim();
+    if (!context?.record || !nextDepartmentId) {
+      throw new Error("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u043f\u0440\u0435\u0434\u0435\u043b\u0438\u0442\u044c \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u0434\u043b\u044f \u0444\u043e\u0442\u043e.");
+    }
+    if (nextDepartmentId === currentDepartmentId) {
+      return context;
+    }
+    if (!sync.hasRemoteSync?.() || typeof sync.reassignOcrFeedbackDepartment !== "function") {
+      throw new Error("\u041f\u0435\u0440\u0435\u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u0438\u0435 \u0444\u043e\u0442\u043e \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u0442\u043e\u043b\u044c\u043a\u043e \u0432 \u043e\u043d\u043b\u0430\u0439\u043d-\u0440\u0435\u0436\u0438\u043c\u0435 \u0432\u043b\u0430\u0434\u0435\u043b\u044c\u0446\u0430.");
+    }
+
+    const result = await sync.reassignOcrFeedbackDepartment(context.record.id, nextDepartmentId);
+    upsertMainTablePhotoGalleryRecord(result?.record);
+    if (result?.snapshot) {
+      applyLoadedSnapshot(result);
+    }
+
+    state.photoLightbox = {
+      ...state.photoLightbox,
+      selectedDepartmentId: nextDepartmentId
+    };
+    return getMainTablePhotoLightboxContext(state.photoLightbox);
+  }
+
+  async function handlePhotoLightboxReassignDepartment() {
+    const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+    const context = getMainTablePhotoLightboxContext(lightbox);
+    const reassignMeta = getPhotoLightboxReassignMeta(context, lightbox);
+    if (!lightbox.open || !context?.record || reassignMeta.disabled) {
+      return;
+    }
+
+    state.photoLightbox = {
+      ...lightbox,
+      isReassigning: true,
+      status: `\u041f\u0435\u0440\u0435\u043d\u043e\u0448\u0443 \u0444\u043e\u0442\u043e \u0432 ${context.departmentName}...`,
+      statusIsError: false
+    };
+    renderPage();
+
+    try {
+      const nextContext = await persistPhotoLightboxDepartmentAssignment(state.photoLightbox);
+      state.photoLightbox = {
+        ...state.photoLightbox,
+        isReassigning: false,
+        status: `\u0424\u043e\u0442\u043e \u043f\u0440\u0438\u0432\u044f\u0437\u0430\u043d\u043e \u043a ${nextContext?.departmentName || context.departmentName}.`,
+        statusIsError: false
+      };
+      renderPage();
+    } catch (error) {
+      state.photoLightbox = {
+        ...state.photoLightbox,
+        isReassigning: false,
+        status: error instanceof Error ? error.message : "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u0434\u043b\u044f \u0444\u043e\u0442\u043e.",
+        statusIsError: true
+      };
+      renderPage();
+    }
   }
 
   function renderPhotoImportPreviewTable(row, photoState, reviewByKey, recognizedFields, suspectFields, options = {}) {
@@ -11040,7 +11204,7 @@ function buildInitialPhotoLightboxState() {
 
   async function handleRotatePhotoLightbox() {
     const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
-    if (!lightbox.open || !lightbox.imageDataUrl || lightbox.isRotating || lightbox.isSaving) {
+    if (!lightbox.open || !lightbox.imageDataUrl || lightbox.isRotating || lightbox.isSaving || lightbox.isReassigning) {
       return;
     }
 
@@ -11075,6 +11239,7 @@ function buildInitialPhotoLightboxState() {
       !lightbox.open
       || lightbox.isRechecking
       || lightbox.isSaving
+      || lightbox.isReassigning
       || lightbox.sourceKind !== "main-table-gallery"
       || !lightbox.sourceId
     ) {
@@ -11102,10 +11267,8 @@ function buildInitialPhotoLightboxState() {
       return;
     }
 
-    const displayContext = getMainTableDisplaySnapshotContext();
-    const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
-    const boundRow = rows.find((row) => Number(row?.photoFeedbackId) === Number(record.id) || row?.id === record.departmentId) || null;
-    const departmentId = boundRow?.id || record.departmentId || "";
+    const context = getMainTablePhotoLightboxContext(lightbox);
+    const departmentId = context?.departmentId || record.departmentId || "";
     if (!departmentId) {
       state.photoLightbox = {
         ...lightbox,
@@ -11190,6 +11353,7 @@ function buildInitialPhotoLightboxState() {
     if (
       !lightbox.open
       || lightbox.isSaving
+      || lightbox.isReassigning
       || lightbox.sourceKind !== "main-table-gallery"
       || !lightbox.sourceId
     ) {
@@ -11266,8 +11430,16 @@ function buildInitialPhotoLightboxState() {
     renderPage();
 
     try {
-      const draftRow = deepCopy(context.boundRow);
-      const appliedKeys = applyPreviewValuesToDepartmentRow(draftRow, context.previewValues, context.recognizedKeys);
+      let saveContext = context;
+      if (saveContext.departmentChanged) {
+        saveContext = await persistPhotoLightboxDepartmentAssignment(state.photoLightbox || lightbox);
+      }
+      if (!saveContext?.boundRow) {
+        throw new Error("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u0438\u0432\u044f\u0437\u0430\u0442\u044c \u0444\u043e\u0442\u043e \u043a \u043d\u0443\u0436\u043d\u043e\u043c\u0443 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u044e.");
+      }
+
+      const draftRow = deepCopy(saveContext.boundRow);
+      const appliedKeys = applyPreviewValuesToDepartmentRow(draftRow, saveContext.previewValues, saveContext.recognizedKeys);
       if (!appliedKeys.length) {
         throw new Error("В OCR таблице нет значений для сохранения.");
       }
@@ -13215,6 +13387,20 @@ function buildInitialPhotoLightboxState() {
     if (photoLightboxRecheck) {
       photoLightboxRecheck.addEventListener("click", () => {
         void handlePhotoLightboxRecheck();
+      });
+    }
+
+    const photoLightboxDepartmentSelect = document.getElementById("photoLightboxDepartmentSelect");
+    if (photoLightboxDepartmentSelect instanceof HTMLSelectElement) {
+      photoLightboxDepartmentSelect.addEventListener("change", () => {
+        handlePhotoLightboxDepartmentChange(photoLightboxDepartmentSelect.value);
+      });
+    }
+
+    const photoLightboxReassignBtn = document.getElementById("photoLightboxReassignBtn");
+    if (photoLightboxReassignBtn) {
+      photoLightboxReassignBtn.addEventListener("click", () => {
+        void handlePhotoLightboxReassignDepartment();
       });
     }
 
