@@ -688,14 +688,31 @@ function buildInitialPhotoLightboxState() {
   }
 
   function normalizeOcrNotes(notes) {
-    if (!Array.isArray(notes)) {
-      return [];
+    if (Array.isArray(notes)) {
+      return notes
+        .filter((item) => typeof item === "string" && item.trim())
+        .map((item) => translateOcrNote(item))
+        .filter(Boolean);
     }
 
-    return notes
-      .filter((item) => typeof item === "string" && item.trim())
-      .map((item) => translateOcrNote(item))
-      .filter(Boolean);
+    if (typeof notes === "string") {
+      const trimmed = notes.trim();
+      if (!trimmed) {
+        return [];
+      }
+
+      if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return normalizeOcrNotes(parsed);
+        } catch (_error) {
+        }
+      }
+
+      return [translateOcrNote(trimmed)].filter(Boolean);
+    }
+
+    return [];
   }
 
   function hasRotatedTelegramPhotoHint(notes) {
@@ -2252,9 +2269,13 @@ function buildInitialPhotoLightboxState() {
       }
     }
 
-    if (notes.some((note) => /Submitted via Android MAINFORM/i.test(note))) {
+    const androidNote = notes.find((note) => /Android MAINFORM/i.test(note));
+    if (androidNote) {
+      const deviceMatch = androidNote.match(/Android MAINFORM\s*:?\s*(.+)$/i);
       return {
-        text: "Источник: Android MAINFORM",
+        text: deviceMatch && deviceMatch[1] && !/^Submitted via/i.test(androidNote)
+          ? `Источник: Android MAINFORM ${deviceMatch[1].trim()}`
+          : "Источник: Android MAINFORM",
         kind: "android"
       };
     }

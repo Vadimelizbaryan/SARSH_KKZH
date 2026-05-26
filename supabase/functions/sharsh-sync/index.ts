@@ -919,13 +919,32 @@ function sanitizeFeedbackKeys(value: unknown) {
 }
 
 function sanitizeFeedbackNotes(value: unknown) {
-  if (!Array.isArray(value)) {
-    return [];
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .map((item) => item.trim());
   }
 
-  return value
-    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-    .map((item) => item.trim());
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return sanitizeFeedbackNotes(parsed);
+        }
+      } catch (_error) {
+      }
+    }
+
+    return [trimmed];
+  }
+
+  return [];
 }
 
 function sanitizeOcrFeedbackPayload(value: unknown) {
