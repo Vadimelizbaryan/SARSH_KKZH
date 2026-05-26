@@ -5180,7 +5180,7 @@ function buildInitialPhotoLightboxState() {
       }
     });
 
-    ["qhCalcApplyBtn", "leaveCalcApplyBtn", "transferCalcApplyBtn", "departmentCalcApplyBtn"].forEach((id) => {
+    ["qhCalcApplyBtn", "leaveCalcApplyBtn", "transferCalcApplyBtn"].forEach((id) => {
       const button = document.getElementById(id);
       if (button instanceof HTMLButtonElement) {
         button.disabled = calcLocked;
@@ -9046,9 +9046,9 @@ function buildInitialPhotoLightboxState() {
   }
 
   function renderDepartmentCombinedCalcPanel(row) {
-    const qhSection = renderQhCalcPanel(row, { embedded: true, showButton: false });
-    const leaveSection = renderLeaveCalcPanel(row, { embedded: true, showButton: false });
-    const transferSection = renderTransferCalcPanel(row, { embedded: true, showButton: false });
+    const qhSection = renderQhCalcPanel(row, { embedded: true });
+    const leaveSection = renderLeaveCalcPanel(row, { embedded: true });
+    const transferSection = renderTransferCalcPanel(row, { embedded: true });
     const introHtml = qhSection
       ? `<p class="department-calc-intro">\u0544\u0578\u0582\u057f\u0584\u0561\u0563\u0580\u0565\u0584 \u0568\u0576\u0564\u0578\u0582\u0576\u057e\u0561\u056e, \u0564\u0578\u0582\u0580\u057d\u0563\u0580\u057e\u0561\u056e, \u0561\u0580\u0571\u0561\u056f\u0578\u0582\u0580\u0564 \u0563\u0576\u0561\u0581\u0578\u0572, \u0561\u0580\u0571\u0561\u056f\u0578\u0582\u0580\u0564\u056b\u0581 \u057e\u0565\u0580\u0561\u0564\u0561\u0580\u0571\u0561\u056e \u0587 \u057f\u0565\u0572\u0561\u0583\u0578\u056d\u057e\u0561\u056e \u0570\u056b\u057e\u0561\u0576\u0564\u0576\u0565\u0580\u056b \u0584\u0561\u0576\u0561\u056f\u0568, \u0570\u0565\u057f\u0578 \u057d\u0565\u0572\u0574\u0565\u0584 \xab\u0540\u0561\u0577\u057e\u0565\u056c \u0587 \u057f\u0565\u0572\u0561\u0564\u0580\u0565\u056c\xbb\u0589</p>`
       : "";
@@ -9060,9 +9060,6 @@ function buildInitialPhotoLightboxState() {
           ${qhSection}
           ${leaveSection}
           ${transferSection}
-        </div>
-        <div class="qh-calc-actions">
-          <button type="button" id="departmentCalcApplyBtn">\u0540\u0561\u0577\u057e\u0565\u056c \u0587 \u057f\u0565\u0572\u0561\u0564\u0580\u0565\u056c</button>
         </div>
       </div>
     `;
@@ -12613,7 +12610,6 @@ function buildInitialPhotoLightboxState() {
     const sheetBody = document.getElementById("sheetBody");
     const qhCalcPanel = document.getElementById("qhCalcPanel");
     const qhCalcApplyBtn = document.getElementById("qhCalcApplyBtn");
-    const departmentCalcApplyBtn = document.getElementById("departmentCalcApplyBtn");
     const transferCalcPanel = document.getElementById("transferCalcPanel");
     const transferCalcApplyBtn = document.getElementById("transferCalcApplyBtn");
     const mainCalcDepartmentSelect = document.getElementById("mainCalcDepartmentSelect");
@@ -13150,12 +13146,6 @@ function buildInitialPhotoLightboxState() {
     if (transferCalcApplyBtn) {
       transferCalcApplyBtn.addEventListener("click", () => {
         applyTransferCalcToDepartment();
-      });
-    }
-
-    if (departmentCalcApplyBtn) {
-      departmentCalcApplyBtn.addEventListener("click", () => {
-        applyDepartmentCombinedCalc();
       });
     }
 
