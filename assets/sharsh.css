@@ -2412,6 +2412,40 @@ a {
   margin-top: 18px;
 }
 
+.main-table-telegram-form-panel__actions {
+  display: flex;
+  justify-content: flex-start;
+  margin: 10px 0 12px;
+}
+
+.main-table-telegram-form-panel__delete-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(154, 28, 14, 0.28);
+  background: #fff4f1;
+  color: #9a1c0e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.main-table-telegram-form-panel__delete-all:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #ffe8e1;
+}
+
+.main-table-telegram-form-panel__delete-all:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
+}
+
 .main-table-telegram-form-list {
   display: grid;
   gap: 10px;

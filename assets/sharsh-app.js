@@ -8022,15 +8022,13 @@ function buildInitialPhotoLightboxState() {
         </section>
 
         <section class="panel no-print main-table-telegram-form-panel">
-          <div class="main-table-photo-gallery-panel__head">
-            <div class="main-table-photo-gallery-panel__copy">
-              <h2>Таблицы Telegram Web форм за сегодня</h2>
-              <p id="mainTableTelegramFormSummaryText">${escapeHtml(mainTableTelegramFormContent.summary)}</p>
-            </div>
+          <h2>Таблицы Telegram Web форм за сегодня</h2>
+          <p id="mainTableTelegramFormSummaryText">${escapeHtml(mainTableTelegramFormContent.summary)}</p>
+          <div class="main-table-telegram-form-panel__actions">
             <button
               type="button"
               id="mainTableTelegramFormDeleteAllBtn"
-              class="main-table-photo-gallery-panel__delete-all"
+              class="main-table-telegram-form-panel__delete-all"
               ${mainTableTelegramFormBulkDeleteMeta.isDisabled ? "disabled" : ""}
               title="${escapeHtml(mainTableTelegramFormBulkDeleteMeta.title)}"
             >${escapeHtml(mainTableTelegramFormBulkDeleteMeta.label)}</button>
