@@ -2237,6 +2237,31 @@ function buildInitialPhotoLightboxState() {
     return normalized === "telegram-web-app-form" || normalized === "telegram-qh-form";
   }
 
+  function getMainTablePhotoGallerySourceMeta(record) {
+    const notes = Array.isArray(record?.notes)
+      ? record.notes.map((item) => String(item || "").trim()).filter(Boolean)
+      : [];
+    const explicitSource = notes.find((note) => /^Источник:\s*/i.test(note));
+    if (explicitSource) {
+      const sourceText = explicitSource.replace(/^Источник:\s*/i, "").trim();
+      if (sourceText) {
+        return {
+          text: `Источник: ${sourceText}`,
+          kind: /Android MAINFORM/i.test(sourceText) ? "android" : "default"
+        };
+      }
+    }
+
+    if (notes.some((note) => /Submitted via Android MAINFORM/i.test(note))) {
+      return {
+        text: "Источник: Android MAINFORM",
+        kind: "android"
+      };
+    }
+
+    return null;
+  }
+
   function normalizeMainTableTelegramFormRecord(record) {
     if (!record || typeof record !== "object") {
       return null;
@@ -2323,6 +2348,7 @@ function buildInitialPhotoLightboxState() {
       .filter((record) => getArchiveDateKeyForTimestamp(record.createdAt) === todayDateKey)
       .map((record) => {
         const boundRow = rowsById.get(record.departmentId) || null;
+        const sourceMeta = getMainTablePhotoGallerySourceMeta(record);
         return {
           ...record,
           feedbackId: record.id,
@@ -2330,6 +2356,7 @@ function buildInitialPhotoLightboxState() {
           departmentId: boundRow?.id || record.departmentId,
           departmentName: boundRow?.department || record.departmentName || record.departmentId || "Неизвестное отделение",
           photoSentAt: record.createdAt,
+          sourceMeta,
           workflowStatus: boundRow?.photoWorkflowStatus || "",
           freshness: boundRow ? getRowFreshnessMeta(boundRow) : null
         };
@@ -2694,6 +2721,8 @@ function buildInitialPhotoLightboxState() {
               <div class="main-table-photo-thumb__meta">
                 <span class="main-table-photo-thumb__caption">${escapeHtml(item.departmentName)}</span>
                 ${item.photoSentAt ? `<span class="main-table-photo-thumb__updated">Отправлено ${escapeHtml(formatTimestamp(item.photoSentAt))}</span>` : ""}
+                ${item.sourceMeta?.text ? `<span class="main-table-photo-thumb__source${item.sourceMeta.kind === "android" ? " main-table-photo-thumb__source--android" : ""}">${escapeHtml(item.sourceMeta.text)}</span>` : ""}
+                ${item.imageName ? `<span class="main-table-photo-thumb__file">Файл: ${escapeHtml(item.imageName)}</span>` : ""}
                 <label class="main-table-photo-thumb__department-picker">
                   <span>Отделение</span>
                   <select

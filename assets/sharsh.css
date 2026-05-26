@@ -2386,6 +2386,19 @@ a {
   text-align: left;
 }
 
+.main-table-photo-thumb__source,
+.main-table-photo-thumb__file {
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--muted);
+}
+
+.main-table-photo-thumb__source--android {
+  color: #0f8b4c;
+  font-weight: 700;
+}
+
 .main-table-photo-thumb__department-picker {
   display: grid;
   gap: 4px;
