@@ -5116,6 +5116,15 @@ function buildInitialPhotoLightboxState() {
     return getDepartmentAdmissionCalcLockSum(row) !== 0;
   }
 
+  function getDepartmentAdmissionCalcLockedMessage(row) {
+    const lockSum = getDepartmentAdmissionCalcLockSum(row);
+    return `Հաշվիչը արգելափակված է. 4, 5, 6, 7, 8, 9 բջիջների գումարը պետք է լինի 0, հիմա՝ ${lockSum}։`;
+  }
+
+  function getDepartmentAdmissionCalcActiveMessage() {
+    return "Հաշվիչը ակտիվ է. 4, 5, 6, 7, 8, 9 բջիջների գումարը 0 է։";
+  }
+
   function syncDepartmentRowInput(rowId, key, value) {
     const input = document.querySelector(`input[data-row="${rowId}"][data-key="${key}"]`);
     if (!(input instanceof HTMLInputElement)) {
@@ -5191,8 +5200,8 @@ function buildInitialPhotoLightboxState() {
     if (status) {
       status.className = `qh-calc-status${calcLocked ? " qh-calc-status--bad" : ""}`;
       status.textContent = calcLocked
-        ? `Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¢Õ¬Õ¸Õ¯Õ¡Õ¾Õ¸Ö€Õ¾Õ¡Õ® Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ ÕºÕ¥Õ¿Ö„ Õ§ Õ¬Õ«Õ¶Õ« 0, Õ°Õ«Õ´Õ¡Õ ${lockSum}Ö‰`
-        : "Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¡Õ¯Õ¿Õ«Õ¾ Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ 0 Õ§Ö‰";
+        ? getDepartmentAdmissionCalcLockedMessage(row)
+        : getDepartmentAdmissionCalcActiveMessage();
     }
   }
 
@@ -5205,7 +5214,7 @@ function buildInitialPhotoLightboxState() {
       return;
     }
     if (isDepartmentAdmissionCalcLocked(row)) {
-      setInfo("Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¢Õ¬Õ¸Õ¯Õ¡Õ¾Õ¸Ö€Õ¾Õ¡Õ® Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ ÕºÕ¥Õ¿Ö„ Õ§ Õ¬Õ«Õ¶Õ« 0Ö‰", true);
+      setInfo(getDepartmentAdmissionCalcLockedMessage(row), true);
       return;
     }
 
@@ -5308,7 +5317,7 @@ function buildInitialPhotoLightboxState() {
       return false;
     }
     if (isDepartmentAdmissionCalcLocked(row)) {
-      setInfo("Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¢Õ¬Õ¸Õ¯Õ¡Õ¾Õ¸Ö€Õ¾Õ¡Õ® Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ ÕºÕ¥Õ¿Ö„ Õ§ Õ¬Õ«Õ¶Õ« 0Ö‰", true);
+      setInfo(getDepartmentAdmissionCalcLockedMessage(row), true);
       return false;
     }
 
@@ -5374,7 +5383,7 @@ function buildInitialPhotoLightboxState() {
       return false;
     }
     if (isDepartmentAdmissionCalcLocked(row)) {
-      setInfo("Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¢Õ¬Õ¸Õ¯Õ¡Õ¾Õ¸Ö€Õ¾Õ¡Õ® Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ ÕºÕ¥Õ¿Ö„ Õ§ Õ¬Õ«Õ¶Õ« 0Ö‰", true);
+      setInfo(getDepartmentAdmissionCalcLockedMessage(row), true);
       return false;
     }
 
@@ -5455,7 +5464,7 @@ function buildInitialPhotoLightboxState() {
       return false;
     }
     if (isDepartmentAdmissionCalcLocked(row)) {
-      setInfo("Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ¢Õ¬Õ¸Õ¯Õ¡Õ¾Õ¸Ö€Õ¾Õ¡Õ® Õ§â€¤ 4, 5, 6, 7, 8, 9 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ« Õ£Õ¸Ö‚Õ´Õ¡Ö€Õ¨ ÕºÕ¥Õ¿Ö„ Õ§ Õ¬Õ«Õ¶Õ« 0Ö‰", true);
+      setInfo(getDepartmentAdmissionCalcLockedMessage(row), true);
       return false;
     }
 
