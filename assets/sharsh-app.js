@@ -535,7 +535,8 @@ function buildInitialPhotoLightboxState() {
       records: [],
       isLoading: false,
       error: "",
-      loaded: false
+      loaded: false,
+      isDeletingAll: false
     };
   }
 
@@ -2321,6 +2322,28 @@ function buildInitialPhotoLightboxState() {
       .sort((left, right) => getTimestampSortValue(right.createdAt) - getTimestampSortValue(left.createdAt));
   }
 
+  function getMainTablePhotoGalleryBulkDeleteMeta(displayContext = getMainTableDisplaySnapshotContext()) {
+    const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
+    const items = getMainTablePhotoGalleryItems(rows);
+    const isDeletingAll = Boolean(state.mainTablePhotoGallery.isDeletingAll);
+    const canUseRemoteDelete = sync.hasRemoteSync?.() && typeof sync.deleteDepartmentFeedback === "function";
+
+    return {
+      items,
+      count: items.length,
+      isDeletingAll,
+      isDisabled: !canUseRemoteDelete || !items.length || state.mainTablePhotoGallery.isLoading || isDeletingAll || Boolean(state.mainTablePhotoGallery.error),
+      label: isDeletingAll
+        ? `Удаляю фото (${items.length})...`
+        : `Удалить все фото${items.length ? ` (${items.length})` : ""}`,
+      title: !canUseRemoteDelete
+        ? "Массовое удаление доступно только в онлайн-режиме владельца."
+        : (!items.length
+          ? "Для текущей таблицы нет загруженных фото для удаления."
+          : "Удалить с сервера все фото, показанные в этом блоке.")
+    };
+  }
+
   function buildMainTableTelegramFormItems() {
     const records = ensureMainTableTelegramFormRecordsLoaded();
     const todayDateKey = getArchiveDateKey();
@@ -2542,6 +2565,7 @@ function buildInitialPhotoLightboxState() {
   function buildMainTablePhotoGalleryContent(displayContext = getMainTableDisplaySnapshotContext()) {
     const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
     const items = getMainTablePhotoGalleryItems(rows);
+    const isDeletingAll = Boolean(state.mainTablePhotoGallery.isDeletingAll);
 
     if (state.mainTablePhotoGallery.error) {
       return {
@@ -2577,6 +2601,7 @@ function buildInitialPhotoLightboxState() {
                 data-main-table-photo-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
                 aria-label="${escapeHtml(`Удалить фото ${item.departmentName}`)}"
                 title="Удалить фото"
+                ${isDeletingAll ? "disabled" : ""}
               >×</button>
               <button
                 type="button"
@@ -2587,6 +2612,7 @@ function buildInitialPhotoLightboxState() {
                 title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `
 Дата на фото: ${item.photoReportDate}` : ""}${item.updatedAt ? `
 Обновлено: ${formatTimestamp(item.updatedAt)}` : ""}`)}"
+                ${isDeletingAll ? "disabled" : ""}
               >
                 <img src="${escapeHtml(item.imageDataUrl)}" alt="${escapeHtml(`Фото бланка ${item.departmentName}`)}">
               </button>
@@ -2598,6 +2624,7 @@ function buildInitialPhotoLightboxState() {
                   <select
                     data-main-table-photo-department-select="${escapeHtml(String(item.feedbackId))}"
                     data-current-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
+                    ${isDeletingAll ? "disabled" : ""}
                   >
                     ${buildMainTablePhotoDepartmentOptions(item.departmentId || item.rowId || "")}
                   </select>
@@ -2726,13 +2753,20 @@ function buildInitialPhotoLightboxState() {
   function refreshMainTablePhotoGalleryUi(displayContext = getMainTableDisplaySnapshotContext()) {
     const summaryEl = document.getElementById("mainTablePhotoGallerySummaryText");
     const listEl = document.getElementById("mainTablePhotoGalleryList");
+    const deleteAllBtn = document.getElementById("mainTablePhotoGalleryDeleteAllBtn");
     if (!summaryEl || !listEl) {
       return;
     }
 
     const content = buildMainTablePhotoGalleryContent(displayContext);
+    const bulkDeleteMeta = getMainTablePhotoGalleryBulkDeleteMeta(displayContext);
     summaryEl.textContent = content.summary;
     listEl.innerHTML = content.html;
+    if (deleteAllBtn) {
+      deleteAllBtn.disabled = bulkDeleteMeta.isDisabled;
+      deleteAllBtn.textContent = bulkDeleteMeta.label;
+      deleteAllBtn.title = bulkDeleteMeta.title;
+    }
     bindMainTablePhotoGalleryEvents(listEl);
   }
 
@@ -7630,6 +7664,10 @@ function buildInitialPhotoLightboxState() {
       snapshot: displayedMainTableSnapshot,
       rows: displayedMainTableRows
     });
+    const mainTablePhotoGalleryBulkDeleteMeta = getMainTablePhotoGalleryBulkDeleteMeta({
+      snapshot: displayedMainTableSnapshot,
+      rows: displayedMainTableRows
+    });
     const mainTableTelegramFormContent = buildMainTableTelegramFormContent();
     const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
     const canEditMainTable = canEditMainTableDirectly();
@@ -7743,8 +7781,19 @@ function buildInitialPhotoLightboxState() {
             </div>
 
         <section class="panel no-print main-table-photo-gallery-panel">
-          <h2>Фото бланков текущей таблицы</h2>
-          <p id="mainTablePhotoGallerySummaryText">${escapeHtml(mainTablePhotoGalleryContent.summary)}</p>
+          <div class="main-table-photo-gallery-panel__head">
+            <div class="main-table-photo-gallery-panel__copy">
+              <h2>Фото бланков текущей таблицы</h2>
+              <p id="mainTablePhotoGallerySummaryText">${escapeHtml(mainTablePhotoGalleryContent.summary)}</p>
+            </div>
+            <button
+              type="button"
+              id="mainTablePhotoGalleryDeleteAllBtn"
+              class="main-table-photo-gallery-panel__delete-all"
+              ${mainTablePhotoGalleryBulkDeleteMeta.isDisabled ? "disabled" : ""}
+              title="${escapeHtml(mainTablePhotoGalleryBulkDeleteMeta.title)}"
+            >${escapeHtml(mainTablePhotoGalleryBulkDeleteMeta.label)}</button>
+          </div>
           <div class="archive-list" id="mainTablePhotoGalleryList">
             ${mainTablePhotoGalleryContent.html}
           </div>
@@ -11200,6 +11249,86 @@ function buildInitialPhotoLightboxState() {
     }
   }
 
+  async function handleDeleteAllMainTablePhotoGalleryFeedback(button) {
+    const displayContext = getMainTableDisplaySnapshotContext();
+    const bulkDeleteMeta = getMainTablePhotoGalleryBulkDeleteMeta(displayContext);
+    const items = Array.isArray(bulkDeleteMeta.items) ? [...bulkDeleteMeta.items] : [];
+
+    if (!items.length) {
+      setInfo("Для текущей таблицы нет загруженных фото для удаления.", false);
+      return;
+    }
+    if (bulkDeleteMeta.isDeletingAll) {
+      return;
+    }
+    if (typeof sync.deleteDepartmentFeedback !== "function" || !sync.hasRemoteSync?.()) {
+      setInfo("Массовое удаление фото доступно только в онлайн-режиме владельца.", true);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Удалить с сервера все фото бланков из блока «Фото бланков текущей таблицы»? Сейчас будет удалено: ${items.length}.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    state.mainTablePhotoGallery.isDeletingAll = true;
+    refreshMainTablePhotoGalleryUi(displayContext);
+
+    let deletedCount = 0;
+    let lastResult = null;
+    let shouldCloseLightbox = false;
+    const failedItems = [];
+
+    try {
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        const departmentName = item.departmentName || item.departmentId || item.rowId || `feedback ${item.feedbackId}`;
+        setInfo(`Удаляю фото ${index + 1} из ${items.length}: ${departmentName}...`, false);
+        try {
+          const result = await sync.deleteDepartmentFeedback(item.departmentId || item.rowId || "", item.feedbackId);
+          lastResult = result;
+          removeMainTablePhotoGalleryRecord(item.feedbackId);
+          if (state.photoLightbox?.open && Number(state.photoLightbox.sourceId) === Number(item.feedbackId)) {
+            shouldCloseLightbox = true;
+          }
+          deletedCount += 1;
+        } catch (error) {
+          failedItems.push({
+            item,
+            error
+          });
+        }
+      }
+
+      if (lastResult) {
+        applyLoadedSnapshot(lastResult);
+      }
+      if (shouldCloseLightbox) {
+        state.photoLightbox = buildInitialPhotoLightboxState();
+      }
+
+      if (failedItems.length) {
+        const failureSummary = failedItems
+          .slice(0, 3)
+          .map(({ item, error }) => {
+            const departmentName = item.departmentName || item.departmentId || item.rowId || `feedback ${item.feedbackId}`;
+            const reason = error instanceof Error && error.message ? error.message : "ошибка удаления";
+            return `${departmentName} (${reason})`;
+          })
+          .join("; ");
+        const extraFailures = failedItems.length > 3 ? ` Ещё ошибок: ${failedItems.length - 3}.` : "";
+        setInfo(`Удалено фото: ${deletedCount} из ${items.length}. Не удалось удалить: ${failureSummary}.${extraFailures}`, true);
+      } else {
+        setInfo(`Все фото бланков текущей таблицы удалены: ${deletedCount}.`, false);
+      }
+    } finally {
+      state.mainTablePhotoGallery.isDeletingAll = false;
+      renderPage();
+    }
+  }
+
   async function handleReassignMainTablePhotoGalleryFeedback(select) {
     const feedbackId = Number(select.getAttribute("data-main-table-photo-department-select") || "");
     const currentDepartmentId = select.getAttribute("data-current-department-id") || "";
@@ -12889,6 +13018,13 @@ function buildInitialPhotoLightboxState() {
     });
 
     bindMainTablePhotoGalleryEvents(document);
+
+    const mainTablePhotoGalleryDeleteAllBtn = document.getElementById("mainTablePhotoGalleryDeleteAllBtn");
+    if (mainTablePhotoGalleryDeleteAllBtn) {
+      mainTablePhotoGalleryDeleteAllBtn.addEventListener("click", () => {
+        void handleDeleteAllMainTablePhotoGalleryFeedback(mainTablePhotoGalleryDeleteAllBtn);
+      });
+    }
 
     const photoLightboxClose = document.getElementById("photoLightboxClose");
     if (photoLightboxClose) {

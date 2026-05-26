@@ -2236,6 +2236,33 @@ a {
   margin-top: 18px;
 }
 
+.main-table-photo-gallery-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.main-table-photo-gallery-panel__copy h2 {
+  margin: 0;
+}
+
+.main-table-photo-gallery-panel__copy p {
+  margin: 6px 0 0;
+}
+
+.main-table-photo-gallery-panel__delete-all {
+  flex-shrink: 0;
+  border-color: rgba(154, 28, 14, 0.28);
+  color: #9a1c0e;
+  background: #fff4f1;
+}
+
+.main-table-photo-gallery-panel__delete-all:hover:not(:disabled) {
+  background: #ffe8e1;
+}
+
 .main-table-photo-gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
