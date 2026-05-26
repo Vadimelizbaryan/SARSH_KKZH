@@ -361,8 +361,8 @@
       leaveAdjustedPresent,
       finalValues: {
         beenTotal: columns.reduce((sum, column) => sum + state[column.baseKey], 0) + preserved.leaveSharq + preserved.leaveSpa + preserved.leavePaym,
-        beenSoldier: state.qhBaseSoldier + state.qhBaseOfficer + state.qhBaseContract,
-        beenSeries: state.qhBaseSoldier,
+        beenSoldier: toNumber(getQuery().get("c2")),
+        beenSeries: toNumber(getQuery().get("c3")),
         admittedTotal,
         admittedSoldier: admittedMilitary,
         admittedSeries: state.qhIncomingSoldier,

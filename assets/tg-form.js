@@ -428,8 +428,6 @@
   function getCalculatorResult(values) {
     const nextValues = { ...values };
     const originalPresentTotal = getActual(values);
-    const originalMilitary = toNumber(values.currentShar) + toNumber(values.currentSpa) + toNumber(values.currentPaym);
-    const originalSeries = toNumber(values.currentShar);
 
     const incomingByType = Object.fromEntries(
       calculatorColumns.map((column) => [column.type, toNumber(calculatorState[column.incomingKey])])
@@ -445,8 +443,6 @@
     );
 
     nextValues.beenTotal = originalPresentTotal;
-    nextValues.beenSoldier = originalMilitary;
-    nextValues.beenSeries = originalSeries;
     nextValues.admittedTotal = calculatorColumns.reduce((sum, column) => sum + incomingByType[column.type], 0);
     nextValues.admittedSoldier = incomingByType.soldier + incomingByType.officer + incomingByType.contract;
     nextValues.admittedSeries = incomingByType.soldier;
