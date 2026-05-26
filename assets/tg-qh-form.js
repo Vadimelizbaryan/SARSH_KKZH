@@ -741,7 +741,6 @@
 
         <form data-qh-form>
           <div class="tg-sheet-layout tg-sheet-layout--single">
-            ${renderCombinedCalculator()}
             ${sectionDefinitions.map((section) => renderSection(section)).join("")}
           </div>
 

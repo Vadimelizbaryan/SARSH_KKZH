@@ -1258,7 +1258,6 @@
 
         <form data-form>
           <div class="tg-sheet-layout" aria-label="Բաժանմունքի ձև">
-            ${renderCombinedCalculator()}
             ${sectionDefinitions.map((section) => renderSection(section)).join("")}
           </div>
 
@@ -1300,59 +1299,9 @@
           input.value = digitsOnly;
         }
         updateControl();
-        refreshCalculatorUi();
       });
       input.addEventListener("focus", () => input.select());
     });
-    root.querySelectorAll("[data-calc-key]").forEach((input) => {
-      input.addEventListener("input", () => {
-        const key = input.getAttribute("data-calc-key");
-        if (!key || !Object.prototype.hasOwnProperty.call(calculatorState, key)) {
-          return;
-        }
-        const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
-        calculatorState[key] = toNumber(digitsOnly);
-        if (input.value !== digitsOnly) {
-          input.value = digitsOnly;
-        }
-        refreshCalculatorUi();
-      });
-      input.addEventListener("focus", () => input.select());
-    });
-    root.querySelectorAll("[data-leave-calc-key]").forEach((input) => {
-      input.addEventListener("input", () => {
-        const key = input.getAttribute("data-leave-calc-key");
-        if (!key || !Object.prototype.hasOwnProperty.call(leaveCalculatorState, key)) {
-          return;
-        }
-        const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
-        leaveCalculatorState[key] = toNumber(digitsOnly);
-        if (input.value !== digitsOnly) {
-          input.value = digitsOnly;
-        }
-        refreshCalculatorUi();
-      });
-      input.addEventListener("focus", () => input.select());
-    });
-    root.querySelectorAll("[data-transfer-calc-key]").forEach((input) => {
-      input.addEventListener("input", () => {
-        const key = input.getAttribute("data-transfer-calc-key");
-        if (!key || !Object.prototype.hasOwnProperty.call(transferCalculatorState, key)) {
-          return;
-        }
-        const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
-        transferCalculatorState[key] = toNumber(digitsOnly);
-        if (input.value !== digitsOnly) {
-          input.value = digitsOnly;
-        }
-        refreshCalculatorUi();
-      });
-      input.addEventListener("focus", () => input.select());
-    });
-    const applyCalculators = root.querySelector("[data-apply-calculators]");
-    if (applyCalculators) {
-      applyCalculators.addEventListener("click", applyCombinedCalculator);
-    }
     const fullEditToggle = root.querySelector("[data-full-edit-toggle]");
     if (fullEditToggle) {
       fullEditToggle.addEventListener("change", () => {
@@ -1393,7 +1342,6 @@
     if (form) {
       form.addEventListener("submit", submitForm);
     }
-    refreshCalculatorUi();
     updateControl();
     syncFieldLockState();
   }
