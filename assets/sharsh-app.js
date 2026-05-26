@@ -62,6 +62,7 @@
   const MAIN_PHOTO_ROUTE_TRANSFER_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:main-photo-route-transfer:`;
   const OCR_FEEDBACK_IMAGE_OVERRIDE_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:ocr-feedback-image-override:`;
   const MAIN_SAVE_NOTICE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-save-notice:v1`;
+  const REMOTE_AUX_PANEL_REFRESH_MS = 45 * 1000;
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
   const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
@@ -541,7 +542,15 @@ function buildInitialPhotoLightboxState() {
       isLoading: false,
       error: "",
       loaded: false,
-      isDeletingAll: false
+      isDeletingAll: false,
+      lastLoadedAt: 0,
+      lastRenderRecordsRef: null,
+      lastRenderDateKey: "",
+      lastRenderIsLoading: false,
+      lastRenderIsDeletingAll: false,
+      lastRenderError: "",
+      lastRenderContent: null,
+      lastRenderToken: 0
     };
   }
 
@@ -2652,7 +2661,12 @@ function buildInitialPhotoLightboxState() {
 Отправлено: ${formatTimestamp(item.photoSentAt)}` : ""}`)}"
                 ${isDeletingAll ? "disabled" : ""}
               >
-                <img src="${escapeHtml(item.imageDataUrl)}" alt="${escapeHtml(`Фото бланка ${item.departmentName}`)}">
+                <img
+                  src="${escapeHtml(item.imageDataUrl)}"
+                  alt="${escapeHtml(`Фото бланка ${item.departmentName}`)}"
+                  loading="lazy"
+                  decoding="async"
+                >
               </button>
               <div class="main-table-photo-thumb__meta">
                 <span class="main-table-photo-thumb__caption">${escapeHtml(item.departmentName)}</span>
@@ -2796,16 +2810,22 @@ function buildInitialPhotoLightboxState() {
       return;
     }
 
-    const content = buildMainTablePhotoGalleryContent(displayContext);
+    const content = getMainTablePhotoGalleryRenderedContent(displayContext);
     const bulkDeleteMeta = getMainTablePhotoGalleryBulkDeleteMeta(displayContext);
-    summaryEl.textContent = content.summary;
-    listEl.innerHTML = content.html;
+    if (summaryEl.textContent !== content.summary) {
+      summaryEl.textContent = content.summary;
+    }
+    const renderToken = String(content.renderToken || 0);
+    if (listEl.dataset.renderToken !== renderToken) {
+      listEl.innerHTML = content.html;
+      listEl.dataset.renderToken = renderToken;
+      bindMainTablePhotoGalleryEvents(listEl);
+    }
     if (deleteAllBtn) {
       deleteAllBtn.disabled = bulkDeleteMeta.isDisabled;
       deleteAllBtn.textContent = bulkDeleteMeta.label;
       deleteAllBtn.title = bulkDeleteMeta.title;
     }
-    bindMainTablePhotoGalleryEvents(listEl);
   }
 
   function refreshMainTableTelegramFormUi() {
@@ -2944,6 +2964,16 @@ function buildInitialPhotoLightboxState() {
       refreshMainTablePhotoGalleryUi(displayContext);
     }
 
+    const now = Date.now();
+    if (
+      state.mainTablePhotoGallery.loaded
+      && Number.isFinite(state.mainTablePhotoGallery.lastLoadedAt)
+      && now - state.mainTablePhotoGallery.lastLoadedAt < REMOTE_AUX_PANEL_REFRESH_MS
+    ) {
+      refreshMainTablePhotoGalleryUi(displayContext);
+      return;
+    }
+
     state.mainTablePhotoGallery.isLoading = true;
     state.mainTablePhotoGallery.error = "";
     refreshMainTablePhotoGalleryUi(displayContext);
@@ -2955,6 +2985,7 @@ function buildInitialPhotoLightboxState() {
         .filter(Boolean);
       state.mainTablePhotoGallery.loaded = true;
       state.mainTablePhotoGallery.error = "";
+      state.mainTablePhotoGallery.lastLoadedAt = Date.now();
     } catch (error) {
       state.mainTablePhotoGallery.loaded = true;
       state.mainTablePhotoGallery.error = error instanceof Error ? error.message : "Не удалось загрузить фото бланков.";
@@ -3884,6 +3915,14 @@ function buildInitialPhotoLightboxState() {
       : 0;
     const nextIndex = Math.min(records.length - 1, Math.max(0, currentIndex + direction));
     state.selectedMainTableSavedKey = records[nextIndex].snapshotKey;
+  }
+
+  function getArchivePickerRenderKey(records) {
+    const items = Array.isArray(records) ? records : [];
+    return [
+      state.selectedArchiveKey || "",
+      ...items.map((record) => `${record.archiveKey}:${record.capturedAt || ""}`)
+    ].join("|");
   }
 
   function buildMainTableSavedSelectionText(record) {
@@ -8443,6 +8482,38 @@ function buildInitialPhotoLightboxState() {
     };
   }
 
+  function getMainTablePhotoGalleryRenderedContent(displayContext = getMainTableDisplaySnapshotContext()) {
+    const galleryState = state.mainTablePhotoGallery || buildInitialMainTablePhotoGalleryState();
+    const recordsRef = ensureMainTablePhotoGalleryRecordsLoaded();
+    const todayDateKey = getArchiveDateKey();
+    if (
+      galleryState.lastRenderContent
+      && galleryState.lastRenderRecordsRef === recordsRef
+      && galleryState.lastRenderDateKey === todayDateKey
+      && galleryState.lastRenderIsLoading === Boolean(galleryState.isLoading)
+      && galleryState.lastRenderIsDeletingAll === Boolean(galleryState.isDeletingAll)
+      && galleryState.lastRenderError === String(galleryState.error || "")
+    ) {
+      return {
+        ...galleryState.lastRenderContent,
+        renderToken: galleryState.lastRenderToken
+      };
+    }
+
+    const content = buildMainTablePhotoGalleryContent(displayContext);
+    galleryState.lastRenderRecordsRef = recordsRef;
+    galleryState.lastRenderDateKey = todayDateKey;
+    galleryState.lastRenderIsLoading = Boolean(galleryState.isLoading);
+    galleryState.lastRenderIsDeletingAll = Boolean(galleryState.isDeletingAll);
+    galleryState.lastRenderError = String(galleryState.error || "");
+    galleryState.lastRenderContent = content;
+    galleryState.lastRenderToken += 1;
+    return {
+      ...content,
+      renderToken: galleryState.lastRenderToken
+    };
+  }
+
   function getPhotoLightboxReassignMeta(context, lightbox = state.photoLightbox || buildInitialPhotoLightboxState()) {
     const recordDepartmentId = String(context?.record?.departmentId || "").trim();
     const selectedDepartmentId = String(context?.departmentId || "").trim();
@@ -8839,6 +8910,15 @@ function buildInitialPhotoLightboxState() {
         <div id="${escapeHtml(validationStatusId)}" class="photo-import-mini-table-status photo-import-mini-table-status--${escapeHtml(validationStatus.tone)}">${escapeHtml(validationStatus.text)}</div>
       </div>
     `;
+  }
+
+  function getMainTableSavedNavigatorRenderKey(records) {
+    const items = Array.isArray(records) ? records : [];
+    return [
+      state.selectedMainTableSavedKey || "",
+      state.activeMainTableSavedPreviewKey || "",
+      ...items.map((record) => `${record.snapshotKey}:${record.savedAt || ""}`)
+    ].join("|");
   }
 
   function renderPhotoImportPanel(row) {
@@ -10003,32 +10083,34 @@ function buildInitialPhotoLightboxState() {
       }
 
       if (archiveSummaryText) {
-        const latestArchive = archiveRecords[0] || null;
-        archiveSummaryText.textContent = latestArchive
-          ? `Последний снимок: ${latestArchive.archiveLabel}, сохранён ${formatTimestamp(latestArchive.capturedAt)}.`
-          : "Архивов пока нет. Первый снимок появится автоматически после 10:00 по Еревану.";
+        const nextArchiveSummary = getArchiveSummaryText(archiveRecords);
+        if (archiveSummaryText.textContent !== nextArchiveSummary) {
+          archiveSummaryText.textContent = nextArchiveSummary;
+        }
       }
       if (archiveList) {
-        archiveList.innerHTML = archiveRecords.length
-          ? archiveRecords.map((record) => buildArchiveItem(record)).join("")
-          : '<div class="archive-empty">Пока нет сохранённых дат.</div>';
-      }
-
-      if (archiveSummaryText) {
-        archiveSummaryText.textContent = getArchiveSummaryText(archiveRecords);
-      }
-      if (archiveList) {
-        archiveList.innerHTML = buildArchivePicker(archiveRecords);
+        const archiveRenderKey = getArchivePickerRenderKey(archiveRecords);
+        if (archiveList.dataset.renderKey !== archiveRenderKey) {
+          archiveList.innerHTML = buildArchivePicker(archiveRecords);
+          archiveList.dataset.renderKey = archiveRenderKey;
+        }
       }
       syncArchivePickerUi();
       if (savedTablesSummaryText) {
-        savedTablesSummaryText.textContent = savedTableRecords.length
+        const nextSavedTablesSummary = savedTableRecords.length
           ? `Сохранённых таблиц: ${savedTableRecords.length}. ${state.activeMainTableSavedPreviewKey ? "Показан" : "Выбран"} снимок: ${buildMainTableSavedSelectionText(selectedSavedRecord)}.`
           : "Сохранённых таблиц пока нет. После ручного сохранения здесь появятся две рабочие версии за сутки.";
+        if (savedTablesSummaryText.textContent !== nextSavedTablesSummary) {
+          savedTablesSummaryText.textContent = nextSavedTablesSummary;
+        }
       }
       if (savedTablesList) {
-        savedTablesList.innerHTML = buildMainTableSavedNavigator(savedTableRecords);
-        attachMainTableSavedNavigatorEvents(savedTablesList);
+        const savedNavigatorRenderKey = getMainTableSavedNavigatorRenderKey(savedTableRecords);
+        if (savedTablesList.dataset.renderKey !== savedNavigatorRenderKey) {
+          savedTablesList.innerHTML = buildMainTableSavedNavigator(savedTableRecords);
+          savedTablesList.dataset.renderKey = savedNavigatorRenderKey;
+          attachMainTableSavedNavigatorEvents(savedTablesList);
+        }
       }
       syncMainTableSavedNavigatorUi();
       refreshMainTableSaveState();
