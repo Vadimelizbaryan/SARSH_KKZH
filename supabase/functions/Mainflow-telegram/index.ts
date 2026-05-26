@@ -5275,15 +5275,20 @@ async function insertTelegramWebFormFeedback(
   photoOptions?: {
     imageName?: string;
     imageDataUrl?: string | null;
-    notes?: string[];
+    notes?: string[] | string;
   } | null
 ) {
+  const photoNotes = Array.isArray(photoOptions?.notes)
+    ? photoOptions.notes.filter(Boolean)
+    : (typeof photoOptions?.notes === "string" && photoOptions.notes.trim()
+      ? [photoOptions.notes.trim()]
+      : []);
   const notes = [
     "Telegram Web App form submission.",
     userId ? `Telegram user id: ${userId}` : "",
     userName ? `Telegram user: ${userName}` : "",
     ...(patientNotes ? buildDepartmentPatientNotesTextLines(patientNotes) : []).map((line) => `Patient note: ${line}`),
-    ...((photoOptions?.notes || []).filter(Boolean))
+    ...photoNotes
   ].filter(Boolean);
 
   return await insertAcceptedFeedback(
@@ -7938,7 +7943,7 @@ async function handleTelegramWebFormSubmit(request: Request) {
         ? {
           imageName: photoImageName,
           imageDataUrl: photoImageDataUrl,
-          notes: "Submitted via Android MAINFORM"
+          notes: ["Submitted via Android MAINFORM"]
         }
         : undefined
     );
@@ -8109,7 +8114,7 @@ async function handleTelegramQhFormSubmit(request: Request) {
         ? {
           imageName: photoImageName,
           imageDataUrl: photoImageDataUrl,
-          notes: "Submitted via Android MAINFORM"
+          notes: ["Submitted via Android MAINFORM"]
         }
         : undefined
     );
