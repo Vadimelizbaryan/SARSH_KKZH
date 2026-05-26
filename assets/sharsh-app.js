@@ -3844,7 +3844,7 @@ function buildInitialPhotoLightboxState() {
     const currentIndex = current
       ? records.findIndex((record) => record.snapshotKey === current.snapshotKey)
       : 0;
-    const nextIndex = Math.min(records.length - 1, Math.max(0, currentIndex - direction));
+    const nextIndex = Math.min(records.length - 1, Math.max(0, currentIndex + direction));
     state.selectedMainTableSavedKey = records[nextIndex].snapshotKey;
   }
 
