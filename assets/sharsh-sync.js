@@ -1353,24 +1353,36 @@
     };
   }
 
-  async function listOcrFeedback(limit, feedbackIds) {
+  async function listOcrFeedback(limit, feedbackIdsOrOptions, maybeOptions) {
     if (!hasRemoteSync()) {
       return [];
     }
 
     ensureOwnerAuth();
-    const cleanFeedbackIds = Array.isArray(feedbackIds)
+    const feedbackIds = Array.isArray(feedbackIdsOrOptions) ? feedbackIdsOrOptions : [];
+    const options = (
+      feedbackIdsOrOptions
+      && typeof feedbackIdsOrOptions === "object"
+      && !Array.isArray(feedbackIdsOrOptions)
+    )
+      ? feedbackIdsOrOptions
+      : (maybeOptions && typeof maybeOptions === "object" ? maybeOptions : {});
+    const cleanFeedbackIds = feedbackIds
       ? feedbackIds
         .map((value) => Number(value))
         .filter((value) => Number.isFinite(value) && value > 0)
       : [];
+    const createdDateKey = typeof options.createdDateKey === "string" ? options.createdDateKey.trim() : "";
+    const excludeTelegramForms = Boolean(options.excludeTelegramForms);
     const response = await fetch(getSyncEndpoint(), {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
         type: "list_ocr_feedback",
         limit: Number.isFinite(Number(limit)) ? Number(limit) : 100,
-        feedbackIds: cleanFeedbackIds
+        feedbackIds: cleanFeedbackIds,
+        createdDateKey,
+        excludeTelegramForms
       })
     });
 

@@ -2213,13 +2213,53 @@ function mapOcrFeedbackRows(rows: Array<Record<string, unknown>> | null | undefi
   }));
 }
 
-async function listOcrFeedbackRecords(supabase: ReturnType<typeof createClient>, limit: number) {
+function buildYerevanDateRange(dateKey: unknown) {
+  const normalizedDateKey = typeof dateKey === "string" ? dateKey.trim() : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDateKey)) {
+    return null;
+  }
+
+  const start = new Date(`${normalizedDateKey}T00:00:00+04:00`);
+  if (Number.isNaN(start.getTime())) {
+    return null;
+  }
+
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return {
+    startIso: start.toISOString(),
+    endIso: end.toISOString()
+  };
+}
+
+async function listOcrFeedbackRecords(
+  supabase: ReturnType<typeof createClient>,
+  limit: number,
+  options?: {
+    createdDateKey?: string,
+    excludeTelegramForms?: boolean
+  }
+) {
   const safeLimit = Math.min(500, Math.max(1, Math.trunc(limit || 100)));
-  const { data, error } = await supabase
+  let query = supabase
     .from("sharsh_ocr_feedback")
     .select("id, created_at, department_id, department_name, report_date, photo_report_date, save_status, image_name, image_data_url, recognized_keys, changed_keys, ocr_raw, final_values, notes, cell_reviews")
     .order("created_at", { ascending: false })
     .limit(safeLimit);
+
+  const createdRange = buildYerevanDateRange(options?.createdDateKey);
+  if (createdRange) {
+    query = query
+      .gte("created_at", createdRange.startIso)
+      .lt("created_at", createdRange.endIso);
+  }
+
+  if (options?.excludeTelegramForms) {
+    query = query
+      .neq("image_name", "telegram-web-app-form")
+      .neq("image_name", "telegram-qh-form");
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -2662,10 +2702,21 @@ Deno.serve(async (request) => {
           .map((value: unknown) => Number(value))
           .filter((value: number) => Number.isFinite(value))
         : [];
+      const createdDateKey = typeof payload?.createdDateKey === "string"
+        ? payload.createdDateKey
+        : "";
+      const excludeTelegramForms = Boolean(payload?.excludeTelegramForms);
       return jsonResponse({
         records: feedbackIds.length
           ? await listOcrFeedbackRecordsByIds(supabase, feedbackIds)
-          : await listOcrFeedbackRecords(supabase, Number.isFinite(limit) ? limit : 100)
+          : await listOcrFeedbackRecords(
+              supabase,
+              Number.isFinite(limit) ? limit : 100,
+              {
+                createdDateKey,
+                excludeTelegramForms
+              }
+            )
       });
     }
 

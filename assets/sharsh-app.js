@@ -2979,7 +2979,10 @@ function buildInitialPhotoLightboxState() {
     refreshMainTablePhotoGalleryUi(displayContext);
 
     try {
-      const records = await sync.listOcrFeedback(120);
+      const records = await sync.listOcrFeedback(80, {
+        createdDateKey: getArchiveDateKey(),
+        excludeTelegramForms: true
+      });
       state.mainTablePhotoGallery.records = (Array.isArray(records) ? records : [])
         .map(normalizeMainTablePhotoGalleryRecord)
         .filter(Boolean);
