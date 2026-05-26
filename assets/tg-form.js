@@ -66,6 +66,7 @@
     "leaveSpa",
     "leavePaym"
   ];
+  const permanentlyReadOnlyKeys = new Set(["beenTotal", "beenSoldier", "beenSeries", "presentTotal"]);
 
   const fieldByKey = Object.fromEntries(fields.map((field) => [field.key, field]));
   const sectionDefinitions = [
@@ -111,6 +112,30 @@
     { key: "returnedFromLeave", title: "Վերադարձել են արձակուրդից", rows: 5 },
     { key: "wentOnLeave", title: "Գնացել են արձակուրդ", rows: 5 }
   ];
+
+  const displaySectionDefinitions = sectionDefinitions.flatMap((section) => {
+    const keys = Array.isArray(section.keys) ? section.keys : [];
+    if (
+      keys.includes("transferFromDepartment")
+      && keys.includes("transferToDepartment")
+      && keys.includes("presentTotal")
+    ) {
+      return [
+        {
+          title: "Տեղափոխված հիվանդ․",
+          columns: 2,
+          keys: ["transferFromDepartment", "transferToDepartment"]
+        },
+        {
+          title: "Ընդհանւր",
+          note: "12-րդ բջիջը միայն ընթերցման համար է։",
+          columns: 1,
+          keys: ["presentTotal"]
+        }
+      ];
+    }
+    return [section];
+  });
 
   let fullEditUnlocked = false;
 
@@ -414,7 +439,7 @@
 
     root.querySelectorAll("[data-field]").forEach((input) => {
       const fieldKey = input.getAttribute("data-field") || "";
-      const shouldLock = fieldKey === "presentTotal" ? true : !fullEditUnlocked;
+      const shouldLock = permanentlyReadOnlyKeys.has(fieldKey) ? true : !fullEditUnlocked;
       input.readOnly = shouldLock;
       input.setAttribute("aria-readonly", shouldLock ? "true" : "false");
       input.classList.toggle("tg-form-input--readonly", shouldLock);
@@ -435,6 +460,10 @@
       lockText.textContent = fullEditUnlocked
         ? "Խմբագրումը միացված է. կարող եք փոխել 1-11 և 13-22 բջիջները, իսկ 12-ը միայն ընթերցման համար է։"
         : "Խմբագրումը անջատված է. բջիջները միայն դիտման համար են։";
+    }
+
+    if (lockText && fullEditUnlocked) {
+      lockText.textContent = "Խմբագրումը միացված է. կարող եք փոխել 4-11 և 13-22 բջիջները, իսկ 1-3 և 12-ը միայն ընթերցման համար են։";
     }
 
     updateControl();
@@ -679,7 +708,7 @@
 
         <form data-form>
           <div class="tg-sheet-layout" aria-label="Բաժանմունքի ձև">
-            ${sectionDefinitions.map((section) => renderSection(section)).join("")}
+            ${displaySectionDefinitions.map((section) => renderSection(section)).join("")}
           </div>
 
           ${renderPatientNotesMobileBlock(department, reportDate)}
