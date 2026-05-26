@@ -2319,7 +2319,7 @@ function buildInitialPhotoLightboxState() {
           rowId: boundRow?.id || record.departmentId,
           departmentId: boundRow?.id || record.departmentId,
           departmentName: boundRow?.department || record.departmentName || record.departmentId || "Неизвестное отделение",
-          updatedAt: boundRow ? getRowEffectiveUpdatedAt(boundRow) : record.createdAt,
+          photoSentAt: record.createdAt,
           workflowStatus: boundRow?.photoWorkflowStatus || "",
           freshness: boundRow ? getRowFreshnessMeta(boundRow) : null
         };
@@ -2648,15 +2648,15 @@ function buildInitialPhotoLightboxState() {
                 data-main-table-photo-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
                 aria-label="${escapeHtml(`Открыть фото бланка ${item.departmentName}`)}"
                 title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `
-Дата на фото: ${item.photoReportDate}` : ""}${item.updatedAt ? `
-Обновлено: ${formatTimestamp(item.updatedAt)}` : ""}`)}"
+Дата на фото: ${item.photoReportDate}` : ""}${item.photoSentAt ? `
+Отправлено: ${formatTimestamp(item.photoSentAt)}` : ""}`)}"
                 ${isDeletingAll ? "disabled" : ""}
               >
                 <img src="${escapeHtml(item.imageDataUrl)}" alt="${escapeHtml(`Фото бланка ${item.departmentName}`)}">
               </button>
               <div class="main-table-photo-thumb__meta">
                 <span class="main-table-photo-thumb__caption">${escapeHtml(item.departmentName)}</span>
-                ${item.updatedAt ? `<span class="main-table-photo-thumb__updated">Обновлено ${escapeHtml(formatTimestamp(item.updatedAt))}</span>` : ""}
+                ${item.photoSentAt ? `<span class="main-table-photo-thumb__updated">Отправлено ${escapeHtml(formatTimestamp(item.photoSentAt))}</span>` : ""}
                 <label class="main-table-photo-thumb__department-picker">
                   <span>Отделение</span>
                   <select
