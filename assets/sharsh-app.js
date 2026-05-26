@@ -8074,6 +8074,12 @@ function buildInitialPhotoLightboxState() {
               <div class="photo-lightbox-save-actions">
                 <button
                   type="button"
+                  class="photo-lightbox-recheck"
+                  id="photoLightboxRecheck"
+                  ${(lightbox.isRechecking || lightbox.isSaving || lightbox.isReassigning) ? "disabled" : ""}
+                >${lightbox.isRechecking ? "\u054d\u057f\u0578\u0582\u0563\u0578\u0582\u0574 \u0565\u0574..." : "\u054e\u0565\u0580\u057d\u057f\u0578\u0582\u0563\u0565\u056c"}</button>
+                <button
+                  type="button"
                   id="photoLightboxSaveBtn"
                   class="${canSave ? "save-ready" : "save-blocked"}"
                   ${(canSave && !lightbox.isSaving && !lightbox.isReassigning) ? "" : "disabled"}
@@ -8100,7 +8106,6 @@ function buildInitialPhotoLightboxState() {
       <div class="photo-lightbox" id="photoLightbox" aria-modal="true" role="dialog">
         <div class="photo-lightbox-backdrop" data-photo-lightbox-close="true"></div>
         <div class="photo-lightbox-dialog">
-          ${recheckButtonHtml}
           <button
             type="button"
             class="photo-lightbox-rotate"
