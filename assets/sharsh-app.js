@@ -229,6 +229,7 @@
     QH_CALC_COLUMNS.flatMap((column) => [column.incomingKey, column.dischargedKey])
   );
   const QH_CALC_OPTIONAL_INPUT_KEYS = new Set(QH_CALC_COLUMNS.map((column) => column.baseKey));
+  const QH_CALC_CURRENT_KEYS = new Set(QH_CALC_COLUMNS.map((column) => column.currentKey));
   const DEPARTMENT_ADMISSION_LOCK_KEYS = [
     "admittedTotal",
     "admittedSoldier",
@@ -238,10 +239,6 @@
     "dgSeries"
   ];
   function getEffectiveQhCalcFieldRows(row = null) {
-    if (isQhCalcDepartment(row)) {
-      return QH_CALC_FIELD_ROWS;
-    }
-
     return QH_CALC_FIELD_ROWS.map((definition, rowIndex) => {
       if (rowIndex !== 2) {
         return definition;
@@ -4891,6 +4888,37 @@ function buildInitialPhotoLightboxState() {
     return Boolean(row && QH_CALC_DEPARTMENT_IDS.has(row.id));
   }
 
+  function hasQhCalcPendingMovementValues(values) {
+    if (!values || typeof values !== "object") {
+      return false;
+    }
+
+    return QH_CALC_COLUMNS.some((column) => {
+      return (config.normalizeCellValue(values[column.incomingKey]) || 0) !== 0
+        || (config.normalizeCellValue(values[column.dischargedKey]) || 0) !== 0;
+    });
+  }
+
+  function syncQhBaseValuesFromCurrentValues(values) {
+    if (!values || typeof values !== "object") {
+      return values;
+    }
+
+    QH_CALC_COLUMNS.forEach((column) => {
+      values[column.baseKey] = config.normalizeCellValue(values[column.currentKey]) || 0;
+    });
+
+    return values;
+  }
+
+  function syncQhBaseValuesFromCurrentRow(row) {
+    if (!isQhCalcDepartment(row) || !row || !row.values || typeof row.values !== "object") {
+      return;
+    }
+
+    syncQhBaseValuesFromCurrentValues(row.values);
+  }
+
   function hasPendingTelegramPhotoUpdate(row) {
     if (!row) {
       return false;
@@ -5036,6 +5064,11 @@ function buildInitialPhotoLightboxState() {
 
     snapshot.rows.forEach((row) => {
       if (!isQhCalcDepartment(row) || !row.values || typeof row.values !== "object") {
+        return;
+      }
+
+      if (!hasQhCalcPendingMovementValues(row.values)) {
+        syncQhBaseValuesFromCurrentValues(row.values);
         return;
       }
 
@@ -5289,6 +5322,7 @@ function buildInitialPhotoLightboxState() {
       row.values[column.incomingKey] = 0;
       row.values[column.dischargedKey] = 0;
     });
+    syncQhBaseValuesFromCurrentRow(row);
 
     if (shouldRefresh) {
       refreshTableData();
@@ -5349,9 +5383,7 @@ function buildInitialPhotoLightboxState() {
     });
 
     if (isQhCalcDepartment(row)) {
-      row.values.qhBaseSoldier = row.values.currentShar || 0;
-      row.values.qhBaseOfficer = row.values.currentSpa || 0;
-      row.values.qhBaseContract = row.values.currentPaym || 0;
+      syncQhBaseValuesFromCurrentRow(row);
       refreshQhCalcDisplay(row);
     }
 
@@ -5426,13 +5458,7 @@ function buildInitialPhotoLightboxState() {
     });
 
     if (isQhCalcDepartment(row)) {
-      row.values.qhBaseSoldier = row.values.currentShar || 0;
-      row.values.qhBaseOfficer = row.values.currentSpa || 0;
-      row.values.qhBaseContract = row.values.currentPaym || 0;
-      row.values.qhBaseZh = row.values.currentZh || 0;
-      row.values.qhBaseFamily = row.values.family || 0;
-      row.values.qhBaseReserve = row.values.officer || 0;
-      row.values.qhBaseCivil = row.values.civil || 0;
+      syncQhBaseValuesFromCurrentRow(row);
       refreshQhCalcDisplay(row);
     }
 
@@ -5729,6 +5755,10 @@ function buildInitialPhotoLightboxState() {
         appliedKeys.push(field.key);
       }
     });
+
+    if (isQhCalcDepartment(row) && appliedKeys.some((key) => QH_CALC_CURRENT_KEYS.has(key))) {
+      syncQhBaseValuesFromCurrentRow(row);
+    }
 
     return appliedKeys;
   }
@@ -11084,9 +11114,7 @@ function buildInitialPhotoLightboxState() {
 
       const expectedValues = config.normalizeRowValues(draftRow.values);
       if (isQhCalcDepartment(draftRow)) {
-        expectedValues.qhBaseSoldier = expectedValues.currentShar || 0;
-        expectedValues.qhBaseOfficer = expectedValues.currentSpa || 0;
-        expectedValues.qhBaseContract = expectedValues.currentPaym || 0;
+        syncQhBaseValuesFromCurrentValues(expectedValues);
       }
 
       const payloadValues = deepCopy(expectedValues);
@@ -11330,9 +11358,7 @@ function buildInitialPhotoLightboxState() {
 
       const expectedValues = config.normalizeRowValues(draftRow.values);
       if (isQhCalcDepartment(draftRow)) {
-        expectedValues.qhBaseSoldier = expectedValues.currentShar || 0;
-        expectedValues.qhBaseOfficer = expectedValues.currentSpa || 0;
-        expectedValues.qhBaseContract = expectedValues.currentPaym || 0;
+        syncQhBaseValuesFromCurrentValues(expectedValues);
       }
 
       const result = await sync.saveDepartmentFromMain(
@@ -12297,9 +12323,7 @@ function buildInitialPhotoLightboxState() {
 
     const expectedValues = config.normalizeRowValues(row.values);
     if (isQhCalcDepartment(row)) {
-      expectedValues.qhBaseSoldier = expectedValues.currentShar || 0;
-      expectedValues.qhBaseOfficer = expectedValues.currentSpa || 0;
-      expectedValues.qhBaseContract = expectedValues.currentPaym || 0;
+      syncQhBaseValuesFromCurrentValues(expectedValues);
     }
     const payloadValues = deepCopy(expectedValues);
     if (isQhCalcDepartment(row)) {
@@ -12480,9 +12504,7 @@ function buildInitialPhotoLightboxState() {
       for (const row of validation.dirtyRows) {
         const expectedValues = config.normalizeRowValues(row.values);
         if (isQhCalcDepartment(row)) {
-          expectedValues.qhBaseSoldier = expectedValues.currentShar || 0;
-          expectedValues.qhBaseOfficer = expectedValues.currentSpa || 0;
-          expectedValues.qhBaseContract = expectedValues.currentPaym || 0;
+          syncQhBaseValuesFromCurrentValues(expectedValues);
         }
         const payloadValues = deepCopy(expectedValues);
         const result = await sync.saveDepartmentFromMain(row.id, state.snapshot.reportDate, payloadValues);
@@ -13219,6 +13241,9 @@ function buildInitialPhotoLightboxState() {
         const sanitized = sanitizeNumericInput(input.value);
         input.value = sanitized.text;
         row.values[key] = sanitized.value;
+        if (isQhCalcDepartment(row) && QH_CALC_CURRENT_KEYS.has(key)) {
+          syncQhBaseValuesFromCurrentRow(row);
+        }
         refreshComputedCells();
         refreshMainTableSaveState();
       });
@@ -13296,6 +13321,9 @@ function buildInitialPhotoLightboxState() {
       const sanitized = sanitizeNumericInput(input.value);
       input.value = sanitized.text;
       row.values[key] = sanitized.value;
+      if (isQhCalcDepartment(row) && QH_CALC_CURRENT_KEYS.has(key)) {
+        syncQhBaseValuesFromCurrentRow(row);
+      }
       refreshTableData();
       queueDepartmentSave();
     });
