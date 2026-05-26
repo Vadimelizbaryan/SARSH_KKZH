@@ -331,7 +331,8 @@
     }
 
     root.querySelectorAll("[data-field]").forEach((input) => {
-      const shouldLock = !fullEditUnlocked;
+      const fieldKey = input.getAttribute("data-field") || "";
+      const shouldLock = fieldKey === "presentTotal" ? true : !fullEditUnlocked;
       input.readOnly = shouldLock;
       input.setAttribute("aria-readonly", shouldLock ? "true" : "false");
       input.classList.toggle("tg-form-input--readonly", shouldLock);
@@ -350,7 +351,7 @@
     }
     if (lockText) {
       lockText.textContent = fullEditUnlocked
-        ? "Խմբագրումը միացված է. կարող եք փոխել 1-22 բոլոր բջիջները։"
+        ? "Խմբագրումը միացված է. կարող եք փոխել 1-11 և 13-22 բջիջները, իսկ 12-ը միայն ընթերցման համար է։"
         : "Խմբագրումը անջատված է. բջիջները միայն դիտման համար են։";
     }
 

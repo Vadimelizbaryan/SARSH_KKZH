@@ -59,6 +59,17 @@
         android:textColor="#2E2E2E"
         android:textSize="14sp" />
 
+    <TextView
+        android:id="@+id/textAuthorCredit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFF9F0"
+        android:paddingHorizontal="12dp"
+        android:paddingBottom="6dp"
+        android:text="@string/author_credit"
+        android:textColor="#6F6658"
+        android:textSize="11sp" />
+
     <LinearLayout
         android:id="@+id/photoControlsContainer"
         android:layout_width="match_parent"
