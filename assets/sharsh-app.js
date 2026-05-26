@@ -513,6 +513,9 @@ function buildInitialPhotoLightboxState() {
       alt: "Фото бланка",
       sourceKind: "",
       sourceId: "",
+      recognizedValues: null,
+      recognizedKeys: null,
+      cellReviews: null,
       isRotating: false,
       isRechecking: false,
       isSaving: false,
@@ -2426,16 +2429,27 @@ function buildInitialPhotoLightboxState() {
     const displayContext = getMainTableDisplaySnapshotContext();
     const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
     const boundRow = rows.find((row) => Number(row?.photoFeedbackId) === Number(record.id) || row?.id === record.departmentId) || null;
-    const previewValues = buildPhotoPreviewValuesFromRecord(record);
-    const recognizedKeys = Array.isArray(record.recognizedKeys) && record.recognizedKeys.length
-      ? record.recognizedKeys.map((item) => String(item))
-      : Object.keys(previewValues);
+    const hasLightboxOverride = Boolean(
+      lightbox?.recognizedValues
+      && typeof lightbox.recognizedValues === "object"
+    );
+    const previewValues = hasLightboxOverride
+      ? normalizePhotoPreviewValueObject(lightbox.recognizedValues)
+      : buildPhotoPreviewValuesFromRecord(record);
+    const recognizedKeys = hasLightboxOverride
+      ? getPhotoPreviewKeysFromValues(previewValues)
+      : (Array.isArray(record.recognizedKeys) && record.recognizedKeys.length
+        ? record.recognizedKeys.map((item) => String(item))
+        : Object.keys(previewValues));
     const recognizedFields = new Set(recognizedKeys);
     const suspectDetails = boundRow
       ? getPhotoImportSuspectDetails(boundRow, recognizedFields, previewValues)
       : { suspectKeys: [], suspectReason: "" };
+    const reviewSource = hasLightboxOverride && Array.isArray(lightbox?.cellReviews)
+      ? lightbox.cellReviews
+      : (Array.isArray(record.cellReviews) ? record.cellReviews : []);
     const reviewByKey = new Map(
-      (Array.isArray(record.cellReviews) ? record.cellReviews : []).map((item) => [item.key, item])
+      reviewSource.map((item) => [item.key, item])
     );
     const validation = boundRow
       ? buildPhotoImportPreviewValidation(boundRow, previewValues)
@@ -2458,11 +2472,20 @@ function buildInitialPhotoLightboxState() {
       previewValues,
       recognizedKeys,
       recognizedFields,
+      reviewSource,
       suspectDetails,
       reviewByKey,
       validation,
       validationStatus
     };
+  }
+
+  function getPhotoPreviewKeysFromValues(values) {
+    const sourceValues = values && typeof values === "object" ? values : {};
+    return PHOTO_FIELD_DEFINITIONS
+      .filter((field) => !field.computed)
+      .filter((field) => Object.prototype.hasOwnProperty.call(sourceValues, field.key) && sourceValues[field.key] !== null)
+      .map((field) => field.key);
   }
 
   function getPhotoPreviewGroups() {
@@ -7984,14 +8007,17 @@ function buildInitialPhotoLightboxState() {
           boundRow,
           {
             recognizedValues: context.previewValues,
-            cellReviews: Array.isArray(context.record.cellReviews) ? context.record.cellReviews : [],
+            cellReviews: context.reviewSource,
             suspectKeys: Array.isArray(context.suspectDetails?.suspectKeys) ? context.suspectDetails.suspectKeys : [],
             suspectReason: context.suspectDetails?.suspectReason || ""
           },
           context.reviewByKey,
           context.recognizedFields,
           new Set(Array.isArray(context.suspectDetails?.suspectKeys) ? context.suspectDetails.suspectKeys : []),
-          { editable: false }
+          {
+            editable: true,
+            validationStatusId: "photoLightboxPreviewValidationStatus"
+          }
         );
         if (previewTable) {
           const isArchivePreview = Boolean(state.activeMainTableSavedPreviewKey);
@@ -8021,10 +8047,10 @@ function buildInitialPhotoLightboxState() {
                   class="${canSave ? "save-ready" : "save-blocked"}"
                   ${(canSave && !lightbox.isSaving) ? "" : "disabled"}
                 >${lightbox.isSaving ? "Сохраняю..." : "Сохранить"}</button>
-                <span class="photo-lightbox-save-hint${(!canSave && saveBlockedByControls) || lightbox.statusIsError ? " warning-note" : ""}">${escapeHtml(saveHint)}</span>
+                <span id="photoLightboxSaveHint" class="photo-lightbox-save-hint${(!canSave && saveBlockedByControls) || lightbox.statusIsError ? " warning-note" : ""}">${escapeHtml(saveHint)}</span>
               </div>
               ${renderPhotoLightboxDepartmentTable(context.displayContext?.snapshot || state.snapshot, boundRow)}
-              ${lightbox.status ? `<p class="hint${lightbox.statusIsError ? " warning-note" : ""}">${escapeHtml(lightbox.status)}</p>` : ""}
+              <p id="photoLightboxStatusText" class="hint${lightbox.statusIsError ? " warning-note" : ""}"${lightbox.status ? "" : " hidden"}>${escapeHtml(lightbox.status || "")}</p>
             </div>
           `;
         }
@@ -8225,10 +8251,7 @@ function buildInitialPhotoLightboxState() {
     const recognizedValues = state.photoImport.recognizedValues && typeof state.photoImport.recognizedValues === "object"
       ? state.photoImport.recognizedValues
       : {};
-    const previewKeys = PHOTO_FIELD_DEFINITIONS
-      .filter((field) => !field.computed)
-      .filter((field) => Object.prototype.hasOwnProperty.call(recognizedValues, field.key) && recognizedValues[field.key] !== null)
-      .map((field) => field.key);
+    const previewKeys = getPhotoPreviewKeysFromValues(recognizedValues);
 
     state.photoImport.lastAppliedKeys = previewKeys;
     state.photoImport.draftMode = false;
@@ -8324,6 +8347,115 @@ function buildInitialPhotoLightboxState() {
     }
   }
 
+  function getPhotoLightboxSaveMeta(context, lightbox = state.photoLightbox || buildInitialPhotoLightboxState()) {
+    const isArchivePreview = Boolean(state.activeMainTableSavedPreviewKey);
+    const hasDirtyMainTableRows = getMainTableDirtyRows().length > 0;
+    const saveBlockedByControls = !context?.validation?.applicable || !context.validation.isValid;
+    const saveBlockedByState = isArchivePreview || hasDirtyMainTableRows || state.mainTableSaveInFlight;
+    const canSave = !saveBlockedByControls && !saveBlockedByState && !lightbox.isSaving;
+    const saveHint = isArchivePreview
+      ? "\u0414\u043b\u044f \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f OCR \u0432\u0435\u0440\u043d\u0438\u0442\u0435\u0441\u044c \u043a \u0442\u0435\u043a\u0443\u0449\u0435\u0439 \u0442\u0430\u0431\u043b\u0438\u0446\u0435."
+      : (hasDirtyMainTableRows
+        ? "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u0435 \u0438\u043b\u0438 \u0441\u043d\u0438\u043c\u0438\u0442\u0435 \u0440\u0443\u0447\u043d\u044b\u0435 \u043f\u0440\u0430\u0432\u043a\u0438 \u0432 \u0433\u043b\u0430\u0432\u043d\u043e\u0439 \u0442\u0430\u0431\u043b\u0438\u0446\u0435."
+        : (state.mainTableSaveInFlight
+          ? "\u0413\u043b\u0430\u0432\u043d\u0430\u044f \u0442\u0430\u0431\u043b\u0438\u0446\u0430 \u0443\u0436\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u0442\u0441\u044f. \u041f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435."
+          : (saveBlockedByControls
+            ? context.validation.failedChecks.map((item) => item.failureMessage).join(" ")
+            : "\u041a\u043e\u043d\u0442\u0440\u043e\u043b\u044c \u043f\u0440\u043e\u0439\u0434\u0435\u043d. OCR \u043c\u043e\u0436\u043d\u043e \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0432 \u0441\u0442\u0440\u043e\u043a\u0443 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u044f.")));
+    return {
+      saveBlockedByControls,
+      saveBlockedByState,
+      canSave,
+      saveHint
+    };
+  }
+
+  function refreshPhotoLightboxPreviewUi(context = getMainTablePhotoLightboxContext()) {
+    const root = document.getElementById("photoLightbox");
+    if (!(root instanceof HTMLDivElement) || !context?.boundRow) {
+      return;
+    }
+
+    const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+    const photoState = {
+      recognizedValues: context.previewValues,
+      cellReviews: context.reviewSource,
+      suspectKeys: Array.isArray(context.suspectDetails?.suspectKeys) ? context.suspectDetails.suspectKeys : [],
+      suspectReason: context.suspectDetails?.suspectReason || ""
+    };
+    const reviewByKey = context.reviewByKey instanceof Map ? context.reviewByKey : new Map();
+    const recognizedFields = context.recognizedFields instanceof Set ? context.recognizedFields : new Set();
+    const suspectFields = new Set(Array.isArray(context.suspectDetails?.suspectKeys) ? context.suspectDetails.suspectKeys : []);
+    const validation = context.validation || buildPhotoImportPreviewValidation(context.boundRow, context.previewValues);
+    const validationStatusMeta = context.validationStatus || buildPhotoImportPreviewValidationStatus(validation);
+
+    const previewTable = root.querySelector(".photo-import-mini-table");
+    if (previewTable instanceof HTMLTableElement) {
+      previewTable.className = `photo-import-mini-table photo-import-mini-table--${validation.statusTone}`;
+    }
+
+    PHOTO_FIELD_DEFINITIONS.forEach((field) => {
+      const cell = root.querySelector(`[data-photo-preview-cell="${field.key}"]`);
+      if (!(cell instanceof HTMLTableCellElement)) {
+        return;
+      }
+
+      const status = getPhotoImportPreviewStatus(photoState, reviewByKey, recognizedFields, suspectFields, field.key);
+      const controlTone = getPhotoImportPreviewControlTone(validation, field.key);
+      cell.className = [
+        "photo-import-mini-table__cell",
+        `photo-import-mini-table__cell--${status}`,
+        controlTone ? `photo-import-mini-table__cell--control-${controlTone}` : ""
+      ].filter(Boolean).join(" ");
+
+      if (field.computed) {
+        const output = cell.querySelector("[data-photo-preview-output]");
+        if (output) {
+          output.textContent = getDisplayValue(getPhotoPreviewValue(context.boundRow, field.key, context.previewValues)) || "\u2014";
+        }
+        return;
+      }
+
+      const input = cell.querySelector("input[data-photo-preview-key]");
+      if (input instanceof HTMLInputElement) {
+        const value = getPhotoPreviewValue(context.boundRow, field.key, context.previewValues);
+        const expectedText = getDisplayValue(value) || "";
+        if (input.value !== expectedText) {
+          input.value = expectedText;
+        }
+      }
+    });
+
+    const validationStatus = document.getElementById("photoLightboxPreviewValidationStatus");
+    if (validationStatus) {
+      validationStatus.textContent = validationStatusMeta.text;
+      validationStatus.className = `photo-import-mini-table-status photo-import-mini-table-status--${validationStatusMeta.tone}`;
+    }
+
+    const saveMeta = getPhotoLightboxSaveMeta(context, lightbox);
+    const saveButton = document.getElementById("photoLightboxSaveBtn");
+    if (saveButton instanceof HTMLButtonElement) {
+      saveButton.disabled = !saveMeta.canSave || lightbox.isSaving;
+      saveButton.className = saveMeta.canSave ? "save-ready" : "save-blocked";
+      saveButton.textContent = lightbox.isSaving
+        ? "\u0421\u043e\u0445\u0440\u0430\u043d\u044f\u044e..."
+        : "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c";
+    }
+
+    const saveHint = document.getElementById("photoLightboxSaveHint");
+    if (saveHint) {
+      saveHint.textContent = saveMeta.saveHint;
+      saveHint.className = `photo-lightbox-save-hint${(!saveMeta.canSave && saveMeta.saveBlockedByControls) || lightbox.statusIsError ? " warning-note" : ""}`;
+    }
+
+    const statusText = document.getElementById("photoLightboxStatusText");
+    if (statusText) {
+      statusText.textContent = lightbox.status || "";
+      statusText.className = `hint${lightbox.statusIsError ? " warning-note" : ""}`;
+      statusText.hidden = !lightbox.status;
+    }
+  }
+
   function handlePhotoImportPreviewEdit(key, rawValue) {
     const row = getCurrentRow();
     const field = getPhotoFieldMetaByKey(key);
@@ -8348,11 +8480,44 @@ function buildInitialPhotoLightboxState() {
     return sanitized;
   }
 
+  function handlePhotoLightboxPreviewEdit(key, rawValue) {
+    const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+    const context = getMainTablePhotoLightboxContext(lightbox);
+    const field = getPhotoFieldMetaByKey(key);
+    if (!lightbox.open || !context?.boundRow || !field || field.computed) {
+      return { text: "", value: null };
+    }
+
+    const sanitized = sanitizeNumericInput(rawValue);
+    const nextValues = normalizePhotoPreviewValueObject(context.previewValues);
+    if (sanitized.value === null) {
+      delete nextValues[key];
+    } else {
+      nextValues[key] = sanitized.value;
+    }
+
+    state.photoLightbox = {
+      ...lightbox,
+      recognizedValues: nextValues,
+      recognizedKeys: getPhotoPreviewKeysFromValues(nextValues),
+      cellReviews: Array.isArray(lightbox.cellReviews)
+        ? lightbox.cellReviews
+        : (Array.isArray(context.reviewSource) ? context.reviewSource : []),
+      status: "OCR \u0434\u0430\u043d\u043d\u044b\u0435 \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u044b \u0432\u0440\u0443\u0447\u043d\u0443\u044e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c \u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c\u00bb.",
+      statusIsError: false
+    };
+    refreshPhotoLightboxPreviewUi(getMainTablePhotoLightboxContext(state.photoLightbox));
+    return sanitized;
+  }
+
   function renderPhotoImportPreviewTable(row, photoState, reviewByKey, recognizedFields, suspectFields, options = {}) {
     const rawValues = photoState?.recognizedValues && typeof photoState.recognizedValues === "object"
       ? photoState.recognizedValues
       : {};
     const editable = options?.editable !== false;
+    const validationStatusId = typeof options?.validationStatusId === "string" && options.validationStatusId.trim()
+      ? options.validationStatusId.trim()
+      : "photoImportPreviewValidationStatus";
     const hasPreviewValues = PHOTO_FIELD_DEFINITIONS.some((field) => {
       if (field.key === "presentTotal") {
         return true;
@@ -8469,7 +8634,7 @@ function buildInitialPhotoLightboxState() {
             <tr>${dataCells}</tr>
           </tbody>
         </table>
-        <div id="photoImportPreviewValidationStatus" class="photo-import-mini-table-status photo-import-mini-table-status--${escapeHtml(validationStatus.tone)}">${escapeHtml(validationStatus.text)}</div>
+        <div id="${escapeHtml(validationStatusId)}" class="photo-import-mini-table-status photo-import-mini-table-status--${escapeHtml(validationStatus.tone)}">${escapeHtml(validationStatus.text)}</div>
       </div>
     `;
   }
@@ -10786,6 +10951,7 @@ function buildInitialPhotoLightboxState() {
       return;
     }
     state.photoLightbox = {
+      ...buildInitialPhotoLightboxState(),
       open: true,
       imageDataUrl,
       alt: alt || "Фото бланка",
@@ -10998,6 +11164,9 @@ function buildInitialPhotoLightboxState() {
         && recognizedKeys.some((key) => Object.prototype.hasOwnProperty.call(recognizedValues, key));
       state.photoLightbox = {
         ...state.photoLightbox,
+        recognizedValues,
+        recognizedKeys,
+        cellReviews: normalizePhotoCellReviews(result),
         isRechecking: false,
         status: hasValues
           ? "OCR-\u0442\u0430\u0431\u043B\u0438\u0446\u0430 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u043F\u043E \u044D\u0442\u043E\u043C\u0443 \u0444\u043E\u0442\u043E."
@@ -12980,7 +13149,9 @@ function buildInitialPhotoLightboxState() {
         if (!key) {
           return;
         }
-        const sanitized = handlePhotoImportPreviewEdit(key, target.value);
+        const sanitized = target.closest(".photo-lightbox")
+          ? handlePhotoLightboxPreviewEdit(key, target.value)
+          : handlePhotoImportPreviewEdit(key, target.value);
         target.value = sanitized.text;
       });
     });
