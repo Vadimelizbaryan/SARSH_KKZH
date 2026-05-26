@@ -560,6 +560,7 @@ function buildInitialPhotoLightboxState() {
       isLoading: false,
       error: "",
       loaded: false,
+      isDeletingAll: false,
       lastLoadedAt: 0
     };
   }
@@ -2391,6 +2392,28 @@ function buildInitialPhotoLightboxState() {
       .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
   }
 
+  function getMainTableTelegramFormBulkDeleteMeta() {
+    const items = buildMainTableTelegramFormItems()
+      .filter((item) => Number.isFinite(Number(item?.id)) && typeof item?.departmentId === "string" && item.departmentId.trim());
+    const isDeletingAll = Boolean(state.mainTableTelegramForms.isDeletingAll);
+    const canUseRemoteDelete = sync.hasRemoteSync?.() && typeof sync.deleteDepartmentFeedback === "function";
+
+    return {
+      items,
+      count: items.length,
+      isDeletingAll,
+      isDisabled: !canUseRemoteDelete || !items.length || state.mainTableTelegramForms.isLoading || isDeletingAll || Boolean(state.mainTableTelegramForms.error),
+      label: isDeletingAll
+        ? `Удаляю формы (${items.length})...`
+        : `Удалить все формы${items.length ? ` (${items.length})` : ""}`,
+      title: !canUseRemoteDelete
+        ? "Массовое удаление Telegram Web форм доступно только в онлайн-режиме владельца."
+        : (!items.length
+          ? "За сегодня нет Telegram Web форм с корректной привязкой для удаления."
+          : "Удалить с сервера все сегодняшние Telegram Web формы, показанные в этом блоке.")
+    };
+  }
+
   function renderMainTableTelegramFormPreviewTable(record, row) {
     if (!record || !row) {
       return "";
@@ -2691,6 +2714,7 @@ function buildInitialPhotoLightboxState() {
 
   function buildMainTableTelegramFormContent() {
     const items = buildMainTableTelegramFormItems();
+    const isDeletingAll = Boolean(state.mainTableTelegramForms.isDeletingAll);
 
     if (!sync.hasRemoteSync?.() || typeof sync.listTelegramFormFeedback !== "function") {
       return {
@@ -2732,7 +2756,8 @@ function buildInitialPhotoLightboxState() {
             const canApply = Boolean(item.liveRow && item.appliedKeys.length)
               && !archivePreviewActive
               && !hasDirtyMainRows
-              && !state.mainTableSaveInFlight;
+              && !state.mainTableSaveInFlight
+              && !isDeletingAll;
             const statusText = item.alreadySaved
               ? "Уже в основной таблице"
               : (item.liveRow ? "Готова к обновлению" : "Не удалось привязать к строке отделения");
@@ -2745,7 +2770,9 @@ function buildInitialPhotoLightboxState() {
             const createdAtText = item.createdAt
               ? `Отправлено: ${formatTimestamp(item.createdAt)}`
               : "Время отправки не указано";
-            const disabledReason = archivePreviewActive
+            const disabledReason = isDeletingAll
+              ? "Дождитесь завершения массового удаления форм."
+              : (archivePreviewActive
               ? "Сначала вернитесь к текущей таблице."
               : (hasDirtyMainRows
                 ? "Сначала сохраните или отмените ручные правки в главной таблице."
@@ -2753,7 +2780,7 @@ function buildInitialPhotoLightboxState() {
                   ? "У формы нет корректной привязки к строке отделения."
                   : (!item.appliedKeys.length
                     ? "В этой форме нет значений для записи в основную таблицу."
-                    : "")));
+                    : ""))));
             return `
               <article class="main-table-telegram-form-card">
                 <div class="main-table-telegram-form-card__head">
@@ -2777,6 +2804,8 @@ function buildInitialPhotoLightboxState() {
                     class="main-table-telegram-form-card__delete"
                     data-main-table-telegram-form-delete="${escapeHtml(String(item.id))}"
                     data-main-table-telegram-form-department-id="${escapeHtml(item.departmentId || "")}"
+                    ${isDeletingAll ? "disabled" : ""}
+                    title="${escapeHtml(isDeletingAll ? "Дождитесь завершения массового удаления форм." : "Удалить эту Telegram Web форму")}"
                   >Удалить</button>
                 </div>
                 ${disabledReason && !canApply ? `<div class="main-table-telegram-form-card__hint">${escapeHtml(disabledReason)}</div>` : ""}
@@ -2831,14 +2860,21 @@ function buildInitialPhotoLightboxState() {
   function refreshMainTableTelegramFormUi() {
     const summaryEl = document.getElementById("mainTableTelegramFormSummaryText");
     const listEl = document.getElementById("mainTableTelegramFormList");
+    const deleteAllBtn = document.getElementById("mainTableTelegramFormDeleteAllBtn");
     if (!summaryEl || !listEl) {
       return;
     }
 
     const content = buildMainTableTelegramFormContent();
+    const bulkDeleteMeta = getMainTableTelegramFormBulkDeleteMeta();
     summaryEl.textContent = content.summary;
     listEl.innerHTML = content.html;
     bindMainTableTelegramFormEvents(listEl);
+    if (deleteAllBtn) {
+      deleteAllBtn.disabled = bulkDeleteMeta.isDisabled;
+      deleteAllBtn.textContent = bulkDeleteMeta.label;
+      deleteAllBtn.title = bulkDeleteMeta.title;
+    }
   }
 
   function bindMainTablePhotoGalleryEvents(root = document) {
@@ -2947,6 +2983,78 @@ function buildInitialPhotoLightboxState() {
         void handleDeleteMainTableTelegramForm(button);
       });
     });
+  }
+
+  async function handleDeleteAllMainTableTelegramForms(button) {
+    const bulkDeleteMeta = getMainTableTelegramFormBulkDeleteMeta();
+    const items = Array.isArray(bulkDeleteMeta.items) ? [...bulkDeleteMeta.items] : [];
+
+    if (!items.length) {
+      setInfo("За сегодня нет Telegram Web форм для массового удаления.", false);
+      return;
+    }
+    if (bulkDeleteMeta.isDeletingAll) {
+      return;
+    }
+    if (typeof sync.deleteDepartmentFeedback !== "function" || !sync.hasRemoteSync?.()) {
+      setInfo("Массовое удаление Telegram Web форм доступно только в онлайн-режиме владельца.", true);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Удалить с сервера все сегодняшние Telegram Web формы из этого блока? Сейчас будет удалено: ${items.length}.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    state.mainTableTelegramForms.isDeletingAll = true;
+    refreshMainTableTelegramFormUi();
+
+    let deletedCount = 0;
+    let lastResult = null;
+    const failedItems = [];
+
+    try {
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        const departmentName = item.departmentName || item.departmentId || `feedback ${item.id}`;
+        setInfo(`Удаляю Telegram Web форму ${index + 1} из ${items.length}: ${departmentName}...`, false);
+        try {
+          const result = await sync.deleteDepartmentFeedback(item.departmentId || "", item.id);
+          lastResult = result;
+          removeMainTableTelegramFormRecord(item.id);
+          deletedCount += 1;
+        } catch (error) {
+          failedItems.push({
+            item,
+            error
+          });
+        }
+      }
+
+      if (lastResult) {
+        applyLoadedSnapshot(lastResult);
+      }
+
+      if (failedItems.length) {
+        const failureSummary = failedItems
+          .slice(0, 3)
+          .map(({ item, error }) => {
+            const departmentName = item.departmentName || item.departmentId || `feedback ${item.id}`;
+            const reason = error instanceof Error && error.message ? error.message : "ошибка удаления";
+            return `${departmentName} (${reason})`;
+          })
+          .join("; ");
+        const extraFailures = failedItems.length > 3 ? ` Ещё ошибок: ${failedItems.length - 3}.` : "";
+        setInfo(`Удалено Telegram Web форм: ${deletedCount} из ${items.length}. Не удалось удалить: ${failureSummary}.${extraFailures}`, true);
+      } else {
+        setInfo(`Все сегодняшние Telegram Web формы удалены: ${deletedCount}.`, false);
+      }
+    } finally {
+      state.mainTableTelegramForms.isDeletingAll = false;
+      renderPage();
+    }
   }
 
   async function refreshMainTablePhotoGalleryRecordsFromRemote(displayContext = getMainTableDisplaySnapshotContext()) {
@@ -7782,6 +7890,7 @@ function buildInitialPhotoLightboxState() {
       rows: displayedMainTableRows
     });
     const mainTableTelegramFormContent = buildMainTableTelegramFormContent();
+    const mainTableTelegramFormBulkDeleteMeta = getMainTableTelegramFormBulkDeleteMeta();
     const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
     const canEditMainTable = canEditMainTableDirectly();
     const mainBlankPdfPath = config.getMainBlankPdfPath
@@ -7913,8 +8022,19 @@ function buildInitialPhotoLightboxState() {
         </section>
 
         <section class="panel no-print main-table-telegram-form-panel">
-          <h2>Таблицы Telegram Web форм за сегодня</h2>
-          <p id="mainTableTelegramFormSummaryText">${escapeHtml(mainTableTelegramFormContent.summary)}</p>
+          <div class="main-table-photo-gallery-panel__head">
+            <div class="main-table-photo-gallery-panel__copy">
+              <h2>Таблицы Telegram Web форм за сегодня</h2>
+              <p id="mainTableTelegramFormSummaryText">${escapeHtml(mainTableTelegramFormContent.summary)}</p>
+            </div>
+            <button
+              type="button"
+              id="mainTableTelegramFormDeleteAllBtn"
+              class="main-table-photo-gallery-panel__delete-all"
+              ${mainTableTelegramFormBulkDeleteMeta.isDisabled ? "disabled" : ""}
+              title="${escapeHtml(mainTableTelegramFormBulkDeleteMeta.title)}"
+            >${escapeHtml(mainTableTelegramFormBulkDeleteMeta.label)}</button>
+          </div>
           <div class="archive-list" id="mainTableTelegramFormList">
             ${mainTableTelegramFormContent.html}
           </div>
@@ -13491,6 +13611,13 @@ function buildInitialPhotoLightboxState() {
     if (mainTablePhotoGalleryDeleteAllBtn) {
       mainTablePhotoGalleryDeleteAllBtn.addEventListener("click", () => {
         void handleDeleteAllMainTablePhotoGalleryFeedback(mainTablePhotoGalleryDeleteAllBtn);
+      });
+    }
+
+    const mainTableTelegramFormDeleteAllBtn = document.getElementById("mainTableTelegramFormDeleteAllBtn");
+    if (mainTableTelegramFormDeleteAllBtn) {
+      mainTableTelegramFormDeleteAllBtn.addEventListener("click", () => {
+        void handleDeleteAllMainTableTelegramForms(mainTableTelegramFormDeleteAllBtn);
       });
     }
 
