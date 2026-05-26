@@ -92,6 +92,7 @@ public class MainActivity : Activity
 
         var selectDepartmentButton = FindViewById<Button>(Resource.Id.buttonSelectDepartment);
         var refreshButton = FindViewById<Button>(Resource.Id.buttonRefresh);
+        var exitButton = FindViewById<Button>(Resource.Id.buttonExit);
 
         ConfigureWebView();
 
@@ -112,6 +113,11 @@ public class MainActivity : Activity
 
                 _webView?.Reload();
             };
+        }
+
+        if (exitButton is not null)
+        {
+            exitButton.Click += (_, _) => ShowExitConfirmation();
         }
 
         if (_photoButton is not null)
@@ -152,6 +158,21 @@ public class MainActivity : Activity
         }
 
         base.OnBackPressed();
+    }
+
+    private void ShowExitConfirmation()
+    {
+        new AlertDialog.Builder(this)
+            .SetTitle(Resource.String.exit_app_title)
+            .SetMessage(Resource.String.exit_app_message)
+            .SetPositiveButton(Resource.String.exit_app_confirm, (_, _) => ExitApplication())
+            .SetNegativeButton(Android.Resource.String.Cancel, (_, _) => { })
+            .Show();
+    }
+
+    private void ExitApplication()
+    {
+        FinishAndRemoveTask();
     }
 
     protected override async void OnActivityResult(int requestCode, Result resultCode, Intent? data)

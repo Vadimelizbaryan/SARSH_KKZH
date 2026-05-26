@@ -34,6 +34,16 @@
             android:text="@string/refresh"
             android:textAllCaps="false"
             android:textColor="#1A1A1A" />
+
+        <Button
+            android:id="@+id/buttonExit"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:backgroundTint="#A33B32"
+            android:text="@string/exit_app"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF" />
     </LinearLayout>
 
     <TextView
