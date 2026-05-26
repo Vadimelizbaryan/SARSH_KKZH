@@ -4963,6 +4963,39 @@ function buildInitialPhotoLightboxState() {
     });
   }
 
+  function attachMainTableSavedNavigatorEvents(root = document) {
+    const scope = root && typeof root.querySelectorAll === "function" ? root : document;
+
+    scope.querySelectorAll("[data-main-saved-nav]").forEach((button) => {
+      if (button.dataset.mainSavedNavBound === "true") {
+        return;
+      }
+      button.dataset.mainSavedNavBound = "true";
+      button.addEventListener("click", () => {
+        const direction = Number(button.getAttribute("data-main-saved-nav") || "0");
+        if (!Number.isFinite(direction) || direction === 0) {
+          return;
+        }
+        moveMainTableSavedSelection(direction);
+        const selectedRecord = getSelectedMainTableSavedRecord();
+        state.activeMainTableSavedPreviewKey = selectedRecord ? selectedRecord.snapshotKey : "";
+        renderPage();
+      });
+    });
+
+    const mainTableSavedLiveBtn = scope.querySelector("#mainTableSavedLiveBtn");
+    if (mainTableSavedLiveBtn instanceof HTMLButtonElement && mainTableSavedLiveBtn.dataset.mainSavedLiveBound !== "true") {
+      mainTableSavedLiveBtn.dataset.mainSavedLiveBound = "true";
+      mainTableSavedLiveBtn.addEventListener("click", () => {
+        if (!state.activeMainTableSavedPreviewKey) {
+          return;
+        }
+        state.activeMainTableSavedPreviewKey = "";
+        renderPage();
+      });
+    }
+  }
+
   function syncQhBaseValuesFromCurrentValues(values) {
     if (!values || typeof values !== "object") {
       return values;
@@ -9940,6 +9973,7 @@ function buildInitialPhotoLightboxState() {
       const departmentPdfArchiveSummaryText = document.getElementById("departmentPdfArchiveSummaryText");
       const departmentPdfArchiveList = document.getElementById("departmentPdfArchiveList");
       const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
+      const selectedSavedRecord = getSelectedMainTableSavedRecord(savedTableRecords);
 
       if (freshCount) {
         freshCount.textContent = String(stats.counts.fresh);
@@ -9989,11 +10023,12 @@ function buildInitialPhotoLightboxState() {
       syncArchivePickerUi();
       if (savedTablesSummaryText) {
         savedTablesSummaryText.textContent = savedTableRecords.length
-          ? `Сохранённых таблиц: ${savedTableRecords.length}. Текущий снимок: ${buildMainTableSavedSelectionText(savedTableRecords[0])}.`
+          ? `Сохранённых таблиц: ${savedTableRecords.length}. ${state.activeMainTableSavedPreviewKey ? "Показан" : "Выбран"} снимок: ${buildMainTableSavedSelectionText(selectedSavedRecord)}.`
           : "Сохранённых таблиц пока нет. После ручного сохранения здесь появятся две рабочие версии за сутки.";
       }
       if (savedTablesList) {
         savedTablesList.innerHTML = buildMainTableSavedNavigator(savedTableRecords);
+        attachMainTableSavedNavigatorEvents(savedTablesList);
       }
       syncMainTableSavedNavigatorUi();
       refreshMainTableSaveState();
@@ -13436,29 +13471,7 @@ function buildInitialPhotoLightboxState() {
       });
     }
 
-    document.querySelectorAll("[data-main-saved-nav]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const direction = Number(button.getAttribute("data-main-saved-nav") || "0");
-        if (!Number.isFinite(direction) || direction === 0) {
-          return;
-        }
-        moveMainTableSavedSelection(direction);
-        const selectedRecord = getSelectedMainTableSavedRecord();
-        state.activeMainTableSavedPreviewKey = selectedRecord ? selectedRecord.snapshotKey : "";
-        renderPage();
-      });
-    });
-
-    const mainTableSavedLiveBtn = document.getElementById("mainTableSavedLiveBtn");
-    if (mainTableSavedLiveBtn) {
-      mainTableSavedLiveBtn.addEventListener("click", () => {
-        if (!state.activeMainTableSavedPreviewKey) {
-          return;
-        }
-        state.activeMainTableSavedPreviewKey = "";
-        renderPage();
-      });
-    }
+    attachMainTableSavedNavigatorEvents();
 
     const departmentPdfArchiveSelect = document.getElementById("departmentPdfArchiveSelect");
     if (departmentPdfArchiveSelect) {
