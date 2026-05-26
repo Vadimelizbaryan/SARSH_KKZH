@@ -180,23 +180,7 @@
     accumulator[column.outgoingKey] = 0;
     return accumulator;
   }, {});
-  const admissionCalcLockKeys = [
-    "admittedTotal",
-    "admittedSoldier",
-    "admittedSeries",
-    "dgTotal",
-    "dgSoldier",
-    "dgSeries"
-  ];
   let fullEditUnlocked = false;
-
-  function getAdmissionDischargeCalcLockSum(values) {
-    return admissionCalcLockKeys.reduce((sum, key) => sum + toNumber(values[key]), 0);
-  }
-
-  function isAdmissionDischargeCalcLocked(values) {
-    return getAdmissionDischargeCalcLockSum(values) !== 0;
-  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -729,8 +713,6 @@
   function refreshCalculatorUi() {
     const values = readValues();
     const calculatorResult = getCalculatorResult(values);
-    const calcLocked = isAdmissionDischargeCalcLocked(values);
-    const lockSum = getAdmissionDischargeCalcLockSum(values);
 
     calculatorColumns.forEach((column) => {
       const baseTarget = root.querySelector(`[data-calc-base="${column.currentKey}"]`);
@@ -788,23 +770,9 @@
           </div>
         `;
     }
-    if (calcLocked && status) {
-      status.className = "tg-form-status bad";
-      status.innerHTML = `
-        <div class="tg-form-status-head">
-          <strong>Հաշվիչը արգելափակված է</strong>
-          <span>${escapeHtml(`4, 5, 6, 7, 8, 9 բջիջների գումարը պետք է լինի 0, հիմա՝ ${lockSum}։`)}</span>
-        </div>
-      `;
-    }
     if (applyButton) {
-      applyButton.disabled = !calculatorResult.isValid || calcLocked;
+      applyButton.disabled = !calculatorResult.isValid;
     }
-    root.querySelectorAll("[data-calc-key], [data-leave-calc-key], [data-transfer-calc-key]").forEach((input) => {
-      if (input instanceof HTMLInputElement) {
-        input.disabled = calcLocked;
-      }
-    });
   }
 
   function writeValuesToForm(values) {
@@ -819,10 +787,6 @@
 
   function applyCombinedCalculator() {
     const values = readValues();
-    if (isAdmissionDischargeCalcLocked(values)) {
-      refreshCalculatorUi();
-      return;
-    }
     const calculatorResult = getCalculatorResult(values);
     if (!calculatorResult.isValid) {
       refreshCalculatorUi();
