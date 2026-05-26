@@ -230,14 +230,6 @@
   );
   const QH_CALC_OPTIONAL_INPUT_KEYS = new Set(QH_CALC_COLUMNS.map((column) => column.baseKey));
   const QH_CALC_CURRENT_KEYS = new Set(QH_CALC_COLUMNS.map((column) => column.currentKey));
-  const DEPARTMENT_ADMISSION_LOCK_KEYS = [
-    "admittedTotal",
-    "admittedSoldier",
-    "admittedSeries",
-    "dgTotal",
-    "dgSoldier",
-    "dgSeries"
-  ];
   function getEffectiveQhCalcFieldRows(row = null) {
     return QH_CALC_FIELD_ROWS.map((definition, rowIndex) => {
       if (rowIndex !== 2) {
@@ -5138,24 +5130,8 @@ function buildInitialPhotoLightboxState() {
     return getDisplayValue(value);
   }
 
-  function getDepartmentAdmissionCalcLockSum(row) {
-    if (!row || !row.values) {
-      return 0;
-    }
-    return DEPARTMENT_ADMISSION_LOCK_KEYS.reduce((sum, key) => sum + (Number(row.values[key]) || 0), 0);
-  }
-
-  function isDepartmentAdmissionCalcLocked(row) {
-    return getDepartmentAdmissionCalcLockSum(row) !== 0;
-  }
-
-  function getDepartmentAdmissionCalcLockedMessage(row) {
-    const lockSum = getDepartmentAdmissionCalcLockSum(row);
-    return `Հաշվիչը արգելափակված է. 4, 5, 6, 7, 8, 9 բջիջների գումարը պետք է լինի 0, հիմա՝ ${lockSum}։`;
-  }
-
   function getDepartmentAdmissionCalcActiveMessage() {
-    return "Հաշվիչը ակտիվ է. 4, 5, 6, 7, 8, 9 բջիջների գումարը 0 է։";
+    return "Հաշվիչը հասանելի է։";
   }
 
   function syncDepartmentRowInput(rowId, key, value) {
@@ -5213,28 +5189,10 @@ function buildInitialPhotoLightboxState() {
       });
     });
 
-    const calcLocked = isDepartmentAdmissionCalcLocked(row);
-    const lockSum = getDepartmentAdmissionCalcLockSum(row);
-
-    document.querySelectorAll("[data-qh-calc-key], [data-leave-calc-key], [data-transfer-calc-key]").forEach((element) => {
-      if (element instanceof HTMLInputElement) {
-        element.disabled = calcLocked;
-      }
-    });
-
-    ["qhCalcApplyBtn", "leaveCalcApplyBtn", "transferCalcApplyBtn"].forEach((id) => {
-      const button = document.getElementById(id);
-      if (button instanceof HTMLButtonElement) {
-        button.disabled = calcLocked;
-      }
-    });
-
     const status = document.getElementById("qhCalcStatus");
     if (status) {
-      status.className = `qh-calc-status${calcLocked ? " qh-calc-status--bad" : ""}`;
-      status.textContent = calcLocked
-        ? getDepartmentAdmissionCalcLockedMessage(row)
-        : getDepartmentAdmissionCalcActiveMessage();
+      status.className = "qh-calc-status";
+      status.textContent = getDepartmentAdmissionCalcActiveMessage();
     }
   }
 
@@ -5244,10 +5202,6 @@ function buildInitialPhotoLightboxState() {
     const shouldAnnounce = options.announce !== false;
     const row = getDepartmentCalcTargetRow();
     if (!row) {
-      return;
-    }
-    if (isDepartmentAdmissionCalcLocked(row)) {
-      setInfo(getDepartmentAdmissionCalcLockedMessage(row), true);
       return;
     }
 
@@ -5350,10 +5304,6 @@ function buildInitialPhotoLightboxState() {
     if (!row) {
       return false;
     }
-    if (isDepartmentAdmissionCalcLocked(row)) {
-      setInfo(getDepartmentAdmissionCalcLockedMessage(row), true);
-      return false;
-    }
 
     const invalidColumns = LEAVE_CALC_COLUMNS.filter((column) =>
       (calcLeaveRemainingValue(row, column.type) || 0) < 0
@@ -5412,10 +5362,6 @@ function buildInitialPhotoLightboxState() {
     const shouldAnnounce = options.announce !== false;
     const row = getDepartmentCalcTargetRow();
     if (!row) {
-      return false;
-    }
-    if (isDepartmentAdmissionCalcLocked(row)) {
-      setInfo(getDepartmentAdmissionCalcLockedMessage(row), true);
       return false;
     }
 
@@ -5487,10 +5433,6 @@ function buildInitialPhotoLightboxState() {
     const shouldAnnounce = options.announce !== false;
     const row = getDepartmentCalcTargetRow();
     if (!row) {
-      return false;
-    }
-    if (isDepartmentAdmissionCalcLocked(row)) {
-      setInfo(getDepartmentAdmissionCalcLockedMessage(row), true);
       return false;
     }
 
