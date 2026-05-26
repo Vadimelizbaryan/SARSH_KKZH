@@ -11504,7 +11504,7 @@ function buildInitialPhotoLightboxState() {
         statusIsError: false
       };
       setInfo(`OCR данные для ${draftRow.department} сохранены в основную таблицу.`, false);
-      refreshTableData();
+      renderPage();
     } catch (error) {
       state.photoLightbox = {
         ...state.photoLightbox,
