@@ -1,0 +1,1254 @@
+:root {
+  color-scheme: light;
+  --tg-ink: #1f2a24;
+  --tg-muted: #65736c;
+  --tg-line: #d8cbb3;
+  --tg-paper: #fffaf0;
+  --tg-panel: rgba(255, 255, 255, 0.92);
+  --tg-accent: #0f8b4c;
+  --tg-danger: #b92d20;
+  --tg-warning: #a86d00;
+  --tg-shadow: 0 18px 55px rgba(80, 62, 30, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Trebuchet MS", "Noto Sans Armenian", Verdana, sans-serif;
+  color: var(--tg-ink);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 225, 149, 0.55), transparent 30%),
+    linear-gradient(135deg, #f8edda 0%, #fffdf8 42%, #e8f4e9 100%);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.tg-form-root {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 12px;
+}
+
+.tg-form-card {
+  background: var(--tg-panel);
+  border: 1px solid rgba(127, 99, 47, 0.22);
+  border-radius: 24px;
+  box-shadow: var(--tg-shadow);
+  padding: 16px;
+}
+
+.tg-form-kicker {
+  margin: 0 0 6px;
+  color: var(--tg-accent);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tg-form-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tg-form-title {
+  margin: 0;
+  font-size: clamp(20px, 5vw, 34px);
+  line-height: 1.05;
+}
+
+.tg-form-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tg-form-pill {
+  border: 1px solid rgba(15, 139, 76, 0.22);
+  border-radius: 999px;
+  background: rgba(15, 139, 76, 0.08);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tg-form-muted {
+  color: var(--tg-muted);
+}
+
+.tg-sheet-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tg-sheet-layout--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tg-sheet-section {
+  border: 1px solid rgba(15, 139, 76, 0.14);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(255, 222, 139, 0.12), rgba(255, 255, 255, 0.94)),
+    #fffdf8;
+  padding: 12px;
+}
+
+.tg-sheet-section--wide {
+  grid-column: 1 / -1;
+}
+
+.tg-sheet-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tg-sheet-section-note {
+  margin: 0;
+  color: var(--tg-muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tg-sheet-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.tg-sheet-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tg-sheet-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tg-sheet-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.tg-sheet-field {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(216, 203, 179, 0.85);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.tg-sheet-field.is-readonly {
+  background: #f7f2e9;
+}
+
+.tg-sheet-field-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tg-sheet-field-index {
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 999px;
+  background: rgba(31, 42, 36, 0.08);
+  color: #4b5d53;
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-sheet-field-label {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.tg-sheet-field-input,
+.tg-sheet-field-value {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 14px;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.tg-sheet-field-value {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(31, 42, 36, 0.18);
+  background: #f3efe7;
+  color: var(--tg-ink);
+}
+
+.tg-form-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--tg-line);
+  border-radius: 20px;
+  background: #fffdf8;
+}
+
+.tg-form-table {
+  width: 100%;
+  min-width: 1180px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.tg-form-table th,
+.tg-form-table td {
+  border: 1px solid var(--tg-line);
+  padding: 4px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.tg-form-table th {
+  background: #efe0c3;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-form-cell-number {
+  display: block;
+  color: var(--tg-muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.tg-form-cell-label {
+  display: block;
+  min-height: 22px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.tg-form-input,
+.tg-form-control-value {
+  width: 100%;
+  min-width: 46px;
+  min-height: 34px;
+  border: 1px solid rgba(31, 42, 36, 0.18);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  font-size: 14px;
+  font-weight: 900;
+  padding: 0 2px;
+  text-align: center;
+}
+
+.tg-form-input {
+  appearance: textfield;
+}
+
+.tg-form-input::-webkit-outer-spin-button,
+.tg-form-input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.tg-form-input:focus {
+  outline: 3px solid rgba(15, 139, 76, 0.18);
+  border-color: var(--tg-accent);
+}
+
+.tg-sheet-field .tg-form-input,
+.tg-sheet-field .tg-sheet-field-value {
+  min-height: 44px;
+  border-radius: 14px;
+  font-size: 24px;
+}
+
+.tg-sheet-field .tg-form-input {
+  padding: 0 6px;
+}
+
+.tg-form-input--readonly {
+  background: #f3efe7;
+  color: var(--tg-muted);
+  cursor: default;
+}
+
+.tg-form-input--readonly:focus {
+  outline-color: rgba(101, 115, 108, 0.18);
+  border-color: rgba(31, 42, 36, 0.18);
+}
+
+.tg-form-control-value {
+  display: grid;
+  place-items: center;
+  background: #f3efe7;
+  color: var(--tg-muted);
+}
+
+.tg-patient-notes {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(15, 139, 76, 0.16);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(255, 222, 139, 0.22), rgba(255, 255, 255, 0.92)),
+    #fffdf8;
+}
+
+.tg-patient-notes-summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.tg-patient-notes-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tg-patient-notes-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tg-patient-notes h2 {
+  margin: 0;
+  font-size: clamp(18px, 4vw, 24px);
+  line-height: 1.1;
+}
+
+.tg-patient-notes-badge {
+  border: 1px solid rgba(15, 139, 76, 0.22);
+  border-radius: 999px;
+  background: rgba(15, 139, 76, 0.08);
+  color: var(--tg-accent);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-patient-notes-help {
+  margin: 8px 0 12px;
+  color: var(--tg-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tg-patient-notes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tg-patient-note-section {
+  border: 1px solid rgba(216, 203, 179, 0.9);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 10px;
+}
+
+.tg-patient-note-section h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.tg-patient-note-lines {
+  display: grid;
+  gap: 6px;
+}
+
+.tg-patient-note-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.tg-patient-note-row span {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.tg-patient-note-input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(31, 42, 36, 0.16);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.tg-patient-note-input:focus {
+  outline: 3px solid rgba(15, 139, 76, 0.18);
+  border-color: var(--tg-accent);
+}
+
+.tg-patient-notes-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tg-patient-notes-actions button {
+  min-height: 36px;
+  border: 1px solid rgba(31, 42, 36, 0.14);
+  border-radius: 999px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-patient-notes-save {
+  background: #eaf6ef;
+  color: var(--tg-accent);
+}
+
+.tg-patient-notes-clear {
+  background: #fff0ed;
+  color: var(--tg-danger);
+}
+
+.tg-patient-notes-actions span {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-form-status {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(15, 139, 76, 0.08);
+  border: 1px solid rgba(15, 139, 76, 0.22);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.tg-form-status-head {
+  display: grid;
+  gap: 4px;
+}
+
+.tg-form-status-head strong {
+  font-size: 15px;
+}
+
+.tg-form-status-head span,
+.tg-validation-note {
+  color: var(--tg-muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tg-validation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tg-validation-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.tg-validation-bullet {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(15, 139, 76, 0.14);
+  color: var(--tg-accent);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-validation-item.is-bad .tg-validation-bullet {
+  background: rgba(185, 45, 32, 0.14);
+  color: var(--tg-danger);
+}
+
+.tg-form-status.bad {
+  background: rgba(185, 45, 32, 0.08);
+  border-color: rgba(185, 45, 32, 0.25);
+  color: var(--tg-danger);
+}
+
+.tg-form-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.tg-form-downloads {
+  margin-top: 10px;
+}
+
+.tg-form-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 42, 36, 0.14);
+  background: #eef5ff;
+  color: #1556a0;
+  font-size: 14px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.tg-inline-lock-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(31, 42, 36, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.department-top-lock-toggle {
+  position: relative;
+  display: inline-flex;
+  width: 56px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.department-top-lock-toggle input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: pointer;
+}
+
+.department-top-lock-toggle-slider {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: #d9ddd8;
+  transition: background-color 0.18s ease;
+  position: relative;
+}
+
+.department-top-lock-toggle-slider::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(31, 42, 36, 0.18);
+  transition: transform 0.18s ease;
+}
+
+.department-top-lock-toggle input:checked + .department-top-lock-toggle-slider {
+  background: var(--tg-accent);
+}
+
+.department-top-lock-toggle input:checked + .department-top-lock-toggle-slider::after {
+  transform: translateX(24px);
+}
+
+.department-top-lock-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.department-top-lock-meta strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.department-top-lock-meta span {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tg-form-submit {
+  min-height: 46px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--tg-accent);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-form-submit:disabled {
+  cursor: not-allowed;
+  background: #aab7af;
+}
+
+.tg-form-message {
+  min-height: 22px;
+  color: var(--tg-muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.tg-form-message.error {
+  color: var(--tg-danger);
+}
+
+.tg-form-message.success {
+  color: var(--tg-accent);
+}
+
+.tg-night-card {
+  padding: 12px;
+}
+
+.tg-night-table-wrap {
+  max-height: 70vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.tg-night-table {
+  min-width: 980px;
+}
+
+.tg-night-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  box-shadow: 0 2px 0 rgba(216, 203, 179, 0.95);
+}
+
+.tg-night-table th:first-child,
+.tg-night-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.tg-night-table tbody th {
+  background: #fff8e8;
+  text-align: left;
+}
+
+.tg-night-table thead th:first-child,
+.tg-night-table tfoot th {
+  background: #efe0c3;
+}
+
+.tg-night-table thead th:first-child {
+  z-index: 5;
+}
+
+.tg-night-table tfoot th,
+.tg-night-table tfoot td {
+  background: #ffed00;
+  font-weight: 900;
+}
+
+.tg-night-table tbody strong {
+  display: block;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tg-night-marker {
+  display: block;
+  color: var(--tg-warning);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.tg-civil-card {
+  padding: 12px;
+}
+
+.tg-civil-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.tg-civil-search,
+.tg-civil-search-btn {
+  min-height: 44px;
+  border: 1px solid rgba(31, 42, 36, 0.16);
+  border-radius: 16px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  font-weight: 900;
+}
+
+.tg-civil-search {
+  min-width: 0;
+  padding: 0 14px;
+  text-align: left;
+}
+
+.tg-civil-search-btn {
+  cursor: pointer;
+}
+
+.tg-civil-document-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.tg-civil-document-actions button {
+  min-height: 36px;
+  border: 1px solid rgba(15, 139, 76, 0.2);
+  border-radius: 999px;
+  background: #eaf6ef;
+  color: var(--tg-accent);
+  padding: 0 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-civil-document-actions button:disabled {
+  cursor: not-allowed;
+  color: var(--tg-muted);
+  background: #eef1ec;
+}
+
+.tg-civil-document-actions .tg-civil-delete-btn {
+  border-color: rgba(188, 70, 46, 0.28);
+  background: #fff0ed;
+  color: #a33123;
+}
+
+.tg-civil-document-actions span {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-civil-new-row {
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid rgba(15, 139, 76, 0.16);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 222, 139, 0.32), rgba(255, 255, 255, 0.92)),
+    #fff8e8;
+}
+
+.tg-civil-new-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.tg-civil-new-head strong {
+  color: var(--tg-accent);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.tg-civil-new-head span {
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-civil-new-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(260px, 2fr)
+    minmax(150px, 1fr)
+    minmax(140px, 0.9fr)
+    minmax(78px, 0.55fr)
+    minmax(74px, 0.45fr)
+    minmax(74px, 0.45fr)
+    minmax(116px, 0.72fr)
+    minmax(116px, 0.72fr)
+    auto;
+  gap: 8px;
+  align-items: end;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.tg-civil-new-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tg-civil-new-field span {
+  color: var(--tg-muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.tg-civil-new-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(31, 42, 36, 0.16);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.tg-civil-new-add {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--tg-accent);
+  color: #ffffff;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tg-civil-new-add:disabled {
+  cursor: not-allowed;
+  background: #a8b4aa;
+}
+
+.tg-civil-search:focus,
+.tg-civil-search-btn:focus,
+.tg-civil-input:focus,
+.tg-civil-new-input:focus {
+  outline: 3px solid rgba(15, 139, 76, 0.18);
+  border-color: var(--tg-accent);
+}
+
+.tg-civil-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0;
+  color: var(--tg-muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tg-civil-pagination button {
+  min-height: 36px;
+  border: 1px solid rgba(31, 42, 36, 0.14);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  padding: 0 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-civil-pagination button:disabled,
+.tg-civil-search-btn:disabled {
+  cursor: not-allowed;
+  color: var(--tg-muted);
+  background: #eef1ec;
+}
+
+.tg-civil-table-wrap {
+  max-height: 64vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.tg-civil-table {
+  min-width: 1270px;
+}
+
+.tg-civil-col-index {
+  width: 54px;
+}
+
+.tg-civil-col-patientName {
+  width: 360px;
+}
+
+.tg-civil-col-medicalCenter {
+  width: 170px;
+}
+
+.tg-civil-col-militaryUnit {
+  width: 160px;
+}
+
+.tg-civil-col-rank {
+  width: 88px;
+}
+
+.tg-civil-col-draftYear,
+.tg-civil-col-birthYear {
+  width: 82px;
+}
+
+.tg-civil-col-referralDate,
+.tg-civil-col-dischargeDate {
+  width: 137px;
+}
+
+.tg-civil-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  box-shadow: 0 2px 0 rgba(216, 203, 179, 0.95);
+}
+
+.tg-civil-table th:first-child,
+.tg-civil-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 54px;
+  min-width: 54px;
+  background: #fff8e8;
+  font-weight: 900;
+}
+
+.tg-civil-table thead th:first-child {
+  z-index: 5;
+  background: #efe0c3;
+}
+
+.tg-civil-table tr.is-selected th,
+.tg-civil-table tr.is-selected td {
+  background: #e7f7ec;
+}
+
+.tg-civil-table tr.is-selected .tg-civil-input {
+  border-color: rgba(21, 144, 94, 0.44);
+  background: #f6fff8;
+}
+
+.tg-civil-row-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tg-civil-row-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #15905e;
+}
+
+.tg-civil-wide-head {
+  min-width: 170px;
+}
+
+.tg-civil-wide-cell {
+  min-width: 170px;
+}
+
+.tg-civil-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(31, 42, 36, 0.16);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--tg-ink);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.tg-civil-date-input {
+  text-align: center;
+}
+
+.tg-civil-empty {
+  padding: 18px;
+  border: 1px dashed rgba(101, 115, 108, 0.4);
+  border-radius: 18px;
+  color: var(--tg-muted);
+  font-weight: 900;
+}
+
+.tg-civil-actions {
+  margin-top: 12px;
+}
+
+.tg-qh-card {
+  display: grid;
+  gap: 14px;
+}
+
+.tg-qh-table {
+  min-width: 920px;
+}
+
+.tg-qh-row-title {
+  min-width: 150px;
+  text-align: left;
+  padding-left: 12px !important;
+}
+
+.tg-qh-cell {
+  min-width: 96px;
+}
+
+.tg-qh-input,
+.tg-qh-output {
+  min-height: 48px;
+  font-size: 20px;
+}
+
+.tg-qh-cell--output .tg-qh-output {
+  background: rgba(15, 139, 76, 0.08);
+  color: var(--tg-accent);
+}
+
+.tg-qh-output-row td,
+.tg-qh-output-row th {
+  background: rgba(15, 139, 76, 0.05);
+}
+
+.tg-qh-formulas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tg-qh-formulas span {
+  border: 1px solid rgba(15, 139, 76, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tg-qh-preview {
+  padding: 0;
+}
+
+.tg-qh-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tg-qh-preview-card {
+  border: 1px solid rgba(216, 203, 179, 0.9);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 10px;
+}
+
+.tg-qh-preview-card h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.tg-qh-preview-items {
+  display: grid;
+  gap: 8px;
+}
+
+.tg-qh-preview-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #fffaf0;
+  border: 1px solid rgba(216, 203, 179, 0.9);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tg-qh-preview-item strong {
+  font-size: 20px;
+  color: var(--tg-accent);
+}
+
+@media (max-width: 720px) {
+  .tg-form-root {
+    padding: 8px;
+  }
+
+  .tg-form-card {
+    border-radius: 18px;
+    padding: 10px;
+  }
+
+  .tg-sheet-layout,
+  .tg-sheet-grid--2,
+  .tg-sheet-grid--3,
+  .tg-sheet-grid--4 {
+    grid-template-columns: 1fr;
+  }
+
+  .tg-form-table {
+    min-width: 1120px;
+  }
+
+  .tg-form-table th,
+  .tg-form-table td {
+    padding: 4px;
+  }
+
+  .tg-form-input,
+  .tg-form-control-value {
+    min-width: 44px;
+    min-height: 32px;
+    font-size: 13px;
+  }
+
+  .tg-sheet-field .tg-form-input,
+  .tg-sheet-field .tg-sheet-field-value {
+    min-height: 40px;
+    font-size: 22px;
+  }
+
+  .tg-patient-notes {
+    padding: 10px;
+  }
+
+  .tg-patient-notes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tg-patient-note-input {
+    min-height: 34px;
+    font-size: 13px;
+  }
+
+  .tg-qh-table {
+    min-width: 840px;
+  }
+
+  .tg-qh-row-title {
+    min-width: 132px;
+  }
+
+  .tg-qh-cell {
+    min-width: 92px;
+  }
+
+  .tg-qh-input,
+  .tg-qh-output {
+    min-height: 44px;
+    font-size: 18px;
+  }
+
+  .tg-qh-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tg-night-table {
+    min-width: 880px;
+  }
+
+  .tg-night-table tbody strong {
+    max-width: 82px;
+  }
+
+  .tg-civil-table {
+    min-width: 1180px;
+  }
+
+  .tg-civil-col-patientName {
+    width: 330px;
+  }
+
+  .tg-civil-col-medicalCenter,
+  .tg-civil-col-militaryUnit {
+    width: 150px;
+  }
+
+  .tg-civil-col-rank {
+    width: 80px;
+  }
+
+  .tg-civil-col-draftYear,
+  .tg-civil-col-birthYear {
+    width: 76px;
+  }
+
+  .tg-civil-col-referralDate,
+  .tg-civil-col-dischargeDate {
+    width: 128px;
+  }
+
+  .tg-civil-table th:first-child,
+  .tg-civil-table td:first-child {
+    width: 44px;
+    min-width: 44px;
+  }
+
+  .tg-civil-input {
+    min-height: 34px;
+    font-size: 13px;
+    padding: 0 8px;
+  }
+
+  .tg-civil-new-grid {
+    grid-template-columns:
+      minmax(250px, 2fr)
+      minmax(140px, 1fr)
+      minmax(128px, 0.9fr)
+      minmax(76px, 0.55fr)
+      minmax(70px, 0.45fr)
+      minmax(70px, 0.45fr)
+      minmax(112px, 0.72fr)
+      minmax(112px, 0.72fr)
+      auto;
+  }
+
+  .tg-civil-new-input,
+  .tg-civil-new-add {
+    min-height: 34px;
+    font-size: 13px;
+  }
+}

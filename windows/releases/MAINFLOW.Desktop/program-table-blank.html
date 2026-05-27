@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="hy">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ô¾Ö€Õ¡Õ£Ö€Õ¡ÕµÕ«Õ¶ Õ¢Õ¬Õ¡Õ¶Õ¯</title>
+  <link rel="stylesheet" href="assets/sharsh.css?v=20260524printbw1">
+  <style>
+    body {
+      margin: 0;
+      background: #efe9dd;
+      color: var(--ink);
+      font-family: "Sylfaen", "Noto Serif Armenian", serif;
+    }
+
+    .print-page {
+      width: 1480px;
+      margin: 24px auto;
+      background: #ffffff;
+      padding: 28px 32px 36px;
+      box-shadow: 0 12px 40px rgba(17, 17, 17, 0.12);
+      box-sizing: border-box;
+    }
+
+    .blank-head {
+      position: relative;
+      min-height: 68px;
+      margin-bottom: 10px;
+    }
+
+    .blank-title {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1.2;
+      padding-top: 8px;
+    }
+
+    .blank-marker {
+      position: absolute;
+      top: 0;
+      right: 0;
+      min-width: 120px;
+      min-height: 72px;
+      border: 2px solid var(--grid);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 800;
+      background: #ffffff;
+      box-sizing: border-box;
+    }
+
+    .table-wrap {
+      overflow: visible;
+      border-radius: 0;
+      margin-top: 8px;
+    }
+
+    .sheet {
+      min-width: 0;
+    }
+
+    .sheet tbody tr {
+      height: 48px;
+    }
+
+    .sheet tbody tr.single-total-row td.data-cell,
+    .sheet tbody tr.single-total-row .dept-cell {
+      background: var(--peach);
+    }
+
+    .sheet tbody tr.blank-entry-row td.data-cell,
+    .sheet tbody tr.blank-entry-row .dept-cell {
+      background: #ffffff;
+    }
+
+    .sheet tbody td.data-cell span {
+      min-height: 40px;
+      padding: 12px 4px 8px;
+    }
+
+    .blank-notes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px 72px;
+      margin-top: 18px;
+    }
+
+    .note-block {
+      display: grid;
+      gap: 6px;
+    }
+
+    .note-block h3 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .note-line {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      font-size: 16px;
+      line-height: 1.2;
+      min-height: 20px;
+    }
+
+    .note-line .index {
+      flex: 0 0 auto;
+      min-width: 22px;
+    }
+
+    .note-line .rule {
+      flex: 1 1 auto;
+      border-bottom: 1px solid #111111;
+      min-height: 16px;
+    }
+
+    .footer-meta {
+      display: flex;
+      justify-content: center;
+      gap: 72px;
+      margin-top: 26px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .footer-meta span {
+      display: inline-flex;
+      gap: 8px;
+      align-items: flex-end;
+      min-width: 320px;
+    }
+
+    .footer-meta .rule {
+      flex: 1 1 auto;
+      border-bottom: 1px solid #111111;
+      min-height: 16px;
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+      }
+
+      .print-page {
+        width: auto;
+        margin: 0;
+        padding: 12px 14px 20px;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="print-page">
+    <header class="blank-head">
+      <div class="blank-title">Ô¾Ö€Õ¡Õ£Ö€Õ¡ÕµÕ«Õ¶ Õ¢Õ¬Õ¡Õ¶Õ¯</div>
+      <div class="blank-marker">SR-00</div>
+    </header>
+
+    <div class="table-wrap">
+      <table class="sheet" aria-label="Ô¾Ö€Õ¡Õ£Ö€Õ¡ÕµÕ«Õ¶ Õ¡Õ²ÕµÕ¸Ö‚Õ½Õ¡Õ¯">
+        <colgroup>
+          <col class="dept-col">
+          <col class="num-col"><col class="num-col"><col class="num-col">
+          <col class="num-col"><col class="num-col"><col class="num-col">
+          <col class="num-col"><col class="num-col"><col class="num-col">
+          <col class="num-col"><col class="num-col">
+          <col class="num-col">
+          <col class="num-col"><col class="num-col"><col class="num-col">
+          <col class="num-col"><col class="num-col"><col class="num-col">
+          <col class="num-col"><col class="num-col"><col class="num-col">
+          <col class="num-col">
+
+          <col class="wide-col">
+        </colgroup>
+        <thead>
+          <tr>
+            <th rowspan="2" class="hdr-peach dept-head">Ô²Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„</th>
+            <th colspan="3" rowspan="2" class="hdr-peach group-end">ÔµÕ²Õ¥Õ¬ Õ§</th>
+            <th colspan="3" rowspan="2" class="hdr-peach group-end">Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¾Õ¥Õ¬ Õ§</th>
+            <th colspan="3" rowspan="2" class="hdr-peach group-end">Ô´/Ô³</th>
+            <th colspan="2" rowspan="2" class="hdr-peach group-end major-left">ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­</th>
+            <th colspan="8" class="hdr-peach major-left">Ô±Õ¼Õ¯Õ¡ Õ§</th>
+            <th colspan="3" class="hdr-peach major-left">Õ¸Ö€Õ¸Õ¶ÖÕ«Ö Õ¢Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶</th>
+            <th class="hdr-yellow major-left">&nbsp;</th>
+          </tr>
+          <tr>
+            <th rowspan="2" class="hdr-yellow major-left">Ô¸Õ†Ô´Ô±Õ„</th>
+            <th colspan="3" class="hdr-peach">Ô¶Õ«Õ¶Õ®Õ¡Õ¼Õ¡ÕµÕ¸Õ²</th>
+            <th rowspan="2" class="hdr-peach">Ô¶/Õ€</th>
+            <th rowspan="2" class="hdr-peach">Ô¶/Ô¾ Õ¨Õ¶Õ¿</th>
+            <th rowspan="2" class="hdr-peach">Ô¶/ÕŠ</th>
+            <th rowspan="2" class="hdr-peach">Õ”-Õ«</th>
+            <th colspan="3" class="hdr-peach major-left">Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ¸Ö‚Õ´</th>
+            <th rowspan="2" class="hdr-yellow major-left">Ô¸Õ¶Õ¤Õ°Õ¡Õ¶Õ¸Ö‚Ö€</th>
+          </tr>
+          <tr>
+            <th class="hdr-peach dept-head">
+              <div class="sheet-datetime" aria-label="Ô±Õ´Õ½Õ¡Õ©Õ«Õ¾ Ö‡ ÕªÕ¡Õ´">
+                <span class="sheet-datetime-date">__.__.____</span>
+                <span class="sheet-datetime-time">__:__</span>
+              </div>
+            </th>
+            <th class="hdr-peach">Ô¸Õ†Ô´</th>
+            <th class="hdr-peach-dark">Ô¶/Ô¾</th>
+            <th class="hdr-peach group-end">Õ‡Ô±Õ</th>
+            <th class="hdr-peach">Ô¸Õ†Ô´</th>
+            <th class="hdr-peach-dark">Ô¶/Ô¾</th>
+            <th class="hdr-peach group-end">Õ‡Ô±Õ</th>
+            <th class="hdr-peach">Ô¸Õ†Ô´</th>
+            <th class="hdr-peach-dark">Ô¶/Ô¾</th>
+            <th class="hdr-peach group-end">Õ‡Ô±Õ</th>
+            <th class="hdr-peach major-left">ÕÕ¥Õ²Õ¡Öƒ Õ¢Õ¡ÕªÕ¶Õ«Ö</th>
+            <th class="hdr-peach group-end">ÕÕ¥Õ²Õ¡Öƒ Õ¢Õ¡ÕªÕ«Õ¶</th>
+            <th class="hdr-peach">Õ‡Ô±Õ</th>
+            <th class="hdr-peach">ÕÕŠÔ±</th>
+            <th class="hdr-peach">ÕŠÔ±Õ…Õ„</th>
+            <th class="hdr-peach major-left">Õ‡Ô±ÕÕ”</th>
+            <th class="hdr-peach">ÕÕŠÔ±</th>
+            <th class="hdr-peach">ÕŠÔ±Õ…Õ„</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="detail-row primary-row blank-entry-row">
+            <td class="dept-cell">________________</td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell group-end"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell group-end"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell group-end"><span></span></td>
+            <td class="data-cell major-left"><span></span></td>
+            <td class="data-cell group-end"><span></span></td>
+            <td class="data-cell calc-cell major-left"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell major-left"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell calc-cell major-left"><span></span></td>
+          </tr>
+          <tr class="single-total-row">
+            <td class="dept-cell">Ð˜Ñ‚Ð¾Ð³ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ</td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell group-end"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell group-end"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell group-end"><span></span></td>
+            <td class="data-cell major-left"><span></span></td>
+            <td class="data-cell group-end"><span></span></td>
+            <td class="data-cell calc-cell major-left"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell major-left"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell"><span></span></td>
+            <td class="data-cell calc-cell major-left"><span></span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <section class="blank-notes" aria-label="Ô¼Ö€Õ¡ÖÕ¸Ö‚ÖÕ«Õ¹ Õ¢Õ¡ÕªÕ«Õ¶Õ¶Õ¥Ö€">
+      <div class="note-block">
+        <h3>Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¾Õ¡Õ® Õ°Õ«Õ¾Õ¡Õ¶Õ¤Õ¶Õ¥Ö€Õ¨</h3>
+        <div class="note-line"><span class="index">1.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">2.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">3.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">4.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">5.</span><span class="rule"></span></div>
+      </div>
+
+      <div class="note-block">
+        <h3>Ô´Õ¸Ö‚Ö€Õ½ Õ£Ö€Õ¾Õ¡Õ® Õ°Õ«Õ¾Õ¡Õ¶Õ¤Õ¶Õ¥Ö€Õ¨</h3>
+        <div class="note-line"><span class="index">1.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">2.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">3.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">4.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">5.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">6.</span><span class="rule"></span></div>
+      </div>
+
+      <div class="note-block">
+        <h3>ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­Õ¾Õ¡Õ® Õ°Õ«Õ¾Õ¡Õ¶Õ¤Õ¶Õ¥Ö€Õ¨</h3>
+        <div class="note-line"><span class="index">1.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">2.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">3.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">4.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">5.</span><span class="rule"></span></div>
+      </div>
+
+      <div class="note-block">
+        <h3>ÕŽÕ¥Ö€Õ¡Õ¤Õ¡Ö€Õ±Õ¥Õ¬ Õ¥Õ¶ Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ«Ö</h3>
+        <div class="note-line"><span class="index">1.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">2.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">3.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">4.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">5.</span><span class="rule"></span></div>
+      </div>
+
+      <div class="note-block">
+        <h3>Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¾Õ¡Õ®-Õ¹Õ¿Õ¡Ö€Õ¾Õ¡Õ®</h3>
+        <div class="note-line"><span class="index">1.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">2.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">3.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">4.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">5.</span><span class="rule"></span></div>
+      </div>
+
+      <div class="note-block">
+        <h3>Ô³Õ¶Õ¡ÖÕ¥Õ¬ Õ¥Õ¶ Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤</h3>
+        <div class="note-line"><span class="index">1.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">2.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">3.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">4.</span><span class="rule"></span></div>
+        <div class="note-line"><span class="index">5.</span><span class="rule"></span></div>
+      </div>
+    </section>
+
+    <footer class="footer-meta">
+      <span>Ô±Õ´Õ½Õ¡Õ©Õ«Õ¾ <i class="rule"></i></span>
+      <span>Õ€Õ¥Ö€Õ©Õ¡ÕºÕ¡Õ° <i class="rule"></i></span>
+    </footer>
+  </main>
+</body>
+</html>

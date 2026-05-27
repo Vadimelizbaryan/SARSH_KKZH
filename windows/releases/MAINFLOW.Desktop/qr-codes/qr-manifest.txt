@@ -1,0 +1,96 @@
+SARSH_KKZH QR manifest
+
+Main page
+Document: index.html
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/index.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\main-index.png
+
+Setup page
+Document: setup.html
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/setup.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\setup-sync.png
+
+Վիրաբուժական
+Document: Վիրաբուժական.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/te9625wg.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\te9625wg.png
+
+Դիմածնոտային վիր
+Document: Դիմածնոտային վիր.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/1ei6dnv2.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\1ei6dnv2.png
+
+Քիթ-կոկորդ բ-ք
+Document: Քիթ-կոկորդ բ-ք.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/du9wa6oq.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\du9wa6oq.png
+
+Ակնաբուժական
+Document: Ակնաբուժական.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/08xa44ew.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\08xa44ew.png
+
+Վնասվածքաբանական
+Document: Վնասվածքաբանական.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/v1914tm9.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\v1914tm9.png
+
+Կրծքային մ-բ
+Document: Կրծքային մ-բ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/c3usp3r9.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\c3usp3r9.png
+
+Ուռոլոգիական
+Document: Ուռոլոգիական.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/g5u3jca0.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\g5u3jca0.png
+
+Նեյրովիրաբուժական
+Document: Նեյրովիրաբուժական.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/4k6uv2xu.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\4k6uv2xu.png
+
+Թռիչքային
+Document: Թռիչքային.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/ltndeohl.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\ltndeohl.png
+
+Թերապիա
+Document: Թերապիա.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/ptf9nvbv.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\ptf9nvbv.png
+
+Վերակենդանացման
+Document: Վերակենդանացման.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/9htuxle8.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\9htuxle8.png
+
+Նյարդաբանական
+Document: Նյարդաբանական.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/ldvp99z7.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\ldvp99z7.png
+
+Գինեկոլոգիական
+Document: Գինեկոլոգիական.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/zzphaoqo.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\zzphaoqo.png
+
+ԱՆՈԹԱՅԻՆ
+Document: ԱՆՈԹԱՅԻՆ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/4zby7qi3.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\4zby7qi3.png
+
+ԻՆՖ
+Document: ԻՆՖ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/c5mv5bh4.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\c5mv5bh4.png
+
+ԱՏԴ
+Document: ԱՏԴ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/5s7rrwg9.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\5s7rrwg9.png
+
+Ք-Հ
+Document: Ք-Հ.docx
+HTML: https://vadimelizbaryan.github.io/SARSH_KKZH/bgej6lyx/3ofsacp6.html
+QR: C:\Users\user\Desktop\SHARSH AI\qr-codes\3ofsacp6.png
