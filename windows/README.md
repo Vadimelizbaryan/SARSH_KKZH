@@ -11,8 +11,9 @@ Windows shell for the MAINFLOW web app.
 ## Offline queue
 
 Offline edits are stored locally and added to a pending sync queue.
-After the internet returns, you can send the accumulated changes back to the server
-from the page itself or from the desktop shell button `Синхр. накопл.`.
+After the internet returns, the queue is sent automatically in the background.
+The page button and the desktop shell button `Синхр. накопл.` remain available
+as a manual fallback.
 
 ## Build
 

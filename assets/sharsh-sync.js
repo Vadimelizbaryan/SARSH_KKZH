@@ -214,7 +214,7 @@
   function getPendingSyncMessage(status = getPendingSyncStatus(), lastError = "") {
     const count = Number(status?.count) || 0;
     const base = count > 0
-      ? `Накоплено несинхронизированных изменений: ${count}. При появлении интернета нажмите «Синхр. накопл.».`
+      ? `Накоплено несинхронизированных изменений: ${count}. При появлении интернета очередь отправится автоматически, а кнопку синхронизации можно использовать вручную.`
       : "Очередь синхронизации пуста.";
     const errorText = typeof lastError === "string" && lastError.trim()
       ? lastError.trim()

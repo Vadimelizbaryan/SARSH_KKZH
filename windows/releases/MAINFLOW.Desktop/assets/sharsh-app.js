@@ -3,6 +3,9 @@
   const sync = window.SHARSH_SYNC;
   const auth = window.SHARSH_AUTH || null;
   const app = document.getElementById("app");
+  const PENDING_SYNC_EVENT_NAME = "sharsh-pending-sync-changed";
+  const AUTO_PENDING_SYNC_DELAY_MS = 1500;
+  const AUTO_PENDING_SYNC_RETRY_MS = Math.max(15000, Number(sync?.runtime?.refreshIntervalMs) || 30000);
 
   if (!config || !sync || !app) {
     return;
@@ -579,6 +582,9 @@ function buildInitialPhotoLightboxState() {
     refreshIntervalId: 0,
     freshnessIntervalId: 0,
     clockIntervalId: 0,
+    pendingSyncAutoTimerId: 0,
+    pendingSyncAutoRetryAfter: 0,
+    pendingSyncEventsBound: false,
     updateAudioContext: null,
     updateAudioBound: false,
     updateAttentionIntervalId: 0,
@@ -7853,13 +7859,13 @@ function buildInitialPhotoLightboxState() {
       if (!sync.hasRemoteSync()) {
         return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼, Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¶Ð´ÑƒÑ‚ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸.`;
       }
-      return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. ÐœÐ¾Ð¶Ð½Ð¾ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð² ÑÐµÑ€Ð²ÐµÑ€ Ð¾Ð´Ð½Ð¾Ð¹ ÐºÐ½Ð¾Ð¿ÐºÐ¾Ð¹.`;
+      return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð² Ñ„Ð¾Ð½Ðµ, Ð° ÐºÐ½Ð¾Ð¿ÐºÐ° Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ Ð´Ð»Ñ Ñ€ÑƒÑ‡Ð½Ð¾Ð¹ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.`;
     }
     if (status.lastSyncedAt) {
       return `ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ Ð¿ÑƒÑÑ‚Ð°. ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ ÑƒÑÐ¿ÐµÑˆÐ½Ð°Ñ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ñ: ${formatTimestamp(status.lastSyncedAt)}.`;
     }
     return sync.hasRemoteSync()
-      ? "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°."
+      ? "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°. Ð¤Ð¾Ð½Ð¾Ð²Ð°Ñ Ð°Ð²Ñ‚Ð¾ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ñ Ð²ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°."
       : "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼. ÐÐ¾Ð²Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð±ÑƒÐ´ÑƒÑ‚ Ð½Ð°ÐºÐ°Ð¿Ð»Ð¸Ð²Ð°Ñ‚ÑŒÑÑ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾.";
   }
 
@@ -7871,6 +7877,89 @@ function buildInitialPhotoLightboxState() {
       return "Ð§Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ, Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÐµÑÑŒ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼.";
     }
     return "";
+  }
+
+  function clearBackgroundPendingSyncSchedule() {
+    window.clearTimeout(state.pendingSyncAutoTimerId);
+    state.pendingSyncAutoTimerId = 0;
+  }
+
+  function hasBlockingLocalWorkForBackgroundSync() {
+    if (state.mainTableSaveInFlight) {
+      return true;
+    }
+    if (mode === "department") {
+      return hasDepartmentPendingLocalChanges();
+    }
+    if (mode === "main") {
+      return state.mainTableUnlocked || hasMainTablePendingLocalChanges();
+    }
+    if (mode === "feedback") {
+      const lightbox = state.photoLightbox || buildInitialPhotoLightboxState();
+      return Boolean(
+        lightbox.open
+        || lightbox.isSaving
+        || lightbox.isRechecking
+        || lightbox.isReassigning
+      );
+    }
+    return false;
+  }
+
+  function scheduleBackgroundPendingSync(options = {}) {
+    if (!state.initialized) {
+      return;
+    }
+
+    const status = getPendingSyncStatus();
+    if (!status.hasPending || status.isSyncing || !sync.hasRemoteSync()) {
+      clearBackgroundPendingSyncSchedule();
+      return;
+    }
+
+    if (state.pendingSyncAutoTimerId) {
+      return;
+    }
+
+    const requestedDelay = Math.max(0, Number(options.delayMs) || AUTO_PENDING_SYNC_DELAY_MS);
+    const retryDelay = Math.max(0, Number(state.pendingSyncAutoRetryAfter) - Date.now());
+    const effectiveDelay = Math.max(requestedDelay, retryDelay);
+
+    state.pendingSyncAutoTimerId = window.setTimeout(() => {
+      state.pendingSyncAutoTimerId = 0;
+      void runPendingSyncNow({
+        silent: true,
+        background: true
+      });
+    }, effectiveDelay);
+  }
+
+  function bindBackgroundPendingSyncEvents() {
+    if (state.pendingSyncEventsBound) {
+      return;
+    }
+
+    window.addEventListener("online", () => {
+      scheduleBackgroundPendingSync({
+        delayMs: AUTO_PENDING_SYNC_DELAY_MS
+      });
+    });
+
+    window.addEventListener(PENDING_SYNC_EVENT_NAME, () => {
+      scheduleBackgroundPendingSync({
+        delayMs: AUTO_PENDING_SYNC_DELAY_MS
+      });
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        scheduleBackgroundPendingSync({
+          delayMs: 250
+        });
+      }
+    });
+
+    state.pendingSyncEventsBound = true;
   }
 
   function renderPendingSyncControls() {
@@ -10275,6 +10364,7 @@ function buildInitialPhotoLightboxState() {
       pendingSyncBtn.classList.toggle("save-ready", Boolean(pendingSyncStatus.hasPending && sync.hasRemoteSync() && !pendingSyncStatus.isSyncing));
       pendingSyncBtn.disabled = !(pendingSyncStatus.hasPending && sync.hasRemoteSync() && !pendingSyncStatus.isSyncing);
     }
+    scheduleBackgroundPendingSync();
     pills.forEach((pill) => {
       pill.textContent = sync.getSourceLabel(state.source);
       pill.classList.toggle("remote", state.source === "remote");
@@ -13018,9 +13108,13 @@ function buildInitialPhotoLightboxState() {
       unlockCurrentDepartment();
       await loadWorkingSnapshot();
       renderPage();
+      bindBackgroundPendingSyncEvents();
       startAutoRefreshIfNeeded();
       startFreshnessTicker();
       startClockTicker();
+      scheduleBackgroundPendingSync({
+        delayMs: AUTO_PENDING_SYNC_DELAY_MS
+      });
       await maybeResumeTransferredPhotoImport();
     } catch (error) {
       clearCurrentDepartmentUnlock();
@@ -13406,10 +13500,15 @@ function buildInitialPhotoLightboxState() {
     localStorage.setItem(config.getZoomStorageKey(zoomScope), String(normalized));
   }
 
-  async function runPendingSyncNow() {
+  async function runPendingSyncNow(options = {}) {
+    const silent = Boolean(options.silent);
+    const background = Boolean(options.background);
     const statusBefore = getPendingSyncStatus();
+    clearBackgroundPendingSyncSchedule();
     if (!statusBefore.hasPending) {
-      setInfo("ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+      if (!silent) {
+        setInfo("ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+      }
       refreshTableData();
       return {
         ok: true,
@@ -13419,7 +13518,9 @@ function buildInitialPhotoLightboxState() {
     }
     if (!sync.hasRemoteSync()) {
       const message = "Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ñ… Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ Ð²ÐºÐ»ÑŽÑ‡Ð¸Ñ‚Ðµ Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼.";
-      setInfo(message, true);
+      if (!silent) {
+        setInfo(message, true);
+      }
       refreshTableData();
       return {
         ok: false,
@@ -13428,28 +13529,48 @@ function buildInitialPhotoLightboxState() {
       };
     }
 
-    setInfo(`Ð¡Ð¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€ÑƒÑŽ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ: ${statusBefore.count}...`, false);
+    if (!silent) {
+      setInfo(`Ð¡Ð¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€ÑƒÑŽ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ: ${statusBefore.count}...`, false);
+    }
     refreshTableData();
 
     try {
       const result = await sync.syncPendingChanges();
-      const reloaded = await sync.loadSnapshot();
-      applyLoadedSnapshot(reloaded);
-      restorePendingMainSaveNotice();
       const syncedCount = Number(result?.syncedCount) || statusBefore.count;
-      setInfo(syncedCount > 0 ? `ÐÐ°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€: ${syncedCount}.` : "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+      state.pendingSyncAutoRetryAfter = 0;
 
-      if (mode === "feedback") {
-        await loadFeedbackRecords(false);
-      }
-      if (mode === "department") {
-        await maybeLoadTelegramFeedbackValues();
-        cancelAutoAppliedTelegramSelectionIfNeeded();
-        await maybeLoadStoredDepartmentPhotoAdjusted();
-        await maybeAutoRecognizeLoadedTelegramPhoto();
-      }
+      if (!background || !hasBlockingLocalWorkForBackgroundSync()) {
+        const reloaded = await sync.loadSnapshot();
+        applyLoadedSnapshot(reloaded);
+        restorePendingMainSaveNotice();
 
-      renderPage();
+        if (mode === "feedback") {
+          await loadFeedbackRecords(false);
+        }
+        if (mode === "department") {
+          await maybeLoadTelegramFeedbackValues();
+          cancelAutoAppliedTelegramSelectionIfNeeded();
+          await maybeLoadStoredDepartmentPhotoAdjusted();
+          await maybeAutoRecognizeLoadedTelegramPhoto();
+        }
+
+        if (!silent) {
+          setInfo(syncedCount > 0 ? `ÐÐ°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€: ${syncedCount}.` : "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+        }
+        renderPage();
+      } else {
+        if (state.source === "pending-sync") {
+          state.source = "remote";
+        }
+        if (typeof state.warning === "string" && state.warning) {
+          state.warning = "";
+        }
+        restorePendingMainSaveNotice();
+        refreshTableData();
+        if (!silent) {
+          setInfo(syncedCount > 0 ? `ÐÐ°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€: ${syncedCount}.` : "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+        }
+      }
       return {
         ok: true,
         syncedCount,
@@ -13457,18 +13578,31 @@ function buildInitialPhotoLightboxState() {
       };
     } catch (error) {
       try {
-        const reloaded = await sync.loadSnapshot();
-        applyLoadedSnapshot(reloaded);
+        if (!background || !hasBlockingLocalWorkForBackgroundSync()) {
+          const reloaded = await sync.loadSnapshot();
+          applyLoadedSnapshot(reloaded);
+        }
       } catch (_reloadError) {
       }
 
       const message = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ.";
-      setInfo(message, true);
+      state.pendingSyncAutoRetryAfter = Date.now() + AUTO_PENDING_SYNC_RETRY_MS;
+      if (!silent) {
+        setInfo(message, true);
+      } else {
+        refreshTableData();
+      }
 
-      if (mode === "feedback") {
+      if (!background && mode === "feedback") {
         await loadFeedbackRecords(false);
       }
-      renderPage();
+      if (!background) {
+        renderPage();
+      } else {
+        scheduleBackgroundPendingSync({
+          delayMs: AUTO_PENDING_SYNC_RETRY_MS
+        });
+      }
       return {
         ok: false,
         error: message,
@@ -14354,10 +14488,14 @@ function buildInitialPhotoLightboxState() {
       await loadFeedbackRecords(true);
     }
     renderPage();
+    bindBackgroundPendingSyncEvents();
     void refreshDepartmentPdfArchiveRecordsFromRemote();
     startAutoRefreshIfNeeded();
     startFreshnessTicker();
     startClockTicker();
+    scheduleBackgroundPendingSync({
+      delayMs: AUTO_PENDING_SYNC_DELAY_MS
+    });
     await maybeResumeTransferredPhotoImport();
     await maybeLoadTelegramFeedbackPhotoAdjusted();
     await maybeLoadTelegramFeedbackValues();
