@@ -5881,7 +5881,7 @@ function buildInitialPhotoLightboxState() {
       return false;
     }
 
-    const originalPresentTotal = calcPresentTotal(state.snapshot, row) || 0;
+    const originalCell1 = getNumber(state.snapshot, row, "beenTotal") || 0;
     const originalMilitary = getNumber(state.snapshot, row, "beenSoldier") || 0;
     const originalSeries = getNumber(state.snapshot, row, "beenSeries") || 0;
 
@@ -5963,7 +5963,7 @@ function buildInitialPhotoLightboxState() {
       return false;
     }
 
-    row.values.beenTotal = originalPresentTotal;
+    row.values.beenTotal = originalCell1;
     row.values.beenSoldier = originalMilitary;
     row.values.beenSeries = originalSeries;
     row.values.admittedTotal = QH_CALC_COLUMNS.reduce((sum, column) => sum + incomingByType[column.type], 0);
