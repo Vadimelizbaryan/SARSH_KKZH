@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
@@ -15,12 +16,28 @@ public partial class Form1 : Form
     private const string RemoteFunctionName = "sharsh-sync";
     private const string AutoStartRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string AutoStartRegistryValueName = "MAINFLOW Desktop";
+    private const string RemoteDesktopManifestUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/MAINFLOW.Desktop/package-manifest.json";
+    private const string RemoteDesktopSetupUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/Mainflow.exe";
+    private const int AutoUpdateIntervalMs = 20 * 60 * 1000;
+    private const int InitialVisibleUpdateDelayMs = 90 * 1000;
+    private const int InitialBackgroundUpdateDelayMs = 15 * 1000;
 
     private readonly bool _startInBackground;
     private readonly string _webRootPath;
     private readonly string _appDataRoot;
     private readonly string _webViewUserDataPath;
     private readonly string _stateFilePath;
+    private readonly string _localPackageManifestPath;
+    private readonly string _updateCacheDir;
+    private readonly HttpClient _releaseHttpClient = new()
+    {
+        Timeout = TimeSpan.FromMinutes(20)
+    };
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true
+    };
     private readonly Dictionary<string, string> _pageTitles = new(StringComparer.OrdinalIgnoreCase)
     {
         [DefaultRelativePage] = "Главная таблица",
@@ -36,6 +53,7 @@ public partial class Form1 : Form
     private readonly ToolStripMenuItem _trayMenuSync;
     private readonly ToolStripMenuItem _trayMenuAutoStart;
     private readonly ToolStripMenuItem _trayMenuExit;
+    private readonly System.Windows.Forms.Timer _autoUpdateTimer;
 
     private DesktopShellState _shellState;
     private bool _suppressModeEvents;
@@ -43,12 +61,19 @@ public partial class Form1 : Form
     private bool _allowClose;
     private bool _trayHintShown;
     private bool _backgroundLaunchHandled;
+    private bool _updateCheckInProgress;
+    private bool _updateInstallInProgress;
     private string _currentRelativePage = DefaultRelativePage;
+    private string _pendingUpdateToken = string.Empty;
+    private string _lastAnnouncedUpdateToken = string.Empty;
 
     public Form1(bool startInBackground = false)
     {
         _startInBackground = startInBackground;
         InitializeComponent();
+
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+        Text = "Mainflow Desktop";
 
         _webRootPath = AppContext.BaseDirectory;
         _appDataRoot = Path.Combine(
@@ -57,9 +82,12 @@ public partial class Form1 : Form
         );
         _webViewUserDataPath = Path.Combine(_appDataRoot, "WebView2");
         _stateFilePath = Path.Combine(_appDataRoot, "desktop-state.json");
+        _localPackageManifestPath = Path.Combine(_webRootPath, "package-manifest.json");
+        _updateCacheDir = Path.Combine(_appDataRoot, "updates");
 
         Directory.CreateDirectory(_appDataRoot);
         Directory.CreateDirectory(_webViewUserDataPath);
+        Directory.CreateDirectory(_updateCacheDir);
 
         _shellState = LoadShellState();
         if (_startInBackground)
@@ -88,8 +116,8 @@ public partial class Form1 : Form
         };
         _toolStripButtonBackground.Click += (_, _) => HideToTray(
             showBalloon: true,
-            title: "MAINFLOW работает в фоне",
-            message: "Приложение свернуто в трей и продолжит синхронизацию и уведомления."
+            title: "Mainflow работает в фоне",
+            message: "Приложение свернуто в трей и продолжит синхронизацию, обновления и уведомления."
         );
 
         _toolStripButtonAutoStart = new ToolStripButton
@@ -111,7 +139,7 @@ public partial class Form1 : Form
         }
 
         _trayMenu = new ContextMenuStrip(components);
-        _trayMenuOpen = new ToolStripMenuItem("Открыть MAINFLOW");
+        _trayMenuOpen = new ToolStripMenuItem("Открыть Mainflow");
         _trayMenuOpen.Click += (_, _) => RestoreFromTray();
         _trayMenuSync = new ToolStripMenuItem("Синхронизировать очередь");
         _trayMenuSync.Click += async (_, _) => await HandleSyncQueueAsync();
@@ -133,13 +161,19 @@ public partial class Form1 : Form
 
         _trayIcon = new NotifyIcon(components)
         {
-            Text = "MAINFLOW Desktop",
+            Text = "Mainflow Desktop",
             Visible = true,
             ContextMenuStrip = _trayMenu,
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application
         };
         _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
         _trayIcon.BalloonTipClicked += (_, _) => RestoreFromTray();
+
+        _autoUpdateTimer = new System.Windows.Forms.Timer(components)
+        {
+            Interval = AutoUpdateIntervalMs
+        };
+        _autoUpdateTimer.Tick += async (_, _) => await CheckForDesktopUpdatesAsync();
 
         toolStripComboBoxMode.Items.Clear();
         toolStripComboBoxMode.Items.AddRange(["Оффлайн", "Онлайн"]);
@@ -160,12 +194,43 @@ public partial class Form1 : Form
         toolStripComboBoxMode.SelectedIndexChanged += (_, _) => HandleModeChangedFromUi();
         networkTimer.Tick += (_, _) => UpdateNetworkStatus();
         Resize += (_, _) => HandleResizeToTray();
+        Disposed += (_, _) =>
+        {
+            _autoUpdateTimer.Dispose();
+            _releaseHttpClient.Dispose();
+        };
         Shown += async (_, _) =>
         {
             await InitializeWebViewAsync();
             HandleInitialBackgroundLaunch();
+            _autoUpdateTimer.Start();
+            FireAndForgetAutoUpdateCheck(_startInBackground ? InitialBackgroundUpdateDelayMs : InitialVisibleUpdateDelayMs);
         };
         FormClosing += HandleFormClosing;
+    }
+
+    private void FireAndForgetAutoUpdateCheck(int delayMs)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (delayMs > 0)
+                {
+                    await Task.Delay(delayMs);
+                }
+
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                BeginInvoke(async () => await CheckForDesktopUpdatesAsync());
+            }
+            catch
+            {
+            }
+        });
     }
 
     private async Task InitializeWebViewAsync()
@@ -186,16 +251,18 @@ public partial class Form1 : Form
             webView.CoreWebView2.NewWindowRequested += (_, args) =>
             {
                 args.Handled = true;
-                if (!string.IsNullOrWhiteSpace(args.Uri))
+                if (string.IsNullOrWhiteSpace(args.Uri))
                 {
-                    if (TryBuildModeAwareUri(args.Uri, _shellState.Mode, out var redirectUri))
-                    {
-                        webView.CoreWebView2.Navigate(redirectUri.AbsoluteUri);
-                        return;
-                    }
-
-                    webView.CoreWebView2.Navigate(args.Uri);
+                    return;
                 }
+
+                if (TryBuildModeAwareUri(args.Uri, _shellState.Mode, out var redirectUri))
+                {
+                    webView.CoreWebView2.Navigate(redirectUri.AbsoluteUri);
+                    return;
+                }
+
+                webView.CoreWebView2.Navigate(args.Uri);
             };
             webView.NavigationCompleted += (_, _) =>
             {
@@ -211,7 +278,7 @@ public partial class Form1 : Form
             MessageBox.Show(
                 this,
                 $"Не удалось запустить встроенный браузер WebView2.\n\n{error.Message}",
-                "MAINFLOW Desktop",
+                "Mainflow Desktop",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
             );
@@ -231,7 +298,7 @@ public partial class Form1 : Form
             MessageBox.Show(
                 this,
                 "Сейчас нет интернет-связи. Переключение в онлайн-режим отменено.",
-                "MAINFLOW Desktop",
+                "Mainflow Desktop",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning
             );
@@ -247,16 +314,19 @@ public partial class Form1 : Form
         {
             NavigateToRelativePage(_currentRelativePage, saveState: false);
         }
+
+        if (requestedMode == DesktopMode.Online)
+        {
+            FireAndForgetAutoUpdateCheck(2000);
+        }
     }
 
     private void ReloadCurrentPage()
     {
-        if (!_webViewReady)
+        if (_webViewReady)
         {
-            return;
+            NavigateToRelativePage(_currentRelativePage, saveState: false);
         }
-
-        NavigateToRelativePage(_currentRelativePage, saveState: false);
     }
 
     private async Task HandleSyncQueueAsync()
@@ -278,8 +348,8 @@ public partial class Form1 : Form
             {
                 MessageBox.Show(
                     this,
-                    "Не удалось прочитать результат синхронизации из страницы MAINFLOW.",
-                    "MAINFLOW Desktop",
+                    "Не удалось прочитать результат синхронизации из страницы Mainflow.",
+                    "Mainflow Desktop",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning
                 );
@@ -288,14 +358,12 @@ public partial class Form1 : Form
 
             if (result.Ok)
             {
-                var syncedCount = result.SyncedCount;
-                var remaining = result.RemainingCount;
                 MessageBox.Show(
                     this,
-                    syncedCount > 0
-                        ? $"Накопленные изменения синхронизированы.\n\nОтправлено: {syncedCount}\nОсталось в очереди: {remaining}"
+                    result.SyncedCount > 0
+                        ? $"Накопленные изменения синхронизированы.\n\nОтправлено: {result.SyncedCount}\nОсталось в очереди: {result.RemainingCount}"
                         : "Очередь синхронизации уже пуста.",
-                    "MAINFLOW Desktop",
+                    "Mainflow Desktop",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
@@ -307,7 +375,7 @@ public partial class Form1 : Form
                 string.IsNullOrWhiteSpace(result.Error)
                     ? "Не удалось синхронизировать накопленные изменения."
                     : result.Error,
-                "MAINFLOW Desktop",
+                "Mainflow Desktop",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning
             );
@@ -317,7 +385,7 @@ public partial class Form1 : Form
             MessageBox.Show(
                 this,
                 $"Не удалось запустить синхронизацию очереди.\n\n{error.Message}",
-                "MAINFLOW Desktop",
+                "Mainflow Desktop",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
             );
@@ -327,6 +395,247 @@ public partial class Form1 : Form
             toolStripButtonSyncQueue.Enabled = true;
             _trayMenuSync.Enabled = true;
         }
+    }
+
+    private async Task CheckForDesktopUpdatesAsync()
+    {
+        if (_updateCheckInProgress || _updateInstallInProgress)
+        {
+            return;
+        }
+
+        if (!_webViewReady || _shellState.Mode != DesktopMode.Online || !HasInternetAvailable())
+        {
+            return;
+        }
+
+        _updateCheckInProgress = true;
+        try
+        {
+            var localManifest = await TryLoadPackageManifestAsync(_localPackageManifestPath);
+            var remoteManifest = await DownloadRemotePackageManifestAsync();
+            if (remoteManifest is null)
+            {
+                return;
+            }
+
+            var localToken = BuildManifestToken(localManifest);
+            var remoteToken = BuildManifestToken(remoteManifest);
+            if (string.IsNullOrWhiteSpace(remoteToken) || string.Equals(localToken, remoteToken, StringComparison.OrdinalIgnoreCase))
+            {
+                _pendingUpdateToken = string.Empty;
+                return;
+            }
+
+            _pendingUpdateToken = remoteToken;
+
+            if (await HasBlockingLocalWorkForUpdateAsync())
+            {
+                return;
+            }
+
+            if (IsHiddenToTrayState())
+            {
+                await BeginSilentUpdateAsync();
+                return;
+            }
+
+            if (!string.Equals(_lastAnnouncedUpdateToken, remoteToken, StringComparison.OrdinalIgnoreCase))
+            {
+                _lastAnnouncedUpdateToken = remoteToken;
+                ShowTrayBalloon(
+                    "Доступно обновление Mainflow",
+                    "Новая версия уже готова. Она установится автоматически, когда приложение уйдет в фон."
+                );
+            }
+        }
+        catch
+        {
+        }
+        finally
+        {
+            _updateCheckInProgress = false;
+        }
+    }
+
+    private async Task BeginSilentUpdateAsync()
+    {
+        if (_updateInstallInProgress || string.IsNullOrWhiteSpace(_pendingUpdateToken))
+        {
+            return;
+        }
+
+        _updateInstallInProgress = true;
+        try
+        {
+            var updaterPath = await DownloadUpdaterAsync(_pendingUpdateToken);
+            if (string.IsNullOrWhiteSpace(updaterPath) || !File.Exists(updaterPath))
+            {
+                throw new FileNotFoundException("Не удалось подготовить updater Mainflow.");
+            }
+
+            SaveShellState();
+
+            var arguments = "--silent-update --remote";
+            if (IsHiddenToTrayState())
+            {
+                arguments += " --restart-background";
+            }
+
+            var started = Process.Start(new ProcessStartInfo
+            {
+                FileName = updaterPath,
+                WorkingDirectory = Path.GetDirectoryName(updaterPath)!,
+                Arguments = arguments,
+                UseShellExecute = true
+            });
+
+            if (started is null)
+            {
+                throw new InvalidOperationException("Updater Mainflow не был запущен.");
+            }
+
+            _allowClose = true;
+            _trayIcon.Visible = false;
+            Close();
+        }
+        catch (Exception error)
+        {
+            _updateInstallInProgress = false;
+            ShowTrayBalloon(
+                "Обновление Mainflow не запущено",
+                LimitBalloonText(error.Message, 240)
+            );
+        }
+    }
+
+    private async Task<string> DownloadUpdaterAsync(string updateToken)
+    {
+        Directory.CreateDirectory(_updateCacheDir);
+
+        foreach (var oldFile in Directory.GetFiles(_updateCacheDir, "Mainflow-updater-*.exe"))
+        {
+            try
+            {
+                File.Delete(oldFile);
+            }
+            catch
+            {
+            }
+        }
+
+        var safeToken = BuildSafeFileToken(updateToken);
+        var finalPath = Path.Combine(_updateCacheDir, $"Mainflow-updater-{safeToken}.exe");
+        var tempPath = finalPath + ".download";
+
+        using var response = await _releaseHttpClient.GetAsync(AppendCacheBust(RemoteDesktopSetupUrl), HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        await using (var input = await response.Content.ReadAsStreamAsync())
+        await using (var output = File.Create(tempPath))
+        {
+            await input.CopyToAsync(output);
+        }
+
+        if (File.Exists(finalPath))
+        {
+            File.Delete(finalPath);
+        }
+
+        File.Move(tempPath, finalPath);
+        return finalPath;
+    }
+
+    private async Task<bool> HasBlockingLocalWorkForUpdateAsync()
+    {
+        if (!_webViewReady || webView.CoreWebView2 is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var rawResult = await webView.CoreWebView2.ExecuteScriptAsync(
+                "window.SHARSH_APP_API?.getPendingSyncStatus ? window.SHARSH_APP_API.getPendingSyncStatus() : null"
+            );
+            var result = DeserializeScriptResult<PendingSyncStatusResult>(rawResult);
+            return result is not null && (result.HasPending || result.IsSyncing || result.Count > 0);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<DesktopPackageManifest?> TryLoadPackageManifestAsync(string manifestPath)
+    {
+        if (!File.Exists(manifestPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(manifestPath);
+            return JsonSerializer.Deserialize<DesktopPackageManifest>(json, _jsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task<DesktopPackageManifest?> DownloadRemotePackageManifestAsync()
+    {
+        try
+        {
+            using var response = await _releaseHttpClient.GetAsync(AppendCacheBust(RemoteDesktopManifestUrl), HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            return await JsonSerializer.DeserializeAsync<DesktopPackageManifest>(stream, _jsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string BuildManifestToken(DesktopPackageManifest? manifest)
+    {
+        if (manifest is null)
+        {
+            return string.Empty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.GeneratedAtUtc))
+        {
+            return manifest.GeneratedAtUtc.Trim();
+        }
+
+        return $"{manifest.Files.Count}:{string.Join("|", manifest.Files.Take(5).Select(file => $"{file.Path}:{file.Size}:{file.Sha256}"))}";
+    }
+
+    private static string BuildSafeFileToken(string token)
+    {
+        var chars = token.Where(char.IsLetterOrDigit).ToArray();
+        if (chars.Length == 0)
+        {
+            return DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        }
+
+        var sanitized = new string(chars);
+        return sanitized.Length <= 32 ? sanitized : sanitized[..32];
+    }
+
+    private bool IsHiddenToTrayState()
+    {
+        return _startInBackground || !Visible || !ShowInTaskbar || WindowState == FormWindowState.Minimized;
+    }
+
+    private static string AppendCacheBust(string url)
+    {
+        var separator = url.Contains('?') ? "&" : "?";
+        return $"{url}{separator}v={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
     }
 
     private void NavigateToRelativePage(string relativePage, bool saveState = true)
@@ -348,7 +657,7 @@ public partial class Form1 : Form
             MessageBox.Show(
                 this,
                 $"Не найден локальный файл страницы:\n{pagePath}",
-                "MAINFLOW Desktop",
+                "Mainflow Desktop",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning
             );
@@ -392,7 +701,7 @@ public partial class Form1 : Form
     {
         var builder = new UriBuilder(new Uri(pagePath))
         {
-            Query = mode == DesktopMode.Online ? BuildRemoteQueryString() : ""
+            Query = mode == DesktopMode.Online ? BuildRemoteQueryString() : string.Empty
         };
         return builder.Uri;
     }
@@ -481,7 +790,7 @@ public partial class Form1 : Form
             MessageBox.Show(
                 this,
                 $"Не удалось открыть папку данных.\n\n{error.Message}",
-                "MAINFLOW Desktop",
+                "Mainflow Desktop",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
             );
@@ -491,8 +800,8 @@ public partial class Form1 : Form
     private void UpdateBannerText()
     {
         bannerLabel.Text = _shellState.Mode == DesktopMode.Offline
-            ? "Оффлайн-режим: ввод и просмотр работают локально на этом ПК. Новые изменения попадают в оффлайн-очередь и после возврата связи отправляются автоматически в фоне. Desktop-оболочка может жить в трее и запускаться вместе с Windows."
-            : "Онлайн-режим: локальная копия сайта работает с сервером и получает новые данные автоматически. Оставьте приложение в трее, чтобы получать фоновые уведомления о Telegram формах, Android MAINFORM и новых фото бланков.";
+            ? "Оффлайн-режим: ввод и просмотр работают локально на этом ПК. Новые изменения попадают в оффлайн-очередь и после возврата связи отправляются автоматически в фоне."
+            : "Онлайн-режим: локальная копия сайта работает с сервером и получает новые данные автоматически. Оставьте приложение в трее, чтобы получать уведомления и фоновое автообновление.";
     }
 
     private void UpdateNetworkStatus()
@@ -569,7 +878,7 @@ public partial class Form1 : Form
         {
             HideToTray(
                 showBalloon: !_trayHintShown,
-                title: "MAINFLOW свернут в трей",
+                title: "Mainflow свернут в трей",
                 message: "Приложение продолжит работать в фоне. Для возврата дважды нажмите значок возле часов."
             );
         }
@@ -585,7 +894,7 @@ public partial class Form1 : Form
         _backgroundLaunchHandled = true;
         HideToTray(
             showBalloon: true,
-            title: "MAINFLOW запущен в фоне",
+            title: "Mainflow запущен в фоне",
             message: "Приложение автоматически стартовало вместе с Windows и будет показывать уведомления о новых данных."
         );
     }
@@ -596,7 +905,7 @@ public partial class Form1 : Form
         {
             if (showBalloon)
             {
-                ShowTrayBalloon(title ?? "MAINFLOW в фоне", message ?? "Приложение продолжает работать в трее.");
+                ShowTrayBalloon(title ?? "Mainflow в фоне", message ?? "Приложение продолжает работать в трее.");
             }
             return;
         }
@@ -607,7 +916,12 @@ public partial class Form1 : Form
 
         if (showBalloon)
         {
-            ShowTrayBalloon(title ?? "MAINFLOW в фоне", message ?? "Приложение продолжает работать в трее.");
+            ShowTrayBalloon(title ?? "Mainflow в фоне", message ?? "Приложение продолжает работать в трее.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_pendingUpdateToken))
+        {
+            FireAndForgetAutoUpdateCheck(2000);
         }
     }
 
@@ -642,7 +956,7 @@ public partial class Form1 : Form
         args.Cancel = true;
         HideToTray(
             showBalloon: true,
-            title: "MAINFLOW продолжит работать",
+            title: "Mainflow продолжит работать",
             message: "Окно закрыто в трей. Используйте значок возле часов, чтобы вернуться или выйти."
         );
     }
@@ -663,8 +977,8 @@ public partial class Form1 : Form
         ShowTrayBalloon(
             "Автозапуск обновлен",
             nextState
-                ? "MAINFLOW будет стартовать вместе с Windows в фоновом режиме."
-                : "Автозапуск MAINFLOW отключен."
+                ? "Mainflow будет стартовать вместе с Windows в фоновом режиме."
+                : "Автозапуск Mainflow отключен."
         );
     }
 
@@ -702,11 +1016,12 @@ public partial class Form1 : Form
                 MessageBox.Show(
                     this,
                     $"Не удалось изменить автозапуск Windows.\n\n{error.Message}",
-                    "MAINFLOW Desktop",
+                    "Mainflow Desktop",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning
                 );
             }
+
             return false;
         }
     }
@@ -723,19 +1038,19 @@ public partial class Form1 : Form
 
             var root = document.RootElement;
             var type = root.TryGetProperty("type", out var typeElement)
-                ? typeElement.GetString() ?? ""
-                : "";
+                ? typeElement.GetString() ?? string.Empty
+                : string.Empty;
             if (!string.Equals(type, "desktop-notification", StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
             var title = root.TryGetProperty("title", out var titleElement)
-                ? titleElement.GetString() ?? "MAINFLOW"
-                : "MAINFLOW";
+                ? titleElement.GetString() ?? "Mainflow"
+                : "Mainflow";
             var message = root.TryGetProperty("message", out var messageElement)
-                ? messageElement.GetString() ?? ""
-                : "";
+                ? messageElement.GetString() ?? string.Empty
+                : string.Empty;
 
             if (string.IsNullOrWhiteSpace(message))
             {
@@ -767,7 +1082,7 @@ public partial class Form1 : Form
 
     private static string LimitBalloonText(string? value, int maxLength)
     {
-        var normalized = string.IsNullOrWhiteSpace(value) ? "" : value.Trim();
+        var normalized = string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         if (normalized.Length <= maxLength)
         {
             return normalized;
@@ -802,7 +1117,7 @@ public partial class Form1 : Form
             ? DefaultRelativePage
             : relativePage.Trim().Replace('\\', '/');
 
-        if (normalized.StartsWith("/"))
+        if (normalized.StartsWith('/'))
         {
             normalized = normalized.TrimStart('/');
         }
@@ -825,7 +1140,7 @@ public partial class Form1 : Form
             }
 
             var raw = File.ReadAllText(_stateFilePath);
-            var parsed = JsonSerializer.Deserialize<DesktopShellState>(raw);
+            var parsed = JsonSerializer.Deserialize<DesktopShellState>(raw, _jsonOptions);
             return parsed is null
                 ? DesktopShellState.Default
                 : parsed with
@@ -845,13 +1160,7 @@ public partial class Form1 : Form
         {
             Directory.CreateDirectory(_appDataRoot);
             var nextState = _shellState with { LastRelativePage = NormalizeRelativePage(_currentRelativePage) };
-            File.WriteAllText(
-                _stateFilePath,
-                JsonSerializer.Serialize(nextState, new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                })
-            );
+            File.WriteAllText(_stateFilePath, JsonSerializer.Serialize(nextState, _jsonOptions));
         }
         catch
         {
@@ -874,4 +1183,18 @@ public partial class Form1 : Form
     }
 
     private sealed record PendingSyncCommandResult(bool Ok, int SyncedCount, int RemainingCount, string Error);
+    private sealed record PendingSyncStatusResult(bool HasPending, int Count, bool IsSyncing);
+
+    private sealed class DesktopPackageManifest
+    {
+        public string GeneratedAtUtc { get; init; } = string.Empty;
+        public List<DesktopPackageFile> Files { get; init; } = new();
+    }
+
+    private sealed class DesktopPackageFile
+    {
+        public string Path { get; init; } = string.Empty;
+        public long Size { get; init; }
+        public string Sha256 { get; init; } = string.Empty;
+    }
 }

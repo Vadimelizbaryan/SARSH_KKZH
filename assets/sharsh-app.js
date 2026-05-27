@@ -7598,10 +7598,10 @@ function buildInitialPhotoLightboxState() {
 
   function getWindowsDesktopSetupPath() {
     try {
-      return appendShareQuery(new URL("windows/releases/MAINFLOW.Desktop.Setup.exe", window.location.href).href);
+      return appendShareQuery(new URL("windows/releases/Mainflow.exe", window.location.href).href);
     } catch (_error) {
       const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
-      return appendShareQuery(`${prefix}windows/releases/MAINFLOW.Desktop.Setup.exe`);
+      return appendShareQuery(`${prefix}windows/releases/Mainflow.exe`);
     }
   }
 
@@ -8266,7 +8266,7 @@ function buildInitialPhotoLightboxState() {
       ? getWindowsDesktopSetupPath()
       : "";
     const downloadDesktopButtonHtml = desktopSetupPath
-      ? `<a class="button-link" href="${escapeHtml(desktopSetupPath)}" download target="_blank" rel="noopener">MAINFLOW.exe</a>`
+      ? `<a class="button-link" href="${escapeHtml(desktopSetupPath)}" download="Mainflow.exe" target="_blank" rel="noopener">Mainflow.exe</a>`
       : "";
     const downloadMainPdfButtonHtml = mainBlankPdfPath
       ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">PDF ներբ.</a>`

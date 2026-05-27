@@ -1,4 +1,4 @@
-# MAINFLOW Desktop
+# Mainflow Desktop
 
 Windows shell for the MAINFLOW web app.
 
@@ -10,6 +10,7 @@ Windows shell for the MAINFLOW web app.
 - Can stay in the Windows tray and continue working in the background.
 - Supports autostart with Windows in hidden `--background` mode.
 - Shows tray notifications for new Telegram forms, Android MAINFORM updates, and new photo blanks.
+- Checks for desktop updates automatically and installs them in the background when it is safe to do so.
 
 ## Offline queue
 
@@ -28,4 +29,4 @@ This script publishes:
 
 - `windows/releases/MAINFLOW.Desktop` - the unpacked desktop app folder
 - `windows/releases/MAINFLOW.Desktop/package-manifest.json` - the desktop package manifest for the installer
-- `windows/releases/MAINFLOW.Desktop.Setup.exe` - the downloadable Windows web installer
+- `windows/releases/Mainflow.exe` - the downloadable Windows web installer

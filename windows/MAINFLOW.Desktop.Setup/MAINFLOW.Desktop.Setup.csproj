@@ -6,10 +6,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>MAINFLOW.Desktop.Setup</AssemblyName>
+    <AssemblyName>MainflowSetup</AssemblyName>
     <RootNamespace>MAINFLOW.Desktop.Setup</RootNamespace>
     <SatelliteResourceLanguages>ru</SatelliteResourceLanguages>
     <LangVersion>latest</LangVersion>
+    <ApplicationIcon>..\Resources\MainflowMedical.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>

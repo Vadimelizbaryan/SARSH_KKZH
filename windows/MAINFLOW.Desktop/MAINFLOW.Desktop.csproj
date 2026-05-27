@@ -7,6 +7,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <SatelliteResourceLanguages>ru</SatelliteResourceLanguages>
+    <AssemblyName>Mainflow</AssemblyName>
+    <ApplicationIcon>..\Resources\MainflowMedical.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
