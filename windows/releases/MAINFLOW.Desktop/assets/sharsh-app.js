@@ -5649,7 +5649,7 @@ function buildInitialPhotoLightboxState() {
       return;
     }
 
-    const originalCell12 = calcPresentTotal(state.snapshot, row) || 0;
+    const originalCell1 = getNumber(state.snapshot, row, "beenTotal") || 0;
     const originalCell2 = getNumber(state.snapshot, row, "beenSoldier") || 0;
     const originalCell3 = getNumber(state.snapshot, row, "beenSeries") || 0;
 
@@ -5685,7 +5685,7 @@ function buildInitialPhotoLightboxState() {
     row.values.officer = cell18;
     row.values.civil = cell19;
 
-    row.values.beenTotal = originalCell12;
+    row.values.beenTotal = originalCell1;
     row.values.beenSoldier = originalCell2;
     row.values.beenSeries = originalCell3;
     row.values.admittedTotal = cell4;
