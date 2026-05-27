@@ -138,6 +138,7 @@ internal sealed class InstallerForm : Form
             await TransferPackageFilesAsync(manifestSource, manifest, existingManifest, installDir);
             RemoveFilesMissingInNewManifest(existingManifest, manifest, installDir);
             RemoveLegacyDesktopFiles(installDir);
+            await WriteInstallManifestAsync(installDir, manifest);
             DeleteEmptyDirectories(installDir);
             CreateDesktopShortcut(executablePath, installDir);
 
@@ -299,6 +300,13 @@ internal sealed class InstallerForm : Form
             await using var output = File.Create(destinationPath);
             await input.CopyToAsync(output);
         }
+    }
+
+    private async Task WriteInstallManifestAsync(string installDir, DesktopPackageManifest manifest)
+    {
+        var manifestPath = Path.Combine(installDir, ManifestFileName);
+        var json = JsonSerializer.Serialize(manifest, _jsonOptions);
+        await File.WriteAllTextAsync(manifestPath, json);
     }
 
     private static Dictionary<string, DesktopPackageFile> BuildManifestEntryMap(DesktopPackageManifest? manifest)
