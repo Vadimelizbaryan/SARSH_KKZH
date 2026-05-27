@@ -1,0 +1,1553 @@
+﻿{
+    "generatedAtUtc":  "2026-05-27T11:24:24.6130120Z",
+    "files":  [
+                  {
+                      "path":  "Accessibility.dll",
+                      "size":  21264
+                  },
+                  {
+                      "path":  "archive-print.html",
+                      "size":  646
+                  },
+                  {
+                      "path":  "assets/civil-referrals.js",
+                      "size":  47581
+                  },
+                  {
+                      "path":  "assets/night-shift.js",
+                      "size":  13205
+                  },
+                  {
+                      "path":  "assets/ocr-template-blank.jpg",
+                      "size":  2251926
+                  },
+                  {
+                      "path":  "assets/sharsh.css",
+                      "size":  83694
+                  },
+                  {
+                      "path":  "assets/sharsh-app.js",
+                      "size":  593446
+                  },
+                  {
+                      "path":  "assets/sharsh-auth.js",
+                      "size":  11406
+                  },
+                  {
+                      "path":  "assets/sharsh-config.js",
+                      "size":  18666
+                  },
+                  {
+                      "path":  "assets/sharsh-runtime-config.js",
+                      "size":  8148
+                  },
+                  {
+                      "path":  "assets/sharsh-setup.js",
+                      "size":  11609
+                  },
+                  {
+                      "path":  "assets/sharsh-sync.js",
+                      "size":  78330
+                  },
+                  {
+                      "path":  "assets/shift-admissions.js",
+                      "size":  20622
+                  },
+                  {
+                      "path":  "assets/templates/SHARSH_KKZH_template.xlsx",
+                      "size":  16697
+                  },
+                  {
+                      "path":  "assets/tg-civil-referrals.js",
+                      "size":  28647
+                  },
+                  {
+                      "path":  "assets/tg-form.css",
+                      "size":  21468
+                  },
+                  {
+                      "path":  "assets/tg-form.js",
+                      "size":  30203
+                  },
+                  {
+                      "path":  "assets/tg-night-form.js",
+                      "size":  9952
+                  },
+                  {
+                      "path":  "assets/tg-qh-form.js",
+                      "size":  22648
+                  },
+                  {
+                      "path":  "assets/tg-shift-form.js",
+                      "size":  15908
+                  },
+                  {
+                      "path":  "assets/vendor/pdfjs/pdf.mjs",
+                      "size":  817035
+                  },
+                  {
+                      "path":  "assets/vendor/pdfjs/pdf.worker.mjs",
+                      "size":  2161149
+                  },
+                  {
+                      "path":  "bgej6lyx/08xa44ew.html",
+                      "size":  148514
+                  },
+                  {
+                      "path":  "bgej6lyx/1ei6dnv2.html",
+                      "size":  176494
+                  },
+                  {
+                      "path":  "bgej6lyx/3ofsacp6.html",
+                      "size":  31156
+                  },
+                  {
+                      "path":  "bgej6lyx/4k6uv2xu.html",
+                      "size":  219655
+                  },
+                  {
+                      "path":  "bgej6lyx/4zby7qi3.html",
+                      "size":  107667
+                  },
+                  {
+                      "path":  "bgej6lyx/5s7rrwg9.html",
+                      "size":  36707
+                  },
+                  {
+                      "path":  "bgej6lyx/9htuxle8.html",
+                      "size":  185255
+                  },
+                  {
+                      "path":  "bgej6lyx/c3usp3r9.html",
+                      "size":  128588
+                  },
+                  {
+                      "path":  "bgej6lyx/c5mv5bh4.html",
+                      "size":  44939
+                  },
+                  {
+                      "path":  "bgej6lyx/du9wa6oq.html",
+                      "size":  143777
+                  },
+                  {
+                      "path":  "bgej6lyx/g5u3jca0.html",
+                      "size":  149959
+                  },
+                  {
+                      "path":  "bgej6lyx/ldvp99z7.html",
+                      "size":  163703
+                  },
+                  {
+                      "path":  "bgej6lyx/ltndeohl.html",
+                      "size":  112587
+                  },
+                  {
+                      "path":  "bgej6lyx/ptf9nvbv.html",
+                      "size":  88635
+                  },
+                  {
+                      "path":  "bgej6lyx/te9625wg.html",
+                      "size":  152538
+                  },
+                  {
+                      "path":  "bgej6lyx/v1914tm9.html",
+                      "size":  196418
+                  },
+                  {
+                      "path":  "bgej6lyx/zzphaoqo.html",
+                      "size":  168443
+                  },
+                  {
+                      "path":  "civil-referrals.html",
+                      "size":  747
+                  },
+                  {
+                      "path":  "clretwrc.dll",
+                      "size":  311096
+                  },
+                  {
+                      "path":  "clrgc.dll",
+                      "size":  668472
+                  },
+                  {
+                      "path":  "clrjit.dll",
+                      "size":  1778440
+                  },
+                  {
+                      "path":  "coreclr.dll",
+                      "size":  4995344
+                  },
+                  {
+                      "path":  "createdump.exe",
+                      "size":  71992
+                  },
+                  {
+                      "path":  "D3DCompiler_47_cor3.dll",
+                      "size":  4916840
+                  },
+                  {
+                      "path":  "day.html",
+                      "size":  752
+                  },
+                  {
+                      "path":  "day-shift.html",
+                      "size":  752
+                  },
+                  {
+                      "path":  "department-instructions.html",
+                      "size":  6109
+                  },
+                  {
+                      "path":  "department-instructions.pdf",
+                      "size":  83891
+                  },
+                  {
+                      "path":  "department-links.txt",
+                      "size":  1672
+                  },
+                  {
+                      "path":  "DirectWriteForwarder.dll",
+                      "size":  502032
+                  },
+                  {
+                      "path":  "discharge.html",
+                      "size":  772
+                  },
+                  {
+                      "path":  "eti77ylq.html",
+                      "size":  607
+                  },
+                  {
+                      "path":  "hospital-report.html",
+                      "size":  729
+                  },
+                  {
+                      "path":  "hostfxr.dll",
+                      "size":  366856
+                  },
+                  {
+                      "path":  "hostpolicy.dll",
+                      "size":  407344
+                  },
+                  {
+                      "path":  "index.html",
+                      "size":  791
+                  },
+                  {
+                      "path":  "MAINFLOW.Desktop.deps.json",
+                      "size":  37253
+                  },
+                  {
+                      "path":  "MAINFLOW.Desktop.dll",
+                      "size":  38912
+                  },
+                  {
+                      "path":  "MAINFLOW.Desktop.exe",
+                      "size":  151552
+                  },
+                  {
+                      "path":  "MAINFLOW.Desktop.runtimeconfig.json",
+                      "size":  468
+                  },
+                  {
+                      "path":  "Microsoft.CSharp.dll",
+                      "size":  1005840
+                  },
+                  {
+                      "path":  "Microsoft.DiaSymReader.Native.amd64.dll",
+                      "size":  2195504
+                  },
+                  {
+                      "path":  "Microsoft.VisualBasic.Core.dll",
+                      "size":  1247536
+                  },
+                  {
+                      "path":  "Microsoft.VisualBasic.dll",
+                      "size":  19216
+                  },
+                  {
+                      "path":  "Microsoft.VisualBasic.Forms.dll",
+                      "size":  248112
+                  },
+                  {
+                      "path":  "Microsoft.Web.WebView2.Core.dll",
+                      "size":  589376
+                  },
+                  {
+                      "path":  "Microsoft.Web.WebView2.Core.xml",
+                      "size":  626091
+                  },
+                  {
+                      "path":  "Microsoft.Web.WebView2.WinForms.dll",
+                      "size":  38464
+                  },
+                  {
+                      "path":  "Microsoft.Web.WebView2.WinForms.xml",
+                      "size":  41393
+                  },
+                  {
+                      "path":  "Microsoft.Web.WebView2.Wpf.dll",
+                      "size":  83016
+                  },
+                  {
+                      "path":  "Microsoft.Web.WebView2.Wpf.xml",
+                      "size":  143352
+                  },
+                  {
+                      "path":  "Microsoft.Win32.Primitives.dll",
+                      "size":  15664
+                  },
+                  {
+                      "path":  "Microsoft.Win32.Registry.AccessControl.dll",
+                      "size":  35088
+                  },
+                  {
+                      "path":  "Microsoft.Win32.Registry.dll",
+                      "size":  121136
+                  },
+                  {
+                      "path":  "Microsoft.Win32.SystemEvents.dll",
+                      "size":  96528
+                  },
+                  {
+                      "path":  "morning-discharge.html",
+                      "size":  774
+                  },
+                  {
+                      "path":  "mscordaccore.dll",
+                      "size":  1346392
+                  },
+                  {
+                      "path":  "mscordaccore_amd64_amd64_8.0.2426.7010.dll",
+                      "size":  1346392
+                  },
+                  {
+                      "path":  "mscordbi.dll",
+                      "size":  1234304
+                  },
+                  {
+                      "path":  "mscorlib.dll",
+                      "size":  59696
+                  },
+                  {
+                      "path":  "mscorrc.dll",
+                      "size":  136968
+                  },
+                  {
+                      "path":  "msquic.dll",
+                      "size":  529480
+                  },
+                  {
+                      "path":  "netstandard.dll",
+                      "size":  101136
+                  },
+                  {
+                      "path":  "night.html",
+                      "size":  750
+                  },
+                  {
+                      "path":  "night-shift.html",
+                      "size":  750
+                  },
+                  {
+                      "path":  "ocr-feedback.html",
+                      "size":  797
+                  },
+                  {
+                      "path":  "PenImc_cor3.dll",
+                      "size":  157968
+                  },
+                  {
+                      "path":  "PresentationCore.dll",
+                      "size":  8542472
+                  },
+                  {
+                      "path":  "PresentationFramework.Aero.dll",
+                      "size":  444720
+                  },
+                  {
+                      "path":  "PresentationFramework.Aero2.dll",
+                      "size":  448784
+                  },
+                  {
+                      "path":  "PresentationFramework.AeroLite.dll",
+                      "size":  239888
+                  },
+                  {
+                      "path":  "PresentationFramework.Classic.dll",
+                      "size":  272648
+                  },
+                  {
+                      "path":  "PresentationFramework.dll",
+                      "size":  16128272
+                  },
+                  {
+                      "path":  "PresentationFramework.Luna.dll",
+                      "size":  669968
+                  },
+                  {
+                      "path":  "PresentationFramework.Royale.dll",
+                      "size":  334096
+                  },
+                  {
+                      "path":  "PresentationFramework-SystemCore.dll",
+                      "size":  39184
+                  },
+                  {
+                      "path":  "PresentationFramework-SystemData.dll",
+                      "size":  35088
+                  },
+                  {
+                      "path":  "PresentationFramework-SystemDrawing.dll",
+                      "size":  35080
+                  },
+                  {
+                      "path":  "PresentationFramework-SystemXml.dll",
+                      "size":  35088
+                  },
+                  {
+                      "path":  "PresentationFramework-SystemXmlLinq.dll",
+                      "size":  31024
+                  },
+                  {
+                      "path":  "PresentationNative_cor3.dll",
+                      "size":  1235760
+                  },
+                  {
+                      "path":  "PresentationUI.dll",
+                      "size":  1288456
+                  },
+                  {
+                      "path":  "program-table-blank.docx",
+                      "size":  20819
+                  },
+                  {
+                      "path":  "program-table-blank.html",
+                      "size":  14507
+                  },
+                  {
+                      "path":  "qr-codes/08xa44ew.png",
+                      "size":  707
+                  },
+                  {
+                      "path":  "qr-codes/1ei6dnv2.png",
+                      "size":  700
+                  },
+                  {
+                      "path":  "qr-codes/3ofsacp6.png",
+                      "size":  701
+                  },
+                  {
+                      "path":  "qr-codes/4k6uv2xu.png",
+                      "size":  704
+                  },
+                  {
+                      "path":  "qr-codes/4zby7qi3.png",
+                      "size":  714
+                  },
+                  {
+                      "path":  "qr-codes/5s7rrwg9.png",
+                      "size":  701
+                  },
+                  {
+                      "path":  "qr-codes/9htuxle8.png",
+                      "size":  702
+                  },
+                  {
+                      "path":  "qr-codes/c3usp3r9.png",
+                      "size":  708
+                  },
+                  {
+                      "path":  "qr-codes/c5mv5bh4.png",
+                      "size":  694
+                  },
+                  {
+                      "path":  "qr-codes/du9wa6oq.png",
+                      "size":  700
+                  },
+                  {
+                      "path":  "qr-codes/g5u3jca0.png",
+                      "size":  707
+                  },
+                  {
+                      "path":  "qr-codes/ldvp99z7.png",
+                      "size":  711
+                  },
+                  {
+                      "path":  "qr-codes/ltndeohl.png",
+                      "size":  706
+                  },
+                  {
+                      "path":  "qr-codes/main-index.png",
+                      "size":  709
+                  },
+                  {
+                      "path":  "qr-codes/ptf9nvbv.png",
+                      "size":  702
+                  },
+                  {
+                      "path":  "qr-codes/qr-manifest.txt",
+                      "size":  3612
+                  },
+                  {
+                      "path":  "qr-codes/setup-sync.png",
+                      "size":  706
+                  },
+                  {
+                      "path":  "qr-codes/te9625wg.png",
+                      "size":  706
+                  },
+                  {
+                      "path":  "qr-codes/v1914tm9.png",
+                      "size":  709
+                  },
+                  {
+                      "path":  "qr-codes/zzphaoqo.png",
+                      "size":  706
+                  },
+                  {
+                      "path":  "qr-sheet.html",
+                      "size":  12516
+                  },
+                  {
+                      "path":  "qr-sheet.pdf",
+                      "size":  362773
+                  },
+                  {
+                      "path":  "ReachFramework.dll",
+                      "size":  1603848
+                  },
+                  {
+                      "path":  "ru/Microsoft.VisualBasic.Forms.resources.dll",
+                      "size":  26896
+                  },
+                  {
+                      "path":  "ru/PresentationCore.resources.dll",
+                      "size":  138512
+                  },
+                  {
+                      "path":  "ru/PresentationFramework.resources.dll",
+                      "size":  257808
+                  },
+                  {
+                      "path":  "ru/PresentationUI.resources.dll",
+                      "size":  54544
+                  },
+                  {
+                      "path":  "ru/ReachFramework.resources.dll",
+                      "size":  44336
+                  },
+                  {
+                      "path":  "ru/System.Windows.Controls.Ribbon.resources.dll",
+                      "size":  19728
+                  },
+                  {
+                      "path":  "ru/System.Windows.Forms.Design.resources.dll",
+                      "size":  163088
+                  },
+                  {
+                      "path":  "ru/System.Windows.Forms.Primitives.resources.dll",
+                      "size":  16656
+                  },
+                  {
+                      "path":  "ru/System.Windows.Forms.resources.dll",
+                      "size":  476976
+                  },
+                  {
+                      "path":  "ru/System.Windows.Input.Manipulations.resources.dll",
+                      "size":  17168
+                  },
+                  {
+                      "path":  "ru/System.Xaml.resources.dll",
+                      "size":  84784
+                  },
+                  {
+                      "path":  "ru/UIAutomationClient.resources.dll",
+                      "size":  21768
+                  },
+                  {
+                      "path":  "ru/UIAutomationClientSideProviders.resources.dll",
+                      "size":  22288
+                  },
+                  {
+                      "path":  "ru/UIAutomationProvider.resources.dll",
+                      "size":  15664
+                  },
+                  {
+                      "path":  "ru/UIAutomationTypes.resources.dll",
+                      "size":  19216
+                  },
+                  {
+                      "path":  "ru/WindowsBase.resources.dll",
+                      "size":  111928
+                  },
+                  {
+                      "path":  "ru/WindowsFormsIntegration.resources.dll",
+                      "size":  16648
+                  },
+                  {
+                      "path":  "runtimes/win-x64/native/WebView2Loader.dll",
+                      "size":  165440
+                  },
+                  {
+                      "path":  "setup.html",
+                      "size":  5879
+                  },
+                  {
+                      "path":  "System.AppContext.dll",
+                      "size":  15624
+                  },
+                  {
+                      "path":  "System.Buffers.dll",
+                      "size":  15672
+                  },
+                  {
+                      "path":  "System.CodeDom.dll",
+                      "size":  489744
+                  },
+                  {
+                      "path":  "System.Collections.Concurrent.dll",
+                      "size":  276744
+                  },
+                  {
+                      "path":  "System.Collections.dll",
+                      "size":  260400
+                  },
+                  {
+                      "path":  "System.Collections.Immutable.dll",
+                      "size":  837896
+                  },
+                  {
+                      "path":  "System.Collections.NonGeneric.dll",
+                      "size":  104712
+                  },
+                  {
+                      "path":  "System.Collections.Specialized.dll",
+                      "size":  104712
+                  },
+                  {
+                      "path":  "System.ComponentModel.Annotations.dll",
+                      "size":  203024
+                  },
+                  {
+                      "path":  "System.ComponentModel.DataAnnotations.dll",
+                      "size":  17200
+                  },
+                  {
+                      "path":  "System.ComponentModel.dll",
+                      "size":  30992
+                  },
+                  {
+                      "path":  "System.ComponentModel.EventBasedAsync.dll",
+                      "size":  47368
+                  },
+                  {
+                      "path":  "System.ComponentModel.Primitives.dll",
+                      "size":  80136
+                  },
+                  {
+                      "path":  "System.ComponentModel.TypeConverter.dll",
+                      "size":  747792
+                  },
+                  {
+                      "path":  "System.Configuration.ConfigurationManager.dll",
+                      "size":  1075472
+                  },
+                  {
+                      "path":  "System.Configuration.dll",
+                      "size":  19760
+                  },
+                  {
+                      "path":  "System.Console.dll",
+                      "size":  174344
+                  },
+                  {
+                      "path":  "System.Core.dll",
+                      "size":  23824
+                  },
+                  {
+                      "path":  "System.Data.Common.dll",
+                      "size":  2861360
+                  },
+                  {
+                      "path":  "System.Data.DataSetExtensions.dll",
+                      "size":  16184
+                  },
+                  {
+                      "path":  "System.Data.dll",
+                      "size":  25352
+                  },
+                  {
+                      "path":  "System.Design.dll",
+                      "size":  22320
+                  },
+                  {
+                      "path":  "System.Diagnostics.Contracts.dll",
+                      "size":  16696
+                  },
+                  {
+                      "path":  "System.Diagnostics.Debug.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Diagnostics.DiagnosticSource.dll",
+                      "size":  416008
+                  },
+                  {
+                      "path":  "System.Diagnostics.EventLog.dll",
+                      "size":  387344
+                  },
+                  {
+                      "path":  "System.Diagnostics.EventLog.Messages.dll",
+                      "size":  801032
+                  },
+                  {
+                      "path":  "System.Diagnostics.FileVersionInfo.dll",
+                      "size":  47376
+                  },
+                  {
+                      "path":  "System.Diagnostics.PerformanceCounter.dll",
+                      "size":  289072
+                  },
+                  {
+                      "path":  "System.Diagnostics.Process.dll",
+                      "size":  338232
+                  },
+                  {
+                      "path":  "System.Diagnostics.StackTrace.dll",
+                      "size":  47368
+                  },
+                  {
+                      "path":  "System.Diagnostics.TextWriterTraceListener.dll",
+                      "size":  67848
+                  },
+                  {
+                      "path":  "System.Diagnostics.Tools.dll",
+                      "size":  15632
+                  },
+                  {
+                      "path":  "System.Diagnostics.TraceSource.dll",
+                      "size":  145672
+                  },
+                  {
+                      "path":  "System.Diagnostics.Tracing.dll",
+                      "size":  16648
+                  },
+                  {
+                      "path":  "System.DirectoryServices.dll",
+                      "size":  1046800
+                  },
+                  {
+                      "path":  "System.dll",
+                      "size":  50480
+                  },
+                  {
+                      "path":  "System.Drawing.Common.dll",
+                      "size":  1530160
+                  },
+                  {
+                      "path":  "System.Drawing.Design.dll",
+                      "size":  15632
+                  },
+                  {
+                      "path":  "System.Drawing.dll",
+                      "size":  21776
+                  },
+                  {
+                      "path":  "System.Drawing.Primitives.dll",
+                      "size":  133392
+                  },
+                  {
+                      "path":  "System.Dynamic.Runtime.dll",
+                      "size":  16656
+                  },
+                  {
+                      "path":  "System.Formats.Asn1.dll",
+                      "size":  243976
+                  },
+                  {
+                      "path":  "System.Formats.Tar.dll",
+                      "size":  272648
+                  },
+                  {
+                      "path":  "System.Globalization.Calendars.dll",
+                      "size":  16184
+                  },
+                  {
+                      "path":  "System.Globalization.dll",
+                      "size":  16184
+                  },
+                  {
+                      "path":  "System.Globalization.Extensions.dll",
+                      "size":  15624
+                  },
+                  {
+                      "path":  "System.IO.Compression.Brotli.dll",
+                      "size":  84232
+                  },
+                  {
+                      "path":  "System.IO.Compression.dll",
+                      "size":  264456
+                  },
+                  {
+                      "path":  "System.IO.Compression.FileSystem.dll",
+                      "size":  15632
+                  },
+                  {
+                      "path":  "System.IO.Compression.Native.dll",
+                      "size":  829240
+                  },
+                  {
+                      "path":  "System.IO.Compression.ZipFile.dll",
+                      "size":  55568
+                  },
+                  {
+                      "path":  "System.IO.dll",
+                      "size":  16144
+                  },
+                  {
+                      "path":  "System.IO.FileSystem.AccessControl.dll",
+                      "size":  104720
+                  },
+                  {
+                      "path":  "System.IO.FileSystem.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.IO.FileSystem.DriveInfo.dll",
+                      "size":  55560
+                  },
+                  {
+                      "path":  "System.IO.FileSystem.Primitives.dll",
+                      "size":  15632
+                  },
+                  {
+                      "path":  "System.IO.FileSystem.Watcher.dll",
+                      "size":  88328
+                  },
+                  {
+                      "path":  "System.IO.IsolatedStorage.dll",
+                      "size":  92464
+                  },
+                  {
+                      "path":  "System.IO.MemoryMappedFiles.dll",
+                      "size":  84232
+                  },
+                  {
+                      "path":  "System.IO.Packaging.dll",
+                      "size":  293176
+                  },
+                  {
+                      "path":  "System.IO.Pipes.AccessControl.dll",
+                      "size":  16688
+                  },
+                  {
+                      "path":  "System.IO.Pipes.dll",
+                      "size":  166152
+                  },
+                  {
+                      "path":  "System.IO.UnmanagedMemoryStream.dll",
+                      "size":  15664
+                  },
+                  {
+                      "path":  "System.Linq.dll",
+                      "size":  543032
+                  },
+                  {
+                      "path":  "System.Linq.Expressions.dll",
+                      "size":  3676432
+                  },
+                  {
+                      "path":  "System.Linq.Parallel.dll",
+                      "size":  805168
+                  },
+                  {
+                      "path":  "System.Linq.Queryable.dll",
+                      "size":  174344
+                  },
+                  {
+                      "path":  "System.Memory.dll",
+                      "size":  157968
+                  },
+                  {
+                      "path":  "System.Net.dll",
+                      "size":  17672
+                  },
+                  {
+                      "path":  "System.Net.Http.dll",
+                      "size":  1730832
+                  },
+                  {
+                      "path":  "System.Net.Http.Json.dll",
+                      "size":  129328
+                  },
+                  {
+                      "path":  "System.Net.HttpListener.dll",
+                      "size":  551176
+                  },
+                  {
+                      "path":  "System.Net.Mail.dll",
+                      "size":  432392
+                  },
+                  {
+                      "path":  "System.Net.NameResolution.dll",
+                      "size":  112952
+                  },
+                  {
+                      "path":  "System.Net.NetworkInformation.dll",
+                      "size":  157960
+                  },
+                  {
+                      "path":  "System.Net.Ping.dll",
+                      "size":  96520
+                  },
+                  {
+                      "path":  "System.Net.Primitives.dll",
+                      "size":  231696
+                  },
+                  {
+                      "path":  "System.Net.Quic.dll",
+                      "size":  284936
+                  },
+                  {
+                      "path":  "System.Net.Requests.dll",
+                      "size":  346376
+                  },
+                  {
+                      "path":  "System.Net.Security.dll",
+                      "size":  670000
+                  },
+                  {
+                      "path":  "System.Net.ServicePoint.dll",
+                      "size":  47376
+                  },
+                  {
+                      "path":  "System.Net.Sockets.dll",
+                      "size":  547080
+                  },
+                  {
+                      "path":  "System.Net.WebClient.dll",
+                      "size":  170256
+                  },
+                  {
+                      "path":  "System.Net.WebHeaderCollection.dll",
+                      "size":  67888
+                  },
+                  {
+                      "path":  "System.Net.WebProxy.dll",
+                      "size":  43320
+                  },
+                  {
+                      "path":  "System.Net.WebSockets.Client.dll",
+                      "size":  100656
+                  },
+                  {
+                      "path":  "System.Net.WebSockets.dll",
+                      "size":  190776
+                  },
+                  {
+                      "path":  "System.Numerics.dll",
+                      "size":  15664
+                  },
+                  {
+                      "path":  "System.Numerics.Vectors.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.ObjectModel.dll",
+                      "size":  80136
+                  },
+                  {
+                      "path":  "System.Printing.dll",
+                      "size":  977168
+                  },
+                  {
+                      "path":  "System.Private.CoreLib.dll",
+                      "size":  13175096
+                  },
+                  {
+                      "path":  "System.Private.DataContractSerialization.dll",
+                      "size":  2083128
+                  },
+                  {
+                      "path":  "System.Private.Uri.dll",
+                      "size":  260400
+                  },
+                  {
+                      "path":  "System.Private.Xml.dll",
+                      "size":  7997704
+                  },
+                  {
+                      "path":  "System.Private.Xml.Linq.dll",
+                      "size":  403760
+                  },
+                  {
+                      "path":  "System.Reflection.DispatchProxy.dll",
+                      "size":  76048
+                  },
+                  {
+                      "path":  "System.Reflection.dll",
+                      "size":  16656
+                  },
+                  {
+                      "path":  "System.Reflection.Emit.dll",
+                      "size":  129336
+                  },
+                  {
+                      "path":  "System.Reflection.Emit.ILGeneration.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Reflection.Emit.Lightweight.dll",
+                      "size":  16144
+                  },
+                  {
+                      "path":  "System.Reflection.Extensions.dll",
+                      "size":  15624
+                  },
+                  {
+                      "path":  "System.Reflection.Metadata.dll",
+                      "size":  1116464
+                  },
+                  {
+                      "path":  "System.Reflection.Primitives.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Reflection.TypeExtensions.dll",
+                      "size":  43320
+                  },
+                  {
+                      "path":  "System.Resources.Extensions.dll",
+                      "size":  137488
+                  },
+                  {
+                      "path":  "System.Resources.Reader.dll",
+                      "size":  15672
+                  },
+                  {
+                      "path":  "System.Resources.ResourceManager.dll",
+                      "size":  16144
+                  },
+                  {
+                      "path":  "System.Resources.Writer.dll",
+                      "size":  51464
+                  },
+                  {
+                      "path":  "System.Runtime.CompilerServices.Unsafe.dll",
+                      "size":  15632
+                  },
+                  {
+                      "path":  "System.Runtime.CompilerServices.VisualC.dll",
+                      "size":  31024
+                  },
+                  {
+                      "path":  "System.Runtime.dll",
+                      "size":  43784
+                  },
+                  {
+                      "path":  "System.Runtime.Extensions.dll",
+                      "size":  18192
+                  },
+                  {
+                      "path":  "System.Runtime.Handles.dll",
+                      "size":  15624
+                  },
+                  {
+                      "path":  "System.Runtime.InteropServices.dll",
+                      "size":  96568
+                  },
+                  {
+                      "path":  "System.Runtime.InteropServices.JavaScript.dll",
+                      "size":  51464
+                  },
+                  {
+                      "path":  "System.Runtime.InteropServices.RuntimeInformation.dll",
+                      "size":  15664
+                  },
+                  {
+                      "path":  "System.Runtime.Intrinsics.dll",
+                      "size":  17160
+                  },
+                  {
+                      "path":  "System.Runtime.Loader.dll",
+                      "size":  16184
+                  },
+                  {
+                      "path":  "System.Runtime.Numerics.dll",
+                      "size":  329992
+                  },
+                  {
+                      "path":  "System.Runtime.Serialization.dll",
+                      "size":  17160
+                  },
+                  {
+                      "path":  "System.Runtime.Serialization.Formatters.dll",
+                      "size":  309560
+                  },
+                  {
+                      "path":  "System.Runtime.Serialization.Json.dll",
+                      "size":  16144
+                  },
+                  {
+                      "path":  "System.Runtime.Serialization.Primitives.dll",
+                      "size":  39176
+                  },
+                  {
+                      "path":  "System.Runtime.Serialization.Xml.dll",
+                      "size":  17160
+                  },
+                  {
+                      "path":  "System.Security.AccessControl.dll",
+                      "size":  231696
+                  },
+                  {
+                      "path":  "System.Security.Claims.dll",
+                      "size":  100664
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.Algorithms.dll",
+                      "size":  17680
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.Cng.dll",
+                      "size":  16696
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.Csp.dll",
+                      "size":  16144
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.dll",
+                      "size":  2050320
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.Encoding.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.OpenSsl.dll",
+                      "size":  15632
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.Pkcs.dll",
+                      "size":  760120
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.Primitives.dll",
+                      "size":  16176
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.ProtectedData.dll",
+                      "size":  55568
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.X509Certificates.dll",
+                      "size":  17160
+                  },
+                  {
+                      "path":  "System.Security.Cryptography.Xml.dll",
+                      "size":  456976
+                  },
+                  {
+                      "path":  "System.Security.dll",
+                      "size":  18704
+                  },
+                  {
+                      "path":  "System.Security.Permissions.dll",
+                      "size":  186632
+                  },
+                  {
+                      "path":  "System.Security.Principal.dll",
+                      "size":  15672
+                  },
+                  {
+                      "path":  "System.Security.Principal.Windows.dll",
+                      "size":  186632
+                  },
+                  {
+                      "path":  "System.Security.SecureString.dll",
+                      "size":  15624
+                  },
+                  {
+                      "path":  "System.ServiceModel.Web.dll",
+                      "size":  17168
+                  },
+                  {
+                      "path":  "System.ServiceProcess.dll",
+                      "size":  16144
+                  },
+                  {
+                      "path":  "System.Text.Encoding.CodePages.dll",
+                      "size":  862520
+                  },
+                  {
+                      "path":  "System.Text.Encoding.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Text.Encoding.Extensions.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Text.Encodings.Web.dll",
+                      "size":  133384
+                  },
+                  {
+                      "path":  "System.Text.Json.dll",
+                      "size":  1501488
+                  },
+                  {
+                      "path":  "System.Text.RegularExpressions.dll",
+                      "size":  1022224
+                  },
+                  {
+                      "path":  "System.Threading.AccessControl.dll",
+                      "size":  84232
+                  },
+                  {
+                      "path":  "System.Threading.Channels.dll",
+                      "size":  133384
+                  },
+                  {
+                      "path":  "System.Threading.dll",
+                      "size":  84280
+                  },
+                  {
+                      "path":  "System.Threading.Overlapped.dll",
+                      "size":  16144
+                  },
+                  {
+                      "path":  "System.Threading.Tasks.Dataflow.dll",
+                      "size":  489784
+                  },
+                  {
+                      "path":  "System.Threading.Tasks.dll",
+                      "size":  17200
+                  },
+                  {
+                      "path":  "System.Threading.Tasks.Extensions.dll",
+                      "size":  16176
+                  },
+                  {
+                      "path":  "System.Threading.Tasks.Parallel.dll",
+                      "size":  133424
+                  },
+                  {
+                      "path":  "System.Threading.Thread.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Threading.ThreadPool.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Threading.Timer.dll",
+                      "size":  15632
+                  },
+                  {
+                      "path":  "System.Transactions.dll",
+                      "size":  16688
+                  },
+                  {
+                      "path":  "System.Transactions.Local.dll",
+                      "size":  661816
+                  },
+                  {
+                      "path":  "System.ValueTuple.dll",
+                      "size":  15672
+                  },
+                  {
+                      "path":  "System.Web.dll",
+                      "size":  15664
+                  },
+                  {
+                      "path":  "System.Web.HttpUtility.dll",
+                      "size":  59656
+                  },
+                  {
+                      "path":  "System.Windows.Controls.Ribbon.dll",
+                      "size":  1452304
+                  },
+                  {
+                      "path":  "System.Windows.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Windows.Extensions.dll",
+                      "size":  117008
+                  },
+                  {
+                      "path":  "System.Windows.Forms.Design.dll",
+                      "size":  5564720
+                  },
+                  {
+                      "path":  "System.Windows.Forms.Design.Editors.dll",
+                      "size":  16688
+                  },
+                  {
+                      "path":  "System.Windows.Forms.dll",
+                      "size":  13564176
+                  },
+                  {
+                      "path":  "System.Windows.Forms.Primitives.dll",
+                      "size":  3012912
+                  },
+                  {
+                      "path":  "System.Windows.Input.Manipulations.dll",
+                      "size":  137480
+                  },
+                  {
+                      "path":  "System.Windows.Presentation.dll",
+                      "size":  31024
+                  },
+                  {
+                      "path":  "System.Xaml.dll",
+                      "size":  1423632
+                  },
+                  {
+                      "path":  "System.Xml.dll",
+                      "size":  23816
+                  },
+                  {
+                      "path":  "System.Xml.Linq.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Xml.ReaderWriter.dll",
+                      "size":  22280
+                  },
+                  {
+                      "path":  "System.Xml.Serialization.dll",
+                      "size":  16656
+                  },
+                  {
+                      "path":  "System.Xml.XDocument.dll",
+                      "size":  16136
+                  },
+                  {
+                      "path":  "System.Xml.XmlDocument.dll",
+                      "size":  16144
+                  },
+                  {
+                      "path":  "System.Xml.XmlSerializer.dll",
+                      "size":  18224
+                  },
+                  {
+                      "path":  "System.Xml.XPath.dll",
+                      "size":  16144
+                  },
+                  {
+                      "path":  "System.Xml.XPath.XDocument.dll",
+                      "size":  31032
+                  },
+                  {
+                      "path":  "tg-civil-referrals.html",
+                      "size":  883
+                  },
+                  {
+                      "path":  "tg-day-form.html",
+                      "size":  916
+                  },
+                  {
+                      "path":  "tg-discharge-form.html",
+                      "size":  936
+                  },
+                  {
+                      "path":  "tg-form.html",
+                      "size":  901
+                  },
+                  {
+                      "path":  "tg-night-form.html",
+                      "size":  920
+                  },
+                  {
+                      "path":  "tg-qh-form.html",
+                      "size":  933
+                  },
+                  {
+                      "path":  "UIAutomationClient.dll",
+                      "size":  416016
+                  },
+                  {
+                      "path":  "UIAutomationClientSideProviders.dll",
+                      "size":  870704
+                  },
+                  {
+                      "path":  "UIAutomationProvider.dll",
+                      "size":  59664
+                  },
+                  {
+                      "path":  "UIAutomationTypes.dll",
+                      "size":  313616
+                  },
+                  {
+                      "path":  "vcruntime140_cor3.dll",
+                      "size":  124544
+                  },
+                  {
+                      "path":  "WebView2Loader.dll",
+                      "size":  165440
+                  },
+                  {
+                      "path":  "WindowsBase.dll",
+                      "size":  2255152
+                  },
+                  {
+                      "path":  "WindowsFormsIntegration.dll",
+                      "size":  211216
+                  },
+                  {
+                      "path":  "wpfgfx_cor3.dll",
+                      "size":  1951536
+                  },
+                  {
+                      "path":  "ykow8ru3.html",
+                      "size":  599
+                  },
+                  {
+                      "path":  "Отделения/Общий бланк отделений.pdf",
+                      "size":  2044245
+                  },
+                  {
+                      "path":  "Отделения/Ակնաբուժական/Ակնաբուժական.docx",
+                      "size":  20697
+                  },
+                  {
+                      "path":  "Отделения/Ակնաբուժական/Ակնաբուժական.pdf",
+                      "size":  134174
+                  },
+                  {
+                      "path":  "Отделения/ԱՆՈԹԱՅԻՆ/ԱՆՈԹԱՅԻՆ.docx",
+                      "size":  20725
+                  },
+                  {
+                      "path":  "Отделения/ԱՆՈԹԱՅԻՆ/ԱՆՈԹԱՅԻՆ.pdf",
+                      "size":  142310
+                  },
+                  {
+                      "path":  "Отделения/ԱՏԴ/ԱՏԴ.docx",
+                      "size":  18442
+                  },
+                  {
+                      "path":  "Отделения/ԱՏԴ/ԱՏԴ.pdf",
+                      "size":  135082
+                  },
+                  {
+                      "path":  "Отделения/Գինեկոլոգիական/Գինեկոլոգիական.docx",
+                      "size":  18465
+                  },
+                  {
+                      "path":  "Отделения/Գինեկոլոգիական/Գինեկոլոգիական.pdf",
+                      "size":  142180
+                  },
+                  {
+                      "path":  "Отделения/Դիմածնոտային վիր/Դիմածնոտային վիր.docx",
+                      "size":  18475
+                  },
+                  {
+                      "path":  "Отделения/Դիմածնոտային վիր/Դիմածնոտային վիր.pdf",
+                      "size":  134455
+                  },
+                  {
+                      "path":  "Отделения/Թերապիա/Թերապիա.docx",
+                      "size":  18463
+                  },
+                  {
+                      "path":  "Отделения/Թերապիա/Թերապիա.pdf",
+                      "size":  142371
+                  },
+                  {
+                      "path":  "Отделения/Թռիչքային/Թռիչքային.docx",
+                      "size":  18462
+                  },
+                  {
+                      "path":  "Отделения/Թռիչքային/Թռիչքային.pdf",
+                      "size":  142813
+                  },
+                  {
+                      "path":  "Отделения/ԻՆՖ/ԻՆՖ.docx",
+                      "size":  26803
+                  },
+                  {
+                      "path":  "Отделения/ԻՆՖ/ԻՆՖ.pdf",
+                      "size":  144550
+                  },
+                  {
+                      "path":  "Отделения/Կրծքային մ-բ/Կրծքային մ-բ.docx",
+                      "size":  18583
+                  },
+                  {
+                      "path":  "Отделения/Կրծքային մ-բ/Կրծքային մ-բ.pdf",
+                      "size":  140864
+                  },
+                  {
+                      "path":  "Отделения/Նեյրովիրաբուժական/Նեյրովիրաբուժական.docx",
+                      "size":  18464
+                  },
+                  {
+                      "path":  "Отделения/Նեյրովիրաբուժական/Նեյրովիրաբուժական.pdf",
+                      "size":  141548
+                  },
+                  {
+                      "path":  "Отделения/Նյարդաբանական/Նյարդաբանական.docx",
+                      "size":  18463
+                  },
+                  {
+                      "path":  "Отделения/Նյարդաբանական/Նյարդաբանական.pdf",
+                      "size":  142021
+                  },
+                  {
+                      "path":  "Отделения/Ուռոլոգիական/Ուռոլոգիական.docx",
+                      "size":  18468
+                  },
+                  {
+                      "path":  "Отделения/Ուռոլոգիական/Ուռոլոգիական.pdf",
+                      "size":  141972
+                  },
+                  {
+                      "path":  "Отделения/Վերակենդանացման/Վերակենդանացման.docx",
+                      "size":  18469
+                  },
+                  {
+                      "path":  "Отделения/Վերակենդանացման/Վերակենդանացման.pdf",
+                      "size":  141986
+                  },
+                  {
+                      "path":  "Отделения/Վիրաբուժական/Վիրաբուժական.docx",
+                      "size":  18456
+                  },
+                  {
+                      "path":  "Отделения/Վիրաբուժական/Վիրաբուժական.pdf",
+                      "size":  134294
+                  },
+                  {
+                      "path":  "Отделения/Վնասվածքաբանական/Վնասվածքաբանական.docx",
+                      "size":  18468
+                  },
+                  {
+                      "path":  "Отделения/Վնասվածքաբանական/Վնասվածքաբանական.pdf",
+                      "size":  134731
+                  },
+                  {
+                      "path":  "Отделения/Քիթ-կոկորդ բ-ք/Քիթ-կոկորդ բ-ք.docx",
+                      "size":  18525
+                  },
+                  {
+                      "path":  "Отделения/Քիթ-կոկորդ բ-ք/Քիթ-կոկորդ բ-ք.pdf",
+                      "size":  135172
+                  },
+                  {
+                      "path":  "Отделения/Ք-Հ/Ք-Հ.docx",
+                      "size":  18441
+                  },
+                  {
+                      "path":  "Отделения/Ք-Հ/Ք-Հ.pdf",
+                      "size":  142269
+                  },
+                  {
+                      "path":  "Օրվա շարժ․.html",
+                      "size":  729
+                  }
+              ]
+}

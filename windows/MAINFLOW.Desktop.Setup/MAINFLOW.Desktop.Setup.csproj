@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>MAINFLOW.Desktop.Setup</AssemblyName>
+    <RootNamespace>MAINFLOW.Desktop.Setup</RootNamespace>
+    <SatelliteResourceLanguages>ru</SatelliteResourceLanguages>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+</Project>

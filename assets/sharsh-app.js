@@ -2289,6 +2289,119 @@ function buildInitialPhotoLightboxState() {
     return null;
   }
 
+  function canPostDesktopHostMessage() {
+    return Boolean(window.chrome?.webview && typeof window.chrome.webview.postMessage === "function");
+  }
+
+  function postDesktopHostMessage(type, payload = {}) {
+    if (!canPostDesktopHostMessage()) {
+      return false;
+    }
+
+    try {
+      window.chrome.webview.postMessage({
+        source: "sharsh-app",
+        type,
+        ...payload
+      });
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function buildDesktopNotificationDepartmentSummary(records, prefix) {
+    const names = Array.from(new Set(
+      (Array.isArray(records) ? records : [])
+        .map((record) => String(record?.departmentName || record?.departmentId || "").trim())
+        .filter(Boolean)
+    ));
+
+    if (!names.length) {
+      return prefix;
+    }
+
+    const visibleNames = names.slice(0, 3).join(", ");
+    const extra = names.length > 3 ? ` и ещё ${names.length - 3}` : "";
+    return `${prefix}: ${visibleNames}${extra}.`;
+  }
+
+  function notifyDesktopHostAboutPhotoGalleryUpdates(previousRecords, nextRecords) {
+    const previousIds = new Set(
+      (Array.isArray(previousRecords) ? previousRecords : [])
+        .map((record) => Number(record?.id))
+        .filter((value) => Number.isFinite(value))
+    );
+    const addedRecords = (Array.isArray(nextRecords) ? nextRecords : [])
+      .filter((record) => record && !previousIds.has(Number(record.id)));
+
+    if (!addedRecords.length) {
+      return;
+    }
+
+    const androidRecords = [];
+    const photoRecords = [];
+    addedRecords.forEach((record) => {
+      const sourceMeta = getMainTablePhotoGallerySourceMeta(record);
+      if (sourceMeta?.kind === "android") {
+        androidRecords.push(record);
+      } else {
+        photoRecords.push(record);
+      }
+    });
+
+    if (androidRecords.length) {
+      postDesktopHostMessage("desktop-notification", {
+        category: "android-update",
+        title: "MAINFLOW: Android MAINFORM",
+        message: buildDesktopNotificationDepartmentSummary(
+          androidRecords,
+          androidRecords.length > 1
+            ? "Получены новые данные из Android MAINFORM"
+            : "Получены новые данные из Android MAINFORM"
+        )
+      });
+    }
+
+    if (photoRecords.length) {
+      postDesktopHostMessage("desktop-notification", {
+        category: "photo-update",
+        title: "MAINFLOW: Фото бланка",
+        message: buildDesktopNotificationDepartmentSummary(
+          photoRecords,
+          photoRecords.length > 1
+            ? "Получены новые фото бланков"
+            : "Получено новое фото бланка"
+        )
+      });
+    }
+  }
+
+  function notifyDesktopHostAboutTelegramFormUpdates(previousRecords, nextRecords) {
+    const previousIds = new Set(
+      (Array.isArray(previousRecords) ? previousRecords : [])
+        .map((record) => Number(record?.id))
+        .filter((value) => Number.isFinite(value))
+    );
+    const addedRecords = (Array.isArray(nextRecords) ? nextRecords : [])
+      .filter((record) => record && !previousIds.has(Number(record.id)));
+
+    if (!addedRecords.length) {
+      return;
+    }
+
+    postDesktopHostMessage("desktop-notification", {
+      category: "telegram-form",
+      title: "MAINFLOW: Telegram форма",
+      message: buildDesktopNotificationDepartmentSummary(
+        addedRecords,
+        addedRecords.length > 1
+          ? "Получены новые Telegram формы"
+          : "Получена новая Telegram форма"
+      )
+    });
+  }
+
   function normalizeMainTableTelegramFormRecord(record) {
     if (!record || typeof record !== "object") {
       return null;
@@ -3143,16 +3256,26 @@ function buildInitialPhotoLightboxState() {
     refreshMainTablePhotoGalleryUi(displayContext);
 
     try {
+      const hadLoadedBefore = Boolean(state.mainTablePhotoGallery.loaded);
+      const previousRecords = hadLoadedBefore
+        ? ensureMainTablePhotoGalleryRecordsLoaded()
+          .map(normalizeMainTablePhotoGalleryRecord)
+          .filter(Boolean)
+        : [];
       const records = await sync.listOcrFeedback(80, {
         createdDateKey: getArchiveDateKey(),
         excludeTelegramForms: true
       });
-      state.mainTablePhotoGallery.records = (Array.isArray(records) ? records : [])
+      const nextRecords = (Array.isArray(records) ? records : [])
         .map(normalizeMainTablePhotoGalleryRecord)
         .filter(Boolean);
+      state.mainTablePhotoGallery.records = nextRecords;
       state.mainTablePhotoGallery.loaded = true;
       state.mainTablePhotoGallery.error = "";
       state.mainTablePhotoGallery.lastLoadedAt = Date.now();
+      if (hadLoadedBefore) {
+        notifyDesktopHostAboutPhotoGalleryUpdates(previousRecords, nextRecords);
+      }
     } catch (error) {
       state.mainTablePhotoGallery.loaded = true;
       state.mainTablePhotoGallery.error = error instanceof Error ? error.message : "Не удалось загрузить фото бланков.";
@@ -3188,13 +3311,23 @@ function buildInitialPhotoLightboxState() {
     refreshMainTableTelegramFormUi();
 
     try {
+      const hadLoadedBefore = Boolean(state.mainTableTelegramForms.loaded);
+      const previousRecords = hadLoadedBefore
+        ? ensureMainTableTelegramFormRecordsLoaded()
+          .map((record) => normalizeMainTableTelegramFormRecord(record))
+          .filter(Boolean)
+        : [];
       const records = await sync.listTelegramFormFeedback(120);
-      state.mainTableTelegramForms.records = (Array.isArray(records) ? records : [])
+      const nextRecords = (Array.isArray(records) ? records : [])
         .map((record) => normalizeMainTableTelegramFormRecord(record))
         .filter(Boolean);
+      state.mainTableTelegramForms.records = nextRecords;
       state.mainTableTelegramForms.loaded = true;
       state.mainTableTelegramForms.error = "";
       state.mainTableTelegramForms.lastLoadedAt = Date.now();
+      if (hadLoadedBefore) {
+        notifyDesktopHostAboutTelegramFormUpdates(previousRecords, nextRecords);
+      }
     } catch (error) {
       state.mainTableTelegramForms.loaded = true;
       state.mainTableTelegramForms.error = error instanceof Error ? error.message : "Не удалось загрузить Telegram Web формы.";
@@ -7463,6 +7596,15 @@ function buildInitialPhotoLightboxState() {
     return appendShareQuery(`${prefix}${DISCHARGE_SHIFT_FILENAME}?view=discharge`);
   }
 
+  function getWindowsDesktopSetupPath() {
+    try {
+      return appendShareQuery(new URL("windows/releases/MAINFLOW.Desktop.Setup.exe", window.location.href).href);
+    } catch (_error) {
+      const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+      return appendShareQuery(`${prefix}windows/releases/MAINFLOW.Desktop.Setup.exe`);
+    }
+  }
+
   function buildHospitalReportData(snapshot) {
     const primaryRows = snapshot.rows.filter((row) => row.group === "primary");
     const subtotal = (key) => getSummaryValue(snapshot, primaryRows, key);
@@ -7628,7 +7770,6 @@ function buildInitialPhotoLightboxState() {
     const report = buildHospitalReportData(state.snapshot);
     const mainPath = appendShareQuery(config.getMainPagePath(basePath));
     const summaryFreshness = getFreshnessMeta(report.updatedAt);
-
     app.innerHTML = `
       <div class="page hospital-report-page">
         <div class="toolbar no-print">
@@ -8121,6 +8262,12 @@ function buildInitialPhotoLightboxState() {
     const mainBlankPdfPath = config.getMainBlankPdfPath
       ? config.getMainBlankPdfPath(basePath)
       : null;
+    const desktopSetupPath = window.location.protocol !== "file:"
+      ? getWindowsDesktopSetupPath()
+      : "";
+    const downloadDesktopButtonHtml = desktopSetupPath
+      ? `<a class="button-link" href="${escapeHtml(desktopSetupPath)}" download target="_blank" rel="noopener">MAINFLOW.exe</a>`
+      : "";
     const downloadMainPdfButtonHtml = mainBlankPdfPath
       ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">PDF ներբ.</a>`
       : "";
@@ -8146,6 +8293,7 @@ function buildInitialPhotoLightboxState() {
               </div>
             </div>
             <div class="main-toolbar-group">
+              ${downloadDesktopButtonHtml}
               ${downloadMainPdfButtonHtml}
               <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
               <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Հաշվետվ.</a>

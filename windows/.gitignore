@@ -1,3 +1,7 @@
 MAINFLOW.Desktop/bin/
 MAINFLOW.Desktop/obj/
 MAINFLOW.Desktop/*.user
+MAINFLOW.Desktop.Setup/bin/
+MAINFLOW.Desktop.Setup/obj/
+MAINFLOW.Desktop.Setup/Payload/*.zip
+.tmp/

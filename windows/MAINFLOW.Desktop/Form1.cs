@@ -3,6 +3,7 @@ using System.Net.NetworkInformation;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using Microsoft.Win32;
 
 namespace MAINFLOW.Desktop;
 
@@ -12,7 +13,10 @@ public partial class Form1 : Form
     private const string RemoteSupabaseUrl = "https://ywecvlapdlaojpvijaqy.supabase.co";
     private const string RemoteSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZWN2bGFwZGxhb2pwdmlqYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNTAzMjgsImV4cCI6MjA5MzYyNjMyOH0._HEPdPB2bBTo_N-1Qo8jLau5g5oYGgvoGnBWPxDupL4";
     private const string RemoteFunctionName = "sharsh-sync";
+    private const string AutoStartRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string AutoStartRegistryValueName = "MAINFLOW Desktop";
 
+    private readonly bool _startInBackground;
     private readonly string _webRootPath;
     private readonly string _appDataRoot;
     private readonly string _webViewUserDataPath;
@@ -24,13 +28,26 @@ public partial class Form1 : Form
         ["ocr-feedback.html"] = "OCR журнал"
     };
 
+    private readonly ToolStripButton _toolStripButtonBackground;
+    private readonly ToolStripButton _toolStripButtonAutoStart;
+    private readonly ContextMenuStrip _trayMenu;
+    private readonly NotifyIcon _trayIcon;
+    private readonly ToolStripMenuItem _trayMenuOpen;
+    private readonly ToolStripMenuItem _trayMenuSync;
+    private readonly ToolStripMenuItem _trayMenuAutoStart;
+    private readonly ToolStripMenuItem _trayMenuExit;
+
     private DesktopShellState _shellState;
     private bool _suppressModeEvents;
     private bool _webViewReady;
+    private bool _allowClose;
+    private bool _trayHintShown;
+    private bool _backgroundLaunchHandled;
     private string _currentRelativePage = DefaultRelativePage;
 
-    public Form1()
+    public Form1(bool startInBackground = false)
     {
+        _startInBackground = startInBackground;
         InitializeComponent();
 
         _webRootPath = AppContext.BaseDirectory;
@@ -45,16 +62,91 @@ public partial class Form1 : Form
         Directory.CreateDirectory(_webViewUserDataPath);
 
         _shellState = LoadShellState();
-        _currentRelativePage = NormalizeRelativePage(_shellState.LastRelativePage);
+        if (_startInBackground)
+        {
+            _currentRelativePage = DefaultRelativePage;
+            if (HasInternetAvailable())
+            {
+                _shellState = _shellState with { Mode = DesktopMode.Online };
+            }
+            WindowState = FormWindowState.Minimized;
+            ShowInTaskbar = false;
+        }
+        else
+        {
+            _currentRelativePage = NormalizeRelativePage(_shellState.LastRelativePage);
+        }
 
         webView.CreationProperties = new CoreWebView2CreationProperties
         {
             UserDataFolder = _webViewUserDataPath
         };
 
+        _toolStripButtonBackground = new ToolStripButton("В фон")
+        {
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+        _toolStripButtonBackground.Click += (_, _) => HideToTray(
+            showBalloon: true,
+            title: "MAINFLOW работает в фоне",
+            message: "Приложение свернуто в трей и продолжит синхронизацию и уведомления."
+        );
+
+        _toolStripButtonAutoStart = new ToolStripButton
+        {
+            DisplayStyle = ToolStripItemDisplayStyle.Text
+        };
+        _toolStripButtonAutoStart.Click += (_, _) => ToggleAutoStartPreference();
+
+        var syncQueueIndex = topToolStrip.Items.IndexOf(toolStripButtonSyncQueue);
+        if (syncQueueIndex >= 0)
+        {
+            topToolStrip.Items.Insert(syncQueueIndex + 1, _toolStripButtonBackground);
+            topToolStrip.Items.Insert(syncQueueIndex + 2, _toolStripButtonAutoStart);
+        }
+        else
+        {
+            topToolStrip.Items.Add(_toolStripButtonBackground);
+            topToolStrip.Items.Add(_toolStripButtonAutoStart);
+        }
+
+        _trayMenu = new ContextMenuStrip(components);
+        _trayMenuOpen = new ToolStripMenuItem("Открыть MAINFLOW");
+        _trayMenuOpen.Click += (_, _) => RestoreFromTray();
+        _trayMenuSync = new ToolStripMenuItem("Синхронизировать очередь");
+        _trayMenuSync.Click += async (_, _) => await HandleSyncQueueAsync();
+        _trayMenuAutoStart = new ToolStripMenuItem("Запускать с Windows")
+        {
+            CheckOnClick = false
+        };
+        _trayMenuAutoStart.Click += (_, _) => ToggleAutoStartPreference();
+        _trayMenuExit = new ToolStripMenuItem("Выход");
+        _trayMenuExit.Click += (_, _) => ExitApplication();
+        _trayMenu.Items.AddRange([
+            _trayMenuOpen,
+            _trayMenuSync,
+            new ToolStripSeparator(),
+            _trayMenuAutoStart,
+            new ToolStripSeparator(),
+            _trayMenuExit
+        ]);
+
+        _trayIcon = new NotifyIcon(components)
+        {
+            Text = "MAINFLOW Desktop",
+            Visible = true,
+            ContextMenuStrip = _trayMenu,
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application
+        };
+        _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
+        _trayIcon.BalloonTipClicked += (_, _) => RestoreFromTray();
+
         toolStripComboBoxMode.Items.Clear();
         toolStripComboBoxMode.Items.AddRange(["Оффлайн", "Онлайн"]);
+
+        ApplyAutoStartPreference(silent: true);
         ApplyModeToUi(GetSafeInitialMode());
+        UpdateAutoStartUi();
         UpdateBannerText();
         UpdateNetworkStatus();
         UpdateCurrentPageStatus();
@@ -67,8 +159,13 @@ public partial class Form1 : Form
         toolStripButtonOpenDataFolder.Click += (_, _) => OpenDataFolder();
         toolStripComboBoxMode.SelectedIndexChanged += (_, _) => HandleModeChangedFromUi();
         networkTimer.Tick += (_, _) => UpdateNetworkStatus();
-        Shown += async (_, _) => await InitializeWebViewAsync();
-        FormClosing += (_, _) => SaveShellState();
+        Resize += (_, _) => HandleResizeToTray();
+        Shown += async (_, _) =>
+        {
+            await InitializeWebViewAsync();
+            HandleInitialBackgroundLaunch();
+        };
+        FormClosing += HandleFormClosing;
     }
 
     private async Task InitializeWebViewAsync()
@@ -85,6 +182,7 @@ public partial class Form1 : Form
             webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
             webView.CoreWebView2.Settings.IsStatusBarEnabled = true;
             webView.CoreWebView2.NavigationStarting += (_, args) => HandleModeAwareNavigation(args);
+            webView.CoreWebView2.WebMessageReceived += HandleWebMessageReceived;
             webView.CoreWebView2.NewWindowRequested += (_, args) =>
             {
                 args.Handled = true;
@@ -169,6 +267,7 @@ public partial class Form1 : Form
         }
 
         toolStripButtonSyncQueue.Enabled = false;
+        _trayMenuSync.Enabled = false;
         try
         {
             var rawResult = await webView.CoreWebView2.ExecuteScriptAsync(
@@ -226,6 +325,7 @@ public partial class Form1 : Form
         finally
         {
             toolStripButtonSyncQueue.Enabled = true;
+            _trayMenuSync.Enabled = true;
         }
     }
 
@@ -290,10 +390,10 @@ public partial class Form1 : Form
 
     private Uri BuildPageUri(string pagePath, DesktopMode mode)
     {
-        var builder = new UriBuilder(new Uri(pagePath));
-        builder.Query = mode == DesktopMode.Online
-            ? BuildRemoteQueryString()
-            : "";
+        var builder = new UriBuilder(new Uri(pagePath))
+        {
+            Query = mode == DesktopMode.Online ? BuildRemoteQueryString() : ""
+        };
         return builder.Uri;
     }
 
@@ -391,8 +491,8 @@ public partial class Form1 : Form
     private void UpdateBannerText()
     {
         bannerLabel.Text = _shellState.Mode == DesktopMode.Offline
-            ? "Оффлайн-режим: ввод и просмотр работают локально на этом ПК. Все новые изменения попадают в офлайн-очередь, а после возврата связи отправляются автоматически в фоне. Кнопка синхронизации остаётся для ручного запуска."
-            : "Онлайн-режим: используется локальная копия сайта, а данные читаются и сохраняются через сервер. Если интернет пропадёт, переключитесь в оффлайн и продолжайте работу без остановки.";
+            ? "Оффлайн-режим: ввод и просмотр работают локально на этом ПК. Новые изменения попадают в оффлайн-очередь и после возврата связи отправляются автоматически в фоне. Desktop-оболочка может жить в трее и запускаться вместе с Windows."
+            : "Онлайн-режим: локальная копия сайта работает с сервером и получает новые данные автоматически. Оставьте приложение в трее, чтобы получать фоновые уведомления о Telegram формах, Android MAINFORM и новых фото бланков.";
     }
 
     private void UpdateNetworkStatus()
@@ -410,6 +510,14 @@ public partial class Form1 : Form
             : _currentRelativePage;
         toolStripStatusLabelPage.Text = $"Страница: {title}";
         toolStripStatusLabelModeValue.Text = _shellState.Mode == DesktopMode.Online ? "онлайн" : "оффлайн";
+    }
+
+    private void UpdateAutoStartUi()
+    {
+        var enabled = _shellState.AutoStartEnabled;
+        _toolStripButtonAutoStart.Text = enabled ? "Автозапуск: вкл" : "Автозапуск: выкл";
+        _trayMenuAutoStart.Checked = enabled;
+        _trayMenuAutoStart.Text = enabled ? "Запускать с Windows: вкл" : "Запускать с Windows: выкл";
     }
 
     private DesktopMode GetSafeInitialMode()
@@ -453,6 +561,219 @@ public partial class Form1 : Form
         {
             return false;
         }
+    }
+
+    private void HandleResizeToTray()
+    {
+        if (WindowState == FormWindowState.Minimized)
+        {
+            HideToTray(
+                showBalloon: !_trayHintShown,
+                title: "MAINFLOW свернут в трей",
+                message: "Приложение продолжит работать в фоне. Для возврата дважды нажмите значок возле часов."
+            );
+        }
+    }
+
+    private void HandleInitialBackgroundLaunch()
+    {
+        if (!_startInBackground || _backgroundLaunchHandled)
+        {
+            return;
+        }
+
+        _backgroundLaunchHandled = true;
+        HideToTray(
+            showBalloon: true,
+            title: "MAINFLOW запущен в фоне",
+            message: "Приложение автоматически стартовало вместе с Windows и будет показывать уведомления о новых данных."
+        );
+    }
+
+    private void HideToTray(bool showBalloon = false, string? title = null, string? message = null)
+    {
+        if (!Visible && !ShowInTaskbar)
+        {
+            if (showBalloon)
+            {
+                ShowTrayBalloon(title ?? "MAINFLOW в фоне", message ?? "Приложение продолжает работать в трее.");
+            }
+            return;
+        }
+
+        ShowInTaskbar = false;
+        WindowState = FormWindowState.Minimized;
+        Hide();
+
+        if (showBalloon)
+        {
+            ShowTrayBalloon(title ?? "MAINFLOW в фоне", message ?? "Приложение продолжает работать в трее.");
+        }
+    }
+
+    private void RestoreFromTray()
+    {
+        Show();
+        ShowInTaskbar = true;
+        WindowState = FormWindowState.Normal;
+        Activate();
+    }
+
+    private void ExitApplication()
+    {
+        _allowClose = true;
+        _trayIcon.Visible = false;
+        Close();
+    }
+
+    private void HandleFormClosing(object? sender, FormClosingEventArgs args)
+    {
+        SaveShellState();
+
+        if (_allowClose
+            || args.CloseReason == CloseReason.ApplicationExitCall
+            || args.CloseReason == CloseReason.WindowsShutDown
+            || args.CloseReason == CloseReason.TaskManagerClosing)
+        {
+            _trayIcon.Visible = false;
+            return;
+        }
+
+        args.Cancel = true;
+        HideToTray(
+            showBalloon: true,
+            title: "MAINFLOW продолжит работать",
+            message: "Окно закрыто в трей. Используйте значок возле часов, чтобы вернуться или выйти."
+        );
+    }
+
+    private void ToggleAutoStartPreference()
+    {
+        var nextState = !_shellState.AutoStartEnabled;
+        _shellState = _shellState with { AutoStartEnabled = nextState };
+        if (!ApplyAutoStartPreference(silent: false))
+        {
+            _shellState = _shellState with { AutoStartEnabled = !nextState };
+            UpdateAutoStartUi();
+            return;
+        }
+
+        SaveShellState();
+        UpdateAutoStartUi();
+        ShowTrayBalloon(
+            "Автозапуск обновлен",
+            nextState
+                ? "MAINFLOW будет стартовать вместе с Windows в фоновом режиме."
+                : "Автозапуск MAINFLOW отключен."
+        );
+    }
+
+    private bool ApplyAutoStartPreference(bool silent)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(AutoStartRegistryPath, writable: true)
+                ?? Registry.CurrentUser.CreateSubKey(AutoStartRegistryPath);
+            if (key is null)
+            {
+                throw new InvalidOperationException("Не удалось открыть раздел автозапуска Windows.");
+            }
+
+            if (_shellState.AutoStartEnabled)
+            {
+                key.SetValue(
+                    AutoStartRegistryValueName,
+                    $"\"{Application.ExecutablePath}\" --background",
+                    RegistryValueKind.String
+                );
+            }
+            else
+            {
+                key.DeleteValue(AutoStartRegistryValueName, throwOnMissingValue: false);
+            }
+
+            UpdateAutoStartUi();
+            return true;
+        }
+        catch (Exception error)
+        {
+            if (!silent)
+            {
+                MessageBox.Show(
+                    this,
+                    $"Не удалось изменить автозапуск Windows.\n\n{error.Message}",
+                    "MAINFLOW Desktop",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+            }
+            return false;
+        }
+    }
+
+    private void HandleWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs args)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(args.WebMessageAsJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return;
+            }
+
+            var root = document.RootElement;
+            var type = root.TryGetProperty("type", out var typeElement)
+                ? typeElement.GetString() ?? ""
+                : "";
+            if (!string.Equals(type, "desktop-notification", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var title = root.TryGetProperty("title", out var titleElement)
+                ? titleElement.GetString() ?? "MAINFLOW"
+                : "MAINFLOW";
+            var message = root.TryGetProperty("message", out var messageElement)
+                ? messageElement.GetString() ?? ""
+                : "";
+
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
+            ShowTrayBalloon(title, message);
+        }
+        catch
+        {
+        }
+    }
+
+    private void ShowTrayBalloon(string title, string message)
+    {
+        var safeTitle = LimitBalloonText(title, 63);
+        var safeMessage = LimitBalloonText(message, 255);
+        if (string.IsNullOrWhiteSpace(safeMessage))
+        {
+            return;
+        }
+
+        _trayHintShown = true;
+        _trayIcon.BalloonTipTitle = safeTitle;
+        _trayIcon.BalloonTipText = safeMessage;
+        _trayIcon.BalloonTipIcon = ToolTipIcon.Info;
+        _trayIcon.ShowBalloonTip(8000);
+    }
+
+    private static string LimitBalloonText(string? value, int maxLength)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value) ? "" : value.Trim();
+        if (normalized.Length <= maxLength)
+        {
+            return normalized;
+        }
+
+        return normalized[..Math.Max(0, maxLength - 1)] + "…";
     }
 
     private static T? DeserializeScriptResult<T>(string rawJson)
@@ -543,9 +864,13 @@ public partial class Form1 : Form
         Online
     }
 
-    private sealed record DesktopShellState(DesktopMode Mode, string LastRelativePage)
+    private sealed record DesktopShellState
     {
-        public static DesktopShellState Default { get; } = new(DesktopMode.Offline, DefaultRelativePage);
+        public DesktopMode Mode { get; init; } = DesktopMode.Offline;
+        public string LastRelativePage { get; init; } = DefaultRelativePage;
+        public bool AutoStartEnabled { get; init; } = true;
+
+        public static DesktopShellState Default { get; } = new();
     }
 
     private sealed record PendingSyncCommandResult(bool Ok, int SyncedCount, int RemainingCount, string Error);
