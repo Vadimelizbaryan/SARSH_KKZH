@@ -8,11 +8,11 @@ Windows shell for the MAINFLOW web app.
 - Supports explicit `offline` and `online` modes.
 - Keeps WebView/browser data under `%LocalAppData%\\MAINFLOW.Desktop`.
 
-## Current limitation
+## Offline queue
 
-Offline work is local-first, but a full pending-sync queue is not implemented yet.
-This means the desktop app is already useful during internet outages, but the next
-required step is a safe replay/merge flow for offline edits after the connection returns.
+Offline edits are stored locally and added to a pending sync queue.
+After the internet returns, you can send the accumulated changes back to the server
+from the page itself or from the desktop shell button `Синхр. накопл.`.
 
 ## Build
 

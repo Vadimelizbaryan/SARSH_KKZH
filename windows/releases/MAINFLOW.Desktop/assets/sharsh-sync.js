@@ -3,6 +3,9 @@
   const runtime = window.SHARSH_RUNTIME_CONFIG || {};
   const runtimeMeta = window.SHARSH_RUNTIME_CONFIG_META || {};
   const auth = window.SHARSH_AUTH || null;
+  const PENDING_SYNC_STORAGE_KEY = `${config.STORAGE_NAMESPACE || "sarsh-kkzh-v2"}:pending-sync-queue:v1`;
+  const PENDING_SYNC_EVENT_NAME = "sharsh-pending-sync-changed";
+  let pendingSyncInFlightPromise = null;
 
   function hasRemoteSync() {
     return runtime.syncMode === "supabase-function"
@@ -69,10 +72,184 @@
   }
 
   function buildResponseError(response, payload, fallback) {
-    if (payload && typeof payload.error === "string" && payload.error.trim()) {
-      return new Error(payload.error.trim());
+    const message = payload && typeof payload.error === "string" && payload.error.trim()
+      ? payload.error.trim()
+      : `${fallback} (${response.status})`;
+    const error = new Error(message);
+    error.statusCode = response.status;
+    return error;
+  }
+
+  function buildEmptyPendingSyncState() {
+    return {
+      version: 1,
+      items: [],
+      lastSyncedAt: "",
+      lastAttemptedAt: "",
+      lastError: ""
+    };
+  }
+
+  function normalizePendingSyncItem(item) {
+    if (!item || typeof item !== "object") {
+      return null;
     }
-    return new Error(`${fallback} (${response.status})`);
+    const type = typeof item.type === "string" ? item.type.trim() : "";
+    if (!type) {
+      return null;
+    }
+    const payload = item.payload && typeof item.payload === "object"
+      ? config.deepCopy(item.payload)
+      : {};
+    return {
+      id: typeof item.id === "string" && item.id.trim()
+        ? item.id.trim()
+        : `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type,
+      payload,
+      createdAt: typeof item.createdAt === "string" && item.createdAt.trim()
+        ? item.createdAt
+        : new Date().toISOString()
+    };
+  }
+
+  function normalizePendingSyncState(input) {
+    const fallback = buildEmptyPendingSyncState();
+    if (!input || typeof input !== "object") {
+      return fallback;
+    }
+    const rawItems = Array.isArray(input.items) ? input.items : [];
+    return {
+      version: 1,
+      items: rawItems.map(normalizePendingSyncItem).filter(Boolean),
+      lastSyncedAt: typeof input.lastSyncedAt === "string" ? input.lastSyncedAt : "",
+      lastAttemptedAt: typeof input.lastAttemptedAt === "string" ? input.lastAttemptedAt : "",
+      lastError: typeof input.lastError === "string" ? input.lastError : ""
+    };
+  }
+
+  function readPendingSyncState() {
+    try {
+      const raw = localStorage.getItem(PENDING_SYNC_STORAGE_KEY);
+      if (!raw) {
+        return buildEmptyPendingSyncState();
+      }
+      return normalizePendingSyncState(JSON.parse(raw));
+    } catch (_error) {
+      return buildEmptyPendingSyncState();
+    }
+  }
+
+  function dispatchPendingSyncChanged(state = readPendingSyncState()) {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
+      return;
+    }
+    try {
+      window.dispatchEvent(new CustomEvent(PENDING_SYNC_EVENT_NAME, {
+        detail: {
+          count: state.items.length,
+          hasPending: state.items.length > 0,
+          isSyncing: Boolean(pendingSyncInFlightPromise),
+          lastSyncedAt: state.lastSyncedAt || "",
+          lastAttemptedAt: state.lastAttemptedAt || "",
+          lastError: state.lastError || ""
+        }
+      }));
+    } catch (_error) {
+    }
+  }
+
+  function writePendingSyncState(nextState) {
+    const normalized = normalizePendingSyncState(nextState);
+    localStorage.setItem(PENDING_SYNC_STORAGE_KEY, JSON.stringify(normalized));
+    dispatchPendingSyncChanged(normalized);
+    return normalized;
+  }
+
+  function getPendingSyncStatus() {
+    const state = readPendingSyncState();
+    return {
+      count: state.items.length,
+      hasPending: state.items.length > 0,
+      isSyncing: Boolean(pendingSyncInFlightPromise),
+      lastSyncedAt: state.lastSyncedAt || "",
+      lastAttemptedAt: state.lastAttemptedAt || "",
+      lastError: state.lastError || "",
+      items: state.items.map((item) => ({
+        id: item.id,
+        type: item.type,
+        createdAt: item.createdAt
+      }))
+    };
+  }
+
+  function hasPendingSyncItems() {
+    return readPendingSyncState().items.length > 0;
+  }
+
+  function createPendingSyncItem(type, payload) {
+    const createdAt = new Date().toISOString();
+    return normalizePendingSyncItem({
+      id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type,
+      payload,
+      createdAt
+    });
+  }
+
+  function enqueuePendingMutation(type, payload, lastError = "") {
+    const nextState = readPendingSyncState();
+    const item = createPendingSyncItem(type, payload);
+    if (!item) {
+      throw new Error("Не удалось подготовить офлайн-изменение для очереди.");
+    }
+    nextState.items.push(item);
+    if (typeof lastError === "string" && lastError.trim()) {
+      nextState.lastError = lastError.trim();
+    }
+    writePendingSyncState(nextState);
+    return nextState;
+  }
+
+  function getPendingSyncMessage(status = getPendingSyncStatus(), lastError = "") {
+    const count = Number(status?.count) || 0;
+    const base = count > 0
+      ? `Накоплено несинхронизированных изменений: ${count}. При появлении интернета нажмите «Синхр. накопл.».`
+      : "Очередь синхронизации пуста.";
+    const errorText = typeof lastError === "string" && lastError.trim()
+      ? lastError.trim()
+      : (typeof status?.lastError === "string" && status.lastError.trim() ? status.lastError.trim() : "");
+    return errorText ? `${base} Последняя ошибка: ${errorText}` : base;
+  }
+
+  function buildPendingSyncResult(snapshot, lastError = "") {
+    const status = getPendingSyncStatus();
+    return {
+      snapshot,
+      source: "pending-sync",
+      warning: getPendingSyncMessage(status, lastError)
+    };
+  }
+
+  function shouldQueueRemoteError(error) {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+    const statusCode = Number(error.statusCode);
+    if (Number.isFinite(statusCode) && statusCode > 0) {
+      return statusCode === 401
+        || statusCode === 403
+        || statusCode === 408
+        || statusCode === 429
+        || statusCode >= 500;
+    }
+    return true;
+  }
+
+  function shouldEnqueueMutationNow() {
+    return !hasRemoteSync()
+      || hasPendingSyncItems()
+      || (requiresOwnerAuth() && !getAccessToken());
   }
 
   function readLocalDepartmentRecord(departmentId) {
@@ -183,6 +360,17 @@
   }
 
   async function loadSnapshot() {
+    const pendingStatus = getPendingSyncStatus();
+    if (pendingStatus.hasPending) {
+      const snapshot = loadLocalSnapshot();
+      writeLocalSnapshot(snapshot);
+      return {
+        snapshot,
+        source: "pending-sync",
+        warning: getPendingSyncMessage(pendingStatus)
+      };
+    }
+
     if (!hasRemoteSync()) {
       const snapshot = loadLocalSnapshot();
       writeLocalSnapshot(snapshot);
@@ -249,6 +437,149 @@
     }
 
     return payload;
+  }
+
+  async function replayPendingMutation(item) {
+    const payload = item && item.payload && typeof item.payload === "object"
+      ? config.deepCopy(item.payload)
+      : {};
+
+    switch (item?.type) {
+      case "save_department":
+        return {
+          snapshot: await postRemote({
+            type: "save_department",
+            departmentId: payload.departmentId,
+            reportDate: payload.reportDate,
+            values: config.normalizeRowValues(payload.values),
+            accessCode: payload.accessCode || ""
+          }),
+          source: "remote"
+        };
+      case "save_department_from_main":
+        return {
+          snapshot: await postRemote({
+            type: "save_department_from_main",
+            departmentId: payload.departmentId,
+            reportDate: payload.reportDate,
+            values: config.normalizeRowValues(payload.values)
+          }),
+          source: "remote"
+        };
+      case "save_report_date":
+        return {
+          snapshot: await postRemote({
+            type: "save_report_date",
+            reportDate: payload.reportDate
+          }),
+          source: "remote"
+        };
+      case "apply_night_shift":
+        return {
+          snapshot: await postRemote({
+            type: "apply_night_shift",
+            reportDate: payload.reportDate,
+            rows: sanitizeNightShiftRows(payload.rows)
+          }),
+          source: "remote"
+        };
+      case "apply_day_shift":
+        return {
+          snapshot: await postRemote({
+            type: "apply_day_shift",
+            reportDate: payload.reportDate,
+            rows: sanitizeNightShiftRows(payload.rows)
+          }),
+          source: "remote"
+        };
+      case "rollover_main_after_archive": {
+        const responsePayload = await postRemotePayload(
+          {
+            type: "rollover_main_after_archive",
+            archiveKey: typeof payload.archiveKey === "string" ? payload.archiveKey : "",
+            reportDate: payload.reportDate
+          },
+          "Не удалось выполнить утренний перенос главной таблицы"
+        );
+        const snapshot = config.buildSnapshotFromSaved(responsePayload);
+        writeLocalSnapshot(snapshot);
+        return {
+          snapshot,
+          source: "remote",
+          archiveRecord: responsePayload && typeof responsePayload.archiveRecord === "object" ? responsePayload.archiveRecord : null,
+          rolloverApplied: Boolean(responsePayload && responsePayload.rolloverApplied),
+          rolloverAlreadyApplied: Boolean(responsePayload && responsePayload.rolloverAlreadyApplied)
+        };
+      }
+      default:
+        throw new Error(`Неизвестный тип офлайн-операции: ${String(item?.type || "")}`);
+    }
+  }
+
+  async function syncPendingChanges() {
+    if (pendingSyncInFlightPromise) {
+      return pendingSyncInFlightPromise;
+    }
+
+    pendingSyncInFlightPromise = (async () => {
+      const initialState = readPendingSyncState();
+      if (!initialState.items.length) {
+        return {
+          snapshot: loadLocalSnapshot(),
+          source: hasRemoteSync() ? "remote" : "local-only",
+          syncedCount: 0,
+          remainingCount: 0
+        };
+      }
+      if (!hasRemoteSync()) {
+        throw new Error("Для синхронизации очереди включите онлайн-режим.");
+      }
+
+      ensureOwnerAuth();
+
+      let queueState = writePendingSyncState({
+        ...initialState,
+        lastAttemptedAt: new Date().toISOString()
+      });
+      let syncedCount = 0;
+      let lastResult = {
+        snapshot: loadLocalSnapshot(),
+        source: "pending-sync"
+      };
+
+      while (queueState.items.length) {
+        const currentItem = queueState.items[0];
+        try {
+          lastResult = await replayPendingMutation(currentItem);
+          syncedCount += 1;
+          queueState = writePendingSyncState({
+            ...queueState,
+            items: queueState.items.slice(1),
+            lastSyncedAt: new Date().toISOString(),
+            lastError: ""
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Не удалось синхронизировать накопленные изменения.";
+          writePendingSyncState({
+            ...queueState,
+            lastAttemptedAt: new Date().toISOString(),
+            lastError: message
+          });
+          throw error;
+        }
+      }
+
+      return {
+        ...lastResult,
+        syncedCount,
+        remainingCount: 0
+      };
+    })().finally(() => {
+      pendingSyncInFlightPromise = null;
+      dispatchPendingSyncChanged();
+    });
+
+    return pendingSyncInFlightPromise;
   }
 
   const CIVIL_REFERRALS_LOCAL_STORAGE_KEY = `${config.STORAGE_NAMESPACE || "sarsh-kkzh-v2"}:civil-referrals:v1`;
@@ -801,7 +1132,7 @@
     };
   }
 
-  async function saveDepartment(departmentId, reportDate, values, accessCode) {
+  function applyLocalDepartmentSnapshot(departmentId, reportDate, values) {
     const localSnapshot = loadLocalSnapshot();
     const rowMap = new Map(localSnapshot.rows.map((row) => [row.id, row]));
     const targetRow = rowMap.get(departmentId);
@@ -816,62 +1147,89 @@
       : localSnapshot.reportDate;
     localSnapshot.updatedAt = new Date().toISOString();
     writeLocalSnapshot(localSnapshot);
+    return localSnapshot;
+  }
 
-    if (!hasRemoteSync()) {
-      return {
-        snapshot: localSnapshot,
-        source: "local-only"
-      };
+  async function saveDepartment(departmentId, reportDate, values, accessCode) {
+    const normalizedValues = config.normalizeRowValues(values);
+    const currentSnapshot = loadLocalSnapshot();
+    const effectiveReportDate = typeof reportDate === "string" && reportDate.trim()
+      ? reportDate
+      : currentSnapshot.reportDate;
+    const queuePayload = {
+      departmentId,
+      reportDate: effectiveReportDate,
+      values: normalizedValues,
+      accessCode: accessCode || ""
+    };
+
+    if (shouldEnqueueMutationNow()) {
+      const snapshot = applyLocalDepartmentSnapshot(departmentId, effectiveReportDate, normalizedValues);
+      enqueuePendingMutation("save_department", queuePayload);
+      return buildPendingSyncResult(snapshot);
     }
 
-    const snapshot = await postRemote({
-      type: "save_department",
-      departmentId,
-      reportDate: localSnapshot.reportDate,
-      values: config.normalizeRowValues(values),
-      accessCode: accessCode || ""
-    });
+    try {
+      const snapshot = await postRemote({
+        type: "save_department",
+        departmentId,
+        reportDate: effectiveReportDate,
+        values: normalizedValues,
+        accessCode: accessCode || ""
+      });
 
-    return {
-      snapshot,
-      source: "remote"
-    };
+      return {
+        snapshot,
+        source: "remote"
+      };
+    } catch (error) {
+      if (!shouldQueueRemoteError(error)) {
+        throw error;
+      }
+      const snapshot = applyLocalDepartmentSnapshot(departmentId, effectiveReportDate, normalizedValues);
+      enqueuePendingMutation("save_department", queuePayload, error instanceof Error ? error.message : "");
+      return buildPendingSyncResult(snapshot, error instanceof Error ? error.message : "");
+    }
   }
 
   async function saveDepartmentFromMain(departmentId, reportDate, values) {
-    const localSnapshot = loadLocalSnapshot();
-    const rowMap = new Map(localSnapshot.rows.map((row) => [row.id, row]));
-    const targetRow = rowMap.get(departmentId);
-
-    if (targetRow) {
-      targetRow.values = config.normalizeRowValues(values);
-      targetRow.updatedAt = new Date().toISOString();
-    }
-
-    localSnapshot.reportDate = typeof reportDate === "string" && reportDate.trim()
+    const normalizedValues = config.normalizeRowValues(values);
+    const currentSnapshot = loadLocalSnapshot();
+    const effectiveReportDate = typeof reportDate === "string" && reportDate.trim()
       ? reportDate
-      : localSnapshot.reportDate;
-    localSnapshot.updatedAt = new Date().toISOString();
-    writeLocalSnapshot(localSnapshot);
+      : currentSnapshot.reportDate;
+    const queuePayload = {
+      departmentId,
+      reportDate: effectiveReportDate,
+      values: normalizedValues
+    };
 
-    if (!hasRemoteSync()) {
-      return {
-        snapshot: localSnapshot,
-        source: "local-only"
-      };
+    if (shouldEnqueueMutationNow()) {
+      const snapshot = applyLocalDepartmentSnapshot(departmentId, effectiveReportDate, normalizedValues);
+      enqueuePendingMutation("save_department_from_main", queuePayload);
+      return buildPendingSyncResult(snapshot);
     }
 
-    const snapshot = await postRemote({
-      type: "save_department_from_main",
-      departmentId,
-      reportDate: localSnapshot.reportDate,
-      values: config.normalizeRowValues(values)
-    });
+    try {
+      const snapshot = await postRemote({
+        type: "save_department_from_main",
+        departmentId,
+        reportDate: effectiveReportDate,
+        values: normalizedValues
+      });
 
-    return {
-      snapshot,
-      source: "remote"
-    };
+      return {
+        snapshot,
+        source: "remote"
+      };
+    } catch (error) {
+      if (!shouldQueueRemoteError(error)) {
+        throw error;
+      }
+      const snapshot = applyLocalDepartmentSnapshot(departmentId, effectiveReportDate, normalizedValues);
+      enqueuePendingMutation("save_department_from_main", queuePayload, error instanceof Error ? error.message : "");
+      return buildPendingSyncResult(snapshot, error instanceof Error ? error.message : "");
+    }
   }
 
   const NIGHT_SHIFT_TRANSFER_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"];
@@ -1042,6 +1400,72 @@
     };
   }
 
+  async function queueAwareRolloverMainAfterArchive(archiveKey, reportDate) {
+    const safeArchiveKey = typeof archiveKey === "string" ? archiveKey.trim() : "";
+    if (!safeArchiveKey) {
+      throw new Error("ÐÐµ ÑƒÐºÐ°Ð·Ð°Ð½ Ð´ÐµÐ½ÑŒ Ð°Ñ€Ñ…Ð¸Ð²Ð° Ð´Ð»Ñ ÑƒÑ‚Ñ€ÐµÐ½Ð½ÐµÐ³Ð¾ Ð¿ÐµÑ€ÐµÐ½Ð¾ÑÐ°.");
+    }
+
+    const queuePayload = {
+      archiveKey: safeArchiveKey,
+      reportDate
+    };
+    const doneKey = `${MORNING_ROLLOVER_DONE_PREFIX}${safeArchiveKey}`;
+
+    if (shouldEnqueueMutationNow()) {
+      if (localStorage.getItem(doneKey) === "1") {
+        return {
+          snapshot: loadLocalSnapshot(),
+          source: "pending-sync",
+          archiveRecord: null,
+          rolloverApplied: false,
+          rolloverAlreadyApplied: true,
+          warning: getPendingSyncMessage()
+        };
+      }
+
+      const snapshot = applyMorningRolloverRowsToSnapshot(loadLocalSnapshot(), reportDate);
+      writeLocalSnapshot(snapshot);
+      localStorage.setItem(doneKey, "1");
+      enqueuePendingMutation("rollover_main_after_archive", queuePayload);
+      return {
+        ...buildPendingSyncResult(snapshot),
+        archiveRecord: null,
+        rolloverApplied: true,
+        rolloverAlreadyApplied: false
+      };
+    }
+
+    try {
+      return await rolloverMainAfterArchive(archiveKey, reportDate);
+    } catch (error) {
+      if (!shouldQueueRemoteError(error)) {
+        throw error;
+      }
+
+      if (localStorage.getItem(doneKey) === "1") {
+        enqueuePendingMutation("rollover_main_after_archive", queuePayload, error instanceof Error ? error.message : "");
+        return {
+          ...buildPendingSyncResult(loadLocalSnapshot(), error instanceof Error ? error.message : ""),
+          archiveRecord: null,
+          rolloverApplied: false,
+          rolloverAlreadyApplied: true
+        };
+      }
+
+      const snapshot = applyMorningRolloverRowsToSnapshot(loadLocalSnapshot(), reportDate);
+      writeLocalSnapshot(snapshot);
+      localStorage.setItem(doneKey, "1");
+      enqueuePendingMutation("rollover_main_after_archive", queuePayload, error instanceof Error ? error.message : "");
+      return {
+        ...buildPendingSyncResult(snapshot, error instanceof Error ? error.message : ""),
+        archiveRecord: null,
+        rolloverApplied: true,
+        rolloverAlreadyApplied: false
+      };
+    }
+  }
+
   function applyNightShiftRowsToSnapshot(snapshot, rows, reportDate) {
     const normalized = config.buildSnapshotFromSaved(snapshot);
     const nightRows = sanitizeNightShiftRows(rows);
@@ -1113,6 +1537,33 @@
       snapshot,
       source: "local-only"
     };
+  }
+
+  async function queueAwareApplyNightShiftToMain(rows, reportDate) {
+    const nightRows = sanitizeNightShiftRows(rows);
+    const queuePayload = {
+      reportDate,
+      rows: nightRows
+    };
+
+    if (shouldEnqueueMutationNow()) {
+      const snapshot = applyNightShiftRowsToSnapshot(loadLocalSnapshot(), nightRows, reportDate);
+      writeLocalSnapshot(snapshot);
+      enqueuePendingMutation("apply_night_shift", queuePayload);
+      return buildPendingSyncResult(snapshot);
+    }
+
+    try {
+      return await applyNightShiftToMain(rows, reportDate);
+    } catch (error) {
+      if (!shouldQueueRemoteError(error)) {
+        throw error;
+      }
+      const snapshot = applyNightShiftRowsToSnapshot(loadLocalSnapshot(), nightRows, reportDate);
+      writeLocalSnapshot(snapshot);
+      enqueuePendingMutation("apply_night_shift", queuePayload, error instanceof Error ? error.message : "");
+      return buildPendingSyncResult(snapshot, error instanceof Error ? error.message : "");
+    }
   }
 
   function normalizeNightShiftDraft(payload) {
@@ -1211,6 +1662,33 @@
       snapshot,
       source: "local-only"
     };
+  }
+
+  async function queueAwareApplyDayShiftToMain(rows, reportDate) {
+    const dayRows = sanitizeNightShiftRows(rows);
+    const queuePayload = {
+      reportDate,
+      rows: dayRows
+    };
+
+    if (shouldEnqueueMutationNow()) {
+      const snapshot = applyDayShiftRowsToSnapshot(loadLocalSnapshot(), dayRows, reportDate);
+      writeLocalSnapshot(snapshot);
+      enqueuePendingMutation("apply_day_shift", queuePayload);
+      return buildPendingSyncResult(snapshot);
+    }
+
+    try {
+      return await applyDayShiftToMain(rows, reportDate);
+    } catch (error) {
+      if (!shouldQueueRemoteError(error)) {
+        throw error;
+      }
+      const snapshot = applyDayShiftRowsToSnapshot(loadLocalSnapshot(), dayRows, reportDate);
+      writeLocalSnapshot(snapshot);
+      enqueuePendingMutation("apply_day_shift", queuePayload, error instanceof Error ? error.message : "");
+      return buildPendingSyncResult(snapshot, error instanceof Error ? error.message : "");
+    }
   }
 
   function normalizeDayShiftDraft(payload) {
@@ -1634,6 +2112,37 @@
     };
   }
 
+  async function queueAwareSaveReportDate(reportDate) {
+    const currentSnapshot = loadLocalSnapshot();
+    const effectiveReportDate = typeof reportDate === "string" && reportDate.trim()
+      ? reportDate
+      : config.DEFAULT_DATE;
+    const queuePayload = {
+      reportDate: effectiveReportDate
+    };
+
+    if (shouldEnqueueMutationNow()) {
+      currentSnapshot.reportDate = effectiveReportDate;
+      currentSnapshot.updatedAt = new Date().toISOString();
+      writeLocalSnapshot(currentSnapshot);
+      enqueuePendingMutation("save_report_date", queuePayload);
+      return buildPendingSyncResult(currentSnapshot);
+    }
+
+    try {
+      return await saveReportDate(reportDate);
+    } catch (error) {
+      if (!shouldQueueRemoteError(error)) {
+        throw error;
+      }
+      currentSnapshot.reportDate = effectiveReportDate;
+      currentSnapshot.updatedAt = new Date().toISOString();
+      writeLocalSnapshot(currentSnapshot);
+      enqueuePendingMutation("save_report_date", queuePayload, error instanceof Error ? error.message : "");
+      return buildPendingSyncResult(currentSnapshot, error instanceof Error ? error.message : "");
+    }
+  }
+
   async function notifyOwnerLogin(details) {
     if (!hasRemoteSync()) {
       return { ok: false, reason: "remote-sync-disabled" };
@@ -1778,6 +2287,9 @@
     if (source === "remote") {
       return "Առցանց սինխր.";
     }
+    if (source === "pending-sync") {
+      return "Ô±Õ¼Õ¡Õ¶ÖÕ¡Õ¶Ö + Õ¸Ö‚Õ²Õ¡Ö€Õ¯Õ´Õ¡Õ¶ Õ¸Õ¹Ö€.";
+    }
     if (source === "local-cache") {
       return "Տեղային պահոց";
     }
@@ -1792,14 +2304,16 @@
     runtime,
     hasRemoteSync,
     loadSnapshot,
+    getPendingSyncStatus,
+    syncPendingChanges,
     saveDepartment,
     saveDepartmentFromMain,
-    rolloverMainAfterArchive,
-    applyNightShiftToMain,
+    rolloverMainAfterArchive: queueAwareRolloverMainAfterArchive,
+    applyNightShiftToMain: queueAwareApplyNightShiftToMain,
     loadNightShiftDraft,
     saveNightShiftDraft,
     clearNightShiftDraft,
-    applyDayShiftToMain,
+    applyDayShiftToMain: queueAwareApplyDayShiftToMain,
     loadDayShiftDraft,
     saveDayShiftDraft,
     clearDayShiftDraft,
@@ -1816,7 +2330,7 @@
     reassignOcrFeedbackDepartment,
     deleteDepartmentFeedback,
     saveRuntimePreferences,
-    saveReportDate,
+    saveReportDate: queueAwareSaveReportDate,
     notifyOwnerLogin,
     sendMainPdfsToTelegram,
     sendShiftFormToTelegram,

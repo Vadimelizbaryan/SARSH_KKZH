@@ -5588,6 +5588,7 @@ function buildInitialPhotoLightboxState() {
       if (mode === "main") {
         renderPage();
       }
+      return;
     }
     if (shouldSave) {
       if (mode === "department") {
@@ -7794,17 +7795,102 @@ function buildInitialPhotoLightboxState() {
   }
 
   function getSourceClass() {
-    return state.source === "remote" ? "remote" : "local";
+    if (state.source === "remote") {
+      return "remote";
+    }
+    if (state.source === "pending-sync") {
+      return "pending";
+    }
+    return "local";
   }
 
   function getSyncDescription() {
     if (state.source === "remote") {
       return "Данные объединяются между компьютерами через интернет.";
     }
+    if (state.source === "pending-sync") {
+      return "Ð§Ð°ÑÑ‚ÑŒ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ ÐµÑ‰Ñ‘ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð° Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€. ÐžÐ½Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð¶Ð´ÑƒÑ‚ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.";
+    }
     if (state.source === "local-cache") {
       return "Сейчас показан локальный кэш. Сервер временно недоступен.";
     }
     return "Сейчас включен локальный режим. Между разными компьютерами данные еще не объединяются.";
+  }
+
+  function getPendingSyncStatus() {
+    if (!sync || typeof sync.getPendingSyncStatus !== "function") {
+      return {
+        count: 0,
+        hasPending: false,
+        isSyncing: false,
+        lastSyncedAt: "",
+        lastAttemptedAt: "",
+        lastError: ""
+      };
+    }
+
+    const status = sync.getPendingSyncStatus();
+    const count = Number(status?.count) || 0;
+    return {
+      count,
+      hasPending: Boolean(status?.hasPending && count > 0),
+      isSyncing: Boolean(status?.isSyncing),
+      lastSyncedAt: typeof status?.lastSyncedAt === "string" ? status.lastSyncedAt : "",
+      lastAttemptedAt: typeof status?.lastAttemptedAt === "string" ? status.lastAttemptedAt : "",
+      lastError: typeof status?.lastError === "string" ? status.lastError : ""
+    };
+  }
+
+  function getPendingSyncButtonLabel(status = getPendingSyncStatus()) {
+    if (status.isSyncing) {
+      return status.count > 0 ? `Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð». (${status.count})...` : "Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð»....";
+    }
+    return status.count > 0 ? `Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð». (${status.count})` : "Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð».";
+  }
+
+  function getPendingSyncSummaryText(status = getPendingSyncStatus()) {
+    if (status.hasPending) {
+      if (!sync.hasRemoteSync()) {
+        return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼, Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¶Ð´ÑƒÑ‚ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸.`;
+      }
+      return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. ÐœÐ¾Ð¶Ð½Ð¾ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð² ÑÐµÑ€Ð²ÐµÑ€ Ð¾Ð´Ð½Ð¾Ð¹ ÐºÐ½Ð¾Ð¿ÐºÐ¾Ð¹.`;
+    }
+    if (status.lastSyncedAt) {
+      return `ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ Ð¿ÑƒÑÑ‚Ð°. ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ ÑƒÑÐ¿ÐµÑˆÐ½Ð°Ñ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ñ: ${formatTimestamp(status.lastSyncedAt)}.`;
+    }
+    return sync.hasRemoteSync()
+      ? "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°."
+      : "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼. ÐÐ¾Ð²Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð±ÑƒÐ´ÑƒÑ‚ Ð½Ð°ÐºÐ°Ð¿Ð»Ð¸Ð²Ð°Ñ‚ÑŒÑÑ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾.";
+  }
+
+  function getPendingSyncErrorText(status = getPendingSyncStatus()) {
+    if (status.lastError) {
+      return `ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ Ð¾ÑˆÐ¸Ð±ÐºÐ° ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸: ${status.lastError}`;
+    }
+    if (status.hasPending && !sync.hasRemoteSync()) {
+      return "Ð§Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ, Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÐµÑÑŒ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼.";
+    }
+    return "";
+  }
+
+  function renderPendingSyncControls() {
+    const status = getPendingSyncStatus();
+    const errorText = getPendingSyncErrorText(status);
+    return `
+      <div class="pending-sync-panel">
+        <div class="pending-sync-panel__copy">
+          <strong>ÐžÑ„Ñ„Ð»Ð°Ð¹Ð½-Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ</strong>
+          <p id="pendingSyncSummaryText">${escapeHtml(getPendingSyncSummaryText(status))}</p>
+          <p class="hint${errorText ? " warning-note" : ""}" id="pendingSyncErrorText">${escapeHtml(errorText)}</p>
+        </div>
+        <button
+          type="button"
+          id="pendingSyncBtn"
+          class="pending-sync-panel__button${status.hasPending && sync.hasRemoteSync() && !status.isSyncing ? " save-ready" : ""}"
+          ${(status.hasPending && !status.isSyncing && sync.hasRemoteSync()) ? "" : "disabled"}
+        >${escapeHtml(getPendingSyncButtonLabel(status))}</button>
+      </div>
+    `;
   }
 
   function showOwnerAuthTools() {
@@ -8109,6 +8195,7 @@ function buildInitialPhotoLightboxState() {
               <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
               <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.")}</p>
               <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
+              ${renderPendingSyncControls()}
               <div class="update-health-banner update-health-banner--${overallUpdateStatus.level}" id="overallUpdateBanner">
                 <strong id="overallUpdateLabel">${escapeHtml(overallUpdateStatus.label)}</strong>
                 <span id="overallUpdateDetail">${escapeHtml(overallUpdateStatus.detail)}</span>
@@ -9381,6 +9468,7 @@ function buildInitialPhotoLightboxState() {
             <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
             <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Изменения сохраняются локально. В общий файл они отправятся только после нажатия Сохранить.")}</p>
             <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
+            ${renderPendingSyncControls()}
             <p class="hint save-rule-note" id="saveRuleText"></p>
             <div class="department-top-lock-panel no-print">
               <label class="department-top-lock-switch" for="departmentTopCellsToggle">
@@ -10143,10 +10231,14 @@ function buildInitialPhotoLightboxState() {
     const syncStatusText = document.getElementById("syncStatusText");
     const syncInfoText = document.getElementById("syncInfoText");
     const warningText = document.getElementById("warningText");
+    const pendingSyncSummaryText = document.getElementById("pendingSyncSummaryText");
+    const pendingSyncErrorText = document.getElementById("pendingSyncErrorText");
+    const pendingSyncBtn = document.getElementById("pendingSyncBtn");
     const lastUpdatedText = document.getElementById("lastUpdatedText");
     const lastUpdatedBadge = document.getElementById("lastUpdatedBadge");
     const pills = Array.from(document.querySelectorAll("#syncModeLabel, #sheetSourcePill"));
     const currentDateTime = syncCurrentReportDate();
+    const pendingSyncStatus = getPendingSyncStatus();
 
     if (headerDateText) {
       headerDateText.textContent = currentDateTime.date;
@@ -10170,10 +10262,24 @@ function buildInitialPhotoLightboxState() {
       warningText.textContent = state.warning || "";
       warningText.classList.toggle("warning-note", Boolean(state.warning));
     }
+    if (pendingSyncSummaryText) {
+      pendingSyncSummaryText.textContent = getPendingSyncSummaryText(pendingSyncStatus);
+    }
+    if (pendingSyncErrorText) {
+      const errorText = getPendingSyncErrorText(pendingSyncStatus);
+      pendingSyncErrorText.textContent = errorText;
+      pendingSyncErrorText.className = `hint${errorText ? " warning-note" : ""}`;
+    }
+    if (pendingSyncBtn) {
+      pendingSyncBtn.textContent = getPendingSyncButtonLabel(pendingSyncStatus);
+      pendingSyncBtn.classList.toggle("save-ready", Boolean(pendingSyncStatus.hasPending && sync.hasRemoteSync() && !pendingSyncStatus.isSyncing));
+      pendingSyncBtn.disabled = !(pendingSyncStatus.hasPending && sync.hasRemoteSync() && !pendingSyncStatus.isSyncing);
+    }
     pills.forEach((pill) => {
       pill.textContent = sync.getSourceLabel(state.source);
       pill.classList.toggle("remote", state.source === "remote");
-      pill.classList.toggle("local", state.source !== "remote");
+      pill.classList.toggle("pending", state.source === "pending-sync");
+      pill.classList.toggle("local", state.source !== "remote" && state.source !== "pending-sync");
     });
 
     if (lastUpdatedText) {
@@ -13118,7 +13224,15 @@ function buildInitialPhotoLightboxState() {
             }
 
             setInfo(manual ? "Данные отделения сохранены. Проверка записи пройдена." : "Изменения отправлены и проверка записи пройдена.", false);
-            state.warning = feedbackWarning;
+            if (result.source === "pending-sync") {
+              setInfo(
+                manual
+                  ? "Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð² Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ."
+                  : "Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð¶Ð´ÑƒÑ‚ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.",
+                false
+              );
+            }
+            state.warning = feedbackWarning || result.warning || "";
             resetPhotoImportAfterSuccessfulSave();
             renderPage();
             if (manual && wasPhotoQueueMode) {
@@ -13160,8 +13274,16 @@ function buildInitialPhotoLightboxState() {
       state.snapshot = deepCopy(result.snapshot);
       state.loadedSnapshot.reportDate = result.snapshot.reportDate;
       state.source = result.source;
-      state.warning = "";
-      setInfo("Дата документа сохранена.", false);
+      state.warning = result.warning || "";
+      if (result.source === "pending-sync") {
+        applyLoadedSnapshot(result);
+      }
+      setInfo(
+        result.source === "pending-sync"
+          ? "Дата документа сохранена локально и добавлена в офлайн-очередь."
+          : "Дата документа сохранена.",
+        false
+      );
       refreshTableData();
     } catch (error) {
       setInfo(error instanceof Error ? error.message : "Не удалось сохранить дату.", true);
@@ -13227,9 +13349,13 @@ function buildInitialPhotoLightboxState() {
       applyLoadedSnapshot(lastResult);
       const savedRecord = captureMainTableSavedSnapshot(state.snapshot);
       setInfo(
-        savedRecord
-          ? `Главная таблица сохранена. Снимок: ${savedRecord.dateLabel} ${savedRecord.slotLabel}.`
-          : "Главная таблица сохранена.",
+        lastResult.source === "pending-sync"
+          ? savedRecord
+            ? `Главная таблица сохранена локально и добавлена в офлайн-очередь. Снимок: ${savedRecord.dateLabel} ${savedRecord.slotLabel}.`
+            : "Главная таблица сохранена локально и добавлена в офлайн-очередь."
+          : savedRecord
+            ? `Главная таблица сохранена. Снимок: ${savedRecord.dateLabel} ${savedRecord.slotLabel}.`
+            : "Главная таблица сохранена.",
         false
       );
       refreshTableData();
@@ -13278,6 +13404,77 @@ function buildInitialPhotoLightboxState() {
 
     const zoomScope = mode === "department" ? departmentId : "main";
     localStorage.setItem(config.getZoomStorageKey(zoomScope), String(normalized));
+  }
+
+  async function runPendingSyncNow() {
+    const statusBefore = getPendingSyncStatus();
+    if (!statusBefore.hasPending) {
+      setInfo("ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+      refreshTableData();
+      return {
+        ok: true,
+        syncedCount: 0,
+        remainingCount: 0
+      };
+    }
+    if (!sync.hasRemoteSync()) {
+      const message = "Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ñ… Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ Ð²ÐºÐ»ÑŽÑ‡Ð¸Ñ‚Ðµ Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼.";
+      setInfo(message, true);
+      refreshTableData();
+      return {
+        ok: false,
+        error: message,
+        remainingCount: statusBefore.count
+      };
+    }
+
+    setInfo(`Ð¡Ð¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€ÑƒÑŽ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ: ${statusBefore.count}...`, false);
+    refreshTableData();
+
+    try {
+      const result = await sync.syncPendingChanges();
+      const reloaded = await sync.loadSnapshot();
+      applyLoadedSnapshot(reloaded);
+      restorePendingMainSaveNotice();
+      const syncedCount = Number(result?.syncedCount) || statusBefore.count;
+      setInfo(syncedCount > 0 ? `ÐÐ°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€: ${syncedCount}.` : "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+
+      if (mode === "feedback") {
+        await loadFeedbackRecords(false);
+      }
+      if (mode === "department") {
+        await maybeLoadTelegramFeedbackValues();
+        cancelAutoAppliedTelegramSelectionIfNeeded();
+        await maybeLoadStoredDepartmentPhotoAdjusted();
+        await maybeAutoRecognizeLoadedTelegramPhoto();
+      }
+
+      renderPage();
+      return {
+        ok: true,
+        syncedCount,
+        remainingCount: getPendingSyncStatus().count
+      };
+    } catch (error) {
+      try {
+        const reloaded = await sync.loadSnapshot();
+        applyLoadedSnapshot(reloaded);
+      } catch (_reloadError) {
+      }
+
+      const message = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ.";
+      setInfo(message, true);
+
+      if (mode === "feedback") {
+        await loadFeedbackRecords(false);
+      }
+      renderPage();
+      return {
+        ok: false,
+        error: message,
+        remainingCount: getPendingSyncStatus().count
+      };
+    }
   }
 
   async function refreshFromSource() {
@@ -13336,6 +13533,7 @@ function buildInitialPhotoLightboxState() {
     const zoomRange = document.getElementById("zoomRange");
     const printBtn = document.getElementById("printBtn");
     const refreshBtn = document.getElementById("refreshBtn");
+    const pendingSyncBtn = document.getElementById("pendingSyncBtn");
     const sendTelegramPdfsBtn = document.getElementById("sendTelegramPdfsBtn");
     const sendShiftFormButtons = Array.from(document.querySelectorAll("[data-send-shift-form]"));
     const resetBtn = document.getElementById("resetBtn");
@@ -13659,6 +13857,12 @@ function buildInitialPhotoLightboxState() {
     if (mainTablePhotoGalleryDeleteAllBtn) {
       mainTablePhotoGalleryDeleteAllBtn.addEventListener("click", () => {
         void handleDeleteAllMainTablePhotoGalleryFeedback(mainTablePhotoGalleryDeleteAllBtn);
+      });
+    }
+
+    if (pendingSyncBtn) {
+      pendingSyncBtn.addEventListener("click", () => {
+        void runPendingSyncNow();
       });
     }
 
@@ -14161,6 +14365,11 @@ function buildInitialPhotoLightboxState() {
     await maybeLoadStoredDepartmentPhotoAdjusted();
     await maybeAutoRecognizeLoadedTelegramPhoto();
   }
+
+  window.SHARSH_APP_API = {
+    syncPendingChanges: runPendingSyncNow,
+    getPendingSyncStatus
+  };
 
   init().catch((error) => {
     app.innerHTML = `

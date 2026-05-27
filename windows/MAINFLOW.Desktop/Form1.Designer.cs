@@ -23,6 +23,7 @@ partial class Form1
         toolStripButtonSetup = new ToolStripButton();
         toolStripButtonFeedback = new ToolStripButton();
         toolStripButtonReload = new ToolStripButton();
+        toolStripButtonSyncQueue = new ToolStripButton();
         toolStripButtonOpenDataFolder = new ToolStripButton();
         toolStripSeparatorLeft = new ToolStripSeparator();
         toolStripLabelMode = new ToolStripLabel();
@@ -43,27 +44,27 @@ partial class Form1
         statusStrip.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)webView).BeginInit();
         SuspendLayout();
-        // 
+        //
         // topToolStrip
-        // 
+        //
         topToolStrip.GripStyle = ToolStripGripStyle.Hidden;
         topToolStrip.ImageScalingSize = new Size(20, 20);
-        topToolStrip.Items.AddRange(new ToolStripItem[] { toolStripButtonHome, toolStripButtonSetup, toolStripButtonFeedback, toolStripButtonReload, toolStripButtonOpenDataFolder, toolStripSeparatorLeft, toolStripLabelMode, toolStripComboBoxMode, toolStripSeparatorRight, toolStripLabelNetwork });
+        topToolStrip.Items.AddRange(new ToolStripItem[] { toolStripButtonHome, toolStripButtonSetup, toolStripButtonFeedback, toolStripButtonReload, toolStripButtonSyncQueue, toolStripButtonOpenDataFolder, toolStripSeparatorLeft, toolStripLabelMode, toolStripComboBoxMode, toolStripSeparatorRight, toolStripLabelNetwork });
         topToolStrip.Location = new Point(0, 0);
         topToolStrip.Name = "topToolStrip";
         topToolStrip.Padding = new Padding(8, 6, 8, 6);
         topToolStrip.Size = new Size(1440, 45);
         topToolStrip.TabIndex = 0;
-        // 
+        //
         // toolStripButtonHome
-        // 
+        //
         toolStripButtonHome.DisplayStyle = ToolStripItemDisplayStyle.Text;
         toolStripButtonHome.Name = "toolStripButtonHome";
         toolStripButtonHome.Size = new Size(64, 30);
         toolStripButtonHome.Text = "Главная";
-        // 
+        //
         // toolStripButtonSetup
-        // 
+        //
         toolStripButtonSetup.DisplayStyle = ToolStripItemDisplayStyle.Text;
         toolStripButtonSetup.Name = "toolStripButtonSetup";
         toolStripButtonSetup.Size = new Size(79, 30);
@@ -82,9 +83,16 @@ partial class Form1
         toolStripButtonReload.Name = "toolStripButtonReload";
         toolStripButtonReload.Size = new Size(81, 30);
         toolStripButtonReload.Text = "Обновить";
-        // 
+        //
+        // toolStripButtonSyncQueue
+        //
+        toolStripButtonSyncQueue.DisplayStyle = ToolStripItemDisplayStyle.Text;
+        toolStripButtonSyncQueue.Name = "toolStripButtonSyncQueue";
+        toolStripButtonSyncQueue.Size = new Size(135, 30);
+        toolStripButtonSyncQueue.Text = "Синхр. очередь";
+        //
         // toolStripButtonOpenDataFolder
-        // 
+        //
         toolStripButtonOpenDataFolder.DisplayStyle = ToolStripItemDisplayStyle.Text;
         toolStripButtonOpenDataFolder.Name = "toolStripButtonOpenDataFolder";
         toolStripButtonOpenDataFolder.Size = new Size(98, 30);
@@ -226,6 +234,7 @@ partial class Form1
     private ToolStripButton toolStripButtonSetup = null!;
     private ToolStripButton toolStripButtonFeedback = null!;
     private ToolStripButton toolStripButtonReload = null!;
+    private ToolStripButton toolStripButtonSyncQueue = null!;
     private ToolStripButton toolStripButtonOpenDataFolder = null!;
     private ToolStripSeparator toolStripSeparatorLeft = null!;
     private ToolStripLabel toolStripLabelMode = null!;

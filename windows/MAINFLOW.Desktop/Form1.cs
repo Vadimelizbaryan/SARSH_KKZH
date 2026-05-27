@@ -63,6 +63,7 @@ public partial class Form1 : Form
         toolStripButtonSetup.Click += (_, _) => NavigateToRelativePage("setup.html");
         toolStripButtonFeedback.Click += (_, _) => NavigateToRelativePage("ocr-feedback.html");
         toolStripButtonReload.Click += (_, _) => ReloadCurrentPage();
+        toolStripButtonSyncQueue.Click += async (_, _) => await HandleSyncQueueAsync();
         toolStripButtonOpenDataFolder.Click += (_, _) => OpenDataFolder();
         toolStripComboBoxMode.SelectedIndexChanged += (_, _) => HandleModeChangedFromUi();
         networkTimer.Tick += (_, _) => UpdateNetworkStatus();
@@ -158,6 +159,74 @@ public partial class Form1 : Form
         }
 
         NavigateToRelativePage(_currentRelativePage, saveState: false);
+    }
+
+    private async Task HandleSyncQueueAsync()
+    {
+        if (!_webViewReady || webView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        toolStripButtonSyncQueue.Enabled = false;
+        try
+        {
+            var rawResult = await webView.CoreWebView2.ExecuteScriptAsync(
+                "window.SHARSH_APP_API?.syncPendingChanges ? window.SHARSH_APP_API.syncPendingChanges() : Promise.resolve({ ok: false, error: 'sync-api-unavailable' });"
+            );
+            var result = DeserializeScriptResult<PendingSyncCommandResult>(rawResult);
+            if (result is null)
+            {
+                MessageBox.Show(
+                    this,
+                    "Не удалось прочитать результат синхронизации из страницы MAINFLOW.",
+                    "MAINFLOW Desktop",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+                return;
+            }
+
+            if (result.Ok)
+            {
+                var syncedCount = result.SyncedCount;
+                var remaining = result.RemainingCount;
+                MessageBox.Show(
+                    this,
+                    syncedCount > 0
+                        ? $"Накопленные изменения синхронизированы.\n\nОтправлено: {syncedCount}\nОсталось в очереди: {remaining}"
+                        : "Очередь синхронизации уже пуста.",
+                    "MAINFLOW Desktop",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+                return;
+            }
+
+            MessageBox.Show(
+                this,
+                string.IsNullOrWhiteSpace(result.Error)
+                    ? "Не удалось синхронизировать накопленные изменения."
+                    : result.Error,
+                "MAINFLOW Desktop",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning
+            );
+        }
+        catch (Exception error)
+        {
+            MessageBox.Show(
+                this,
+                $"Не удалось запустить синхронизацию очереди.\n\n{error.Message}",
+                "MAINFLOW Desktop",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+        }
+        finally
+        {
+            toolStripButtonSyncQueue.Enabled = true;
+        }
     }
 
     private void NavigateToRelativePage(string relativePage, bool saveState = true)
@@ -322,8 +391,8 @@ public partial class Form1 : Form
     private void UpdateBannerText()
     {
         bannerLabel.Text = _shellState.Mode == DesktopMode.Offline
-            ? "Оффлайн-режим: ввод и просмотр работают локально на этом ПК. Следующий обязательный этап — очередь синхронизации, чтобы безопасно отправлять накопленные оффлайн-изменения обратно на сервер."
-            : "Онлайн-режим: используется локальная копия сайта, но данные берутся и сохраняются через сервер. Если интернет пропадёт, переключитесь в оффлайн, чтобы работа не остановилась.";
+            ? "Оффлайн-режим: ввод и просмотр работают локально на этом ПК. Все новые изменения сохраняются в офлайн-очередь, а затем отправляются на сервер по кнопке синхронизации."
+            : "Онлайн-режим: используется локальная копия сайта, а данные читаются и сохраняются через сервер. Если интернет пропадёт, переключитесь в оффлайн и продолжайте работу без остановки.";
     }
 
     private void UpdateNetworkStatus()
@@ -383,6 +452,26 @@ public partial class Form1 : Form
         catch
         {
             return false;
+        }
+    }
+
+    private static T? DeserializeScriptResult<T>(string rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return default;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(rawJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch
+        {
+            return default;
         }
     }
 
@@ -458,4 +547,6 @@ public partial class Form1 : Form
     {
         public static DesktopShellState Default { get; } = new(DesktopMode.Offline, DefaultRelativePage);
     }
+
+    private sealed record PendingSyncCommandResult(bool Ok, int SyncedCount, int RemainingCount, string Error);
 }

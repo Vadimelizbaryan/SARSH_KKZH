@@ -151,6 +151,12 @@ a {
   color: var(--local);
 }
 
+.pill.pending {
+  color: #a25600;
+  background: #fff3df;
+  border-color: rgba(162, 86, 0, 0.22);
+}
+
 .zoom-control {
   display: flex;
   align-items: center;
@@ -198,6 +204,37 @@ a {
 .toolbar button:active,
 .toolbar a.button-link:active {
   transform: translateY(0);
+}
+
+.pending-sync-panel {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 250, 240, 0.88);
+}
+
+.pending-sync-panel__copy {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.pending-sync-panel__copy strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.pending-sync-panel__copy p {
+  margin: 0;
+}
+
+.pending-sync-panel__button {
+  flex: 0 0 auto;
 }
 
 #saveBtn.save-ready,
