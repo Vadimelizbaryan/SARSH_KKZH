@@ -32,8 +32,8 @@ const TELEGRAM_PHOTO_AUTOROTATE_META_KEY = "pref:telegram_photo_auto_rotate";
 const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
 const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է միայն բոտի ադմինիստրատորին։";
 const TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT = "Գիշերային ընդունում";
-const TELEGRAM_DAY_SHIFT_BUTTON_TEXT = "Ցերեկային ընդունում";
-const TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT = "Ցերեկային դուրսգրում";
+const TELEGRAM_DAY_SHIFT_BUTTON_TEXT = "Ընդունում";
+const TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT = "Դուրսգրում";
 const TELEGRAM_APPLY_NIGHT_SHIFT_CALLBACK = "apply_night_shift_to_main";
 const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
 const REPORT_PDF_FILE_NAME = "Report.pdf";
@@ -2711,10 +2711,10 @@ function buildWorkplaceLocationReplyMarkup(gpsEnabled = false) {
   const keyboard = gpsEnabled
     ? [
       [{ text: "Ես աշխատանքի եմ", request_location: true }],
-      [{ text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
+      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
     ]
     : [
-      [{ text: TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
+      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
     ];
   return {
     keyboard,
@@ -6710,11 +6710,13 @@ function isTelegramNightShiftButtonRequest(text: string) {
 }
 
 function isTelegramDayShiftButtonRequest(text: string) {
-  return text.trim() === TELEGRAM_DAY_SHIFT_BUTTON_TEXT;
+  const normalized = text.trim();
+  return normalized === TELEGRAM_DAY_SHIFT_BUTTON_TEXT || normalized === "Ցերեկային ընդունում";
 }
 
 function isTelegramDischargeShiftButtonRequest(text: string) {
-  return text.trim() === TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT;
+  const normalized = text.trim();
+  return normalized === TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT || normalized === "Ցերեկային դուրսգրում";
 }
 
 function buildColleagueStartText(firstName = "") {
@@ -6729,7 +6731,7 @@ function buildColleagueStartText(firstName = "") {
     "1. Ուղարկեք բաժանմունքի կոդը, օրինակ՝ SR-7։",
     "2. Բոտը կուղարկի ընթացիկ PDF-ը և Telegram ձևը բացելու կոճակը։",
     "3. Լրացրեք ձևը և ուղարկեք բլանկի լուսանկարը։",
-    "Ընդունման ձևի համար օգտագործեք /day, իսկ դուրսգրման ձևի համար՝ /discharge։ /night հրամանը նույնպես բացում է ընդունման նույն ձևը։",
+    `Ընտրեք «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» կամ «${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}» կոճակը։`,
     "",
     "SR-? հրամանը ցույց կտա բաժանմունքների ցանկը։",
     "",
@@ -6760,9 +6762,9 @@ function buildAdminHelpText() {
     "SR-? — ցույց տալ բաժանմունքների SR կոդերի ցանկը։",
     "SR-7 կամ r7 — ուղարկել ընթացիկ տվյալների PDF-ը և Telegram ձևի կոճակը։",
     "/form SR-7 — ընթացիկ տվյալների PDF + Telegram ձևի կոճակ։",
-    "/day — բացել ընդունման Telegram ձևը։",
-    "/discharge — բացել դուրսգրման Telegram ձևը։",
-    "/night — հին համատեղելի հրաման է և նույնպես բացում է ընդունման ձևը։",
+    `«${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» — բացել ընդունման Telegram ձևը։`,
+    `«${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}» — բացել դուրսգրման Telegram ձևը։`,
+    "/night — հին համատեղելի հրաման է, որը պահպանված է միայն համատեղելիության համար։",
     "/civil — բացել Քաղ. ԲԿ բազայի Telegram ձևը։",
     "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը։",
     "/duty — նշել, որ կոլեգան գիշերային հերթապահ է։",
@@ -6799,9 +6801,9 @@ function buildHelpText() {
     "/pdf — գլխավոր ֆայլի հղումը",
     "/done — նույնն է, ինչ /pdf",
     "/form SR-4 — ստանալ ընթացիկ տվյալների PDF-ը և բացել Telegram Web App ձևը",
-    "/day — բացել ընդունման Telegram Web App ձևը",
-    "/discharge — բացել դուրսգրման Telegram Web App ձևը",
-    "/night — հին համատեղելի հրաման է և նույնպես բացում է ընդունման ձևը",
+    `«${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» — բացել ընդունման Telegram Web App ձևը`,
+    `«${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}» — բացել դուրսգրման Telegram Web App ձևը`,
+    "/night — հին համատեղելի հրաման է, որը պահպանված է միայն համատեղելիության համար",
     "/civil — բացել Քաղ. ԲԿ բազայի Telegram Web App ձևը",
     "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը",
     "/duty — նշել գիշերային հերթապահությունը",
@@ -8971,7 +8973,7 @@ async function handleTelegramLocation(
       responseChatId,
       isTelegramAdminChat(accessChatId)
         ? "GPS սցենարը հիմա անջատված է։ Միացնելու համար գրեք /gps_on։"
-        : `GPS սցենարը հիմա անջատված է։ Գիշերային ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`,
+        : `GPS սցենարը հիմա անջատված է։ Ընդունման ձևի համար սեղմեք «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» կոճակը։`,
       buildWorkplaceLocationReplyMarkup(false)
     );
     return;
@@ -9346,7 +9348,7 @@ async function handleTelegramCallbackQuery(
         "",
         gpsEnabled
           ? "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը եւ ուղարկեք geolocation-ը։"
-          : `Ընդունման ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
+          : `Ընդունման ձևի համար սեղմեք «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» կոճակը։`
       ].join("\n"),
       buildWorkplaceLocationReplyMarkup(gpsEnabled)
     ).catch((error) => {
@@ -9459,7 +9461,7 @@ async function handleTelegramCommand(
       [
         "GPS սցենարը անջատված է։",
         "Հին ներկայության նշումները մաքրված են։",
-        `Բոտը հիմա կթողնի միայն «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
+        `Բոտը հիմա կթողնի «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» և «${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}» կոճակները։`
       ].join("\n"),
       buildWorkplaceLocationReplyMarkup(false)
     );
@@ -9529,7 +9531,7 @@ async function handleTelegramCommand(
     if (!gpsEnabled) {
       await sendTelegramMessageWithReplyMarkup(
         chatId,
-        `GPS սցենարը հիմա անջատված է։ Գիշերային ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`,
+        `GPS սցենարը հիմա անջատված է։ Ընդունման ձևի համար սեղմեք «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» կոճակը։`,
         buildWorkplaceLocationReplyMarkup(false)
       );
       return;
@@ -9550,7 +9552,7 @@ async function handleTelegramCommand(
     if (!gpsEnabled) {
       await sendTelegramMessageWithReplyMarkup(
         chatId,
-        `GPS սցենարը հիմա անջատված է։ Գիշերային ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`,
+        `GPS սցենարը հիմա անջատված է։ Ընդունման ձևի համար սեղմեք «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» կոճակը։`,
         buildWorkplaceLocationReplyMarkup(false)
       );
       return;
@@ -9676,7 +9678,7 @@ async function handleTelegramCommand(
         "",
         gpsEnabled
           ? "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը։"
-          : `Ընդունման ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
+          : `Ընդունման ձևի համար սեղմեք «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» կոճակը։`
       ].join("\n"),
       buildWorkplaceLocationReplyMarkup(gpsEnabled)
     );
@@ -9722,7 +9724,7 @@ async function handleTelegramCommand(
           chatId,
           [
             `${firstName}, տեսնում եմ ընդունման հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
-            "Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք /day կամ /night։"
+            `Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}»։`
           ].join("\n")
         );
       }
@@ -9747,7 +9749,7 @@ async function handleTelegramCommand(
           chatId,
           [
             `${firstName}, տեսնում եմ ընդունման հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
-            "Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք /day։"
+            `Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}»։`
           ].join("\n")
         );
       }
@@ -9772,7 +9774,7 @@ async function handleTelegramCommand(
           chatId,
           [
             `${firstName}, տեսնում եմ դուրսգրման հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
-            "Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք /discharge։"
+            `Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք «${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}»։`
           ].join("\n")
         );
       }
