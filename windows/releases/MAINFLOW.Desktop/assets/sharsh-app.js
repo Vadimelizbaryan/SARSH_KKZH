@@ -66,6 +66,14 @@
   const OCR_FEEDBACK_IMAGE_OVERRIDE_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:ocr-feedback-image-override:`;
   const MAIN_SAVE_NOTICE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-save-notice:v1`;
   const MAIN_PAGE_COLLAPSE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-panel-collapse:v1`;
+  const SHIFT_AUTO_TRANSFER_MODE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:shift-auto-transfer-mode:v1`;
+  const SHIFT_AUTO_TRANSFER_DONE_PREFIX = `${config.STORAGE_NAMESPACE}:shift-auto-transfer-done:`;
+  const SHIFT_TRANSFER_SIGNAL_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:shift-transfer-signal:v1`;
+  const SHIFT_AUTO_TRANSFER_TIME_MINUTES = (8 * 60) + 1;
+  const SHIFT_DRAFT_DAY_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:day-shift:v3`;
+  const SHIFT_DRAFT_DAY_LEGACY_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:night-shift:v1`;
+  const SHIFT_DRAFT_DISCHARGE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:discharge-shift:v3`;
+  const SHIFT_DRAFT_COLUMNS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"];
   const REMOTE_AUX_PANEL_REFRESH_MS = 45 * 1000;
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
@@ -98,7 +106,7 @@
     { cell: 21, key: "leaveSpa", label: "21" },
     { cell: 22, key: "leavePaym", label: "22" }
   ];
-  const QH_CALC_DEPARTMENT_IDS = new Set(["r19", "r20", "r21"]);
+  const QH_CALC_DEPARTMENT_IDS = new Set();
   const QH_CALC_COLUMNS = [
     {
       type: "soldier",
@@ -586,6 +594,7 @@ function buildInitialPhotoLightboxState() {
     pendingSyncAutoTimerId: 0,
     pendingSyncAutoRetryAfter: 0,
     pendingSyncEventsBound: false,
+    shiftTransferEventsBound: false,
     updateAudioContext: null,
     updateAudioBound: false,
     updateAttentionIntervalId: 0,
@@ -615,6 +624,8 @@ function buildInitialPhotoLightboxState() {
     mainTableTelegramForms: buildInitialMainTableTelegramFormState(),
     selectedMainCalcDepartmentId: "",
     departmentTopCellsUnlocked: false,
+    shiftAutoTransferEnabled: readShiftAutoTransferEnabled(),
+    shiftTransferInFlightMode: "",
     mainTableUnlocked: false,
     mainTableSaveSequence: 0,
     mainTableSaveInFlight: false
@@ -651,6 +662,187 @@ function buildInitialPhotoLightboxState() {
       localStorage.setItem(MAIN_PAGE_COLLAPSE_STORAGE_KEY, JSON.stringify(nextState && typeof nextState === "object" ? nextState : {}));
     } catch (_error) {
       // Ignore local storage errors and keep the current UI state in memory only.
+    }
+  }
+
+  function readShiftAutoTransferEnabled() {
+    try {
+      return localStorage.getItem(SHIFT_AUTO_TRANSFER_MODE_STORAGE_KEY) === "auto";
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function writeShiftAutoTransferEnabled(enabled) {
+    state.shiftAutoTransferEnabled = Boolean(enabled);
+    try {
+      localStorage.setItem(
+        SHIFT_AUTO_TRANSFER_MODE_STORAGE_KEY,
+        state.shiftAutoTransferEnabled ? "auto" : "manual"
+      );
+    } catch (_error) {
+      // Ignore local storage errors and keep the setting in memory.
+    }
+  }
+
+  function getShiftTransferModeMeta(modeKey) {
+    return modeKey === "day"
+      ? {
+        modeKey: "day",
+        label: "Ընդունում",
+        loadFn: "loadDayShiftDraft",
+        applyFn: "applyDayShiftToMain",
+        storageKeys: [SHIFT_DRAFT_DAY_STORAGE_KEY, SHIFT_DRAFT_DAY_LEGACY_STORAGE_KEY]
+      }
+      : {
+        modeKey: "discharge",
+        label: "Դուրսգրում",
+        loadFn: "loadDischargeShiftDraft",
+        applyFn: "applyDischargeShiftToMain",
+        storageKeys: [SHIFT_DRAFT_DISCHARGE_STORAGE_KEY]
+      };
+  }
+
+  function buildEmptyShiftDraftRows() {
+    return Object.fromEntries(
+      config.departmentDefinitions.map((department) => [
+        department.id,
+        Object.fromEntries(SHIFT_DRAFT_COLUMNS.map((key) => [key, 0]))
+      ])
+    );
+  }
+
+  function sanitizeShiftDraftRows(rows) {
+    const sanitized = buildEmptyShiftDraftRows();
+    config.departmentDefinitions.forEach((department) => {
+      SHIFT_DRAFT_COLUMNS.forEach((key) => {
+        sanitized[department.id][key] = config.normalizeCellValue(rows?.[department.id]?.[key]) || 0;
+      });
+    });
+    return sanitized;
+  }
+
+  function shiftDraftHasValues(rows) {
+    return config.departmentDefinitions.some((department) =>
+      SHIFT_DRAFT_COLUMNS.some((key) => (config.normalizeCellValue(rows?.[department.id]?.[key]) || 0) > 0)
+    );
+  }
+
+  function buildEmptyShiftDraftState(reportDateTime = getCurrentDateTimeParts().full) {
+    return {
+      reportDateTime,
+      savedAt: "",
+      rows: buildEmptyShiftDraftRows()
+    };
+  }
+
+  function parseShiftDraftState(rawValue, fallbackReportDateTime = getCurrentDateTimeParts().full) {
+    if (!rawValue) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(rawValue);
+      return {
+        reportDateTime: typeof parsed?.reportDateTime === "string" && parsed.reportDateTime.trim()
+          ? parsed.reportDateTime.trim()
+          : fallbackReportDateTime,
+        savedAt: typeof parsed?.savedAt === "string" ? parsed.savedAt.trim() : "",
+        rows: sanitizeShiftDraftRows(parsed?.rows)
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function loadLocalShiftDraftState(modeKey) {
+    const meta = getShiftTransferModeMeta(modeKey);
+    const fallback = buildEmptyShiftDraftState();
+
+    for (const storageKey of meta.storageKeys) {
+      const parsed = parseShiftDraftState(localStorage.getItem(storageKey), fallback.reportDateTime);
+      if (parsed && shiftDraftHasValues(parsed.rows)) {
+        return parsed;
+      }
+    }
+
+    for (const storageKey of meta.storageKeys) {
+      const parsed = parseShiftDraftState(localStorage.getItem(storageKey), fallback.reportDateTime);
+      if (parsed) {
+        return parsed;
+      }
+    }
+
+    return fallback;
+  }
+
+  function clearLocalShiftDraftState(modeKey) {
+    const meta = getShiftTransferModeMeta(modeKey);
+    meta.storageKeys.forEach((storageKey) => {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (_error) {
+      }
+    });
+  }
+
+  function getShiftAutoTransferDoneStorageKey(modeKey, dateKey) {
+    return `${SHIFT_AUTO_TRANSFER_DONE_PREFIX}${modeKey}:${dateKey}`;
+  }
+
+  function hasShiftAutoTransferCompleted(modeKey, dateKey) {
+    if (!dateKey) {
+      return false;
+    }
+    try {
+      return localStorage.getItem(getShiftAutoTransferDoneStorageKey(modeKey, dateKey)) === "1";
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function markShiftAutoTransferCompleted(modeKey, dateKey) {
+    if (!dateKey) {
+      return;
+    }
+    try {
+      localStorage.setItem(getShiftAutoTransferDoneStorageKey(modeKey, dateKey), "1");
+    } catch (_error) {
+    }
+  }
+
+  function parseShiftTransferSignal(rawValue) {
+    if (!rawValue) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(rawValue);
+      const modeKey = parsed?.mode === "day" ? "day" : (parsed?.mode === "discharge" ? "discharge" : "");
+      if (!modeKey) {
+        return null;
+      }
+      return {
+        mode: modeKey,
+        source: typeof parsed?.source === "string" ? parsed.source : "",
+        at: typeof parsed?.at === "string" ? parsed.at : "",
+        reportDateTime: typeof parsed?.reportDateTime === "string" ? parsed.reportDateTime : ""
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function emitShiftTransferSignal(modeKey, source, reportDateTime) {
+    const payload = {
+      mode: modeKey,
+      source,
+      at: new Date().toISOString(),
+      reportDateTime: typeof reportDateTime === "string" ? reportDateTime : ""
+    };
+
+    try {
+      localStorage.setItem(SHIFT_TRANSFER_SIGNAL_STORAGE_KEY, JSON.stringify(payload));
+    } catch (_error) {
     }
   }
 
@@ -2739,6 +2931,37 @@ function buildInitialPhotoLightboxState() {
       .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
   }
 
+  function buildMainTableAndroidAppItems(displayContext = getMainTableDisplaySnapshotContext()) {
+    const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
+    return getMainTablePhotoGalleryItems(rows)
+      .filter((item) => item?.sourceMeta?.kind === "android")
+      .map((item) => {
+        const previewValues = buildPhotoPreviewValuesFromRecord(item);
+        const recognizedKeys = Array.isArray(item.recognizedKeys) && item.recognizedKeys.length
+          ? item.recognizedKeys.map((entry) => String(entry))
+          : Object.keys(previewValues);
+        const liveRow = typeof item.departmentId === "string" && item.departmentId
+          ? getDepartmentRow(state.snapshot, item.departmentId)
+          : null;
+        const previewRow = liveRow ? deepCopy(liveRow) : null;
+        const appliedKeys = previewRow
+          ? applyPreviewValuesToDepartmentRow(previewRow, previewValues, recognizedKeys)
+          : [];
+        const alreadySaved = liveRow
+          ? doesDepartmentRowMatchPreviewValues(state.snapshot, liveRow, previewValues, recognizedKeys)
+          : false;
+        return {
+          ...item,
+          liveRow,
+          previewValues,
+          recognizedKeys,
+          previewRow,
+          appliedKeys,
+          alreadySaved
+        };
+      });
+  }
+
   function getMainTableTelegramFormBulkDeleteMeta() {
     const items = buildMainTableTelegramFormItems()
       .filter((item) => Number.isFinite(Number(item?.id)) && typeof item?.departmentId === "string" && item.departmentId.trim());
@@ -3189,6 +3412,7 @@ function buildInitialPhotoLightboxState() {
     const listEl = document.getElementById("mainTablePhotoGalleryList");
     const deleteAllBtn = document.getElementById("mainTablePhotoGalleryDeleteAllBtn");
     if (!summaryEl || !listEl) {
+      refreshMainTableAndroidAppUi(displayContext);
       return;
     }
 
@@ -3208,6 +3432,20 @@ function buildInitialPhotoLightboxState() {
       deleteAllBtn.textContent = bulkDeleteMeta.label;
       deleteAllBtn.title = bulkDeleteMeta.title;
     }
+    refreshMainTableAndroidAppUi(displayContext);
+  }
+
+  function refreshMainTableAndroidAppUi(displayContext = getMainTableDisplaySnapshotContext()) {
+    const summaryEl = document.getElementById("mainTableAndroidAppSummaryText");
+    const listEl = document.getElementById("mainTableAndroidAppList");
+    if (!summaryEl || !listEl) {
+      return;
+    }
+
+    const content = buildMainTableAndroidAppContent(displayContext);
+    summaryEl.textContent = content.summary;
+    listEl.innerHTML = content.html;
+    bindMainTablePhotoGalleryEvents(listEl);
   }
 
   function refreshMainTableTelegramFormUi() {
@@ -8573,6 +8811,216 @@ function buildInitialPhotoLightboxState() {
     return "";
   }
 
+  function getShiftTransferSummaryText() {
+    const context = getArchiveContext();
+    const completed = [
+      hasShiftAutoTransferCompleted("day", context.key) ? "Ընդունում" : "",
+      hasShiftAutoTransferCompleted("discharge", context.key) ? "Դուրսգրում" : ""
+    ].filter(Boolean);
+
+    if (state.shiftAutoTransferEnabled) {
+      const base = "Автоперенос включён: после 08:01 данные из Ընդունում и Դուրսգրում автоматически перейдут в основную таблицу.";
+      return completed.length
+        ? `${base} Сегодня уже перенесены: ${completed.join(", ")}.`
+        : base;
+    }
+
+    return "Автоперенос выключен. Сейчас действует ручной режим: перенос выполняется кнопками ниже или со страниц `Ընդունում` и `Դուրսգրում`.";
+  }
+
+  function getShiftTransferStatusText() {
+    if (!state.shiftTransferInFlightMode) {
+      return "";
+    }
+    const meta = getShiftTransferModeMeta(state.shiftTransferInFlightMode);
+    return `Переношу данные из ${meta.label} в основную таблицу...`;
+  }
+
+  function isMainTableBusyForShiftTransfer() {
+    return Boolean(state.mainTableUnlocked || hasMainTablePendingLocalChanges() || state.mainTableSaveInFlight);
+  }
+
+  async function loadShiftDraftForMainTransfer(modeKey) {
+    const meta = getShiftTransferModeMeta(modeKey);
+    let remoteDraft = null;
+
+    if (typeof sync[meta.loadFn] === "function") {
+      try {
+        const result = await sync[meta.loadFn]();
+        if (result && result.draft) {
+          remoteDraft = {
+            reportDateTime: typeof result.draft.reportDateTime === "string" && result.draft.reportDateTime.trim()
+              ? result.draft.reportDateTime.trim()
+              : getCurrentDateTimeParts().full,
+            savedAt: typeof result.draft.savedAt === "string" ? result.draft.savedAt.trim() : "",
+            rows: sanitizeShiftDraftRows(result.draft.rows)
+          };
+        }
+      } catch (_error) {
+        remoteDraft = null;
+      }
+    }
+
+    const localDraft = loadLocalShiftDraftState(modeKey);
+    if (shiftDraftHasValues(localDraft.rows)) {
+      return {
+        draft: localDraft,
+        source: "local-draft"
+      };
+    }
+    if (remoteDraft && shiftDraftHasValues(remoteDraft.rows)) {
+      return {
+        draft: remoteDraft,
+        source: "remote-draft"
+      };
+    }
+
+    return {
+      draft: remoteDraft || localDraft || buildEmptyShiftDraftState(),
+      source: remoteDraft ? "remote-draft" : "local-draft"
+    };
+  }
+
+  async function transferShiftDraftToMain(modeKey, options = {}) {
+    const automatic = Boolean(options.automatic);
+    const meta = getShiftTransferModeMeta(modeKey);
+
+    if (state.shiftTransferInFlightMode) {
+      return { applied: false, busy: true };
+    }
+
+    if (mode !== "main") {
+      return { applied: false, unsupported: true };
+    }
+
+    if (isMainTableBusyForShiftTransfer()) {
+      if (!automatic) {
+        setInfo("Сначала сохраните или закройте редактирование основной таблицы, потом переносите данные из Ընդունում/Դուրսգրում.", true);
+        refreshTableData();
+      }
+      return { applied: false, blocked: true };
+    }
+
+    state.shiftTransferInFlightMode = modeKey;
+    refreshTableData();
+
+    try {
+      const loaded = await loadShiftDraftForMainTransfer(modeKey);
+      const draft = loaded.draft || buildEmptyShiftDraftState();
+      if (!shiftDraftHasValues(draft.rows)) {
+        if (!automatic) {
+          setInfo(`В странице ${meta.label} сейчас нет данных для переноса.`, false);
+          refreshTableData();
+        }
+        return { applied: false, empty: true };
+      }
+
+      if (typeof sync[meta.applyFn] !== "function") {
+        throw new Error(`Перенос ${meta.label} сейчас недоступен.`);
+      }
+
+      const effectiveReportDate = typeof draft.reportDateTime === "string" && draft.reportDateTime.trim()
+        ? draft.reportDateTime.trim()
+        : getCurrentDateTimeParts().full;
+      const result = await sync[meta.applyFn](draft.rows, effectiveReportDate);
+
+      if (result && result.snapshot) {
+        applyLoadedSnapshot(result);
+      }
+
+      clearLocalShiftDraftState(modeKey);
+      markShiftAutoTransferCompleted(modeKey, getArchiveContext().key);
+      emitShiftTransferSignal(modeKey, automatic ? "main-auto" : "main-manual", effectiveReportDate);
+      setInfo(
+        automatic
+          ? `Автоперенос ${meta.label} выполнен: данные добавлены в основную таблицу и черновик очищен.`
+          : `Данные из ${meta.label} перенесены в основную таблицу и черновик очищен.`,
+        false
+      );
+      refreshTableData();
+      return { applied: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Не удалось перенести данные из ${meta.label}.`;
+      if (!automatic || !state.info) {
+        setInfo(message, true);
+        refreshTableData();
+      }
+      return { applied: false, error: message };
+    } finally {
+      state.shiftTransferInFlightMode = "";
+      refreshTableData();
+    }
+  }
+
+  async function maybeAutoTransferShiftDrafts() {
+    if (mode !== "main" || !state.initialized || !state.shiftAutoTransferEnabled || state.shiftTransferInFlightMode) {
+      return;
+    }
+
+    const context = getArchiveContext();
+    if (context.totalMinutes < SHIFT_AUTO_TRANSFER_TIME_MINUTES || isMainTableBusyForShiftTransfer()) {
+      return;
+    }
+
+    if (!hasShiftAutoTransferCompleted("day", context.key)) {
+      const result = await transferShiftDraftToMain("day", { automatic: true });
+      if (result && result.busy) {
+        return;
+      }
+    }
+
+    if (!hasShiftAutoTransferCompleted("discharge", context.key)) {
+      await transferShiftDraftToMain("discharge", { automatic: true });
+    }
+  }
+
+  async function handleExternalShiftTransferSignal(detail) {
+    if (!detail || typeof detail !== "object" || mode !== "main") {
+      return;
+    }
+
+    markShiftAutoTransferCompleted(detail.mode, getArchiveContext().key);
+
+    if (isMainTableBusyForShiftTransfer()) {
+      setInfo(`Данные из ${getShiftTransferModeMeta(detail.mode).label} уже перенесены в другой вкладке. Завершите локальные правки и обновите сводку.`, false);
+      refreshTableData();
+      return;
+    }
+
+    try {
+      const result = await sync.loadSnapshot();
+      applyLoadedSnapshot(result);
+      restorePendingMainSaveNotice();
+      setInfo(`Главная таблица обновлена после переноса данных из ${getShiftTransferModeMeta(detail.mode).label}.`, false);
+      refreshTableData();
+    } catch (error) {
+      setInfo(
+        error instanceof Error ? error.message : `Не удалось обновить главную таблицу после переноса ${getShiftTransferModeMeta(detail.mode).label}.`,
+        true
+      );
+      refreshTableData();
+    }
+  }
+
+  function bindShiftTransferEvents() {
+    if (state.shiftTransferEventsBound) {
+      return;
+    }
+
+    window.addEventListener("storage", (event) => {
+      if (event.key !== SHIFT_TRANSFER_SIGNAL_STORAGE_KEY || !event.newValue) {
+        return;
+      }
+      const signal = parseShiftTransferSignal(event.newValue);
+      if (!signal) {
+        return;
+      }
+      void handleExternalShiftTransferSignal(signal);
+    });
+
+    state.shiftTransferEventsBound = true;
+  }
+
   function clearBackgroundPendingSyncSchedule() {
     window.clearTimeout(state.pendingSyncAutoTimerId);
     state.pendingSyncAutoTimerId = 0;
@@ -8672,6 +9120,119 @@ function buildInitialPhotoLightboxState() {
           class="pending-sync-panel__button${status.hasPending && sync.hasRemoteSync() && !status.isSyncing ? " save-ready" : ""}"
           ${(status.hasPending && !status.isSyncing && sync.hasRemoteSync()) ? "" : "disabled"}
         >${escapeHtml(getPendingSyncButtonLabel(status))}</button>
+      </div>
+    `;
+  }
+
+  function buildMainTableAndroidAppContent(displayContext = getMainTableDisplaySnapshotContext()) {
+    const items = buildMainTableAndroidAppItems(displayContext);
+
+    if (state.mainTablePhotoGallery.error && !items.length) {
+      return {
+        summary: state.mainTablePhotoGallery.error,
+        html: '<div class="archive-empty">Не удалось загрузить отправки Android MAINFORM.</div>'
+      };
+    }
+
+    if (state.mainTablePhotoGallery.isLoading && !items.length) {
+      return {
+        summary: "Загружаю Android MAINFORM отправки за сегодня...",
+        html: '<div class="archive-empty">Загружаю Android MAINFORM данные...</div>'
+      };
+    }
+
+    if (!items.length) {
+      return {
+        summary: "За текущие сутки отправок Android MAINFORM пока нет.",
+        html: '<div class="archive-empty">Сегодняшние отправки Android MAINFORM пока не поступали.</div>'
+      };
+    }
+
+    return {
+      summary: `Показано Android MAINFORM отправок за сегодня: ${items.length}. Здесь видны фото и табличные данные, которые пришли через Android app.`,
+      html: `
+        <div class="main-table-android-list">
+          ${items.map((item) => {
+            const statusText = item.alreadySaved
+              ? "Уже в основной таблице"
+              : (item.appliedKeys.length ? "Есть данные Android MAINFORM" : "Нет табличных данных");
+            const statusClass = item.alreadySaved
+              ? "main-table-telegram-form-card__status--saved"
+              : (item.appliedKeys.length ? "main-table-telegram-form-card__status--pending" : "main-table-telegram-form-card__status--error");
+            const reportDateText = item.reportDate
+              ? `Дата отчёта: ${item.reportDate}`
+              : "Дата отчёта не указана";
+            const createdAtText = item.createdAt
+              ? `Отправлено: ${formatTimestamp(item.createdAt)}`
+              : "Время отправки не указано";
+            return `
+              <article class="main-table-android-card">
+                <div class="main-table-android-card__head">
+                  <div class="main-table-android-card__meta">
+                    <strong>${escapeHtml(item.departmentName || item.departmentId || `feedback ${item.id}`)}</strong>
+                    <span>Android MAINFORM</span>
+                    <span>${escapeHtml(reportDateText)}</span>
+                    <span>${escapeHtml(createdAtText)}</span>
+                    ${item.imageName ? `<span>Файл: ${escapeHtml(item.imageName)}</span>` : ""}
+                  </div>
+                  <span class="main-table-telegram-form-card__status ${statusClass}">${escapeHtml(statusText)}</span>
+                </div>
+                <div class="main-table-android-card__body">
+                  <div class="main-table-android-card__photo">
+                    <button
+                      type="button"
+                      class="main-table-android-card__photo-button"
+                      data-main-table-photo-open="${escapeHtml(String(item.feedbackId))}"
+                      data-main-table-photo-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
+                      aria-label="${escapeHtml(`Открыть Android MAINFORM фото ${item.departmentName}`)}"
+                      title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `\nДата на фото: ${item.photoReportDate}` : ""}${item.photoSentAt ? `\nОтправлено: ${formatTimestamp(item.photoSentAt)}` : ""}`)}"
+                    >
+                      <img
+                        src="${escapeHtml(item.imageDataUrl)}"
+                        alt="${escapeHtml(`Android MAINFORM фото ${item.departmentName}`)}"
+                        loading="lazy"
+                        decoding="async"
+                      >
+                    </button>
+                    ${item.sourceMeta?.text ? `<span class="main-table-android-card__source">${escapeHtml(item.sourceMeta.text)}</span>` : ""}
+                  </div>
+                  <div class="main-table-android-card__table">
+                    ${item.previewRow
+                      ? renderMainTableTelegramFormPreviewTable(item, item.previewRow)
+                      : '<div class="archive-empty">В этой Android-отправке нет табличных данных для предпросмотра.</div>'}
+                  </div>
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      `
+    };
+  }
+
+  function renderShiftTransferControls() {
+    const busy = Boolean(state.shiftTransferInFlightMode);
+    const statusText = getShiftTransferStatusText();
+    return `
+      <div class="shift-transfer-panel">
+        <div class="shift-transfer-panel__copy">
+          <strong>Ընդունում / Դուրսգրում</strong>
+          <p id="shiftTransferSummaryText">${escapeHtml(getShiftTransferSummaryText())}</p>
+          <label class="shift-transfer-panel__toggle" for="shiftAutoTransferToggle">
+            <input
+              type="checkbox"
+              id="shiftAutoTransferToggle"
+              ${state.shiftAutoTransferEnabled ? "checked" : ""}
+              ${busy ? "disabled" : ""}
+            >
+            <span>Автоперенос в 08:01</span>
+          </label>
+          <p class="hint" id="shiftTransferStatusText">${escapeHtml(statusText)}</p>
+        </div>
+        <div class="shift-transfer-panel__actions">
+          <button type="button" id="applyDayShiftNowBtn" ${busy ? "disabled" : ""}>Перенести Ընդունում</button>
+          <button type="button" id="applyDischargeShiftNowBtn" ${busy ? "disabled" : ""}>Перенести Դուրսգրում</button>
+        </div>
       </div>
     `;
   }
@@ -8805,6 +9366,10 @@ function buildInitialPhotoLightboxState() {
       rows: displayedMainTableRows
     });
     const mainTablePhotoGalleryBulkDeleteMeta = getMainTablePhotoGalleryBulkDeleteMeta({
+      snapshot: displayedMainTableSnapshot,
+      rows: displayedMainTableRows
+    });
+    const mainTableAndroidAppContent = buildMainTableAndroidAppContent({
       snapshot: displayedMainTableSnapshot,
       rows: displayedMainTableRows
     });
@@ -8946,6 +9511,14 @@ function buildInitialPhotoLightboxState() {
           </div>
         </section>
 
+        <section class="panel no-print main-table-android-panel">
+          <h2>Данные Android MAINFORM за сегодня</h2>
+          <p id="mainTableAndroidAppSummaryText">${escapeHtml(mainTableAndroidAppContent.summary)}</p>
+          <div class="archive-list" id="mainTableAndroidAppList">
+            ${mainTableAndroidAppContent.html}
+          </div>
+        </section>
+
         <section class="panel no-print main-table-telegram-form-panel">
           <h2>Таблицы Telegram Web форм за сегодня</h2>
           <p id="mainTableTelegramFormSummaryText">${escapeHtml(mainTableTelegramFormContent.summary)}</p>
@@ -8985,6 +9558,7 @@ function buildInitialPhotoLightboxState() {
               <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.")}</p>
               <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
               ${renderPendingSyncControls()}
+              ${renderShiftTransferControls()}
               <div class="update-health-banner update-health-banner--${overallUpdateStatus.level}" id="overallUpdateBanner">
                 <strong id="overallUpdateLabel">${escapeHtml(overallUpdateStatus.label)}</strong>
                 <span id="overallUpdateDetail">${escapeHtml(overallUpdateStatus.detail)}</span>
@@ -11222,6 +11796,7 @@ function buildInitialPhotoLightboxState() {
       if (archiveCapture && archiveCapture.shouldRollover) {
         void maybeApplyMorningRolloverAfterArchive(archiveCapture.record);
       }
+      void maybeAutoTransferShiftDrafts();
       const stats = buildFreshnessStats(state.snapshot.rows);
       const overallUpdateStatus = getOverallUpdateStatus(stats, state.snapshot.rows.length);
       const freshCount = document.getElementById("freshCount");
@@ -11243,6 +11818,12 @@ function buildInitialPhotoLightboxState() {
       const departmentPdfArchiveList = document.getElementById("departmentPdfArchiveList");
       const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
       const selectedSavedRecord = getSelectedMainTableSavedRecord(savedTableRecords);
+      const shiftTransferSummaryText = document.getElementById("shiftTransferSummaryText");
+      const shiftTransferStatusText = document.getElementById("shiftTransferStatusText");
+      const shiftAutoTransferToggle = document.getElementById("shiftAutoTransferToggle");
+      const applyDayShiftNowBtn = document.getElementById("applyDayShiftNowBtn");
+      const applyDischargeShiftNowBtn = document.getElementById("applyDischargeShiftNowBtn");
+      const shiftTransferBusy = Boolean(state.shiftTransferInFlightMode || state.mainTableSaveInFlight);
 
       if (freshCount) {
         freshCount.textContent = String(stats.counts.fresh);
@@ -11303,6 +11884,24 @@ function buildInitialPhotoLightboxState() {
       }
       syncMainTableSavedNavigatorUi();
       refreshMainTableSaveState();
+      if (shiftTransferSummaryText) {
+        shiftTransferSummaryText.textContent = getShiftTransferSummaryText();
+      }
+      if (shiftTransferStatusText) {
+        const statusText = getShiftTransferStatusText();
+        shiftTransferStatusText.textContent = statusText;
+        shiftTransferStatusText.className = "hint";
+      }
+      if (shiftAutoTransferToggle instanceof HTMLInputElement) {
+        shiftAutoTransferToggle.checked = Boolean(state.shiftAutoTransferEnabled);
+        shiftAutoTransferToggle.disabled = shiftTransferBusy;
+      }
+      if (applyDayShiftNowBtn instanceof HTMLButtonElement) {
+        applyDayShiftNowBtn.disabled = shiftTransferBusy;
+      }
+      if (applyDischargeShiftNowBtn instanceof HTMLButtonElement) {
+        applyDischargeShiftNowBtn.disabled = shiftTransferBusy;
+      }
       if (departmentPdfArchiveSummaryText) {
         departmentPdfArchiveSummaryText.textContent = getDepartmentPdfArchiveSummaryText(departmentPdfArchiveRecords);
       }
@@ -13931,6 +14530,7 @@ function buildInitialPhotoLightboxState() {
       await loadWorkingSnapshot();
       renderPage();
       bindBackgroundPendingSyncEvents();
+      bindShiftTransferEvents();
       startAutoRefreshIfNeeded();
       startFreshnessTicker();
       startClockTicker();
@@ -14504,6 +15104,9 @@ function buildInitialPhotoLightboxState() {
     const transferCalcPanel = document.getElementById("transferCalcPanel");
     const transferCalcApplyBtn = document.getElementById("transferCalcApplyBtn");
     const mainCalcDepartmentSelect = document.getElementById("mainCalcDepartmentSelect");
+    const shiftAutoTransferToggle = document.getElementById("shiftAutoTransferToggle");
+    const applyDayShiftNowBtn = document.getElementById("applyDayShiftNowBtn");
+    const applyDischargeShiftNowBtn = document.getElementById("applyDischargeShiftNowBtn");
 
     bindUpdateAudioUnlock();
 
@@ -14820,6 +15423,28 @@ function buildInitialPhotoLightboxState() {
     if (pendingSyncBtn) {
       pendingSyncBtn.addEventListener("click", () => {
         void runPendingSyncNow();
+      });
+    }
+
+    if (shiftAutoTransferToggle instanceof HTMLInputElement) {
+      shiftAutoTransferToggle.addEventListener("change", () => {
+        writeShiftAutoTransferEnabled(shiftAutoTransferToggle.checked);
+        refreshTableData();
+        if (shiftAutoTransferToggle.checked) {
+          void maybeAutoTransferShiftDrafts();
+        }
+      });
+    }
+
+    if (applyDayShiftNowBtn instanceof HTMLButtonElement) {
+      applyDayShiftNowBtn.addEventListener("click", () => {
+        void transferShiftDraftToMain("day", { automatic: false });
+      });
+    }
+
+    if (applyDischargeShiftNowBtn instanceof HTMLButtonElement) {
+      applyDischargeShiftNowBtn.addEventListener("click", () => {
+        void transferShiftDraftToMain("discharge", { automatic: false });
       });
     }
 
@@ -15340,6 +15965,7 @@ function buildInitialPhotoLightboxState() {
     }
     renderPage();
     bindBackgroundPendingSyncEvents();
+    bindShiftTransferEvents();
     void refreshDepartmentPdfArchiveRecordsFromRemote();
     startAutoRefreshIfNeeded();
     startFreshnessTicker();

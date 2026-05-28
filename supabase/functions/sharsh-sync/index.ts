@@ -62,7 +62,7 @@ const MORNING_ROLLOVER_ZERO_KEYS = [
   "transferToDepartment"
 ] as const;
 const MORNING_ROLLOVER_META_KEY = "main_morning_rollover";
-const QH_CALC_DEPARTMENT_IDS = new Set(["r19", "r20", "r21"]);
+const QH_CALC_DEPARTMENT_IDS = new Set<string>();
 const NIGHT_SHIFT_ROW_PREFIX = "night:";
 const NIGHT_SHIFT_META_KEY = "night_shift";
 const DAY_SHIFT_ROW_PREFIX = "day:";

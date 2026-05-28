@@ -89,10 +89,12 @@
   };
 
   const copy = MODES[mode];
+  const modeKey = mode === "admission" ? "day" : "discharge";
   const STORAGE_KEY = `${config.STORAGE_NAMESPACE}:${copy.storage}:v3`;
   const LEGACY_STORAGE_KEY = copy.legacyStorage
     ? `${config.STORAGE_NAMESPACE}:${copy.legacyStorage}:v1`
     : "";
+  const SHIFT_TRANSFER_SIGNAL_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:shift-transfer-signal:v1`;
   const state = loadState();
   let statusText = "";
   let statusIsError = false;
@@ -342,6 +344,54 @@
   function setStatus(message, isError = false) {
     statusText = message || "";
     statusIsError = Boolean(isError);
+  }
+
+  function emitTransferSignal(source = "shift-page") {
+    try {
+      localStorage.setItem(
+        SHIFT_TRANSFER_SIGNAL_STORAGE_KEY,
+        JSON.stringify({
+          mode: modeKey,
+          source,
+          at: new Date().toISOString(),
+          reportDateTime: state.reportDateTime || ""
+        })
+      );
+    } catch (_error) {
+      // Ignore localStorage signaling failures.
+    }
+  }
+
+  function parseTransferSignal(rawValue) {
+    if (typeof rawValue !== "string" || !rawValue.trim()) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(rawValue);
+      if (!parsed || typeof parsed !== "object") {
+        return null;
+      }
+      const nextMode = String(parsed.mode || "").trim();
+      if (!nextMode) {
+        return null;
+      }
+      return {
+        mode: nextMode,
+        source: String(parsed.source || "").trim(),
+        reportDateTime: String(parsed.reportDateTime || "").trim()
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function handleExternalTransferSignal(detail) {
+    if (!detail || detail.mode !== modeKey) {
+      return;
+    }
+    clearStateRows();
+    setStatus(`${copy.transferred} (с другой страницы)։ Черновик очищен.`, false);
+    render();
   }
 
   function getLatestSavedAt(records) {
@@ -606,6 +656,7 @@
       const result = await callSyncFunction(copy.applyFn, state.rows, state.reportDateTime);
       const clearWarnings = await clearRemoteDraftsBestEffort(state.reportDateTime, copy.clearFns);
       clearStateRows();
+      emitTransferSignal("shift-page");
       const sourceText = result && result.source === "remote" ? "առցանց" : "տեղային";
       const warningText = clearWarnings.length ? ` Զգուշացում: ${clearWarnings.join(" | ")}` : "";
       setStatus(`${copy.transferred} (${sourceText})։${warningText}`, false);
@@ -657,6 +708,17 @@
     if (target.id === "shiftPrintBtn") {
       window.print();
     }
+  });
+
+  window.addEventListener("storage", (event) => {
+    if (event.key !== SHIFT_TRANSFER_SIGNAL_STORAGE_KEY || !event.newValue) {
+      return;
+    }
+    const signal = parseTransferSignal(event.newValue);
+    if (!signal) {
+      return;
+    }
+    handleExternalTransferSignal(signal);
   });
 
   async function init() {

@@ -212,7 +212,6 @@
     return accumulator;
   }, {});
   let fullEditUnlocked = false;
-  let calculatorsApplied = false;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -557,7 +556,7 @@
         <div class="tg-sheet-section-head">
           <div>
             <p class="tg-form-kicker">Հաշվարկային գործիքներ</p>
-            <p class="tg-sheet-section-note">Մուտքագրեք ընդունված, դուրս գրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը։ Սեղմեք «Հաշվել և տեղադրել», և տվյալները կտեղադրվեն ստորև եղած բջիջներում։</p>
+            <p class="tg-sheet-section-note">Մուտքագրեք ընդունված, դուրս գրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը։ Հաշվարկը կկատարվի ավտոմատ ուղարկելու պահին։</p>
           </div>
         </div>
         <div class="tg-calc-grid">
@@ -604,7 +603,6 @@
           </section>
         </div>
         <div class="tg-form-status" data-calc-status></div>
-        <button class="tg-form-submit tg-calc-apply" data-apply-calculators type="button">Հաշվել և տեղադրել</button>
       </section>
     `;
   }
@@ -621,7 +619,6 @@
       refreshUi();
       return;
     }
-    calculatorsApplied = true;
     writeFieldValues(validation.finalValues);
     refreshUi();
   }
@@ -749,7 +746,7 @@
 
           <div class="tg-form-status" data-status></div>
           <div class="tg-form-actions">
-            <button class="tg-form-submit" data-submit type="submit">Ստուգել և ուղարկել</button>
+            <button class="tg-form-submit" data-submit type="submit">Ուղարկել</button>
             <div class="tg-form-message${hasSubmitAccess() ? "" : " error"}" data-message>
               ${hasSubmitAccess() ? "Ստուգեք հաշվարկը և ուղարկեք ձևը գլխավոր աղյուսակ պահպանելու համար։" : "Բացեք ձևը Telegram բոտի կամ Android հավելվածի միջոցով։"}
             </div>
@@ -810,7 +807,6 @@
 
     const status = root.querySelector("[data-status]");
     const calcStatus = root.querySelector("[data-calc-status]");
-    const applyButton = root.querySelector("[data-apply-calculators]");
     const pendingCalculatorInput = hasPendingCalculatorInput();
     if (calcStatus) {
       calcStatus.className = `tg-form-status${validation.hasNegativeRemaining ? " bad" : ""}`;
@@ -818,20 +814,17 @@
         ? `
           <div class="tg-form-status-head">
             <strong>Ստուգեք հաշվարկը</strong>
-            <span>Բացասական արժեք է ստացվում հաշվարկում։ Ստուգեք մուտքային դաշտերը և նորից սեղմեք «Հաշվել և տեղադրել»։</span>
+            <span>Բացասական արժեք է ստացվում հաշվարկում։ Ստուգեք մուտքային դաշտերը և նորից սեղմեք «Ուղարկել»։</span>
           </div>
         `
         : `
           <div class="tg-form-status-head">
-            <strong>${pendingCalculatorInput && !calculatorsApplied ? "Հաշվարկը պատրաստ է" : "Հաշվարկը կիրառված է"}</strong>
-            <span>${pendingCalculatorInput && !calculatorsApplied
-              ? "Սեղմեք «Հաշվել և տեղադրել», և հաշվարկված տվյալները կկիրառվեն ձևի բջիջներում։"
-              : "Ձևի բջիջները թարմացվել են հաշվարկված տվյալներով։ Կարող եք ստուգել և ուղարկել ձևը։"}</span>
+            <strong>Հաշվարկը պատրաստ է</strong>
+            <span>${pendingCalculatorInput
+              ? "Հաշվարկված տվյալները կկիրառվեն ձևի բջիջներում ավտոմատ՝ «Ուղարկել» սեղմելիս։"
+              : "Ձևը պատրաստ է ուղարկման։"}</span>
           </div>
         `;
-    }
-    if (applyButton) {
-      applyButton.disabled = validation.hasNegativeRemaining;
     }
     if (status) {
       status.className = `tg-form-status${validation.isValid ? "" : " bad"}`;
@@ -860,7 +853,7 @@
 
     const submit = root.querySelector("[data-submit]");
     if (submit) {
-      submit.disabled = !validation.isValid || !hasSubmitAccess() || !hasRequiredAndroidPhoto() || (pendingCalculatorInput && !calculatorsApplied);
+      submit.disabled = !validation.isValid || !hasSubmitAccess() || !hasRequiredAndroidPhoto();
     }
   }
 
@@ -878,7 +871,6 @@
         }
         state[key] = toNumber(input.value);
         input.value = String(state[key]);
-        calculatorsApplied = false;
         refreshUi();
       });
     });
@@ -891,7 +883,6 @@
         }
         leaveState[key] = toNumber(input.value);
         input.value = String(leaveState[key]);
-        calculatorsApplied = false;
         refreshUi();
       });
     });
@@ -902,15 +893,9 @@
           return;
         }
         input.value = String(toNumber(input.value));
-        calculatorsApplied = false;
         refreshUi();
       });
     });
-
-    const applyCalculators = root.querySelector("[data-apply-calculators]");
-    if (applyCalculators) {
-      applyCalculators.addEventListener("click", applyCombinedCalculator);
-    }
 
     const fullEditToggle = root.querySelector("[data-full-edit-toggle]");
     if (fullEditToggle) {
@@ -929,6 +914,8 @@
     }
 
     const validation = getValidationState();
+    writeFieldValues(validation.finalValues);
+    refreshUi(true);
     if (!validation.isValid) {
       return;
     }
@@ -945,7 +932,7 @@
     const message = root.querySelector("[data-message]");
     if (submit) {
       submit.disabled = true;
-      submit.textContent = "Ստուգվում է...";
+      submit.textContent = "Ուղարկվում է...";
     }
     if (message) {
       message.className = "tg-form-message";
@@ -978,6 +965,10 @@
         message.className = "tg-form-message success";
         message.textContent = payload.message || "Տվյալները պահպանվել են։";
       }
+      if (submit) {
+        submit.disabled = false;
+        submit.textContent = "Ուղարկել";
+      }
       if (telegram) {
         telegram.HapticFeedback && telegram.HapticFeedback.notificationOccurred("success");
         telegram.MainButton && telegram.MainButton.setText("Փակել").show().onClick(() => telegram.close());
@@ -992,7 +983,7 @@
       }
       if (submit) {
         submit.disabled = false;
-        submit.textContent = "Ստուգել և ուղարկել";
+        submit.textContent = "Ուղարկել";
       }
     }
   }

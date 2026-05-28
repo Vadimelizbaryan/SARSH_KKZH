@@ -1242,7 +1242,7 @@
   }
 
   const NIGHT_SHIFT_TRANSFER_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"];
-  const QH_CALC_DEPARTMENT_IDS = new Set(["r19", "r20", "r21"]);
+  const QH_CALC_DEPARTMENT_IDS = new Set();
   const MORNING_ROLLOVER_DONE_PREFIX = `${config.STORAGE_NAMESPACE || "sarsh-kkzh-v2"}:morning-rollover-done:`;
   const MORNING_ROLLOVER_PRESENT_KEYS = [
     "currentShar",
