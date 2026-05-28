@@ -2755,6 +2755,10 @@ function buildInitialPhotoLightboxState() {
           { key: "leaveSpa", label: "ՍՊԱ" },
           { key: "leavePaym", label: "ՊԱՅՄ" }
         ]
+      },
+      {
+        label: "Առկա է",
+        cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.presentKey, marker: column.presentOutputMarker, role: "present-output" }))
       }
     ];
   }
@@ -5302,6 +5306,42 @@ function buildInitialPhotoLightboxState() {
     });
   }
 
+  function hasLeaveCalcPendingMovementValues(values) {
+    if (!values || typeof values !== "object") {
+      return false;
+    }
+
+    return LEAVE_CALC_COLUMNS.some((column) => {
+      return (config.normalizeCellValue(values[column.sentKey]) || 0) !== 0
+        || (config.normalizeCellValue(values[column.returnedKey]) || 0) !== 0;
+    });
+  }
+
+  function hasTransferCalcPendingMovementValues(values) {
+    if (!values || typeof values !== "object") {
+      return false;
+    }
+
+    return TRANSFER_CALC_COLUMNS.some((column) => {
+      return (config.normalizeCellValue(values[column.incomingKey]) || 0) !== 0
+        || (config.normalizeCellValue(values[column.outgoingKey]) || 0) !== 0;
+    });
+  }
+
+  function shouldApplyDepartmentCombinedCalcFromPendingPanels(row) {
+    if (!isQhCalcDepartment(row) || !row || !row.values || typeof row.values !== "object") {
+      return false;
+    }
+
+    const activePanels = [
+      hasQhCalcPendingMovementValues(row.values),
+      hasLeaveCalcPendingMovementValues(row.values),
+      hasTransferCalcPendingMovementValues(row.values)
+    ].filter(Boolean).length;
+
+    return activePanels > 1;
+  }
+
   function attachMainTableSavedNavigatorEvents(root = document) {
     const scope = root && typeof root.querySelectorAll === "function" ? root : document;
 
@@ -5472,6 +5512,102 @@ function buildInitialPhotoLightboxState() {
     return config.normalizeCellValue(value);
   }
 
+  function getLeaveCalcColumnByKey(key) {
+    return LEAVE_CALC_COLUMNS.find((column) =>
+      column.leaveKey === key
+      || column.presentKey === key
+      || column.sentKey === key
+      || column.returnedKey === key
+    ) || null;
+  }
+
+  function getLeaveCalcConstraint(row, key, snapshot = state.snapshot) {
+    if (!row) {
+      return null;
+    }
+
+    const column = getLeaveCalcColumnByKey(key);
+    if (!column) {
+      return null;
+    }
+
+    const sentRaw = Math.max(0, Number(getLeaveCalcSourceValue(row, column.sentKey)) || 0);
+    const returnedRaw = Math.max(0, Number(getLeaveCalcSourceValue(row, column.returnedKey)) || 0);
+
+    if (column.sentKey === key) {
+      const limit = Math.max(0, (getNumber(snapshot, row, column.presentKey) || 0) + returnedRaw);
+      return {
+        column,
+        kind: "sent",
+        limit,
+        blocked: limit <= 0
+      };
+    }
+
+    if (column.returnedKey === key) {
+      const limit = Math.max(0, (getNumber(snapshot, row, column.leaveKey) || 0) + sentRaw);
+      return {
+        column,
+        kind: "returned",
+        limit,
+        blocked: limit <= 0
+      };
+    }
+
+    return null;
+  }
+
+  function normalizeLeaveCalcInputValue(row, key, value, snapshot = state.snapshot) {
+    if (value === null || value === "" || typeof value === "undefined") {
+      return null;
+    }
+
+    const normalized = Math.max(0, Number(value) || 0);
+    const constraint = getLeaveCalcConstraint(row, key, snapshot);
+    if (!constraint) {
+      return normalized;
+    }
+
+    return Math.min(normalized, constraint.limit);
+  }
+
+  function getLeaveCalcBlockedColumns(row, snapshot = state.snapshot) {
+    if (!row) {
+      return [];
+    }
+
+    return LEAVE_CALC_COLUMNS.flatMap((column) => {
+      const sentConstraint = getLeaveCalcConstraint(row, column.sentKey, snapshot);
+      const returnedConstraint = getLeaveCalcConstraint(row, column.returnedKey, snapshot);
+      const blocked = [];
+      if (sentConstraint && sentConstraint.blocked) {
+        blocked.push(sentConstraint);
+      }
+      if (returnedConstraint && returnedConstraint.blocked) {
+        blocked.push(returnedConstraint);
+      }
+      return blocked;
+    });
+  }
+
+  function getLeaveCalcConstraintTitle(constraint) {
+    if (!constraint) {
+      return "";
+    }
+
+    if (constraint.kind === "sent") {
+      if (constraint.blocked) {
+        return `По категории ${constraint.column.label} нет наличия в больнице. Отправка в отпуск заблокирована.`;
+      }
+      return `По категории ${constraint.column.label} можно отправить в отпуск не больше ${constraint.limit}.`;
+    }
+
+    if (constraint.blocked) {
+      return `По категории ${constraint.column.label} нет больных в лечебном отпуске. Возврат заблокирован.`;
+    }
+    return `По категории ${constraint.column.label} можно вернуть из отпуска не больше ${constraint.limit}.`;
+  }
+
   function calcQhRemainingValue(row, type, snapshot = state.snapshot) {
     if (!row) {
       return null;
@@ -5484,7 +5620,12 @@ function buildInitialPhotoLightboxState() {
 
     const previous = getQhCalcSourceValue(row, source.baseKey, snapshot);
     const incoming = getQhCalcSourceValue(row, source.incomingKey, snapshot);
-    const discharged = getQhCalcSourceValue(row, source.dischargedKey, snapshot);
+    const discharged = normalizeQhCalcInputValue(
+      row,
+      source.dischargedKey,
+      getQhCalcSourceValue(row, source.dischargedKey, snapshot),
+      snapshot
+    );
 
     if (previous === null && incoming === null && discharged === null) {
       return null;
@@ -5539,39 +5680,97 @@ function buildInitialPhotoLightboxState() {
     return snapshot;
   }
 
-  function getQhCalcDisplayValue(row, key) {
+  function getQhCalcDisplayValue(row, key, snapshot = state.snapshot) {
     if (!row) {
       return "";
     }
 
     if (key === "qhRemainingSoldier") {
-      return getDisplayValue(calcQhRemainingValue(row, "soldier"));
+      return getDisplayValue(calcQhRemainingValue(row, "soldier", snapshot));
     }
     if (key === "qhRemainingOfficer") {
-      return getDisplayValue(calcQhRemainingValue(row, "officer"));
+      return getDisplayValue(calcQhRemainingValue(row, "officer", snapshot));
     }
     if (key === "qhRemainingContract") {
-      return getDisplayValue(calcQhRemainingValue(row, "contract"));
+      return getDisplayValue(calcQhRemainingValue(row, "contract", snapshot));
     }
     if (key === "qhRemainingZh") {
-      return getDisplayValue(calcQhRemainingValue(row, "zh"));
+      return getDisplayValue(calcQhRemainingValue(row, "zh", snapshot));
     }
     if (key === "qhRemainingFamily") {
-      return getDisplayValue(calcQhRemainingValue(row, "family"));
+      return getDisplayValue(calcQhRemainingValue(row, "family", snapshot));
     }
     if (key === "qhRemainingReserve") {
-      return getDisplayValue(calcQhRemainingValue(row, "reserve"));
+      return getDisplayValue(calcQhRemainingValue(row, "reserve", snapshot));
     }
     if (key === "qhRemainingCivil") {
-      return getDisplayValue(calcQhRemainingValue(row, "civil"));
+      return getDisplayValue(calcQhRemainingValue(row, "civil", snapshot));
     }
 
-    const value = getQhCalcSourceValue(row, key);
+    const value = getQhCalcSourceValue(row, key, snapshot);
     if ((QH_CALC_INPUT_KEYS.has(key) || QH_CALC_OPTIONAL_INPUT_KEYS.has(key))
       && (value === null || value === "" || typeof value === "undefined")) {
       return "0";
     }
+    if (QH_CALC_INPUT_KEYS.has(key)) {
+      return getDisplayValue(normalizeQhCalcInputValue(row, key, value, snapshot));
+    }
     return getDisplayValue(value);
+  }
+
+  function getQhDischargeConstraint(row, key, snapshot = state.snapshot) {
+    if (!row) {
+      return null;
+    }
+
+    const column = getQhCalcColumnByKey(key);
+    if (!column || column.dischargedKey !== key) {
+      return null;
+    }
+
+    const limit = Math.max(0, getNumber(snapshot, row, column.currentKey) || 0);
+    return {
+      column,
+      limit,
+      blocked: limit <= 0
+    };
+  }
+
+  function normalizeQhCalcInputValue(row, key, value, snapshot = state.snapshot) {
+    if (value === null || value === "" || typeof value === "undefined") {
+      return null;
+    }
+
+    const normalized = Math.max(0, Number(value) || 0);
+    const dischargeConstraint = getQhDischargeConstraint(row, key, snapshot);
+    if (!dischargeConstraint) {
+      return normalized;
+    }
+
+    return Math.min(normalized, dischargeConstraint.limit);
+  }
+
+  function getQhCalcBlockedDischargeColumns(row, snapshot = state.snapshot) {
+    if (!row) {
+      return [];
+    }
+
+    return QH_CALC_COLUMNS.filter((column) => {
+      const dischargeConstraint = getQhDischargeConstraint(row, column.dischargedKey, snapshot);
+      return Boolean(dischargeConstraint && dischargeConstraint.blocked);
+    });
+  }
+
+  function getQhCalcDischargeTitle(constraint) {
+    if (!constraint) {
+      return "";
+    }
+
+    if (constraint.blocked) {
+      return `По категории ${constraint.column.label} нет наличия. Выписка заблокирована.`;
+    }
+
+    return `По категории ${constraint.column.label} можно выписать не больше ${constraint.limit}.`;
   }
 
   function getDepartmentAdmissionCalcActiveMessage() {
@@ -5633,10 +5832,31 @@ function buildInitialPhotoLightboxState() {
       });
     });
 
+    QH_CALC_COLUMNS.forEach((column) => {
+      const dischargeConstraint = getQhDischargeConstraint(row, column.dischargedKey);
+      const displayValue = getQhCalcDisplayValue(row, column.dischargedKey) || "0";
+      document.querySelectorAll(`[data-qh-calc-key="${column.dischargedKey}"]`).forEach((element) => {
+        if (!(element instanceof HTMLInputElement)) {
+          return;
+        }
+
+        if (document.activeElement !== element) {
+          element.value = displayValue;
+        }
+        element.max = dischargeConstraint ? String(dischargeConstraint.limit) : "";
+        element.disabled = Boolean(dischargeConstraint && dischargeConstraint.blocked);
+        element.title = getQhCalcDischargeTitle(dischargeConstraint);
+        const cell = element.closest(".qh-calc-cell");
+        if (cell) {
+          cell.classList.toggle("qh-calc-cell--blocked", Boolean(dischargeConstraint && dischargeConstraint.blocked));
+        }
+      });
+    });
+
     const status = document.getElementById("qhCalcStatus");
     if (status) {
       status.className = "qh-calc-status";
-      status.textContent = getDepartmentAdmissionCalcActiveMessage();
+      status.textContent = "";
     }
   }
 
@@ -5644,6 +5864,9 @@ function buildInitialPhotoLightboxState() {
     const shouldRefresh = options.refresh !== false;
     const shouldSave = options.save !== false;
     const shouldAnnounce = options.announce !== false;
+    if (mode === "main" && state.activeMainTableSavedPreviewKey) {
+      state.activeMainTableSavedPreviewKey = "";
+    }
     const row = getDepartmentCalcTargetRow();
     if (!row) {
       return;
@@ -5652,12 +5875,21 @@ function buildInitialPhotoLightboxState() {
     const originalCell1 = getNumber(state.snapshot, row, "beenTotal") || 0;
     const originalCell2 = getNumber(state.snapshot, row, "beenSoldier") || 0;
     const originalCell3 = getNumber(state.snapshot, row, "beenSeries") || 0;
+    const originalCell4 = getNumber(state.snapshot, row, "admittedTotal") || 0;
+    const originalCell5 = getNumber(state.snapshot, row, "admittedSoldier") || 0;
+    const originalCell6 = getNumber(state.snapshot, row, "admittedSeries") || 0;
+    const originalCell7 = getNumber(state.snapshot, row, "dgTotal") || 0;
+    const originalCell8 = getNumber(state.snapshot, row, "dgSoldier") || 0;
+    const originalCell9 = getNumber(state.snapshot, row, "dgSeries") || 0;
 
     const incomingByType = Object.fromEntries(
       QH_CALC_COLUMNS.map((column) => [column.type, getQhCalcSourceValue(row, column.incomingKey) || 0])
     );
     const dischargedByType = Object.fromEntries(
-      QH_CALC_COLUMNS.map((column) => [column.type, getQhCalcSourceValue(row, column.dischargedKey) || 0])
+      QH_CALC_COLUMNS.map((column) => [
+        column.type,
+        normalizeQhCalcInputValue(row, column.dischargedKey, getQhCalcSourceValue(row, column.dischargedKey)) || 0
+      ])
     );
     const remainingByType = Object.fromEntries(
       QH_CALC_COLUMNS.map((column) => [column.type, calcQhRemainingValue(row, column.type) || 0])
@@ -5688,12 +5920,12 @@ function buildInitialPhotoLightboxState() {
     row.values.beenTotal = originalCell1;
     row.values.beenSoldier = originalCell2;
     row.values.beenSeries = originalCell3;
-    row.values.admittedTotal = cell4;
-    row.values.admittedSoldier = cell5;
-    row.values.admittedSeries = cell6;
-    row.values.dgTotal = cell7;
-    row.values.dgSoldier = cell8;
-    row.values.dgSeries = cell9;
+    row.values.admittedTotal = originalCell4 + cell4;
+    row.values.admittedSoldier = originalCell5 + cell5;
+    row.values.admittedSeries = originalCell6 + cell6;
+    row.values.dgTotal = originalCell7 + cell7;
+    row.values.dgSoldier = originalCell8 + cell8;
+    row.values.dgSeries = originalCell9 + cell9;
 
     [
       ["beenTotal", row.values.beenTotal],
@@ -5745,23 +5977,30 @@ function buildInitialPhotoLightboxState() {
     const shouldRefresh = options.refresh !== false;
     const shouldSave = options.save !== false;
     const shouldAnnounce = options.announce !== false;
+    if (mode === "main" && state.activeMainTableSavedPreviewKey) {
+      state.activeMainTableSavedPreviewKey = "";
+    }
     const row = getDepartmentCalcTargetRow();
     if (!row) {
       return false;
     }
 
-    const invalidColumns = LEAVE_CALC_COLUMNS.filter((column) =>
-      (calcLeaveRemainingValue(row, column.type) || 0) < 0
-      || (calcLeavePresentValue(row, column.type) || 0) < 0
-    );
+    const nextLeaveResults = LEAVE_CALC_COLUMNS.map((column) => ({
+      column,
+      nextLeave: calcLeaveRemainingValue(row, column.type) || 0,
+      nextPresent: calcLeavePresentValue(row, column.type) || 0
+    }));
+    const invalidColumns = nextLeaveResults
+      .filter((item) => item.nextLeave < 0 || item.nextPresent < 0)
+      .map((item) => item.column);
     if (invalidColumns.length) {
       setInfo(`Բուժական արձակուրդի հաշվարկը չի կարող կիրառվել․ ${invalidColumns.map((column) => column.label).join(", ")} սյունակներում ստացվել է բացասական արժեք։`, true);
       return false;
     }
 
-    LEAVE_CALC_COLUMNS.forEach((column) => {
-      row.values[column.leaveKey] = calcLeaveRemainingValue(row, column.type) || 0;
-      row.values[column.presentKey] = calcLeavePresentValue(row, column.type) || 0;
+    nextLeaveResults.forEach(({ column, nextLeave, nextPresent }) => {
+      row.values[column.leaveKey] = nextLeave;
+      row.values[column.presentKey] = nextPresent;
       row.values[column.sentKey] = 0;
       row.values[column.returnedKey] = 0;
     });
@@ -5805,10 +6044,16 @@ function buildInitialPhotoLightboxState() {
     const shouldRefresh = options.refresh !== false;
     const shouldSave = options.save !== false;
     const shouldAnnounce = options.announce !== false;
+    if (mode === "main" && state.activeMainTableSavedPreviewKey) {
+      state.activeMainTableSavedPreviewKey = "";
+    }
     const row = getDepartmentCalcTargetRow();
     if (!row) {
       return false;
     }
+
+    const originalCell10 = getNumber(state.snapshot, row, "transferFromDepartment") || 0;
+    const originalCell11 = getNumber(state.snapshot, row, "transferToDepartment") || 0;
 
     const invalidColumns = getTransferCalcInvalidColumns(row);
     if (invalidColumns.length) {
@@ -5819,8 +6064,12 @@ function buildInitialPhotoLightboxState() {
     let incomingTotal = 0;
     let outgoingTotal = 0;
     TRANSFER_CALC_COLUMNS.forEach((column) => {
-      const incoming = getTransferCalcSourceValue(row, column.incomingKey) || 0;
-      const outgoing = getTransferCalcSourceValue(row, column.outgoingKey) || 0;
+      const incoming = Math.max(0, Number(getTransferCalcSourceValue(row, column.incomingKey)) || 0);
+      const outgoing = normalizeTransferCalcInputValue(
+        row,
+        column.outgoingKey,
+        getTransferCalcSourceValue(row, column.outgoingKey)
+      ) || 0;
       const nextCurrent = calcTransferRemainingValue(row, column.type) || 0;
 
       row.values[column.currentKey] = nextCurrent;
@@ -5831,8 +6080,8 @@ function buildInitialPhotoLightboxState() {
       outgoingTotal += outgoing;
     });
 
-    row.values.transferToDepartment = incomingTotal;
-    row.values.transferFromDepartment = outgoingTotal;
+    row.values.transferToDepartment = originalCell11 + incomingTotal;
+    row.values.transferFromDepartment = originalCell10 + outgoingTotal;
 
     [
       ["currentShar", row.values.currentShar],
@@ -5876,6 +6125,9 @@ function buildInitialPhotoLightboxState() {
     const shouldRefresh = options.refresh !== false;
     const shouldSave = options.save !== false;
     const shouldAnnounce = options.announce !== false;
+    if (mode === "main" && state.activeMainTableSavedPreviewKey) {
+      state.activeMainTableSavedPreviewKey = "";
+    }
     const row = getDepartmentCalcTargetRow();
     if (!row) {
       return false;
@@ -5884,12 +6136,23 @@ function buildInitialPhotoLightboxState() {
     const originalCell1 = getNumber(state.snapshot, row, "beenTotal") || 0;
     const originalMilitary = getNumber(state.snapshot, row, "beenSoldier") || 0;
     const originalSeries = getNumber(state.snapshot, row, "beenSeries") || 0;
+    const originalCell4 = getNumber(state.snapshot, row, "admittedTotal") || 0;
+    const originalCell5 = getNumber(state.snapshot, row, "admittedSoldier") || 0;
+    const originalCell6 = getNumber(state.snapshot, row, "admittedSeries") || 0;
+    const originalCell7 = getNumber(state.snapshot, row, "dgTotal") || 0;
+    const originalCell8 = getNumber(state.snapshot, row, "dgSoldier") || 0;
+    const originalCell9 = getNumber(state.snapshot, row, "dgSeries") || 0;
+    const originalCell10 = getNumber(state.snapshot, row, "transferFromDepartment") || 0;
+    const originalCell11 = getNumber(state.snapshot, row, "transferToDepartment") || 0;
 
     const incomingByType = Object.fromEntries(
       QH_CALC_COLUMNS.map((column) => [column.type, getQhCalcSourceValue(row, column.incomingKey) || 0])
     );
     const dischargedByType = Object.fromEntries(
-      QH_CALC_COLUMNS.map((column) => [column.type, getQhCalcSourceValue(row, column.dischargedKey) || 0])
+      QH_CALC_COLUMNS.map((column) => [
+        column.type,
+        normalizeQhCalcInputValue(row, column.dischargedKey, getQhCalcSourceValue(row, column.dischargedKey)) || 0
+      ])
     );
     const remainingByType = Object.fromEntries(
       QH_CALC_COLUMNS.map((column) => [
@@ -5909,8 +6172,8 @@ function buildInitialPhotoLightboxState() {
       LEAVE_CALC_COLUMNS.map((column) => [
         column.type,
         (getNumber(state.snapshot, row, column.leaveKey) || 0)
-          + (getLeaveCalcSourceValue(row, column.sentKey) || 0)
-          - (getLeaveCalcSourceValue(row, column.returnedKey) || 0)
+          + (normalizeLeaveCalcInputValue(row, column.sentKey, getLeaveCalcSourceValue(row, column.sentKey)) || 0)
+          - (normalizeLeaveCalcInputValue(row, column.returnedKey, getLeaveCalcSourceValue(row, column.returnedKey)) || 0)
       ])
     );
     const leavePresentByType = Object.fromEntries(
@@ -5921,8 +6184,8 @@ function buildInitialPhotoLightboxState() {
         return [
           column.type,
           currentAfterAdmission
-            - (getLeaveCalcSourceValue(row, column.sentKey) || 0)
-            + (getLeaveCalcSourceValue(row, column.returnedKey) || 0)
+            - (normalizeLeaveCalcInputValue(row, column.sentKey, getLeaveCalcSourceValue(row, column.sentKey)) || 0)
+            + (normalizeLeaveCalcInputValue(row, column.returnedKey, getLeaveCalcSourceValue(row, column.returnedKey)) || 0)
         ];
       })
     );
@@ -5966,12 +6229,12 @@ function buildInitialPhotoLightboxState() {
     row.values.beenTotal = originalCell1;
     row.values.beenSoldier = originalMilitary;
     row.values.beenSeries = originalSeries;
-    row.values.admittedTotal = QH_CALC_COLUMNS.reduce((sum, column) => sum + incomingByType[column.type], 0);
-    row.values.admittedSoldier = incomingByType.soldier + incomingByType.officer + incomingByType.contract;
-    row.values.admittedSeries = incomingByType.soldier;
-    row.values.dgTotal = QH_CALC_COLUMNS.reduce((sum, column) => sum + dischargedByType[column.type], 0);
-    row.values.dgSoldier = dischargedByType.soldier + dischargedByType.officer + dischargedByType.contract;
-    row.values.dgSeries = dischargedByType.soldier;
+    row.values.admittedTotal = originalCell4 + QH_CALC_COLUMNS.reduce((sum, column) => sum + incomingByType[column.type], 0);
+    row.values.admittedSoldier = originalCell5 + incomingByType.soldier + incomingByType.officer + incomingByType.contract;
+    row.values.admittedSeries = originalCell6 + incomingByType.soldier;
+    row.values.dgTotal = originalCell7 + QH_CALC_COLUMNS.reduce((sum, column) => sum + dischargedByType[column.type], 0);
+    row.values.dgSoldier = originalCell8 + dischargedByType.soldier + dischargedByType.officer + dischargedByType.contract;
+    row.values.dgSeries = originalCell9 + dischargedByType.soldier;
 
     row.values.currentShar = transferRemainingByType.soldier;
     row.values.currentSpa = transferRemainingByType.officer;
@@ -5985,8 +6248,8 @@ function buildInitialPhotoLightboxState() {
     row.values.leaveSpa = leaveRemainingByType.spa;
     row.values.leavePaym = leaveRemainingByType.paym;
 
-    row.values.transferToDepartment = TRANSFER_CALC_COLUMNS.reduce((sum, column) => sum + transferIncomingByType[column.type], 0);
-    row.values.transferFromDepartment = TRANSFER_CALC_COLUMNS.reduce((sum, column) => sum + transferOutgoingByType[column.type], 0);
+    row.values.transferToDepartment = originalCell11 + TRANSFER_CALC_COLUMNS.reduce((sum, column) => sum + transferIncomingByType[column.type], 0);
+    row.values.transferFromDepartment = originalCell10 + TRANSFER_CALC_COLUMNS.reduce((sum, column) => sum + transferOutgoingByType[column.type], 0);
 
     [
       ["beenTotal", row.values.beenTotal],
@@ -6799,14 +7062,24 @@ function buildInitialPhotoLightboxState() {
         expected: 0,
         checks: [],
         failedChecks: [],
+        failedKeySet: new Set(),
+        applicableKeySet: new Set(),
+        statusTone: "neutral",
         message: ""
       };
     }
 
     const checks = buildDepartmentValidationChecksForSnapshot(snapshot, row);
+    const applicableChecks = checks.filter((item) => item.applicable);
     const failedChecks = checks.filter((item) => item.applicable && !item.isValid);
     const primaryCheck = checks[0] || null;
     const isValid = failedChecks.length === 0;
+    const failedKeySet = new Set(
+      failedChecks.flatMap((item) => Array.isArray(item.suspectKeys) ? item.suspectKeys : [])
+    );
+    const applicableKeySet = new Set(
+      applicableChecks.flatMap((item) => Array.isArray(item.suspectKeys) ? item.suspectKeys : [])
+    );
 
     return {
       applicable: true,
@@ -6814,7 +7087,11 @@ function buildInitialPhotoLightboxState() {
       actual: primaryCheck ? primaryCheck.actual : 0,
       expected: primaryCheck ? primaryCheck.expected : 0,
       checks,
+      applicableChecks,
       failedChecks,
+      failedKeySet,
+      applicableKeySet,
+      statusTone: isValid ? "valid" : "invalid",
       message: buildDepartmentValidationMessage(isValid, checks, failedChecks)
     };
   }
@@ -7068,6 +7345,17 @@ function buildInitialPhotoLightboxState() {
     if (mode === "department" && isDepartmentMorningControlledKey(key) && !areDepartmentMorningCellsUnlocked()) {
       classes.push("department-locked-top-cell");
     }
+    if (row && options && options.validationPreview === true) {
+      const failedKeySet = options.validationFailedKeySet instanceof Set ? options.validationFailedKeySet : null;
+      const applicableKeySet = options.validationApplicableKeySet instanceof Set ? options.validationApplicableKeySet : null;
+      if (failedKeySet && failedKeySet.has(key)) {
+        classes.push("main-calc-preview-control-cell", "main-calc-preview-control-cell--invalid");
+      } else if (options.validationStatusTone === "valid" && applicableKeySet && applicableKeySet.has(key)) {
+        classes.push("main-calc-preview-control-cell", "main-calc-preview-control-cell--valid");
+      } else if (options.validationStatusTone === "invalid" && applicableKeySet && applicableKeySet.has(key)) {
+        classes.push("main-calc-preview-control-cell", "main-calc-preview-control-cell--watch");
+      }
+    }
 
     return classes.join(" ");
   }
@@ -7162,8 +7450,12 @@ function buildInitialPhotoLightboxState() {
     ]
       .filter(Boolean)
       .join(" ");
+    const renderComputedInline = Boolean(options && options.inlineComputedValues);
 
     if (key === "presentTotal") {
+      if (renderComputedInline) {
+        return `<td class="${classes}" data-column-key="${key}"><span>${escapeHtml(String(calcPresentTotal(snapshot, row)))}</span></td>`;
+      }
       return `<td class="${classes}" data-column-key="${key}"><span data-output="presentTotal" data-row="${row.id}"></span></td>`;
     }
 
@@ -7171,11 +7463,17 @@ function buildInitialPhotoLightboxState() {
       if (!row.hasLeaveTotal) {
         return `<td class="${classes} blank-cell" data-column-key="${key}"><span></span></td>`;
       }
+      if (renderComputedInline) {
+        return `<td class="${classes}" data-column-key="${key}"><span>${escapeHtml(String(calcLeaveTotal(snapshot, row) || 0))}</span></td>`;
+      }
       return `<td class="${classes}" data-column-key="${key}"><span data-output="leaveTotal" data-row="${row.id}"></span></td>`;
     }
 
     const linkedSource = getLinkedSource(row, key);
     if (linkedSource) {
+      if (renderComputedInline) {
+        return `<td class="${classes}" data-column-key="${key}"><span>${escapeHtml(getDisplayValue(getEffectiveValue(snapshot, row, key)))}</span></td>`;
+      }
       return `<td class="${classes}" data-column-key="${key}"><span data-linked="${row.id}:${key}"></span></td>`;
     }
 
@@ -7203,14 +7501,24 @@ function buildInitialPhotoLightboxState() {
 
   function renderDetailRow(snapshot, row, interactive, viewMode, options = null) {
     const freshness = viewMode === "main" ? getRowFreshnessMeta(row) : null;
-    const validation = viewMode === "main" ? getDepartmentValidationStateForSnapshot(snapshot, row) : null;
+    const previewValidation = viewMode !== "main"
+      && options
+      && options.validationPreviewRow === true
+      && options.validationPreviewState
+      && options.validationPreviewState.rowId === row.id
+      ? options.validationPreviewState.validation
+      : null;
+    const validation = viewMode === "main" ? getDepartmentValidationStateForSnapshot(snapshot, row) : previewValidation;
     const mainRowState = viewMode === "main" ? getDepartmentMainTableStateMeta(row, validation) : null;
+    const previewRowValidationClass = previewValidation && previewValidation.applicable
+      ? ` main-calc-preview-row main-calc-preview-row--${previewValidation.isValid ? "valid" : "invalid"}`
+      : "";
     const validationClass = validation && validation.applicable && !validation.isValid ? " main-invalid-row" : "";
     const validationAttr = validation && validation.applicable
       ? ` data-row-validation="${validation.isValid ? "valid" : "invalid"}"`
       : "";
-    const validationTitle = validation && validation.applicable && !validation.isValid
-      ? ` title="${escapeHtml(validation.failedChecks.map((item) => item.failureMessage).join(" "))}"`
+    const validationTitle = validation && validation.applicable
+      ? ` title="${escapeHtml(validation.message || validation.failedChecks.map((item) => item.failureMessage).join(" "))}"`
       : "";
     const freshnessClass = freshness && freshness.level === "fresh" && !(validation && validation.applicable && !validation.isValid)
       ? " main-fresh-row"
@@ -7228,9 +7536,11 @@ function buildInitialPhotoLightboxState() {
       : "";
     const deptTitle = mainRowState && mainRowState.title
       ? `${row.department}\n${mainRowState.title}`
+      : validation && validation.applicable && validation.message
+        ? `${row.department}\n${validation.message}`
       : row.department;
     return `
-      <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}${validationClass}${openRowClass}" data-row-id="${row.id}"${freshnessAttr}${validationAttr}${validationTitle}${openRowAttr}>
+      <tr class="detail-row ${row.group === "extra" ? "extra-row" : "primary-row"}${freshnessClass}${validationClass}${previewRowValidationClass}${openRowClass}" data-row-id="${row.id}"${freshnessAttr}${validationAttr}${validationTitle}${openRowAttr}>
         <td class="dept-cell${deptStateClass}" title="${escapeHtml(deptTitle)}">${renderResponsiveDepartmentName(row.department)}</td>
         ${config.columns.map((key) => renderDetailCell(snapshot, row, key, interactive, options)).join("")}
       </tr>
@@ -7258,7 +7568,14 @@ function buildInitialPhotoLightboxState() {
       transferMismatch: Boolean(
         (options.highlightTransferMismatch || (options.viewMode === "main" && mode === "main"))
         && getTransferColumnMismatchMeta(snapshot, rows).hasMismatch
-      )
+      ),
+      inlineComputedValues: Boolean(options.inlineComputedValues),
+      validationPreview: Boolean(options.validationPreview),
+      validationPreviewRow: Boolean(options.validationPreviewRow),
+      validationPreviewState: options.validationPreviewState || null,
+      validationStatusTone: typeof options.validationStatusTone === "string" ? options.validationStatusTone : "neutral",
+      validationFailedKeySet: options.validationFailedKeySet instanceof Set ? options.validationFailedKeySet : new Set(),
+      validationApplicableKeySet: options.validationApplicableKeySet instanceof Set ? options.validationApplicableKeySet : new Set()
     };
     let bodyHtml = "";
 
@@ -7366,8 +7683,8 @@ function buildInitialPhotoLightboxState() {
       return null;
     }
     const baseLeave = getNumber(snapshot, row, column.leaveKey) || 0;
-    const sent = getLeaveCalcSourceValue(row, column.sentKey) || 0;
-    const returned = getLeaveCalcSourceValue(row, column.returnedKey) || 0;
+    const sent = normalizeLeaveCalcInputValue(row, column.sentKey, getLeaveCalcSourceValue(row, column.sentKey), snapshot) || 0;
+    const returned = normalizeLeaveCalcInputValue(row, column.returnedKey, getLeaveCalcSourceValue(row, column.returnedKey), snapshot) || 0;
     return baseLeave + sent - returned;
   }
 
@@ -7377,8 +7694,8 @@ function buildInitialPhotoLightboxState() {
       return null;
     }
     const basePresent = getNumber(snapshot, row, column.presentKey) || 0;
-    const sent = getLeaveCalcSourceValue(row, column.sentKey) || 0;
-    const returned = getLeaveCalcSourceValue(row, column.returnedKey) || 0;
+    const sent = normalizeLeaveCalcInputValue(row, column.sentKey, getLeaveCalcSourceValue(row, column.sentKey), snapshot) || 0;
+    const returned = normalizeLeaveCalcInputValue(row, column.returnedKey, getLeaveCalcSourceValue(row, column.returnedKey), snapshot) || 0;
     return basePresent - sent + returned;
   }
 
@@ -7411,6 +7728,62 @@ function buildInitialPhotoLightboxState() {
         )).join("")
         : `<div>${escapeHtml("Այս հաշվարկը չի փոխում ընդհանուր քանակը․ փոխվում են միայն 13-15 և 20-22 բջիջները։")}</div>`;
     }
+  }
+
+  function refreshLeaveCalcDisplay(row) {
+    if (!row) {
+      return;
+    }
+
+    LEAVE_CALC_COLUMNS.forEach((column) => {
+      document.querySelectorAll(`[data-leave-calc-base="${column.leaveKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(getNumber(state.snapshot, row, column.leaveKey)) || "0";
+      });
+      document.querySelectorAll(`[data-leave-calc-output="${column.leaveKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(calcLeaveRemainingValue(row, column.type)) || "0";
+      });
+      document.querySelectorAll(`[data-leave-calc-output="${column.presentKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(calcLeavePresentValue(row, column.type)) || "0";
+      });
+
+      [column.sentKey, column.returnedKey].forEach((key) => {
+        const constraint = getLeaveCalcConstraint(row, key);
+        const displayValue = getDisplayValue(
+          normalizeLeaveCalcInputValue(row, key, getLeaveCalcSourceValue(row, key))
+        ) || "0";
+
+        document.querySelectorAll(`[data-leave-calc-key="${key}"]`).forEach((element) => {
+          if (!(element instanceof HTMLInputElement)) {
+            return;
+          }
+
+          if (document.activeElement !== element) {
+            element.value = displayValue;
+          }
+          element.max = constraint ? String(constraint.limit) : "";
+          element.disabled = Boolean(constraint && constraint.blocked);
+          element.title = getLeaveCalcConstraintTitle(constraint);
+          const cell = element.closest(".qh-calc-cell");
+          if (cell) {
+            cell.classList.toggle("qh-calc-cell--blocked", Boolean(constraint && constraint.blocked));
+          }
+        });
+      });
+    });
+
+    const status = document.getElementById("leaveCalcStatus");
+    if (status) {
+      const invalidColumns = LEAVE_CALC_COLUMNS.filter((column) =>
+        (calcLeaveRemainingValue(row, column.type) || 0) < 0
+        || (calcLeavePresentValue(row, column.type) || 0) < 0
+      );
+    status.className = `qh-calc-status${invalidColumns.length ? " qh-calc-status--bad" : ""}`;
+    status.innerHTML = invalidColumns.length
+      ? invalidColumns.map((column) => (
+        `<div>${escapeHtml(`${column.label}: Õ¹Õ« Õ¯Õ¡Ö€Õ¸Õ² Õ¬Õ«Õ¶Õ¥Õ¬ Õ¢Õ¡ÖÕ¡Õ½Õ¡Õ¯Õ¡Õ¶ Õ¡Ö€ÕªÕ¥Ö„`)}</div>`
+      )).join("")
+      : "";
+  }
   }
 
   function hasMainTablePendingLocalChanges() {
@@ -7956,7 +8329,7 @@ function buildInitialPhotoLightboxState() {
       return "Данные объединяются между компьютерами через интернет.";
     }
     if (state.source === "pending-sync") {
-      return "Ð§Ð°ÑÑ‚ÑŒ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ ÐµÑ‰Ñ‘ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð° Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€. ÐžÐ½Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð¶Ð´ÑƒÑ‚ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.";
+      return "Часть изменений ещё не отправлена на сервер. Они сохранены локально и ждут синхронизации.";
     }
     if (state.source === "local-cache") {
       return "Сейчас показан локальный кэш. Сервер временно недоступен.";
@@ -7990,32 +8363,32 @@ function buildInitialPhotoLightboxState() {
 
   function getPendingSyncButtonLabel(status = getPendingSyncStatus()) {
     if (status.isSyncing) {
-      return status.count > 0 ? `Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð». (${status.count})...` : "Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð»....";
+      return status.count > 0 ? `Синхр. накопл. (${status.count})...` : "Синхр. накопл....";
     }
-    return status.count > 0 ? `Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð». (${status.count})` : "Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð».";
+    return status.count > 0 ? `Синхр. накопл. (${status.count})` : "Синхр. накопл.";
   }
 
   function getPendingSyncSummaryText(status = getPendingSyncStatus()) {
     if (status.hasPending) {
       if (!sync.hasRemoteSync()) {
-        return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼, Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¶Ð´ÑƒÑ‚ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸.`;
+        return `В очереди: ${status.count}. Сейчас оффлайн-режим, поэтому изменения ждут отправки.`;
       }
-      return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð² Ñ„Ð¾Ð½Ðµ, Ð° ÐºÐ½Ð¾Ð¿ÐºÐ° Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ Ð´Ð»Ñ Ñ€ÑƒÑ‡Ð½Ð¾Ð¹ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.`;
+      return `В очереди: ${status.count}. Очередь отправится автоматически в фоне, а кнопка остаётся для ручной синхронизации.`;
     }
     if (status.lastSyncedAt) {
-      return `ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ Ð¿ÑƒÑÑ‚Ð°. ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ ÑƒÑÐ¿ÐµÑˆÐ½Ð°Ñ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ñ: ${formatTimestamp(status.lastSyncedAt)}.`;
+      return `Очередь пуста. Последняя успешная синхронизация: ${formatTimestamp(status.lastSyncedAt)}.`;
     }
     return sync.hasRemoteSync()
-      ? "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°. Ð¤Ð¾Ð½Ð¾Ð²Ð°Ñ Ð°Ð²Ñ‚Ð¾ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ñ Ð²ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°."
-      : "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼. ÐÐ¾Ð²Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð±ÑƒÐ´ÑƒÑ‚ Ð½Ð°ÐºÐ°Ð¿Ð»Ð¸Ð²Ð°Ñ‚ÑŒÑÑ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾.";
+      ? "Очередь синхронизации пуста. Фоновая автосинхронизация включена."
+      : "Сейчас оффлайн-режим. Новые изменения будут накапливаться локально.";
   }
 
   function getPendingSyncErrorText(status = getPendingSyncStatus()) {
     if (status.lastError) {
-      return `ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ Ð¾ÑˆÐ¸Ð±ÐºÐ° ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸: ${status.lastError}`;
+      return `Последняя ошибка синхронизации: ${status.lastError}`;
     }
     if (status.hasPending && !sync.hasRemoteSync()) {
-      return "Ð§Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ, Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÐµÑÑŒ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼.";
+      return "Чтобы отправить накопленные изменения, переключитесь в онлайн-режим.";
     }
     return "";
   }
@@ -8109,7 +8482,7 @@ function buildInitialPhotoLightboxState() {
     return `
       <div class="pending-sync-panel">
         <div class="pending-sync-panel__copy">
-          <strong>ÐžÑ„Ñ„Ð»Ð°Ð¹Ð½-Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ</strong>
+          <strong>Оффлайн-очередь</strong>
           <p id="pendingSyncSummaryText">${escapeHtml(getPendingSyncSummaryText(status))}</p>
           <p class="hint${errorText ? " warning-note" : ""}" id="pendingSyncErrorText">${escapeHtml(errorText)}</p>
         </div>
@@ -9512,8 +9885,10 @@ function buildInitialPhotoLightboxState() {
       return "";
     }
 
+    const isEmbedded = Boolean(options.embedded);
     const fieldRows = getEffectiveQhCalcFieldRows(row);
-    const bodyRows = fieldRows.map((definition, rowIndex) => `
+    const visibleFieldRows = isEmbedded ? fieldRows.slice(0, 2) : fieldRows;
+    const bodyRows = visibleFieldRows.map((definition, rowIndex) => `
       <tr>
         <th scope="row">${escapeHtml(definition.label)}</th>
         ${definition.cells.map((cell, columnIndex) => {
@@ -9534,14 +9909,22 @@ function buildInitialPhotoLightboxState() {
           }
 
           if (cell.role === "input") {
+            const dischargeConstraint = getQhDischargeConstraint(row, cell.key);
+            const isBlockedDischarge = Boolean(dischargeConstraint && dischargeConstraint.blocked);
+            const dischargeMaxAttr = dischargeConstraint ? ` max="${escapeHtml(String(dischargeConstraint.limit))}"` : "";
+            const dischargeDisabledAttr = isBlockedDischarge ? " disabled" : "";
+            const dischargeTitleAttr = dischargeConstraint
+              ? ` title="${escapeHtml(getQhCalcDischargeTitle(dischargeConstraint))}"`
+              : "";
             return `
-              <td class="qh-calc-cell">
+              <td class="qh-calc-cell${isBlockedDischarge ? " qh-calc-cell--blocked" : ""}">
                 <input
                   type="number"
                   min="0"
                   step="1"
                   inputmode="numeric"
                   value="${escapeHtml(getQhCalcDisplayValue(row, cell.key) || "0")}"
+                  ${dischargeMaxAttr}${dischargeDisabledAttr}${dischargeTitleAttr}
                   data-qh-calc-key="${escapeHtml(cell.key)}"
                   data-qh-calc-row="${rowIndex}"
                   data-qh-calc-col="${columnIndex}"
@@ -9570,7 +9953,6 @@ function buildInitialPhotoLightboxState() {
       </tr>
     `).join("");
 
-    const isEmbedded = Boolean(options.embedded);
     const panelClass = isEmbedded ? "department-calc-section department-calc-section--qh" : "panel qh-calc-panel";
     const titleTag = isEmbedded ? "h3" : "h2";
     const statusHtml = `<div id="qhCalcStatus" class="qh-calc-status"></div>`;
@@ -9851,22 +10233,36 @@ function buildInitialPhotoLightboxState() {
       {
         label: "Հաշվարկ",
         cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.leaveKey, marker: column.leaveOutputMarker, role: "leave-output" }))
+      },
+      {
+        label: "Առկա է",
+        cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.presentKey, marker: column.presentOutputMarker, role: "present-output" }))
       }
     ];
 
-    const bodyHtml = bodyRows.map((definition, rowIndex) => `
+    const isEmbedded = Boolean(options.embedded);
+    const visibleRows = isEmbedded ? bodyRows.slice(0, 2) : bodyRows;
+    const bodyHtml = visibleRows.map((definition, rowIndex) => `
       <tr>
         <th scope="row">${escapeHtml(definition.label)}</th>
         ${definition.cells.map((cell, columnIndex) => {
           if (cell.role === "input") {
+            const leaveConstraint = getLeaveCalcConstraint(row, cell.key);
+            const isBlockedLeaveInput = Boolean(leaveConstraint && leaveConstraint.blocked);
+            const leaveMaxAttr = leaveConstraint ? ` max="${escapeHtml(String(leaveConstraint.limit))}"` : "";
+            const leaveDisabledAttr = isBlockedLeaveInput ? " disabled" : "";
+            const leaveTitleAttr = leaveConstraint
+              ? ` title="${escapeHtml(getLeaveCalcConstraintTitle(leaveConstraint))}"`
+              : "";
             return `
-              <td class="qh-calc-cell">
+              <td class="qh-calc-cell${isBlockedLeaveInput ? " qh-calc-cell--blocked" : ""}">
                 <input
                   type="number"
                   min="0"
                   step="1"
                   inputmode="numeric"
                   value="${escapeHtml(getDisplayValue(getLeaveCalcSourceValue(row, cell.key)) || "0")}"
+                  ${leaveMaxAttr}${leaveDisabledAttr}${leaveTitleAttr}
                   data-leave-calc-key="${escapeHtml(cell.key)}"
                   data-leave-calc-row="${rowIndex}"
                   data-leave-calc-col="${columnIndex}"
@@ -9899,7 +10295,6 @@ function buildInitialPhotoLightboxState() {
       </tr>
     `).join("");
 
-    const isEmbedded = Boolean(options.embedded);
     const panelClass = isEmbedded ? "department-calc-section department-calc-section--leave" : "panel qh-calc-panel";
     const titleTag = isEmbedded ? "h3" : "h2";
     const buttonHtml = options.showButton === false ? "" : `
@@ -9950,7 +10345,9 @@ function buildInitialPhotoLightboxState() {
       }
     ];
 
-    const bodyHtml = bodyRows.map((definition) => `
+    const isEmbedded = Boolean(options.embedded);
+    const visibleRows = isEmbedded ? bodyRows.slice(0, 2) : bodyRows;
+    const bodyHtml = visibleRows.map((definition) => `
       <tr>
         <th scope="row">${escapeHtml(definition.label)}</th>
         ${definition.cells.map((cell) => {
@@ -9987,7 +10384,6 @@ function buildInitialPhotoLightboxState() {
       </tr>
     `).join("");
 
-    const isEmbedded = Boolean(options.embedded);
     const panelClass = isEmbedded ? "department-calc-section department-calc-section--transfer" : "panel qh-calc-panel";
     const titleTag = isEmbedded ? "h3" : "h2";
     const buttonHtml = options.showButton === false ? "" : `
@@ -10019,11 +10415,18 @@ function buildInitialPhotoLightboxState() {
   }
 
   function renderDepartmentCombinedCalcPanel(row) {
-    const qhSection = renderQhCalcPanel(row, { embedded: true });
-    const leaveSection = renderLeaveCalcPanel(row, { embedded: true });
-    const transferSection = renderTransferCalcPanel(row, { embedded: true });
+    const qhSection = renderQhCalcPanel(row, { embedded: true, showButton: false });
+    const leaveSection = renderLeaveCalcPanel(row, { embedded: true, showButton: false });
+    const transferSection = renderTransferCalcPanel(row, { embedded: true, showButton: false });
     const introHtml = qhSection
       ? `<p class="department-calc-intro">\u0544\u0578\u0582\u057f\u0584\u0561\u0563\u0580\u0565\u0584 \u0568\u0576\u0564\u0578\u0582\u0576\u057e\u0561\u056e, \u0564\u0578\u0582\u0580\u057d\u0563\u0580\u057e\u0561\u056e, \u0561\u0580\u0571\u0561\u056f\u0578\u0582\u0580\u0564 \u0563\u0576\u0561\u0581\u0578\u0572, \u0561\u0580\u0571\u0561\u056f\u0578\u0582\u0580\u0564\u056b\u0581 \u057e\u0565\u0580\u0561\u0564\u0561\u0580\u0571\u0561\u056e \u0587 \u057f\u0565\u0572\u0561\u0583\u0578\u056d\u057e\u0561\u056e \u0570\u056b\u057e\u0561\u0576\u0564\u0576\u0565\u0580\u056b \u0584\u0561\u0576\u0561\u056f\u0568, \u0570\u0565\u057f\u0578 \u057d\u0565\u0572\u0574\u0565\u0584 \xab\u0540\u0561\u0577\u057e\u0565\u056c \u0587 \u057f\u0565\u0572\u0561\u0564\u0580\u0565\u056c\xbb\u0589</p>`
+      : "";
+    const buttonHtml = qhSection
+      ? `
+        <div class="qh-calc-actions department-calc-actions">
+          <button type="button" id="departmentCombinedCalcApplyBtn">\u0540\u0561\u0577\u057e\u0565\u056c \u0587 \u057f\u0565\u0572\u0561\u0564\u0580\u0565\u056c</button>
+        </div>
+      `
       : "";
 
     return `
@@ -10034,13 +10437,14 @@ function buildInitialPhotoLightboxState() {
           ${leaveSection}
           ${transferSection}
         </div>
+        ${buttonHtml}
       </div>
     `;
   }
 
-  function renderMainDepartmentCalcPanel(displayContext = getMainTableDisplaySnapshotContext()) {
-    const rows = Array.isArray(displayContext?.rows)
-      ? displayContext.rows.filter((row) => row && typeof row.id === "string")
+  function renderMainDepartmentCalcPanel() {
+    const rows = Array.isArray(state.snapshot?.rows)
+      ? state.snapshot.rows.filter((row) => row && typeof row.id === "string")
       : [];
 
     if (!rows.length) {
@@ -10054,18 +10458,33 @@ function buildInitialPhotoLightboxState() {
 
     const selectedId = getSelectedMainCalcDepartmentId(rows);
     const row = rows.find((item) => item.id === selectedId) || rows[0];
+    const validation = row ? getDepartmentValidationStateForSnapshot(state.snapshot, row) : null;
+    const previewWrapStateClass = validation && validation.applicable
+      ? ` main-department-calc-panel__preview-wrap--${validation.statusTone}`
+      : "";
+    const previewStatusClass = validation && validation.applicable
+      ? ` main-department-calc-panel__preview-status--${validation.statusTone}`
+      : "";
     const tableHtml = row
       ? renderTable(
-          displayContext.snapshot,
+          state.snapshot,
           [row],
           {
             interactive: false,
             viewMode: "department",
-            headerDateTime: displayContext?.headerDateTime || getCurrentDateTimeParts()
+            headerDateTime: getCurrentDateTimeParts(),
+            inlineComputedValues: true,
+            validationPreview: true,
+            validationPreviewRow: true,
+            validationPreviewState: { rowId: row.id, validation },
+            validationStatusTone: validation?.statusTone || "neutral",
+            validationFailedKeySet: validation?.failedKeySet || new Set(),
+            validationApplicableKeySet: validation?.applicableKeySet || new Set()
           }
         )
           .replace(' id="sheetTable"', "")
           .replace(' id="sheetBody"', "")
+          .replace(/<tr class="single-total-row">[\s\S]*?<\/tr>/, "")
       : "";
 
     return `
@@ -10083,9 +10502,12 @@ function buildInitialPhotoLightboxState() {
           </label>
         </div>
         <div class="main-department-calc-panel__preview">
-          <div class="table-wrap main-department-calc-panel__preview-wrap">
+          <div class="table-wrap main-department-calc-panel__preview-wrap${previewWrapStateClass}">
             ${tableHtml}
           </div>
+          ${validation && validation.applicable
+            ? `<div class="main-department-calc-panel__preview-status${previewStatusClass}">${escapeHtml(validation.message)}</div>`
+            : ""}
         </div>
         ${renderDepartmentCombinedCalcPanel(row)}
       </section>
@@ -10402,14 +10824,83 @@ function buildInitialPhotoLightboxState() {
     return config.normalizeCellValue(value);
   }
 
+  function getTransferCalcColumnByKey(key) {
+    return TRANSFER_CALC_COLUMNS.find((column) =>
+      column.currentKey === key
+      || column.incomingKey === key
+      || column.outgoingKey === key
+      || column.outputKey === key
+    ) || null;
+  }
+
+  function getTransferCalcConstraint(row, key, snapshot = state.snapshot) {
+    if (!row) {
+      return null;
+    }
+
+    const column = getTransferCalcColumnByKey(key);
+    if (!column || column.outgoingKey !== key) {
+      return null;
+    }
+
+    const incomingRaw = Math.max(0, Number(getTransferCalcSourceValue(row, column.incomingKey)) || 0);
+    const limit = Math.max(0, (getNumber(snapshot, row, column.currentKey) || 0) + incomingRaw);
+    return {
+      column,
+      limit,
+      blocked: limit <= 0
+    };
+  }
+
+  function normalizeTransferCalcInputValue(row, key, value, snapshot = state.snapshot) {
+    if (value === null || value === "" || typeof value === "undefined") {
+      return null;
+    }
+
+    const normalized = Math.max(0, Number(value) || 0);
+    const constraint = getTransferCalcConstraint(row, key, snapshot);
+    if (!constraint) {
+      return normalized;
+    }
+
+    return Math.min(normalized, constraint.limit);
+  }
+
+  function getTransferCalcBlockedColumns(row, snapshot = state.snapshot) {
+    if (!row) {
+      return [];
+    }
+
+    return TRANSFER_CALC_COLUMNS
+      .map((column) => getTransferCalcConstraint(row, column.outgoingKey, snapshot))
+      .filter((constraint) => Boolean(constraint && constraint.blocked));
+  }
+
+  function getTransferCalcConstraintTitle(constraint) {
+    if (!constraint) {
+      return "";
+    }
+
+    if (constraint.blocked) {
+      return `По категории ${constraint.column.label} нет наличия в отделении. Перевод из отделения заблокирован.`;
+    }
+
+    return `По категории ${constraint.column.label} можно перевести из отделения не больше ${constraint.limit}.`;
+  }
+
   function calcTransferRemainingValue(row, type, snapshot = state.snapshot) {
     const column = TRANSFER_CALC_COLUMNS.find((item) => item.type === type);
     if (!row || !column) {
       return null;
     }
     const baseCurrent = getNumber(snapshot, row, column.currentKey) || 0;
-    const incoming = getTransferCalcSourceValue(row, column.incomingKey) || 0;
-    const outgoing = getTransferCalcSourceValue(row, column.outgoingKey) || 0;
+    const incoming = Math.max(0, Number(getTransferCalcSourceValue(row, column.incomingKey)) || 0);
+    const outgoing = normalizeTransferCalcInputValue(
+      row,
+      column.outgoingKey,
+      getTransferCalcSourceValue(row, column.outgoingKey),
+      snapshot
+    ) || 0;
     return baseCurrent + incoming - outgoing;
   }
 
@@ -10424,6 +10915,9 @@ function buildInitialPhotoLightboxState() {
     const directValue = getTransferCalcSourceValue(row, key);
     if (TRANSFER_CALC_INPUT_KEYS.has(key) && (directValue === null || directValue === "" || typeof directValue === "undefined")) {
       return "0";
+    }
+    if (getTransferCalcConstraint(row, key, snapshot)) {
+      return getDisplayValue(normalizeTransferCalcInputValue(row, key, directValue, snapshot));
     }
     return getDisplayValue(directValue);
   }
@@ -13469,8 +13963,8 @@ function buildInitialPhotoLightboxState() {
             if (result.source === "pending-sync") {
               setInfo(
                 manual
-                  ? "Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð² Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ."
-                  : "Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð¶Ð´ÑƒÑ‚ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.",
+                  ? "Данные отделения сохранены локально и добавлены в офлайн-очередь."
+                  : "Изменения отделения сохранены и ждут синхронизации.",
                 false
               );
             }
@@ -13655,7 +14149,7 @@ function buildInitialPhotoLightboxState() {
     clearBackgroundPendingSyncSchedule();
     if (!statusBefore.hasPending) {
       if (!silent) {
-        setInfo("ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+        setInfo("Очередь синхронизации пуста.", false);
       }
       refreshTableData();
       return {
@@ -13665,7 +14159,7 @@ function buildInitialPhotoLightboxState() {
       };
     }
     if (!sync.hasRemoteSync()) {
-      const message = "Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ñ… Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ Ð²ÐºÐ»ÑŽÑ‡Ð¸Ñ‚Ðµ Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼.";
+      const message = "Для отправки накопленных изменений включите онлайн-режим.";
       if (!silent) {
         setInfo(message, true);
       }
@@ -13678,7 +14172,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     if (!silent) {
-      setInfo(`Ð¡Ð¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€ÑƒÑŽ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ: ${statusBefore.count}...`, false);
+      setInfo(`Синхронизирую накопленные изменения: ${statusBefore.count}...`, false);
     }
     refreshTableData();
 
@@ -13703,7 +14197,7 @@ function buildInitialPhotoLightboxState() {
         }
 
         if (!silent) {
-          setInfo(syncedCount > 0 ? `ÐÐ°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€: ${syncedCount}.` : "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+          setInfo(syncedCount > 0 ? `Накопленные изменения отправлены на сервер: ${syncedCount}.` : "Очередь синхронизации пуста.", false);
         }
         renderPage();
       } else {
@@ -13716,7 +14210,7 @@ function buildInitialPhotoLightboxState() {
         restorePendingMainSaveNotice();
         refreshTableData();
         if (!silent) {
-          setInfo(syncedCount > 0 ? `ÐÐ°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€: ${syncedCount}.` : "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+          setInfo(syncedCount > 0 ? `Накопленные изменения отправлены на сервер: ${syncedCount}.` : "Очередь синхронизации пуста.", false);
         }
       }
       return {
@@ -13733,7 +14227,7 @@ function buildInitialPhotoLightboxState() {
       } catch (_reloadError) {
       }
 
-      const message = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ.";
+      const message = error instanceof Error ? error.message : "Не удалось синхронизировать накопленные изменения.";
       state.pendingSyncAutoRetryAfter = Date.now() + AUTO_PENDING_SYNC_RETRY_MS;
       if (!silent) {
         setInfo(message, true);
@@ -13826,6 +14320,7 @@ function buildInitialPhotoLightboxState() {
     const sheetBody = document.getElementById("sheetBody");
     const qhCalcPanel = document.getElementById("qhCalcPanel");
     const qhCalcApplyBtn = document.getElementById("qhCalcApplyBtn");
+    const departmentCombinedCalcApplyBtn = document.getElementById("departmentCombinedCalcApplyBtn");
     const transferCalcPanel = document.getElementById("transferCalcPanel");
     const transferCalcApplyBtn = document.getElementById("transferCalcApplyBtn");
     const mainCalcDepartmentSelect = document.getElementById("mainCalcDepartmentSelect");
@@ -14287,10 +14782,11 @@ function buildInitialPhotoLightboxState() {
         }
 
         const sanitized = sanitizeNumericInput(input.value);
-        input.value = sanitized.text;
-        row.values[key] = sanitized.value;
+        const normalizedValue = normalizeQhCalcInputValue(row, key, sanitized.value);
+        input.value = normalizedValue === null || typeof normalizedValue === "undefined" ? sanitized.text : String(normalizedValue);
+        row.values[key] = normalizedValue;
         if (key === "currentShar" || key === "currentSpa" || key === "currentPaym") {
-          syncDepartmentRowInput(row.id, key, sanitized.value);
+          syncDepartmentRowInput(row.id, key, normalizedValue);
         }
         refreshQhCalcDisplay(row);
         if (mode === "department") {
@@ -14320,8 +14816,9 @@ function buildInitialPhotoLightboxState() {
         }
 
         const sanitized = sanitizeNumericInput(input.value);
-        input.value = sanitized.text;
-        row.values[key] = sanitized.value;
+        const normalizedValue = normalizeLeaveCalcInputValue(row, key, sanitized.value);
+        input.value = normalizedValue === null || typeof normalizedValue === "undefined" ? sanitized.text : String(normalizedValue);
+        row.values[key] = normalizedValue;
         refreshLeaveCalcDisplay(row);
         if (mode === "department") {
           queueDepartmentSave();
@@ -14349,8 +14846,9 @@ function buildInitialPhotoLightboxState() {
         }
 
         const sanitized = sanitizeNumericInput(input.value);
-        input.value = sanitized.text;
-        row.values[key] = sanitized.value;
+        const normalizedValue = normalizeTransferCalcInputValue(row, key, sanitized.value);
+        input.value = normalizedValue === null || typeof normalizedValue === "undefined" ? sanitized.text : String(normalizedValue);
+        row.values[key] = normalizedValue;
         refreshTransferCalcDisplay(row);
         if (mode === "department") {
           queueDepartmentSave();
@@ -14362,6 +14860,11 @@ function buildInitialPhotoLightboxState() {
 
     if (qhCalcApplyBtn) {
       qhCalcApplyBtn.addEventListener("click", () => {
+        const row = getDepartmentCalcTargetRow();
+        if (shouldApplyDepartmentCombinedCalcFromPendingPanels(row)) {
+          applyDepartmentCombinedCalc();
+          return;
+        }
         applyQhCalcToDepartment();
       });
     }
@@ -14369,13 +14872,29 @@ function buildInitialPhotoLightboxState() {
     const leaveCalcApplyBtn = document.getElementById("leaveCalcApplyBtn");
     if (leaveCalcApplyBtn) {
       leaveCalcApplyBtn.addEventListener("click", () => {
+        const row = getDepartmentCalcTargetRow();
+        if (shouldApplyDepartmentCombinedCalcFromPendingPanels(row)) {
+          applyDepartmentCombinedCalc();
+          return;
+        }
         applyLeaveCalcToDepartment();
       });
     }
 
     if (transferCalcApplyBtn) {
       transferCalcApplyBtn.addEventListener("click", () => {
+        const row = getDepartmentCalcTargetRow();
+        if (shouldApplyDepartmentCombinedCalcFromPendingPanels(row)) {
+          applyDepartmentCombinedCalc();
+          return;
+        }
         applyTransferCalcToDepartment();
+      });
+    }
+
+    if (departmentCombinedCalcApplyBtn) {
+      departmentCombinedCalcApplyBtn.addEventListener("click", () => {
+        applyDepartmentCombinedCalc();
       });
     }
 
@@ -14492,7 +15011,7 @@ function buildInitialPhotoLightboxState() {
       });
     }
 
-    if (mode !== "department" || !sheetBody) {
+    if (!sheetBody) {
       return;
     }
 
@@ -14512,7 +15031,7 @@ function buildInitialPhotoLightboxState() {
       if (!row) {
         return;
       }
-      if (isDepartmentMorningControlledKey(key) && !areDepartmentMorningCellsUnlocked()) {
+      if (mode === "department" && isDepartmentMorningControlledKey(key) && !areDepartmentMorningCellsUnlocked()) {
         input.value = getDisplayValue(getEffectiveValue(state.snapshot, row, key)) || "0";
         return;
       }
@@ -14524,7 +15043,11 @@ function buildInitialPhotoLightboxState() {
         syncQhBaseValuesFromCurrentRow(row);
       }
       refreshTableData();
-      queueDepartmentSave();
+      if (mode === "department") {
+        queueDepartmentSave();
+      } else if (mode === "main") {
+        refreshMainTableSaveState();
+      }
     });
 
   }
@@ -14650,6 +15173,180 @@ function buildInitialPhotoLightboxState() {
     cancelAutoAppliedTelegramSelectionIfNeeded();
     await maybeLoadStoredDepartmentPhotoAdjusted();
     await maybeAutoRecognizeLoadedTelegramPhoto();
+  }
+
+  function refreshLeaveCalcDisplay(row) {
+    if (!row) {
+      return;
+    }
+
+    LEAVE_CALC_COLUMNS.forEach((column) => {
+      document.querySelectorAll(`[data-leave-calc-base="${column.leaveKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(getNumber(state.snapshot, row, column.leaveKey)) || "0";
+      });
+      document.querySelectorAll(`[data-leave-calc-output="${column.leaveKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(calcLeaveRemainingValue(row, column.type)) || "0";
+      });
+      document.querySelectorAll(`[data-leave-calc-output="${column.presentKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(calcLeavePresentValue(row, column.type)) || "0";
+      });
+
+      [column.sentKey, column.returnedKey].forEach((key) => {
+        const constraint = getLeaveCalcConstraint(row, key);
+        const displayValue = getDisplayValue(
+          normalizeLeaveCalcInputValue(row, key, getLeaveCalcSourceValue(row, key))
+        ) || "0";
+
+        document.querySelectorAll(`[data-leave-calc-key="${key}"]`).forEach((element) => {
+          if (!(element instanceof HTMLInputElement)) {
+            return;
+          }
+
+          if (document.activeElement !== element) {
+            element.value = displayValue;
+          }
+          element.max = constraint ? String(constraint.limit) : "";
+          element.disabled = Boolean(constraint && constraint.blocked);
+          element.title = getLeaveCalcConstraintTitle(constraint);
+          const cell = element.closest(".qh-calc-cell");
+          if (cell) {
+            cell.classList.toggle("qh-calc-cell--blocked", Boolean(constraint && constraint.blocked));
+          }
+        });
+      });
+    });
+
+    const status = document.getElementById("leaveCalcStatus");
+    if (!status) {
+      return;
+    }
+
+    const invalidColumns = LEAVE_CALC_COLUMNS.filter((column) =>
+      (calcLeaveRemainingValue(row, column.type) || 0) < 0
+      || (calcLeavePresentValue(row, column.type) || 0) < 0
+    );
+    status.className = `qh-calc-status${invalidColumns.length ? " qh-calc-status--bad" : ""}`;
+    status.innerHTML = invalidColumns.length
+      ? invalidColumns.map((column) => (
+        `<div>${escapeHtml(`${column.label}: չի կարող լինել բացասական արժեք`)}</div>`
+      )).join("")
+      : "";
+  }
+
+  function getSyncDescription() {
+    if (state.source === "remote") {
+      return "Данные объединяются между компьютерами через интернет.";
+    }
+    if (state.source === "pending-sync") {
+      return "Часть изменений ещё не отправлена на сервер. Они сохранены локально и ждут синхронизации.";
+    }
+    if (state.source === "local-cache") {
+      return "Сейчас показан локальный кэш. Сервер временно недоступен.";
+    }
+    return "Сейчас включён локальный режим. Между разными компьютерами данные ещё не объединяются.";
+  }
+
+  function getPendingSyncButtonLabel(status = getPendingSyncStatus()) {
+    if (status.isSyncing) {
+      return status.count > 0 ? `Синхр. накопл. (${status.count})...` : "Синхр. накопл....";
+    }
+    return status.count > 0 ? `Синхр. накопл. (${status.count})` : "Синхр. накопл.";
+  }
+
+  function getPendingSyncSummaryText(status = getPendingSyncStatus()) {
+    if (status.hasPending) {
+      if (!sync.hasRemoteSync()) {
+        return `В очереди: ${status.count}. Сейчас оффлайн-режим, поэтому изменения ждут отправки.`;
+      }
+      return `В очереди: ${status.count}. Очередь отправится автоматически в фоне, а кнопка остаётся для ручной синхронизации.`;
+    }
+    if (status.lastSyncedAt) {
+      return `Очередь пуста. Последняя успешная синхронизация: ${formatTimestamp(status.lastSyncedAt)}.`;
+    }
+    return sync.hasRemoteSync()
+      ? "Очередь синхронизации пуста. Фоновая автосинхронизация включена."
+      : "Сейчас оффлайн-режим. Новые изменения будут накапливаться локально.";
+  }
+
+  function getPendingSyncErrorText(status = getPendingSyncStatus()) {
+    if (status.lastError) {
+      return `Последняя ошибка синхронизации: ${status.lastError}`;
+    }
+    if (status.hasPending && !sync.hasRemoteSync()) {
+      return "Чтобы отправить накопленные изменения, переключитесь в онлайн-режим.";
+    }
+    return "";
+  }
+
+  function renderPendingSyncControls() {
+    const status = getPendingSyncStatus();
+    const errorText = getPendingSyncErrorText(status);
+    return `
+      <div class="pending-sync-panel">
+        <div class="pending-sync-panel__copy">
+          <strong>Оффлайн-очередь</strong>
+          <p id="pendingSyncSummaryText">${escapeHtml(getPendingSyncSummaryText(status))}</p>
+          <p class="hint${errorText ? " warning-note" : ""}" id="pendingSyncErrorText">${escapeHtml(errorText)}</p>
+        </div>
+        <button
+          type="button"
+          id="pendingSyncBtn"
+          class="pending-sync-panel__button${status.hasPending && sync.hasRemoteSync() && !status.isSyncing ? " save-ready" : ""}"
+          ${(status.hasPending && !status.isSyncing && sync.hasRemoteSync()) ? "" : "disabled"}
+        >${escapeHtml(getPendingSyncButtonLabel(status))}</button>
+      </div>
+    `;
+  }
+
+  function refreshTransferCalcDisplay(row, snapshot = state.snapshot) {
+    if (!row) {
+      return;
+    }
+
+    TRANSFER_CALC_COLUMNS.forEach((column) => {
+      document.querySelectorAll(`[data-transfer-calc-base="${column.currentKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(getNumber(snapshot, row, column.currentKey)) || "0";
+      });
+      document.querySelectorAll(`[data-transfer-calc-output="${column.outputKey}"]`).forEach((element) => {
+        element.textContent = getDisplayValue(calcTransferRemainingValue(row, column.type, snapshot)) || "0";
+      });
+
+      [column.incomingKey, column.outgoingKey].forEach((key) => {
+        const constraint = getTransferCalcConstraint(row, key, snapshot);
+        const displayValue = getTransferCalcDisplayValue(row, key, snapshot) || "0";
+        document.querySelectorAll(`[data-transfer-calc-key="${key}"]`).forEach((element) => {
+          if (!(element instanceof HTMLInputElement)) {
+            return;
+          }
+
+          if (document.activeElement !== element) {
+            element.value = displayValue;
+          }
+          element.max = constraint ? String(constraint.limit) : "";
+          element.disabled = Boolean(constraint && constraint.blocked);
+          element.title = constraint ? getTransferCalcConstraintTitle(constraint) : "";
+          const cell = element.closest(".qh-calc-cell");
+          if (cell) {
+            cell.classList.toggle("qh-calc-cell--blocked", Boolean(constraint && constraint.blocked));
+          }
+        });
+      });
+    });
+
+    const statusEl = document.getElementById("transferCalcStatus");
+    if (!statusEl) {
+      return;
+    }
+
+    const invalidColumns = getTransferCalcInvalidColumns(row, snapshot);
+    if (invalidColumns.length) {
+      statusEl.textContent = `Расчёт переводов не может быть применён: по категориям ${invalidColumns.map((column) => column.label).join(", ")} получается отрицательный остаток.`;
+      statusEl.className = "qh-calc-status qh-calc-status--invalid";
+      return;
+    }
+
+    statusEl.textContent = "";
+    statusEl.className = "qh-calc-status";
   }
 
   window.SHARSH_APP_API = {

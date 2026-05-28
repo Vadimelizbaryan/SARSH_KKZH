@@ -5,30 +5,35 @@
   const root = document.getElementById("tg-form-root");
 
   const fields = [
-    { cell: 1, key: "beenTotal", label: "ընդ." },
-    { cell: 2, key: "beenSoldier", label: "զ/ծ" },
-    { cell: 3, key: "beenSeries", label: "շարք" },
-    { cell: 4, key: "admittedTotal", label: "ընդ." },
-    { cell: 5, key: "admittedSoldier", label: "զ/ծ" },
-    { cell: 6, key: "admittedSeries", label: "շարք" },
-    { cell: 7, key: "dgTotal", label: "ընդ." },
-    { cell: 8, key: "dgSoldier", label: "զ/ծ" },
-    { cell: 9, key: "dgSeries", label: "շարք" },
-    { cell: 10, key: "transferFromDepartment", label: "գնաց" },
-    { cell: 11, key: "transferToDepartment", label: "եկավ" },
-    { cell: 12, key: "presentTotal", label: "հաշվ." },
-    { cell: 13, key: "currentShar", label: "շարք" },
-    { cell: 14, key: "currentSpa", label: "սպա" },
-    { cell: 15, key: "currentPaym", label: "պայմ." },
-    { cell: 16, key: "currentZh", label: "զ/հ" },
-    { cell: 17, key: "family", label: "զ/ծ ընտ" },
-    { cell: 18, key: "officer", label: "զ/պ" },
-    { cell: 19, key: "civil", label: "քաղ." },
-    { cell: 20, key: "leaveSharq", label: "շարք" },
-    { cell: 21, key: "leaveSpa", label: "սպա" },
-    { cell: 22, key: "leavePaym", label: "պայմ." }
+    { cell: 1, key: "beenTotal", group: "Եղել է", label: "ընդ." },
+    { cell: 2, key: "beenSoldier", group: "Եղել է", label: "զ/ծ" },
+    { cell: 3, key: "beenSeries", group: "Եղել է", label: "շարք" },
+    { cell: 4, key: "admittedTotal", group: "Ընդունվել է", label: "ընդ." },
+    { cell: 5, key: "admittedSoldier", group: "Ընդունվել է", label: "զ/ծ" },
+    { cell: 6, key: "admittedSeries", group: "Ընդունվել է", label: "շարք" },
+    { cell: 7, key: "dgTotal", group: "Դ/Գ", label: "ընդ." },
+    { cell: 8, key: "dgSoldier", group: "Դ/Գ", label: "զ/ծ" },
+    { cell: 9, key: "dgSeries", group: "Դ/Գ", label: "շարք" },
+    { cell: 10, key: "transferFromDepartment", group: "Տեղափոխ", label: "գնաց" },
+    { cell: 11, key: "transferToDepartment", group: "Տեղափոխ", label: "եկավ" },
+    { cell: 12, key: "presentTotal", group: "Հսկիչ", label: "հաշվ." },
+    { cell: 13, key: "currentShar", group: "Առկա է", label: "շարք" },
+    { cell: 14, key: "currentSpa", group: "Առկա է", label: "սպա" },
+    { cell: 15, key: "currentPaym", group: "Առկա է", label: "պայմ." },
+    { cell: 16, key: "currentZh", group: "Առկա է", label: "զ/հ" },
+    { cell: 17, key: "family", group: "Առկա է", label: "զ/ծ ընտ" },
+    { cell: 18, key: "officer", group: "Առկա է", label: "զ/պ" },
+    { cell: 19, key: "civil", group: "Առկա է", label: "քաղ." },
+    { cell: 20, key: "leaveSharq", group: "Արձակուրդ", label: "շարք" },
+    { cell: 21, key: "leaveSpa", group: "Արձակուրդ", label: "սպա" },
+    { cell: 22, key: "leavePaym", group: "Արձակուրդ", label: "պայմ." }
   ];
 
+  const editableKeys = fields
+    .filter((field) => field.key !== "presentTotal")
+    .map((field) => field.key);
+  const readOnlyKeys = new Set(fields.map((field) => field.key));
+  const permanentlyReadOnlyKeys = new Set(["beenTotal", "beenSoldier", "beenSeries", "presentTotal"]);
   const carryoverQueryParamByKey = {
     beenTotal: "c1",
     beenSoldier: "c2",
@@ -66,13 +71,12 @@
     "leaveSpa",
     "leavePaym"
   ];
-  const permanentlyReadOnlyKeys = new Set(["beenTotal", "beenSoldier", "beenSeries", "presentTotal"]);
 
   const fieldByKey = Object.fromEntries(fields.map((field) => [field.key, field]));
   const sectionDefinitions = [
     {
       title: "Եղել է",
-      note: "Բերվում է գլխավոր աղյուսակից և մնում է միայն դիտման համար։",
+      note: "Բերվում է գլխավոր աղյուսակից և մնում է միայն կարդալու համար։",
       columns: 3,
       keys: ["beenTotal", "beenSoldier", "beenSeries"]
     },
@@ -113,30 +117,70 @@
     { key: "wentOnLeave", title: "Գնացել են արձակուրդ", rows: 5 }
   ];
 
-  const displaySectionDefinitions = sectionDefinitions.flatMap((section) => {
-    const keys = Array.isArray(section.keys) ? section.keys : [];
-    if (
-      keys.includes("transferFromDepartment")
-      && keys.includes("transferToDepartment")
-      && keys.includes("presentTotal")
-    ) {
-      return [
-        {
-          title: "Տեղափոխված հիվանդ․",
-          columns: 2,
-          keys: ["transferFromDepartment", "transferToDepartment"]
-        },
-        {
-          title: "Ընդհանւր",
-          note: "12-րդ բջիջը միայն ընթերցման համար է։",
-          columns: 1,
-          keys: ["presentTotal"]
-        }
-      ];
-    }
-    return [section];
-  });
+  const calculatorColumns = [
+    { type: "soldier", label: "ՇԱՐ", currentKey: "currentShar", incomingKey: "calcIncomingSoldier", dischargedKey: "calcDischargedSoldier", outputKey: "calcRemainingSoldier" },
+    { type: "officer", label: "ՍՊԱ", currentKey: "currentSpa", incomingKey: "calcIncomingOfficer", dischargedKey: "calcDischargedOfficer", outputKey: "calcRemainingOfficer" },
+    { type: "contract", label: "ՊԱՅՄ", currentKey: "currentPaym", incomingKey: "calcIncomingContract", dischargedKey: "calcDischargedContract", outputKey: "calcRemainingContract" },
+    { type: "zh", label: "Զ/Հ", currentKey: "currentZh", incomingKey: "calcIncomingZh", dischargedKey: "calcDischargedZh", outputKey: "calcRemainingZh" },
+    { type: "family", label: "Զ/Ծ ընտ", currentKey: "family", incomingKey: "calcIncomingFamily", dischargedKey: "calcDischargedFamily", outputKey: "calcRemainingFamily" },
+    { type: "reserve", label: "Զ/Պ", currentKey: "officer", incomingKey: "calcIncomingReserve", dischargedKey: "calcDischargedReserve", outputKey: "calcRemainingReserve" },
+    { type: "civil", label: "Ք-ի", currentKey: "civil", incomingKey: "calcIncomingCivil", dischargedKey: "calcDischargedCivil", outputKey: "calcRemainingCivil" }
+  ];
 
+  const calculatorRows = [
+    { label: "Ընդունվել է", cells: calculatorColumns.map((column) => ({ key: column.incomingKey, role: "input" })) },
+    { label: "Դուրս է գրվել", cells: calculatorColumns.map((column) => ({ key: column.dischargedKey, role: "input" })) },
+    { label: "Եղել է", cells: calculatorColumns.map((column) => ({ key: column.currentKey, role: "linked" })) },
+    { label: "Հաշվարկ", cells: calculatorColumns.map((column) => ({ key: column.outputKey, role: "output" })) }
+  ];
+
+  const leaveCalculatorColumns = [
+    { type: "sharq", label: "ՇԱՐ", presentKey: "currentShar", leaveKey: "leaveSharq", sentKey: "leaveCalcSentSharq", returnedKey: "leaveCalcReturnedSharq" },
+    { type: "spa", label: "ՍՊԱ", presentKey: "currentSpa", leaveKey: "leaveSpa", sentKey: "leaveCalcSentSpa", returnedKey: "leaveCalcReturnedSpa" },
+    { type: "paym", label: "ՊԱՅՄ", presentKey: "currentPaym", leaveKey: "leavePaym", sentKey: "leaveCalcSentPaym", returnedKey: "leaveCalcReturnedPaym" }
+  ];
+
+  const leaveCalculatorRows = [
+    { label: "Ուղարկվել է բուժ. արձակուրդ", cells: leaveCalculatorColumns.map((column) => ({ key: column.sentKey, role: "input" })) },
+    { label: "Վերադարձել է արձակուրդից", cells: leaveCalculatorColumns.map((column) => ({ key: column.returnedKey, role: "input" })) },
+    { label: "Եղել է արձակուրդում", cells: leaveCalculatorColumns.map((column) => ({ key: column.leaveKey, role: "linked" })) },
+    { label: "Հաշվարկ", cells: leaveCalculatorColumns.map((column) => ({ key: column.leaveKey, role: "output" })) }
+  ];
+
+  const transferCalculatorColumns = [
+    { type: "soldier", label: "ՇԱՐ", currentKey: "currentShar", incomingKey: "transferCalcIncomingSoldier", outgoingKey: "transferCalcOutgoingSoldier", outputKey: "transferCalcRemainingSoldier" },
+    { type: "officer", label: "ՍՊԱ", currentKey: "currentSpa", incomingKey: "transferCalcIncomingOfficer", outgoingKey: "transferCalcOutgoingOfficer", outputKey: "transferCalcRemainingOfficer" },
+    { type: "contract", label: "ՊԱՅՄ", currentKey: "currentPaym", incomingKey: "transferCalcIncomingContract", outgoingKey: "transferCalcOutgoingContract", outputKey: "transferCalcRemainingContract" },
+    { type: "zh", label: "Զ/Հ", currentKey: "currentZh", incomingKey: "transferCalcIncomingZh", outgoingKey: "transferCalcOutgoingZh", outputKey: "transferCalcRemainingZh" },
+    { type: "family", label: "Զ/Ծ ընտ", currentKey: "family", incomingKey: "transferCalcIncomingFamily", outgoingKey: "transferCalcOutgoingFamily", outputKey: "transferCalcRemainingFamily" },
+    { type: "reserve", label: "Զ/Պ", currentKey: "officer", incomingKey: "transferCalcIncomingReserve", outgoingKey: "transferCalcOutgoingReserve", outputKey: "transferCalcRemainingReserve" },
+    { type: "civil", label: "Ք-ի", currentKey: "civil", incomingKey: "transferCalcIncomingCivil", outgoingKey: "transferCalcOutgoingCivil", outputKey: "transferCalcRemainingCivil" }
+  ];
+
+  const transferCalculatorRows = [
+    { label: "Ներս է եկել", cells: transferCalculatorColumns.map((column) => ({ key: column.incomingKey, role: "input" })) },
+    { label: "Դուրս է գնացել", cells: transferCalculatorColumns.map((column) => ({ key: column.outgoingKey, role: "input" })) },
+    { label: "Եղել է", cells: transferCalculatorColumns.map((column) => ({ key: column.currentKey, role: "linked" })) },
+    { label: "Հաշվարկ", cells: transferCalculatorColumns.map((column) => ({ key: column.outputKey, role: "output" })) }
+  ];
+
+  const calculatorState = calculatorColumns.reduce((accumulator, column) => {
+    accumulator[column.incomingKey] = 0;
+    accumulator[column.dischargedKey] = 0;
+    return accumulator;
+  }, {});
+
+  const leaveCalculatorState = leaveCalculatorColumns.reduce((accumulator, column) => {
+    accumulator[column.sentKey] = 0;
+    accumulator[column.returnedKey] = 0;
+    return accumulator;
+  }, {});
+
+  const transferCalculatorState = transferCalculatorColumns.reduce((accumulator, column) => {
+    accumulator[column.incomingKey] = 0;
+    accumulator[column.outgoingKey] = 0;
+    return accumulator;
+  }, {});
   let fullEditUnlocked = false;
 
   function escapeHtml(value) {
@@ -152,18 +196,13 @@
     return new URLSearchParams(window.location.search);
   }
 
-  function toNumber(value) {
-    const parsed = Number.parseInt(String(value ?? "").replace(/[^\d-]/g, ""), 10);
-    return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 999) : 0;
-  }
-
   function getDepartment() {
     const departmentId = getQuery().get("department") || "";
     return config.getDepartmentById ? config.getDepartmentById(departmentId) : null;
   }
 
   function getReportDate() {
-    return getQuery().get("date") || (config.DEFAULT_DATE || "05.05.2026");
+    return getQuery().get("date") || (config.DEFAULT_DATE || "05,05,26");
   }
 
   function getAndroidDeviceId() {
@@ -211,25 +250,28 @@
     return photo.message || "Отделение не опознано, сделайте повторное фото.";
   }
 
-  function getInitData() {
-    return telegram && typeof telegram.initData === "string" ? telegram.initData : "";
-  }
-
   function hasSubmitAccess() {
     return Boolean(getInitData() || getAndroidDeviceId());
   }
 
-  function getApkDownloadUrl() {
-    return new URL("android/releases/MAINFORM.apk", window.location.href).href;
-  }
-
-  function getEndpoint() {
-    const baseUrl = String(runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co").replace(/\/+$/, "");
-    return `${baseUrl}/functions/v1/Mainflow-telegram?action=web-form-submit`;
+  function getCarryoverValue(key) {
+    const query = getQuery();
+    return toNumber(query.get(carryoverQueryParamByKey[key] || ""));
   }
 
   function getInitialValue(key) {
-    return toNumber(getQuery().get(carryoverQueryParamByKey[key] || ""));
+    return Object.prototype.hasOwnProperty.call(carryoverQueryParamByKey, key)
+      ? getCarryoverValue(key)
+      : 0;
+  }
+
+  function toNumber(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 0;
+  }
+
+  function getApkDownloadUrl() {
+    return new URL("android/releases/MAINFORM.apk", window.location.href).href;
   }
 
   function getPatientNotesStorageKey(department, reportDate) {
@@ -299,9 +341,6 @@
 
   function readPatientNotes() {
     const notes = createEmptyPatientNotes();
-    if (!root) {
-      return notes;
-    }
     root.querySelectorAll("[data-patient-note-input]").forEach((input) => {
       const sectionKey = input.getAttribute("data-note-section");
       const index = Number(input.getAttribute("data-note-index"));
@@ -313,9 +352,6 @@
   }
 
   function updatePatientNotesUi(notes, message) {
-    if (!root) {
-      return;
-    }
     const badge = root.querySelector("[data-patient-notes-badge]");
     const status = root.querySelector("[data-patient-notes-status]");
     const count = countPatientNotes(notes);
@@ -323,7 +359,470 @@
       badge.textContent = count ? `Լրացված է ${count}` : "Տեղային գրառում չկա";
     }
     if (status) {
-      status.textContent = message || "Պահվում է այս սարքում և ուղարկելիս կտեղադրվի PDF բլանկում։";
+      status.textContent = message || "Պահվում է այս սարքում եւ ուղարկվելիս կտեղադրվի PDF բլանկում։";
+    }
+  }
+
+  function renderPatientNotesBlock(department, reportDate) {
+    const notes = loadPatientNotes(department, reportDate);
+    const filledCount = countPatientNotes(notes);
+    const sections = patientNoteSections.map((section) => {
+      const rows = getPatientNoteRows(notes, section.key);
+      const inputs = Array.from({ length: section.rows }, (_, index) => `
+        <label class="tg-patient-note-row">
+          <span>${index + 1}.</span>
+          <input
+            class="tg-patient-note-input"
+            data-patient-note-input
+            data-note-section="${escapeHtml(section.key)}"
+            data-note-index="${index}"
+            type="text"
+            autocomplete="off"
+            placeholder="Ա.Ա.Հ."
+            value="${escapeHtml(rows[index] || "")}"
+          >
+        </label>
+      `).join("");
+
+      return `
+        <section class="tg-patient-note-section">
+          <h3>${escapeHtml(section.title)}</h3>
+          <div class="tg-patient-note-lines">${inputs}</div>
+        </section>
+      `;
+    }).join("");
+
+    return `
+      <section class="tg-patient-notes" data-patient-notes>
+        <header class="tg-patient-notes-head">
+          <div>
+            <p class="tg-form-kicker">ՏԵՂԱՅԻՆ ԳՐԱՌՈՒՄՆԵՐ</p>
+            <h2>Հիվանդների գրառումներ</h2>
+          </div>
+          <span class="tg-patient-notes-badge" data-patient-notes-badge>
+            ${filledCount ? `Լրացված է ${filledCount}` : "Տեղային գրառում չկա"}
+          </span>
+        </header>
+        <p class="tg-patient-notes-help">
+          Այս մասը պահվում է այս սարքում եւ ուղարկվելիս կտեղադրվի PDF բլանկում։
+        </p>
+        <div class="tg-patient-notes-grid">${sections}</div>
+        <div class="tg-patient-notes-actions">
+          <button type="button" class="tg-patient-notes-save" data-save-patient-notes>Պահպանել տեղում</button>
+          <button type="button" class="tg-patient-notes-clear" data-clear-patient-notes>Մաքրել գրառումները</button>
+          <span data-patient-notes-status>Պահվում է այս սարքում եւ ուղարկվելիս կտեղադրվի PDF բլանկում։</span>
+        </div>
+      </section>
+    `;
+  }
+
+  function readValues() {
+    const values = {};
+    fields.forEach((field) => {
+      const key = field.key;
+      const input = root.querySelector(`[data-field="${key}"]`);
+      values[key] = toNumber(input ? input.value : 0);
+    });
+    return values;
+  }
+
+  function getCalculatorResult(values) {
+    const nextValues = { ...values };
+    const originalPresentTotal = getActual(values);
+
+    const incomingByType = Object.fromEntries(
+      calculatorColumns.map((column) => [column.type, toNumber(calculatorState[column.incomingKey])])
+    );
+    const dischargedByType = Object.fromEntries(
+      calculatorColumns.map((column) => [column.type, toNumber(calculatorState[column.dischargedKey])])
+    );
+    const remainingByType = Object.fromEntries(
+      calculatorColumns.map((column) => [
+        column.type,
+        toNumber(values[column.currentKey]) + incomingByType[column.type] - dischargedByType[column.type]
+      ])
+    );
+
+    nextValues.beenTotal = originalPresentTotal;
+    nextValues.admittedTotal = calculatorColumns.reduce((sum, column) => sum + incomingByType[column.type], 0);
+    nextValues.admittedSoldier = incomingByType.soldier + incomingByType.officer + incomingByType.contract;
+    nextValues.admittedSeries = incomingByType.soldier;
+    nextValues.dgTotal = calculatorColumns.reduce((sum, column) => sum + dischargedByType[column.type], 0);
+    nextValues.dgSoldier = dischargedByType.soldier + dischargedByType.officer + dischargedByType.contract;
+    nextValues.dgSeries = dischargedByType.soldier;
+    nextValues.currentShar = remainingByType.soldier;
+    nextValues.currentSpa = remainingByType.officer;
+    nextValues.currentPaym = remainingByType.contract;
+    nextValues.currentZh = remainingByType.zh;
+    nextValues.family = remainingByType.family;
+    nextValues.officer = remainingByType.reserve;
+    nextValues.civil = remainingByType.civil;
+
+    const leaveRemainingByType = Object.fromEntries(
+      leaveCalculatorColumns.map((column) => [
+        column.type,
+        toNumber(values[column.leaveKey]) + toNumber(leaveCalculatorState[column.sentKey]) - toNumber(leaveCalculatorState[column.returnedKey])
+      ])
+    );
+    const leavePresentByType = Object.fromEntries(
+      leaveCalculatorColumns.map((column) => [
+        column.type,
+        toNumber(nextValues[column.presentKey]) - toNumber(leaveCalculatorState[column.sentKey]) + toNumber(leaveCalculatorState[column.returnedKey])
+      ])
+    );
+
+    nextValues.currentShar = leavePresentByType.sharq;
+    nextValues.currentSpa = leavePresentByType.spa;
+    nextValues.currentPaym = leavePresentByType.paym;
+    nextValues.leaveSharq = leaveRemainingByType.sharq;
+    nextValues.leaveSpa = leaveRemainingByType.spa;
+    nextValues.leavePaym = leaveRemainingByType.paym;
+
+    const transferIncomingByType = Object.fromEntries(
+      transferCalculatorColumns.map((column) => [column.type, toNumber(transferCalculatorState[column.incomingKey])])
+    );
+    const transferOutgoingByType = Object.fromEntries(
+      transferCalculatorColumns.map((column) => [column.type, toNumber(transferCalculatorState[column.outgoingKey])])
+    );
+    const transferRemainingByType = Object.fromEntries(
+      transferCalculatorColumns.map((column) => [
+        column.type,
+        toNumber(nextValues[column.currentKey]) + transferIncomingByType[column.type] - transferOutgoingByType[column.type]
+      ])
+    );
+
+    nextValues.currentShar = transferRemainingByType.soldier;
+    nextValues.currentSpa = transferRemainingByType.officer;
+    nextValues.currentPaym = transferRemainingByType.contract;
+    nextValues.currentZh = transferRemainingByType.zh;
+    nextValues.family = transferRemainingByType.family;
+    nextValues.officer = transferRemainingByType.reserve;
+    nextValues.civil = transferRemainingByType.civil;
+    nextValues.transferToDepartment = transferCalculatorColumns.reduce((sum, column) => sum + transferIncomingByType[column.type], 0);
+    nextValues.transferFromDepartment = transferCalculatorColumns.reduce((sum, column) => sum + transferOutgoingByType[column.type], 0);
+    nextValues.presentTotal = getExpected(nextValues);
+
+    const invalidCurrentColumns = calculatorColumns.filter((column) => remainingByType[column.type] < 0);
+    const invalidLeaveColumns = leaveCalculatorColumns.filter((column) =>
+      leaveRemainingByType[column.type] < 0 || leavePresentByType[column.type] < 0
+    );
+    const invalidTransferColumns = transferCalculatorColumns.filter((column) => transferRemainingByType[column.type] < 0);
+
+    return {
+      nextValues,
+      remainingByType,
+      leaveRemainingByType,
+      transferRemainingByType,
+      invalidCurrentColumns,
+      invalidLeaveColumns,
+      invalidTransferColumns,
+      isValid: invalidCurrentColumns.length === 0 && invalidLeaveColumns.length === 0 && invalidTransferColumns.length === 0
+    };
+  }
+
+  function renderCalculatorRow(row) {
+    return `
+      <tr>
+        <th scope="row" class="tg-qh-row-title">${escapeHtml(row.label)}</th>
+        ${row.cells.map((cell) => {
+          if (cell.role === "input") {
+            return `
+              <td class="tg-qh-cell">
+                <input
+                  class="tg-form-input tg-qh-input"
+                  data-calc-key="${escapeHtml(cell.key)}"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  type="text"
+                  autocomplete="off"
+                  maxlength="4"
+                  value="${escapeHtml(calculatorState[cell.key] || 0)}"
+                >
+              </td>
+            `;
+          }
+          if (cell.role === "linked") {
+            return `
+              <td class="tg-qh-cell tg-qh-cell--output">
+                <span class="tg-form-control-value tg-qh-output" data-calc-base="${escapeHtml(cell.key)}">0</span>
+              </td>
+            `;
+          }
+          return `
+            <td class="tg-qh-cell tg-qh-cell--output">
+              <span class="tg-form-control-value tg-qh-output" data-calc-output="${escapeHtml(cell.key)}">0</span>
+            </td>
+          `;
+        }).join("")}
+      </tr>
+    `;
+  }
+
+  function renderLeaveCalculatorRow(row) {
+    return `
+      <tr>
+        <th scope="row" class="tg-qh-row-title">${escapeHtml(row.label)}</th>
+        ${row.cells.map((cell) => {
+          if (cell.role === "input") {
+            return `
+              <td class="tg-qh-cell">
+                <input
+                  class="tg-form-input tg-qh-input"
+                  data-leave-calc-key="${escapeHtml(cell.key)}"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  type="text"
+                  autocomplete="off"
+                  maxlength="4"
+                  value="${escapeHtml(leaveCalculatorState[cell.key] || 0)}"
+                >
+              </td>
+            `;
+          }
+          if (cell.role === "linked") {
+            return `
+              <td class="tg-qh-cell tg-qh-cell--output">
+                <span class="tg-form-control-value tg-qh-output" data-leave-base="${escapeHtml(cell.key)}">0</span>
+              </td>
+            `;
+          }
+          return `
+            <td class="tg-qh-cell tg-qh-cell--output">
+              <span class="tg-form-control-value tg-qh-output" data-leave-output="${escapeHtml(cell.key)}">0</span>
+            </td>
+          `;
+        }).join("")}
+      </tr>
+    `;
+  }
+
+  function renderTransferCalculatorRow(row) {
+    return `
+      <tr>
+        <th scope="row" class="tg-qh-row-title">${escapeHtml(row.label)}</th>
+        ${row.cells.map((cell) => {
+          if (cell.role === "input") {
+            return `
+              <td class="tg-qh-cell">
+                <input
+                  class="tg-form-input tg-qh-input"
+                  data-transfer-calc-key="${escapeHtml(cell.key)}"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  type="text"
+                  autocomplete="off"
+                  maxlength="4"
+                  value="${escapeHtml(transferCalculatorState[cell.key] || 0)}"
+                >
+              </td>
+            `;
+          }
+          if (cell.role === "linked") {
+            return `
+              <td class="tg-qh-cell tg-qh-cell--output">
+                <span class="tg-form-control-value tg-qh-output" data-transfer-base="${escapeHtml(cell.key)}">0</span>
+              </td>
+            `;
+          }
+          return `
+            <td class="tg-qh-cell tg-qh-cell--output">
+              <span class="tg-form-control-value tg-qh-output" data-transfer-output="${escapeHtml(cell.key)}">0</span>
+            </td>
+          `;
+        }).join("")}
+      </tr>
+    `;
+  }
+
+  function renderCombinedCalculator() {
+    return `
+      <section class="tg-sheet-section tg-sheet-section--wide">
+        <div class="tg-sheet-section-head">
+          <div>
+            <p class="tg-form-kicker">Հաշվարկային գործիքներ</p>
+            <p class="tg-sheet-section-note">Մուտքագրեք ընդունված, դուրս գրված, տեղափոխված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը։ Սեղմեք «Հաշվել և տեղադրել», և տվյալները կտեղադրվեն ստորև եղած բջիջներում։</p>
+          </div>
+        </div>
+        <div class="tg-calc-grid">
+          <section class="tg-calc-card">
+            <div class="tg-sheet-section-head">
+              <div>
+                <p class="tg-form-kicker">Ընդունում/Դուրսգրում</p>
+              </div>
+            </div>
+            <div class="tg-form-table-wrap tg-qh-table-wrap">
+              <table class="tg-form-table tg-qh-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    ${calculatorColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${calculatorRows.map(renderCalculatorRow).join("")}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section class="tg-calc-card">
+            <div class="tg-sheet-section-head">
+              <div>
+                <p class="tg-form-kicker">Բուժական արձակուրդ</p>
+              </div>
+            </div>
+            <div class="tg-form-table-wrap tg-qh-table-wrap">
+              <table class="tg-form-table tg-qh-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    ${leaveCalculatorColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${leaveCalculatorRows.map(renderLeaveCalculatorRow).join("")}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section class="tg-calc-card">
+            <div class="tg-sheet-section-head">
+              <div>
+                <p class="tg-form-kicker">Տեղափոխություն</p>
+              </div>
+            </div>
+            <div class="tg-form-table-wrap tg-qh-table-wrap">
+              <table class="tg-form-table tg-qh-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    ${transferCalculatorColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${transferCalculatorRows.map(renderTransferCalculatorRow).join("")}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+        <div class="tg-form-status" data-calc-status></div>
+        <button class="tg-form-submit tg-calc-apply" data-apply-calculators type="button">Հաշվել և տեղադրել</button>
+      </section>
+    `;
+  }
+
+  function refreshCalculatorUi() {
+    const values = readValues();
+    const calculatorResult = getCalculatorResult(values);
+
+    calculatorColumns.forEach((column) => {
+      const baseTarget = root.querySelector(`[data-calc-base="${column.currentKey}"]`);
+      const target = root.querySelector(`[data-calc-output="${column.outputKey}"]`);
+      if (baseTarget) {
+        baseTarget.textContent = String(toNumber(values[column.currentKey]));
+      }
+      if (target) {
+        target.textContent = String(calculatorResult.remainingByType[column.type] || 0);
+      }
+    });
+
+    leaveCalculatorColumns.forEach((column) => {
+      const baseTarget = root.querySelector(`[data-leave-base="${column.leaveKey}"]`);
+      const outputTarget = root.querySelector(`[data-leave-output="${column.leaveKey}"]`);
+      if (baseTarget) {
+        baseTarget.textContent = String(toNumber(values[column.leaveKey]));
+      }
+      if (outputTarget) {
+        outputTarget.textContent = String(calculatorResult.leaveRemainingByType[column.type] || 0);
+      }
+    });
+
+    transferCalculatorColumns.forEach((column) => {
+      const baseTarget = root.querySelector(`[data-transfer-base="${column.currentKey}"]`);
+      const outputTarget = root.querySelector(`[data-transfer-output="${column.outputKey}"]`);
+      if (baseTarget) {
+        baseTarget.textContent = String(toNumber(values[column.currentKey]));
+      }
+      if (outputTarget) {
+        outputTarget.textContent = String(calculatorResult.transferRemainingByType[column.type] || 0);
+      }
+    });
+
+    const status = root.querySelector("[data-calc-status]");
+    const applyButton = root.querySelector("[data-apply-calculators]");
+    if (status) {
+      const invalidLabels = [
+        ...calculatorResult.invalidCurrentColumns.map((column) => column.label),
+        ...calculatorResult.invalidLeaveColumns.map((column) => column.label),
+        ...calculatorResult.invalidTransferColumns.map((column) => column.label)
+      ];
+      status.className = `tg-form-status${calculatorResult.isValid ? "" : " bad"}`;
+      status.innerHTML = calculatorResult.isValid
+        ? `
+          <div class="tg-form-status-head">
+            <strong>Հաշվարկը պատրաստ է</strong>
+            <span>Սեղմեք «Հաշվել և տեղադրել», և տվյալները կտեղադրվեն բաժանմունքի ձևի բջիջներում։</span>
+          </div>
+        `
+        : `
+          <div class="tg-form-status-head">
+            <strong>Ստուգեք հաշվարկը</strong>
+            <span>${escapeHtml(`Բացասական արժեք է ստացվում հետևյալ սյունակներում՝ ${invalidLabels.join(", ")}։`)}</span>
+          </div>
+        `;
+    }
+    if (applyButton) {
+      applyButton.disabled = !calculatorResult.isValid;
+    }
+  }
+
+  function writeValuesToForm(values) {
+    fields.forEach((field) => {
+      const key = field.key;
+      const input = root.querySelector(`[data-field="${key}"]`);
+      if (input) {
+        input.value = String(toNumber(values[key]));
+      }
+    });
+  }
+
+  function applyCombinedCalculator() {
+    const values = readValues();
+    const calculatorResult = getCalculatorResult(values);
+    if (!calculatorResult.isValid) {
+      refreshCalculatorUi();
+      return;
+    }
+
+    writeValuesToForm(calculatorResult.nextValues);
+    Object.keys(calculatorState).forEach((key) => {
+      calculatorState[key] = 0;
+      const input = root.querySelector(`[data-calc-key="${key}"]`);
+      if (input) {
+        input.value = "0";
+      }
+    });
+    Object.keys(leaveCalculatorState).forEach((key) => {
+      leaveCalculatorState[key] = 0;
+      const input = root.querySelector(`[data-leave-calc-key="${key}"]`);
+      if (input) {
+        input.value = "0";
+      }
+    });
+    Object.keys(transferCalculatorState).forEach((key) => {
+      transferCalculatorState[key] = 0;
+      const input = root.querySelector(`[data-transfer-calc-key="${key}"]`);
+      if (input) {
+        input.value = "0";
+      }
+    });
+    refreshCalculatorUi();
+    updateControl();
+
+    const message = root.querySelector("[data-message]");
+    if (message && hasSubmitAccess()) {
+      message.className = "tg-form-message";
+      message.textContent = "Հաշվարկային տվյալները տեղադրվել են ձևի բջիջներում։ Ստուգեք և ուղարկեք։";
     }
   }
 
@@ -370,37 +869,26 @@
           </div>
         </summary>
         <p class="tg-patient-notes-help">
-          Այս մասը պահվում է այս սարքում և ուղարկելիս կտեղադրվի PDF բլանկում։
+          Այս մասը պահվում է այս սարքում և ուղարկվելիս կտեղադրվի PDF բլանկում։
         </p>
         <div class="tg-patient-notes-grid">${sections}</div>
         <div class="tg-patient-notes-actions">
           <button type="button" class="tg-patient-notes-save" data-save-patient-notes>Պահպանել տեղում</button>
           <button type="button" class="tg-patient-notes-clear" data-clear-patient-notes>Մաքրել գրառումները</button>
-          <span data-patient-notes-status>Պահվում է այս սարքում և ուղարկելիս կտեղադրվի PDF բլանկում։</span>
+          <span data-patient-notes-status>Պահվում է այս սարքում և ուղարկվելիս կտեղադրվի PDF բլանկում։</span>
         </div>
       </details>
     `;
   }
 
-  function readValues() {
-    const values = {};
-    fields.forEach((field) => {
-      const input = root ? root.querySelector(`[data-field="${field.key}"]`) : null;
-      values[field.key] = toNumber(input ? input.value : 0);
-    });
-    return values;
-  }
-
   function renderFieldCard(field) {
-    return `
-      <label class="tg-sheet-field is-readonly">
-        <span class="tg-sheet-field-top">
-          <span class="tg-sheet-field-index">${field.cell}</span>
-          <span class="tg-sheet-field-label">${escapeHtml(field.label)}</span>
-        </span>
+    const isControl = field.key === "presentTotal";
+    const isReadOnly = readOnlyKeys.has(field.key);
+    const controlHtml = isControl
+      ? '<span class="tg-sheet-field-value" data-control-total>0</span>'
+      : `
         <input
-          class="tg-form-input tg-sheet-field-input tg-form-input--readonly"
-          ${field.key === "presentTotal" ? 'data-control-total' : ""}
+          class="tg-form-input tg-sheet-field-input${isReadOnly ? " tg-form-input--readonly" : ""}"
           data-field="${escapeHtml(field.key)}"
           inputmode="numeric"
           pattern="[0-9]*"
@@ -408,10 +896,17 @@
           autocomplete="off"
           maxlength="3"
           value="${getInitialValue(field.key)}"
-          readonly
-          aria-readonly="true"
-          title="Ստացվել է գլխավոր աղյուսակից"
+          ${isReadOnly ? 'readonly aria-readonly="true" title="Ստացվել է գլխավոր աղյուսակից"' : ""}
         >
+      `;
+
+    return `
+      <label class="tg-sheet-field${isReadOnly ? " is-readonly" : ""}">
+        <span class="tg-sheet-field-top">
+          <span class="tg-sheet-field-index">${field.cell}</span>
+          <span class="tg-sheet-field-label">${escapeHtml(field.label)}</span>
+        </span>
+        ${controlHtml}
       </label>
     `;
   }
@@ -432,14 +927,35 @@
     `;
   }
 
-  function syncFieldLockState() {
-    if (!root) {
-      return;
-    }
+  function renderFieldCard(field) {
+    const isControl = field.key === "presentTotal";
+    const isReadOnly = readOnlyKeys.has(field.key);
+    return `
+      <label class="tg-sheet-field${isReadOnly ? " is-readonly" : ""}">
+        <span class="tg-sheet-field-top">
+          <span class="tg-sheet-field-index">${field.cell}</span>
+          <span class="tg-sheet-field-label">${escapeHtml(field.label)}</span>
+        </span>
+        <input
+          class="tg-form-input tg-sheet-field-input${isReadOnly ? " tg-form-input--readonly" : ""}"
+          ${isControl ? 'data-control-total' : ""}
+          data-field="${escapeHtml(field.key)}"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          type="text"
+          autocomplete="off"
+          maxlength="3"
+          value="${getInitialValue(field.key)}"
+          ${isReadOnly ? 'readonly aria-readonly="true" title="Ստացվել է գլխավոր աղյուսակից"' : ""}
+        >
+      </label>
+    `;
+  }
 
+  function syncFieldLockState() {
     root.querySelectorAll("[data-field]").forEach((input) => {
-      const fieldKey = input.getAttribute("data-field") || "";
-      const shouldLock = permanentlyReadOnlyKeys.has(fieldKey) ? true : !fullEditUnlocked;
+      const key = input.getAttribute("data-field");
+      const shouldLock = permanentlyReadOnlyKeys.has(key) || !fullEditUnlocked;
       input.readOnly = shouldLock;
       input.setAttribute("aria-readonly", shouldLock ? "true" : "false");
       input.classList.toggle("tg-form-input--readonly", shouldLock);
@@ -448,6 +964,9 @@
         input.setAttribute("title", "Ստացվել է գլխավոր աղյուսակից");
       } else {
         input.setAttribute("title", "Խմբագրումը միացված է");
+      }
+      if (key === "presentTotal" && shouldLock) {
+        updateControl();
       }
     });
 
@@ -458,15 +977,9 @@
     }
     if (lockText) {
       lockText.textContent = fullEditUnlocked
-        ? "Խմբագրումը միացված է. կարող եք փոխել 1-11 և 13-22 բջիջները, իսկ 12-ը միայն ընթերցման համար է։"
-        : "Խմբագրումը անջատված է. բջիջները միայն դիտման համար են։";
+        ? "Խմբագրումը միացված է․ կարող եք փոխել 4-11 և 13-22 բջիջները, իսկ 1-3 և 12-ը միայն ընթերցման համար են։"
+        : "Խմբագրումը անջատված է․ բջիջները միայն դիտման համար են։";
     }
-
-    if (lockText && fullEditUnlocked) {
-      lockText.textContent = "Խմբագրումը միացված է. կարող եք փոխել 4-11 և 13-22 բջիջները, իսկ 1-3 և 12-ը միայն ընթերցման համար են։";
-    }
-
-    updateControl();
   }
 
   function getExpected(values) {
@@ -542,14 +1055,10 @@
   }
 
   function isUsingCopiedValues(values) {
-    return fields.every((field) => toNumber(values[field.key]) === getInitialValue(field.key));
+    return editableKeys.every((key) => toNumber(values[key]) === getInitialValue(key));
   }
 
   function updateControl() {
-    if (!root) {
-      return;
-    }
-
     const values = readValues();
     const validation = getValidationResult(values);
     const primaryCheck = validation.checks[0];
@@ -558,12 +1067,11 @@
     const status = root.querySelector("[data-status]");
     const submit = root.querySelector("[data-submit]");
 
-    if (control && !fullEditUnlocked) {
-      control.value = String(copiedState || !primaryCheck
+    if (control) {
+      control.textContent = String(copiedState || !primaryCheck
         ? getInitialValue("presentTotal")
         : primaryCheck.expected);
     }
-
     if (status) {
       status.classList.toggle("bad", !validation.isValid);
       status.innerHTML = hasSubmitAccess()
@@ -588,18 +1096,65 @@
         `
         : `<div class="tg-form-status-head"><strong>${escapeHtml("Բացեք ձևը Telegram բոտի կամ Android հավելվածի միջոցով։")}</strong></div>`;
     }
-
     if (submit) {
       submit.disabled = !validation.isValid || !hasSubmitAccess() || !hasRequiredAndroidPhoto();
     }
   }
 
+  function getInitData() {
+    return telegram && typeof telegram.initData === "string" ? telegram.initData : "";
+  }
+
+  function updateControl() {
+    const values = readValues();
+    const validation = getValidationResult(values);
+    const primaryCheck = validation.checks[0];
+    const copiedState = isUsingCopiedValues(values);
+    const control = root.querySelector("[data-control-total]");
+    const status = root.querySelector("[data-status]");
+    const submit = root.querySelector("[data-submit]");
+
+    if (control && !fullEditUnlocked) {
+      control.value = String(copiedState || !primaryCheck
+        ? getInitialValue("presentTotal")
+        : primaryCheck.expected);
+    }
+    if (status) {
+      status.classList.toggle("bad", !validation.isValid);
+      status.innerHTML = hasSubmitAccess()
+        ? `
+          <div class="tg-form-status-head">
+            <strong>${validation.isValid ? "Բոլոր վերահսկիչները համընկնում են" : "Ստուգեք վերահսկիչ գումարները"}</strong>
+            <span>${escapeHtml(copiedState
+              ? "Բոլոր բջիջները բերվել են գլխավոր աղյուսակից։"
+              : "Փոփոխված տվյալները ստուգվում են ընթացիկ մուտքի հիման վրա։")}</span>
+          </div>
+          <div class="tg-validation-list">
+            ${validation.checks.map((check) => `
+              <div class="tg-validation-item${check.isValid ? "" : " is-bad"}">
+                <span class="tg-validation-bullet">${check.isValid ? "✓" : "!"}</span>
+                <span>${escapeHtml(formatValidationLine(check))}</span>
+              </div>
+            `).join("")}
+            ${!shouldCheckExtraControls(values)
+              ? `<div class="tg-validation-note">${escapeHtml("«Շարքայիններ» և «Զինծառայողներ» ստուգումները միանում են, երբ 10 և 11 բջիջներում արժեքը 0 է։")}</div>`
+              : ""}
+          </div>
+        `
+        : `<div class="tg-form-status-head"><strong>${escapeHtml("Բացեք ձևը Telegram բոտի կամ Android հավելվածի միջոցով։")}</strong></div>`;
+    }
+    if (submit) {
+      submit.disabled = !validation.isValid || !hasSubmitAccess() || !hasRequiredAndroidPhoto();
+    }
+  }
+
+  function getEndpoint() {
+    const baseUrl = String(runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co").replace(/\/+$/, "");
+    return `${baseUrl}/functions/v1/Mainflow-telegram?action=web-form-submit`;
+  }
+
   async function submitForm(event) {
     event.preventDefault();
-    if (!root) {
-      return;
-    }
-
     const submit = root.querySelector("[data-submit]");
     const message = root.querySelector("[data-message]");
     const department = getDepartment();
@@ -628,7 +1183,7 @@
     }
     if (message) {
       message.className = "tg-form-message";
-      message.textContent = "Сохраняю данные формы...";
+      message.textContent = "Ստուգում եմ և ուղարկում տվյալները...";
     }
 
     try {
@@ -650,11 +1205,11 @@
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload || payload.ok !== true) {
-        throw new Error(payload && payload.error ? payload.error : "Не удалось отправить форму.");
+        throw new Error(payload && payload.error ? payload.error : "Չհաջողվեց ուղարկել ձևը։");
       }
       if (message) {
         message.className = "tg-form-message success";
-        message.textContent = payload.message || "Данные сохранены.";
+        message.textContent = "Տվյալները ստուգվել են և պահպանվել գլխավոր աղյուսակում։";
       }
       if (telegram) {
         telegram.HapticFeedback && telegram.HapticFeedback.notificationOccurred("success");
@@ -663,7 +1218,7 @@
     } catch (error) {
       if (message) {
         message.className = "tg-form-message error";
-        message.textContent = error instanceof Error ? error.message : "Не удалось отправить форму.";
+        message.textContent = error instanceof Error ? error.message : "Չհաջողվեց ուղարկել ձևը։";
       }
       if (telegram && telegram.HapticFeedback) {
         telegram.HapticFeedback.notificationOccurred("error");
@@ -676,10 +1231,6 @@
   }
 
   function render() {
-    if (!root) {
-      return;
-    }
-
     const department = getDepartment();
     const reportDate = getReportDate();
     if (!department) {
@@ -708,7 +1259,8 @@
 
         <form data-form>
           <div class="tg-sheet-layout" aria-label="Բաժանմունքի ձև">
-            ${displaySectionDefinitions.map((section) => renderSection(section)).join("")}
+            ${renderCombinedCalculator()}
+            ${sectionDefinitions.map((section) => renderSection(section)).join("")}
           </div>
 
           ${renderPatientNotesMobileBlock(department, reportDate)}
@@ -717,7 +1269,7 @@
           <div class="tg-form-actions">
             <button class="tg-form-submit" data-submit type="submit">Ստուգել և ուղարկել</button>
             <div class="tg-form-message${hasSubmitAccess() ? "" : " error"}" data-message>
-              ${hasSubmitAccess() ? "Բջիջները բացվել են գլխավոր աղյուսակից բերված տվյալներով։" : "Բացեք ձևը Telegram բոտի կամ Android հավելվածի միջոցով։"}
+              ${hasSubmitAccess() ? "Ձևը բացվել է գլխավոր աղյուսակից բերված տվյալներով։" : "Բացեք ձևը Telegram բոտի կամ Android հավելվածի միջոցով։"}
             </div>
           </div>
           <div class="tg-form-downloads">
@@ -730,17 +1282,16 @@
             </label>
             <div class="department-top-lock-meta">
               <strong>Խմբագրել բոլոր բջիջները</strong>
-              <span data-full-edit-status>Խմբագրումը անջատված է. բջիջները միայն դիտման համար են։</span>
+              <span data-full-edit-status>Խմբագրումը անջատված է․ բջիջները միայն դիտման համար են։</span>
             </div>
           </div>
         </form>
       </section>
     `;
-  }
 
-  function bindEvents() {
-    if (!root) {
-      return;
+    const initialMessage = root.querySelector("[data-message]");
+    if (initialMessage && hasSubmitAccess()) {
+      initialMessage.textContent = "Բջիջները բերվել են գլխավոր աղյուսակից։ Փոփոխելուց հետո ստուգումը կթարմացվի ավտոմատ։";
     }
 
     root.querySelectorAll("[data-field]").forEach((input) => {
@@ -750,10 +1301,59 @@
           input.value = digitsOnly;
         }
         updateControl();
+        refreshCalculatorUi();
       });
       input.addEventListener("focus", () => input.select());
     });
-
+    root.querySelectorAll("[data-calc-key]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const key = input.getAttribute("data-calc-key");
+        if (!key || !Object.prototype.hasOwnProperty.call(calculatorState, key)) {
+          return;
+        }
+        const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
+        calculatorState[key] = toNumber(digitsOnly);
+        if (input.value !== digitsOnly) {
+          input.value = digitsOnly;
+        }
+        refreshCalculatorUi();
+      });
+      input.addEventListener("focus", () => input.select());
+    });
+    root.querySelectorAll("[data-leave-calc-key]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const key = input.getAttribute("data-leave-calc-key");
+        if (!key || !Object.prototype.hasOwnProperty.call(leaveCalculatorState, key)) {
+          return;
+        }
+        const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
+        leaveCalculatorState[key] = toNumber(digitsOnly);
+        if (input.value !== digitsOnly) {
+          input.value = digitsOnly;
+        }
+        refreshCalculatorUi();
+      });
+      input.addEventListener("focus", () => input.select());
+    });
+    root.querySelectorAll("[data-transfer-calc-key]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const key = input.getAttribute("data-transfer-calc-key");
+        if (!key || !Object.prototype.hasOwnProperty.call(transferCalculatorState, key)) {
+          return;
+        }
+        const digitsOnly = input.value.replace(/\D+/g, "").slice(0, 4);
+        transferCalculatorState[key] = toNumber(digitsOnly);
+        if (input.value !== digitsOnly) {
+          input.value = digitsOnly;
+        }
+        refreshCalculatorUi();
+      });
+      input.addEventListener("focus", () => input.select());
+    });
+    const applyCalculators = root.querySelector("[data-apply-calculators]");
+    if (applyCalculators) {
+      applyCalculators.addEventListener("click", applyCombinedCalculator);
+    }
     const fullEditToggle = root.querySelector("[data-full-edit-toggle]");
     if (fullEditToggle) {
       fullEditToggle.addEventListener("change", () => {
@@ -761,9 +1361,6 @@
         syncFieldLockState();
       });
     }
-
-    const department = getDepartment();
-    const reportDate = getReportDate();
     root.querySelectorAll("[data-patient-note-input]").forEach((input) => {
       input.addEventListener("input", () => {
         const notes = readPatientNotes();
@@ -771,7 +1368,6 @@
         updatePatientNotesUi(notes, saved ? "Պահված է տեղում։" : "Չհաջողվեց պահել այս սարքում։");
       });
     });
-
     const patientNotesSave = root.querySelector("[data-save-patient-notes]");
     if (patientNotesSave) {
       patientNotesSave.addEventListener("click", () => {
@@ -780,7 +1376,6 @@
         updatePatientNotesUi(notes, saved ? "Պահված է տեղում։" : "Չհաջողվեց պահել այս սարքում։");
       });
     }
-
     const patientNotesClear = root.querySelector("[data-clear-patient-notes]");
     if (patientNotesClear) {
       patientNotesClear.addEventListener("click", () => {
@@ -795,24 +1390,27 @@
         updatePatientNotesUi(createEmptyPatientNotes(), "Գրառումները մաքրված են։");
       });
     }
-
     const form = root.querySelector("[data-form]");
     if (form) {
       form.addEventListener("submit", submitForm);
     }
+    refreshCalculatorUi();
+    updateControl();
+    syncFieldLockState();
+  }
+
+  if (telegram) {
+    telegram.ready();
+    telegram.expand();
   }
 
   render();
-  bindEvents();
-  syncFieldLockState();
-
   const initialAndroidMessage = root && root.querySelector ? root.querySelector("[data-message]") : null;
   if (initialAndroidMessage && isAndroidMode()) {
     initialAndroidMessage.className = `tg-form-message${hasRequiredAndroidPhoto() ? "" : " error"}`;
     initialAndroidMessage.textContent = getAndroidPhotoMessage();
     updateControl();
   }
-
   window.addEventListener("mainform-android-state-changed", () => {
     const currentMessage = root && root.querySelector ? root.querySelector("[data-message]") : null;
     if (currentMessage && isAndroidMode()) {
@@ -821,9 +1419,4 @@
     }
     updateControl();
   });
-
-  if (telegram) {
-    telegram.ready();
-    telegram.expand();
-  }
 })();

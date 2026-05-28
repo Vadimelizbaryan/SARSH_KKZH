@@ -1403,7 +1403,7 @@
   async function queueAwareRolloverMainAfterArchive(archiveKey, reportDate) {
     const safeArchiveKey = typeof archiveKey === "string" ? archiveKey.trim() : "";
     if (!safeArchiveKey) {
-      throw new Error("ÐÐµ ÑƒÐºÐ°Ð·Ð°Ð½ Ð´ÐµÐ½ÑŒ Ð°Ñ€Ñ…Ð¸Ð²Ð° Ð´Ð»Ñ ÑƒÑ‚Ñ€ÐµÐ½Ð½ÐµÐ³Ð¾ Ð¿ÐµÑ€ÐµÐ½Ð¾ÑÐ°.");
+      throw new Error("Не указан день архива для утреннего переноса.");
     }
 
     const queuePayload = {
@@ -2161,9 +2161,9 @@
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
       if (await handleOwnerAuthFailure(response)) {
-        throw new Error("Ð¡ÐµÑÑÐ¸Ñ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð° Ð½ÐµÐ´ÐµÐ¹ÑÑ‚Ð²Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ð°. Ð’Ð¾Ð¹Ð´Ð¸Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°.");
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
       }
-      throw buildResponseError(response, payload, "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Telegram-ÑƒÐ²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ðµ");
+      throw buildResponseError(response, payload, "Не удалось отправить Telegram-уведомление");
     }
 
     return payload;
@@ -2288,7 +2288,7 @@
       return "Առցանց սինխր.";
     }
     if (source === "pending-sync") {
-      return "Ô±Õ¼Õ¡Õ¶ÖÕ¡Õ¶Ö + Õ¸Ö‚Õ²Õ¡Ö€Õ¯Õ´Õ¡Õ¶ Õ¸Õ¹Ö€.";
+      return "Առցանց + ուղարկման հերթ.";
     }
     if (source === "local-cache") {
       return "Տեղային պահոց";

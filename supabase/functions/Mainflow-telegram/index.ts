@@ -1225,7 +1225,7 @@ function getTelegramWebFormUrl(
   options: { autoRotateImages?: boolean | null } = {}
 ) {
   const params = new URLSearchParams();
-  params.set("ui", "20260526tgreadonlylayout1");
+  params.set("ui", "20260528tgcalcrestore2");
   params.set("department", departmentId);
   params.set("date", reportDate);
   if (typeof options.autoRotateImages === "boolean") {
@@ -1830,20 +1830,20 @@ function buildTelegramPhotoOrientationAdviceMessage(
 ) {
   const departmentMeta = options.departmentId ? DEPARTMENTS[options.departmentId] : null;
   const confidenceLabel = advice.confidence === "high"
-    ? "Ð²Ñ‹ÑÐ¾ÐºÐ°Ñ"
-    : (advice.confidence === "medium" ? "ÑÑ€ÐµÐ´Ð½ÑÑ" : "Ð½Ð¸Ð·ÐºÐ°Ñ");
+    ? "высокая"
+    : (advice.confidence === "medium" ? "средняя" : "низкая");
   const rotationLabel = advice.rotationDegrees === 0
-    ? "0Â° (Ñ„Ð¾Ñ‚Ð¾ ÑƒÐ¶Ðµ Ð²Ñ‹Ð³Ð»ÑÐ´Ð¸Ñ‚ Ð¿Ñ€Ð°Ð²Ð¸Ð»ÑŒÐ½Ð¾)"
-    : `${advice.rotationDegrees}Â° Ð¿Ð¾ Ñ‡Ð°ÑÐ¾Ð²Ð¾Ð¹ ÑÑ‚Ñ€ÐµÐ»ÐºÐµ`;
+    ? "0° (фото уже выглядит правильно)"
+    : `${advice.rotationDegrees}° по часовой стрелке`;
 
   return [
-    "Ð¢ÐµÑÑ‚ Ð¾Ñ€Ð¸ÐµÐ½Ñ‚Ð°Ñ†Ð¸Ð¸ Ñ„Ð¾Ñ‚Ð¾",
-    "Ð­Ñ‚Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ð¾Ð´ÑÐºÐ°Ð·ÐºÐ°. OCR Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ ÑÐµÐ¹Ñ‡Ð°Ñ Ð½Ðµ Ð¼ÐµÐ½ÑÐ»Ð¸ÑÑŒ.",
-    departmentMeta ? `ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ: ${departmentMeta.department} (${departmentMeta.marker})` : "",
-    options.reportDate ? `Ð”Ð°Ñ‚Ð° Ð¾Ñ‚Ñ‡Ñ‘Ñ‚Ð°: ${options.reportDate}` : "",
-    `Ð ÐµÐºÐ¾Ð¼ÐµÐ½Ð´ÑƒÐµÐ¼Ñ‹Ð¹ Ð¿Ð¾Ð²Ð¾Ñ€Ð¾Ñ‚: ${rotationLabel}`,
-    `Ð£Ð²ÐµÑ€ÐµÐ½Ð½Ð¾ÑÑ‚ÑŒ: ${confidenceLabel}`,
-    ...(advice.notes.length ? ["Ð—Ð°Ð¼ÐµÑ‚ÐºÐ¸:", ...advice.notes] : [])
+    "Тест ориентации фото",
+    "Это только подсказка. OCR и сохранённые данные сейчас не менялись.",
+    departmentMeta ? `Отделение: ${departmentMeta.department} (${departmentMeta.marker})` : "",
+    options.reportDate ? `Дата отчёта: ${options.reportDate}` : "",
+    `Рекомендуемый поворот: ${rotationLabel}`,
+    `Уверенность: ${confidenceLabel}`,
+    ...(advice.notes.length ? ["Заметки:", ...advice.notes] : [])
   ].filter(Boolean).join("\n");
 }
 
