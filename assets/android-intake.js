@@ -70,6 +70,13 @@
     return url.toString();
   }
 
+  function getNativeBridge() {
+    const bridge = window.MainflowAndroidBridge;
+    return bridge && typeof bridge.captureAdmissionHubPhoto === "function"
+      ? bridge
+      : null;
+  }
+
   function getStorageKey(sessionKey) {
     return `${SESSION_STORAGE_PREFIX}:${deviceId}:${sessionKey || "pending"}`;
   }
@@ -243,6 +250,16 @@
 
   function openFilePicker(departmentId) {
     state.pendingDepartmentId = departmentId;
+    const nativeBridge = getNativeBridge();
+    if (nativeBridge) {
+      try {
+        setMessage("Открываю камеру...", "info");
+        nativeBridge.captureAdmissionHubPhoto(String(departmentId || ""));
+        return;
+      } catch (_error) {
+        // Fallback to standard file picker below.
+      }
+    }
     const input = document.getElementById("androidIntakeFileInput");
     if (!(input instanceof HTMLInputElement)) {
       return;
@@ -364,6 +381,25 @@
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось подготовить фото.", "error");
     }
+  }
+
+  function handleNativeCapturedPhoto(payload) {
+    const departmentId = String(payload?.departmentId || "").trim();
+    const slot = getSlotByDepartmentId(departmentId);
+    if (!slot) {
+      return;
+    }
+
+    const photo = normalizeLocalDraft(payload?.photo);
+    if (!photo) {
+      setMessage("Не удалось получить фото с камеры.", "error");
+      return;
+    }
+
+    slot.localDraft = photo;
+    writeLocalDrafts();
+    render();
+    setMessage(`Фото для ${slot.departmentName} готово. Если нужно, сделайте пересъёмку двойным тапом.`, "success");
   }
 
   function syncServerPhotoIntoSlot(departmentId, record) {
@@ -566,6 +602,16 @@
     if (!document.hidden) {
       void loadState(false);
     }
+  });
+
+  window.MAINFORM_ANDROID_INTAKE_HUB = {
+    receiveCapturedPhoto(payload) {
+      handleNativeCapturedPhoto(payload);
+    }
+  };
+
+  window.addEventListener("mainform-android-intake-photo", (event) => {
+    handleNativeCapturedPhoto(event?.detail || {});
   });
 
   render();

@@ -1226,7 +1226,7 @@ function getTelegramWebFormUrl(
   options: { autoRotateImages?: boolean | null } = {}
 ) {
   const params = new URLSearchParams();
-  params.set("ui", "20260528androidhubsync1");
+  params.set("ui", "20260529androidhubcamera1");
   params.set("department", departmentId);
   params.set("date", reportDate);
   if (typeof options.autoRotateImages === "boolean") {
@@ -1283,7 +1283,7 @@ function getAndroidIntakeHubUrl(
   androidAccess?: { deviceId?: string; deviceName?: string } | null
 ) {
   const params = new URLSearchParams();
-  params.set("ui", "20260528androidhubsync1");
+  params.set("ui", "20260529androidhubcamera1");
   params.set("date", reportDate);
   const androidDeviceId = sanitizeAndroidDeviceId(androidAccess?.deviceId || "");
   const androidDeviceName = sanitizeAndroidDeviceName(androidAccess?.deviceName || "");

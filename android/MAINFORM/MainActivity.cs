@@ -11,6 +11,7 @@ using Android.Views;
 using Android.Webkit;
 using Android.Widget;
 using AndroidX.Core.Content;
+using Java.Interop;
 
 namespace MAINFORM;
 
@@ -77,6 +78,7 @@ public class MainActivity : Activity
     private bool _updatePromptShown;
     private bool _pageReady;
     private DepartmentOption? _selectedDepartment;
+    private string _pendingAdmissionHubCaptureDepartmentId = string.Empty;
     private AndroidPhotoRuntimeState _photoState = AndroidPhotoRuntimeState.Empty;
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -204,6 +206,15 @@ public class MainActivity : Activity
         _pendingCameraUri = null;
         if (selectedUri is not null)
         {
+            if (IsAdmissionHubDepartment(_selectedDepartment) &&
+                !string.IsNullOrWhiteSpace(_pendingAdmissionHubCaptureDepartmentId))
+            {
+                var targetDepartmentId = _pendingAdmissionHubCaptureDepartmentId;
+                _pendingAdmissionHubCaptureDepartmentId = string.Empty;
+                await ProcessAdmissionHubPhotoAsync(selectedUri, targetDepartmentId);
+                return;
+            }
+
             await ProcessNativePhotoAsync(selectedUri);
         }
     }
@@ -256,6 +267,7 @@ public class MainActivity : Activity
             CookieManager.Instance.SetAcceptThirdPartyCookies(_webView, true);
         }
 
+        _webView.AddJavascriptInterface(new MainflowAndroidBridge(this), "MainflowAndroidBridge");
         _webView.SetWebViewClient(new MainFormWebViewClient(this));
         _webView.SetWebChromeClient(new MainFormWebChromeClient(this));
     }
@@ -469,6 +481,27 @@ public class MainActivity : Activity
             .Show();
     }
 
+    internal void StartAdmissionHubCameraCapture(string departmentId)
+    {
+        if (!IsAdmissionHubDepartment(_selectedDepartment))
+        {
+            Toast.MakeText(this, Resource.String.select_department_first, ToastLength.Short)?.Show();
+            return;
+        }
+
+        _pendingAdmissionHubCaptureDepartmentId = string.IsNullOrWhiteSpace(departmentId)
+            ? string.Empty
+            : departmentId.Trim();
+
+        if (string.IsNullOrWhiteSpace(_pendingAdmissionHubCaptureDepartmentId))
+        {
+            Toast.MakeText(this, Resource.String.photo_processing_failed, ToastLength.Short)?.Show();
+            return;
+        }
+
+        StartCameraCapture();
+    }
+
     private void StartGalleryPicker()
     {
         try
@@ -555,6 +588,39 @@ public class MainActivity : Activity
                     : error.Message;
                 SetPhotoStatus(message, "#B92D20");
                 ApplyAndroidRuntimeStateToWebView();
+            });
+        }
+    }
+
+    private async Task ProcessAdmissionHubPhotoAsync(Android.Net.Uri sourceUri, string targetDepartmentId)
+    {
+        try
+        {
+            var preparedPhoto = await PreparePhotoPayloadAsync(sourceUri, targetDepartmentId);
+            var payload = new
+            {
+                departmentId = targetDepartmentId,
+                photo = new
+                {
+                    imageDataUrl = preparedPhoto.ImageDataUrl,
+                    imageName = preparedPhoto.ImageName,
+                    createdAt = DateTime.UtcNow.ToString("O"),
+                    reportDate = string.Empty
+                }
+            };
+            ApplyAdmissionHubPhotoToWebView(payload);
+        }
+        catch (Exception error)
+        {
+            RunOnUiThread(() =>
+            {
+                Toast.MakeText(
+                    this,
+                    string.IsNullOrWhiteSpace(error.Message)
+                        ? GetString(Resource.String.photo_processing_failed)
+                        : error.Message,
+                    ToastLength.Long
+                )?.Show();
             });
         }
     }
@@ -1039,6 +1105,30 @@ public class MainActivity : Activity
         }
     }
 
+    private void ApplyAdmissionHubPhotoToWebView(object payload)
+    {
+        if (_webView is null || !_pageReady)
+        {
+            return;
+        }
+
+        var json = JsonSerializer.Serialize(payload, JsonOptions);
+        var script =
+            "(function(){" +
+            $"const payload={json};" +
+            "if(window.MAINFORM_ANDROID_INTAKE_HUB&&typeof window.MAINFORM_ANDROID_INTAKE_HUB.receiveCapturedPhoto==='function'){window.MAINFORM_ANDROID_INTAKE_HUB.receiveCapturedPhoto(payload);}" +
+            "window.dispatchEvent(new CustomEvent('mainform-android-intake-photo',{detail:payload}));" +
+            "})();";
+        try
+        {
+            RunOnUiThread(() => _webView.EvaluateJavascript(script, null));
+        }
+        catch
+        {
+            // Ignore transient WebView timing errors.
+        }
+    }
+
     internal bool StartFileChooser(IValueCallback? callback)
     {
         _fileChooserCallback?.OnReceiveValue(null);
@@ -1144,6 +1234,18 @@ public class MainActivity : Activity
         {
             activity.UpdateProgress(newProgress);
             base.OnProgressChanged(view, newProgress);
+        }
+    }
+
+    private sealed class MainflowAndroidBridge(MainActivity activity) : Java.Lang.Object
+    {
+        [JavascriptInterface]
+        [Export("captureAdmissionHubPhoto")]
+        public void CaptureAdmissionHubPhoto(string? departmentId)
+        {
+            activity.RunOnUiThread(() =>
+                activity.StartAdmissionHubCameraCapture(departmentId ?? string.Empty)
+            );
         }
     }
 
