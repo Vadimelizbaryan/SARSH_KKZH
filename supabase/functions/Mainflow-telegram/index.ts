@@ -5163,6 +5163,64 @@ function extractTelegramUserNameFromFeedbackNotes(notes: unknown) {
   return "";
 }
 
+function buildDepartmentSubmissionSourceLabel(
+  imageName: string,
+  notes: unknown
+) {
+  const normalizedNotes = Array.isArray(notes)
+    ? notes.map((item) => String(item || ""))
+    : [];
+  if (normalizedNotes.some((note) => /Submitted via Android MAINFORM/i.test(note))) {
+    return "Android MAINFORM";
+  }
+  if (imageName === "telegram-qh-form") {
+    return "Telegram QH form";
+  }
+  return "Telegram Web App";
+}
+
+async function loadLatestDepartmentSubmissionRecord(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: DepartmentId,
+  reportDate: string
+) {
+  const { data, error } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id, image_name, final_values, notes, created_at")
+    .eq("department_id", departmentId)
+    .eq("report_date", reportDate)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    throw error;
+  }
+  const rows = Array.isArray(data) ? data : [];
+  const record = rows.find((row) => {
+    const imageName = typeof row?.image_name === "string" ? row.image_name : "";
+    const normalizedNotes = Array.isArray(row?.notes)
+      ? row.notes.map((item: unknown) => String(item || ""))
+      : [];
+    return imageName === "telegram-web-app-form"
+      || imageName === "telegram-qh-form"
+      || normalizedNotes.some((note) => /Telegram Web App form submission\./i.test(note));
+  });
+
+  if (!record?.id) {
+    return null;
+  }
+
+  const imageName = typeof record.image_name === "string" ? record.image_name : "";
+  return {
+    id: String(record.id),
+    imageName,
+    values: sanitizeDepartmentFormValues(record.final_values),
+    userName: extractTelegramUserNameFromFeedbackNotes(record.notes),
+    createdAt: typeof record.created_at === "string" ? record.created_at : "",
+    sourceLabel: buildDepartmentSubmissionSourceLabel(imageName, record.notes)
+  };
+}
+
 async function loadLatestTelegramWebFormFeedback(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
@@ -10600,6 +10658,32 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "latest_department_photo_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
+    }
+
+    if (action === "latest-department-submission") {
+      try {
+        const currentUrl = new URL(request.url);
+        const departmentId = parseDepartmentId(currentUrl.searchParams.get("departmentId"));
+        const reportDate = (currentUrl.searchParams.get("reportDate") || DEFAULT_DATE).trim() || DEFAULT_DATE;
+        if (!departmentId) {
+          return jsonResponse({ ok: false, error: "Department is required." }, 400);
+        }
+
+        const supabase = createSupabaseAdmin();
+        const record = await loadLatestDepartmentSubmissionRecord(
+          supabase,
+          departmentId,
+          reportDate
+        );
+        return jsonResponse({ ok: true, record });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "latest_department_submission_failed",
           error: error instanceof Error ? error.message : String(error)
         }, 500);
       }
