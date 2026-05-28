@@ -1,0 +1,281 @@
+body {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #f6f1e8;
+  color: #1d2b28;
+}
+
+.android-intake {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 16px 14px 28px;
+}
+
+.android-intake__head {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  margin-bottom: 16px;
+}
+
+.android-intake__title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.android-intake__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.android-intake__pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eef7ef;
+  border: 1px solid #b8d8bf;
+  color: #264933;
+  font-weight: 600;
+}
+
+.android-intake__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.android-intake__button {
+  appearance: none;
+  border: 0;
+  border-radius: 16px;
+  min-height: 46px;
+  padding: 0 18px;
+  background: #d8e7dc;
+  color: #19362a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.android-intake__button--primary {
+  background: #1f7a53;
+  color: #fff;
+}
+
+.android-intake__button--secondary {
+  background: #f1e4c9;
+  color: #5e4514;
+}
+
+.android-intake__button[disabled] {
+  opacity: 0.55;
+}
+
+.android-intake__hint {
+  margin: 0;
+  color: #5e5b54;
+  font-size: 14px;
+}
+
+.android-intake__message {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: #eef2f0;
+  border: 1px solid #d7e0dc;
+  color: #244239;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.android-intake__message--error {
+  background: #fff0ef;
+  border-color: #efc0bb;
+  color: #8a2d20;
+}
+
+.android-intake__message--success {
+  background: #edf8ee;
+  border-color: #b7dbbf;
+  color: #16663a;
+}
+
+.android-intake__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.android-intake__card {
+  background: #fffaf1;
+  border: 1px solid #e5d9c3;
+  border-radius: 20px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(78, 52, 17, 0.06);
+}
+
+.android-intake__card.is-local {
+  border-color: #d6ba7e;
+}
+
+.android-intake__card.is-complete {
+  border-color: #b4d7bb;
+}
+
+.android-intake__thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid #dbcdb5;
+  border-radius: 18px;
+  background: #fffef8;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.android-intake__thumb-button {
+  all: unset;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.android-intake__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.android-intake__camera-icon {
+  font-size: 42px;
+  line-height: 1;
+}
+
+.android-intake__camera-text {
+  margin-top: 8px;
+  color: #7a5e2a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.android-intake__card-meta {
+  margin-top: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.android-intake__card-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #8f6400;
+}
+
+.android-intake__card-title small {
+  display: block;
+  margin-top: 3px;
+  color: #31463b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.android-intake__card-status {
+  color: #4e5d56;
+  font-size: 13px;
+}
+
+.android-intake__card-status strong {
+  color: #144f30;
+}
+
+.android-intake__card-status--local strong {
+  color: #855400;
+}
+
+.android-intake__card-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.android-intake__mini-button {
+  appearance: none;
+  border: 1px solid #d6cfbf;
+  border-radius: 12px;
+  background: #fff;
+  min-height: 36px;
+  padding: 0 12px;
+  color: #2c4038;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.android-intake__modal[hidden] {
+  display: none;
+}
+
+.android-intake__modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 24, 23, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  z-index: 1000;
+}
+
+.android-intake__modal-dialog {
+  width: min(100%, 820px);
+  max-height: 92vh;
+  overflow: auto;
+  border-radius: 20px;
+  background: #fffdf7;
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+.android-intake__modal-close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #4f4a42;
+  font-size: 28px;
+  line-height: 1;
+  float: right;
+}
+
+.android-intake__modal img {
+  width: 100%;
+  border-radius: 16px;
+  display: block;
+  margin-top: 12px;
+}
+
+.android-intake__modal-meta {
+  margin-top: 10px;
+  display: grid;
+  gap: 4px;
+  color: #3e4a45;
+  font-size: 14px;
+}
+
+@media (min-width: 920px) {
+  .android-intake__head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .android-intake__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

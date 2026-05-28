@@ -31,6 +31,7 @@ public class MainActivity : Activity
     private const int CameraPermissionRequestCode = 1103;
     private const int PhotoMaxDimension = 1600;
     private const int PhotoQuality = 86;
+    private const string AndroidIntakeHubDepartmentId = "admission_hub";
 
     private static readonly HttpClient BootstrapHttpClient = new()
     {
@@ -41,6 +42,7 @@ public class MainActivity : Activity
 
     private static readonly DepartmentOption[] Departments =
     [
+        new("Ընդունարան", "admission_hub", AndroidIntakeHubDepartmentId),
         new("Վիրաբուժական", "te9625wg", "r4"),
         new("Դ/Ծ վ/բ բաժանմունք", "1ei6dnv2", "r5"),
         new("Քիթ-կոկորդ բ-ք", "du9wa6oq", "r6"),
@@ -63,6 +65,7 @@ public class MainActivity : Activity
     private WebView? _webView;
     private TextView? _currentPageText;
     private ProgressBar? _progressBar;
+    private View? _photoControlsContainer;
     private Button? _photoButton;
     private Button? _clearPhotoButton;
     private TextView? _photoStatusText;
@@ -85,6 +88,7 @@ public class MainActivity : Activity
         _webView = FindViewById<WebView>(Resource.Id.mainWebView);
         _currentPageText = FindViewById<TextView>(Resource.Id.textCurrentPage);
         _progressBar = FindViewById<ProgressBar>(Resource.Id.progressBar);
+        _photoControlsContainer = FindViewById(Resource.Id.photoControlsContainer);
         _photoButton = FindViewById<Button>(Resource.Id.buttonPhoto);
         _clearPhotoButton = FindViewById<Button>(Resource.Id.buttonClearPhoto);
         _photoStatusText = FindViewById<TextView>(Resource.Id.textPhotoStatus);
@@ -131,6 +135,7 @@ public class MainActivity : Activity
         }
 
         RenderPhotoState();
+        UpdatePhotoUiVisibility();
 
         var selectedSlug = _preferences?.GetString(SelectedDepartmentKey, null);
         _selectedDepartment = Departments.FirstOrDefault(item => item.Slug == selectedSlug);
@@ -332,6 +337,8 @@ public class MainActivity : Activity
         {
             ClearSelectedPhoto(showToast: false);
         }
+
+        RunOnUiThread(UpdatePhotoUiVisibility);
 
         RunOnUiThread(() =>
         {
@@ -722,6 +729,14 @@ public class MainActivity : Activity
             return;
         }
 
+        UpdatePhotoUiVisibility();
+        if (IsAdmissionHubDepartment(_selectedDepartment))
+        {
+            _photoPreviewView.SetImageDrawable(null);
+            _photoPreviewView.Visibility = ViewStates.Gone;
+            return;
+        }
+
         if (_photoState.Exists && !string.IsNullOrWhiteSpace(_photoState.ImageDataUrl))
         {
             try
@@ -756,6 +771,33 @@ public class MainActivity : Activity
                 : _photoState.Message,
             _photoState.Matched ? "#0F8B4C" : "#B92D20"
         );
+    }
+
+    private void UpdatePhotoUiVisibility()
+    {
+        var isAdmissionHub = IsAdmissionHubDepartment(_selectedDepartment);
+
+        if (_photoControlsContainer is not null)
+        {
+            _photoControlsContainer.Visibility = isAdmissionHub ? ViewStates.Gone : ViewStates.Visible;
+        }
+
+        if (_photoStatusText is not null)
+        {
+            _photoStatusText.Visibility = isAdmissionHub ? ViewStates.Gone : ViewStates.Visible;
+        }
+
+        if (_photoPreviewView is not null && isAdmissionHub)
+        {
+            _photoPreviewView.SetImageDrawable(null);
+            _photoPreviewView.Visibility = ViewStates.Gone;
+        }
+    }
+
+    private static bool IsAdmissionHubDepartment(DepartmentOption? option)
+    {
+        return option is not null &&
+               string.Equals(option.DepartmentId, AndroidIntakeHubDepartmentId, StringComparison.Ordinal);
     }
 
     private void SetPhotoStatus(string message, string colorHex)

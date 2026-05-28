@@ -29,6 +29,7 @@ const TELEGRAM_DAILY_REMINDER_META_PREFIX = "telegram_daily_reminder_sent";
 const TELEGRAM_MAIN_PDFS_META_KEY = "telegram_main_pdfs_sent";
 const TELEGRAM_PENDING_PHOTO_APPROVALS_META_KEY = "telegram_pending_photo_approvals";
 const TELEGRAM_PHOTO_AUTOROTATE_META_KEY = "pref:telegram_photo_auto_rotate";
+const ANDROID_INTAKE_HUB_ID = "admission_hub";
 const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
 const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է միայն բոտի ադմինիստրատորին։";
 const TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT = "Գիշերային ընդունում";
@@ -1225,7 +1226,7 @@ function getTelegramWebFormUrl(
   options: { autoRotateImages?: boolean | null } = {}
 ) {
   const params = new URLSearchParams();
-  params.set("ui", "20260528tgcalcrestore2");
+  params.set("ui", "20260528androidhubsync1");
   params.set("department", departmentId);
   params.set("date", reportDate);
   if (typeof options.autoRotateImages === "boolean") {
@@ -1275,6 +1276,25 @@ function getTelegramWebFormUrl(
   }
   const formPath = QH_CALC_DEPARTMENT_IDS.has(departmentId) ? "tg-qh-form.html" : "tg-form.html";
   return `${getPublicSiteBaseUrl()}/${formPath}?${params.toString()}`;
+}
+
+function getAndroidIntakeHubUrl(
+  reportDate: string,
+  androidAccess?: { deviceId?: string; deviceName?: string } | null
+) {
+  const params = new URLSearchParams();
+  params.set("ui", "20260528androidhubsync1");
+  params.set("date", reportDate);
+  const androidDeviceId = sanitizeAndroidDeviceId(androidAccess?.deviceId || "");
+  const androidDeviceName = sanitizeAndroidDeviceName(androidAccess?.deviceName || "");
+  if (androidDeviceId) {
+    params.set("androidApp", "1");
+    params.set("androidDeviceId", androidDeviceId);
+    if (androidDeviceName) {
+      params.set("androidDeviceName", androidDeviceName);
+    }
+  }
+  return `${getPublicSiteBaseUrl()}/android-intake.html?${params.toString()}`;
 }
 
 function getTelegramNightFormUrl(reportDateTime: string) {
@@ -3163,6 +3183,174 @@ async function handleAndroidPhotoCheck(request: Request) {
   }
 }
 
+async function verifyAndroidIntakeHubAccess(
+  supabase: ReturnType<typeof createClient>,
+  payload: Record<string, unknown> | null
+) {
+  const deviceId = sanitizeAndroidDeviceId(
+    typeof payload?.androidDeviceId === "string" ? payload.androidDeviceId : ""
+  );
+  const deviceName = sanitizeAndroidDeviceName(
+    typeof payload?.androidDeviceName === "string" ? payload.androidDeviceName : ""
+  ) || "Android MAINFORM";
+
+  if (!deviceId) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Բացեք էջը հաստատված Android հավելվածից։"
+    };
+  }
+
+  const accessState = await getAndroidDeviceAccessState(supabase, deviceId, deviceName, "r4");
+  if (accessState.status === "blocked") {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Այս Android սարքի հասանելիությունը արգելափակված է։"
+    };
+  }
+  if (accessState.status !== "approved") {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Android սարքի մուտքը դեռ չի հաստատվել։"
+    };
+  }
+
+  return {
+    ok: true as const,
+    deviceId,
+    deviceName
+  };
+}
+
+async function handleAndroidIntakeState(request: Request) {
+  try {
+    const currentUrl = new URL(request.url);
+    const payload = {
+      androidDeviceId: currentUrl.searchParams.get("deviceId") || "",
+      androidDeviceName: currentUrl.searchParams.get("deviceName") || ""
+    };
+    const supabase = createSupabaseAdmin();
+    const access = await verifyAndroidIntakeHubAccess(supabase, payload);
+    if (!access.ok) {
+      return jsonResponse({ ok: false, error: access.error }, access.status);
+    }
+
+    const snapshot = await loadSnapshot(supabase);
+    const reportDate = snapshot.reportDate || getYerevanReportDateText();
+    const session = getAndroidIntakeSessionContext();
+    const latestPhotos = await listAndroidIntakeSessionPhotoRecords(
+      supabase,
+      session.sessionStartIso,
+      session.sessionEndIso
+    );
+    const latestByDepartment = new Map(latestPhotos.map((item) => [item.departmentId, item]));
+
+    return jsonResponse({
+      ok: true,
+      reportDate,
+      sessionKey: session.sessionKey,
+      sessionLabel: session.sessionLabel,
+      sessionStartIso: session.sessionStartIso,
+      sessionEndIso: session.sessionEndIso,
+      departments: Object.entries(DEPARTMENTS).map(([departmentId, meta]) => ({
+        departmentId,
+        marker: meta.marker,
+        departmentName: meta.department,
+        latestPhoto: latestByDepartment.get(departmentId) || null
+      }))
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_intake_state_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
+async function handleAndroidIntakePhotoSubmit(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const departmentId = parseDepartmentId(typeof payload?.departmentId === "string" ? payload.departmentId : "");
+    if (!departmentId) {
+      return jsonResponse({ ok: false, error: "Department is required." }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const access = await verifyAndroidIntakeHubAccess(supabase, payload);
+    if (!access.ok) {
+      return jsonResponse({ ok: false, error: access.error }, access.status);
+    }
+
+    const snapshot = await loadSnapshot(supabase);
+    const reportDate = sanitizeReportDate(payload?.reportDate) || snapshot.reportDate || getYerevanReportDateText();
+    const imageDataUrl = sanitizeAndroidPhotoDataUrl(payload?.imageDataUrl);
+    const imageName = sanitizeAndroidPhotoName(payload?.imageName) || "admission-hub-photo.jpg";
+    if (!imageDataUrl) {
+      return jsonResponse({ ok: false, error: "Photo is required." }, 400);
+    }
+
+    const shouldAutoRotatePhoto = await isTelegramPhotoAutoRotateEnabled(supabase);
+    const preparedPhoto = await inspectTelegramPhotoOrientation(
+      imageDataUrl,
+      imageName,
+      {
+        requireAdvice: false,
+        enabled: shouldAutoRotatePhoto
+      }
+    );
+    const liveDepartmentRow = snapshot?.rows.find((item) => item.id === departmentId) || null;
+    const recognized = await recognizeDepartmentPhoto(departmentId, preparedPhoto.dataUrl);
+    const evaluation = evaluateTelegramPhotoRecognitionCandidate(
+      recognized,
+      liveDepartmentRow?.values
+    );
+    const feedbackId = await insertAcceptedFeedback(
+      supabase,
+      departmentId,
+      reportDate,
+      recognized.reportDate,
+      preparedPhoto.fileName,
+      preparedPhoto.dataUrl,
+      recognized.values,
+      recognized.recognizedKeys,
+      [
+        "Admission hub Android photo.",
+        `Device: ${access.deviceName}`,
+        "OCR review required before manual save to the main table.",
+        ...preparedPhoto.orientationNotes,
+        ...recognized.notes
+      ]
+    );
+    await markDepartmentPhotoPending(supabase, departmentId, feedbackId, preparedPhoto.fileName);
+    const preview = await loadAcceptedFeedbackPreview(supabase, feedbackId, departmentId);
+
+    return jsonResponse({
+      ok: true,
+      departmentId,
+      reportDate,
+      feedbackId,
+      record: preview,
+      controlPassed: Boolean(evaluation.isControlPassed),
+      hasRecognizedValues: Boolean(evaluation.hasRecognizedValues),
+      message: evaluation.isControlPassed
+        ? "Լուսանկարը ուղարկվել է։ OCR-ը մշակել է այն, բայց մինչ պահպանումը ստուգեք տվյալները վեբ էջում։"
+        : "Լուսանկարը ուղարկվել է։ OCR-ը մշակել է այն, բայց տվյալները պետք է ձեռքով ստուգել և ուղղել վեբ էջում։"
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_intake_photo_submit_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
 async function approveTelegramColleague(
   supabase: ReturnType<typeof createClient>,
   targetChatId: string
@@ -3308,6 +3496,35 @@ function getYerevanReportDateText(date = new Date()) {
 function getYerevanHour(date = new Date()) {
   const parsed = Number(getYerevanDateParts(date).hour);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getAndroidIntakeSessionContext(date = new Date()) {
+  const shifted = getShiftedYerevanDate(date);
+  let year = shifted.getUTCFullYear();
+  let month = shifted.getUTCMonth();
+  let day = shifted.getUTCDate();
+  const hour = shifted.getUTCHours();
+
+  if (hour < 19) {
+    const previousShifted = new Date(Date.UTC(year, month, day) - (24 * 60 * 60 * 1000));
+    year = previousShifted.getUTCFullYear();
+    month = previousShifted.getUTCMonth();
+    day = previousShifted.getUTCDate();
+  }
+
+  const sessionStartShiftedMs = Date.UTC(year, month, day, 19, 0, 0);
+  const sessionEndShiftedMs = sessionStartShiftedMs + (24 * 60 * 60 * 1000);
+  const sessionStartUtcMs = sessionStartShiftedMs - YEREVAN_UTC_OFFSET_MS;
+  const sessionEndUtcMs = sessionEndShiftedMs - YEREVAN_UTC_OFFSET_MS;
+  const sessionDate = new Date(sessionStartUtcMs);
+  const parts = getYerevanDateParts(sessionDate);
+
+  return {
+    sessionKey: `${parts.year}-${parts.month}-${parts.day}`,
+    sessionStartIso: new Date(sessionStartUtcMs).toISOString(),
+    sessionEndIso: new Date(sessionEndUtcMs).toISOString(),
+    sessionLabel: `${parts.day}.${parts.month}.${parts.year} 19:00`
+  };
 }
 
 function isYerevanNightDutyTime(date = new Date()) {
@@ -5301,6 +5518,70 @@ async function loadLatestDepartmentPhotoPreview(
     imageName: latestFeedback.imageName || preview.imageName,
     createdAt: latestFeedback.createdAt || preview.createdAt
   };
+}
+
+function buildAndroidIntakePhotoSourceLabel(notes: string[]) {
+  if (notes.some((note) => /Submitted via Android MAINFORM/i.test(note))) {
+    return "Android MAINFORM";
+  }
+  if (notes.some((note) => /Admission hub Android photo/i.test(note))) {
+    return "Ընդունարան";
+  }
+  if (notes.some((note) => /Telegram Web App form submission\./i.test(note))) {
+    return "Telegram Web App";
+  }
+  return "Լուսանկար";
+}
+
+async function listAndroidIntakeSessionPhotoRecords(
+  supabase: ReturnType<typeof createClient>,
+  sessionStartIso: string,
+  sessionEndIso: string
+) {
+  const { data, error } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id, department_id, department_name, report_date, photo_report_date, image_name, image_data_url, notes, created_at")
+    .gte("created_at", sessionStartIso)
+    .lt("created_at", sessionEndIso)
+    .neq("image_name", "telegram-web-app-form")
+    .neq("image_name", "telegram-qh-form")
+    .not("image_data_url", "is", null)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const departmentIds = new Set(Object.keys(DEPARTMENTS));
+  const latestByDepartment = new Map<string, Record<string, unknown>>();
+
+  for (const rawRow of Array.isArray(data) ? data : []) {
+    const row = rawRow as Record<string, unknown>;
+    const departmentId = parseDepartmentId(row.department_id);
+    const imageDataUrl = typeof row.image_data_url === "string" ? row.image_data_url : "";
+    if (!departmentId || !departmentIds.has(departmentId) || !imageDataUrl.startsWith("data:image/")) {
+      continue;
+    }
+    if (!latestByDepartment.has(departmentId)) {
+      latestByDepartment.set(departmentId, row);
+    }
+  }
+
+  return Array.from(latestByDepartment.values()).map((row) => {
+    const departmentId = parseDepartmentId(row.department_id) as DepartmentId;
+    const notes = normalizeOcrFeedbackNotes(row.notes);
+    return {
+      departmentId,
+      departmentName: typeof row.department_name === "string" ? row.department_name : DEPARTMENTS[departmentId].department,
+      feedbackId: String(row.id || ""),
+      reportDate: typeof row.report_date === "string" ? row.report_date : "",
+      photoReportDate: typeof row.photo_report_date === "string" ? row.photo_report_date : "",
+      imageName: typeof row.image_name === "string" ? row.image_name : "",
+      imageDataUrl: typeof row.image_data_url === "string" ? row.image_data_url : "",
+      createdAt: typeof row.created_at === "string" ? row.created_at : "",
+      sourceLabel: buildAndroidIntakePhotoSourceLabel(notes)
+    };
+  });
 }
 
 async function insertAcceptedFeedback(
@@ -10689,11 +10970,17 @@ Deno.serve(async (request) => {
       }
     }
 
+    if (action === "android-intake-state") {
+      return await handleAndroidIntakeState(request);
+    }
+
     if (action === "android-form-url") {
       try {
         const currentUrl = new URL(request.url);
-        const departmentId = parseDepartmentId(currentUrl.searchParams.get("departmentId"));
-        if (!departmentId) {
+        const rawDepartmentId = String(currentUrl.searchParams.get("departmentId") || "").trim();
+        const isAndroidIntakeHub = rawDepartmentId === ANDROID_INTAKE_HUB_ID;
+        const departmentId = isAndroidIntakeHub ? null : parseDepartmentId(rawDepartmentId);
+        if (!isAndroidIntakeHub && !departmentId) {
           return jsonResponse({ ok: false, error: "Department is required." }, 400);
         }
         const deviceId = sanitizeAndroidDeviceId(currentUrl.searchParams.get("deviceId"));
@@ -10707,7 +10994,7 @@ Deno.serve(async (request) => {
           supabase,
           deviceId,
           deviceName,
-          departmentId
+          departmentId || "r4"
         );
         if (accessState.status === "missing") {
           return jsonResponse({
@@ -10732,19 +11019,23 @@ Deno.serve(async (request) => {
         }
         const snapshot = await loadSnapshot(supabase);
         const reportDate = snapshot.reportDate || getYerevanReportDateText();
-        const carryoverValues = getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId);
+        const carryoverValues = departmentId
+          ? getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId)
+          : null;
         const autoRotateImages = await isTelegramPhotoAutoRotateEnabled(supabase);
-        const formUrl = getTelegramWebFormUrl(
-          departmentId,
-          reportDate,
-          carryoverValues,
-          { deviceId, deviceName },
-          { autoRotateImages }
-        );
+        const formUrl = isAndroidIntakeHub
+          ? getAndroidIntakeHubUrl(reportDate, { deviceId, deviceName })
+          : getTelegramWebFormUrl(
+            departmentId as DepartmentId,
+            reportDate,
+            carryoverValues || undefined,
+            { deviceId, deviceName },
+            { autoRotateImages }
+          );
 
         return jsonResponse({
           ok: true,
-          departmentId,
+          departmentId: isAndroidIntakeHub ? ANDROID_INTAKE_HUB_ID : departmentId,
           reportDate,
           deviceId,
           autoRotateImages,
@@ -10780,6 +11071,9 @@ Deno.serve(async (request) => {
   }
   if (postUrl.searchParams.get("action") === "android-photo-check") {
     return await handleAndroidPhotoCheck(request);
+  }
+  if (postUrl.searchParams.get("action") === "android-intake-photo-submit") {
+    return await handleAndroidIntakePhotoSubmit(request);
   }
   if (postUrl.searchParams.get("action") === "night-form-load") {
     return await handleTelegramShiftFormLoad(request, "night");
