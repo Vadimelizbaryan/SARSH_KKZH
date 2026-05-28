@@ -5498,12 +5498,91 @@ async function loadLatestDepartmentPhotoFeedback(
   };
 }
 
+async function loadLatestDepartmentPhotoFeedbackByPhotoReportDate(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: DepartmentId,
+  photoReportDate: string
+) {
+  const { data, error } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id, image_name, created_at")
+    .eq("department_id", departmentId)
+    .eq("photo_report_date", photoReportDate)
+    .neq("image_name", "telegram-web-app-form")
+    .not("image_data_url", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!data?.id) {
+    return null;
+  }
+
+  return {
+    id: String(data.id),
+    imageName: typeof data.image_name === "string" ? data.image_name : "",
+    createdAt: typeof data.created_at === "string" ? data.created_at : ""
+  };
+}
+
+async function loadLatestDepartmentPhotoFeedbackForSession(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: DepartmentId,
+  sessionStartIso: string,
+  sessionEndIso: string
+) {
+  const { data, error } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id, image_name, created_at")
+    .eq("department_id", departmentId)
+    .gte("created_at", sessionStartIso)
+    .lt("created_at", sessionEndIso)
+    .neq("image_name", "telegram-web-app-form")
+    .neq("image_name", "telegram-qh-form")
+    .not("image_data_url", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!data?.id) {
+    return null;
+  }
+
+  return {
+    id: String(data.id),
+    imageName: typeof data.image_name === "string" ? data.image_name : "",
+    createdAt: typeof data.created_at === "string" ? data.created_at : ""
+  };
+}
+
 async function loadLatestDepartmentPhotoPreview(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
   reportDate: string
 ) {
-  const latestFeedback = await loadLatestDepartmentPhotoFeedback(supabase, departmentId, reportDate);
+  let latestFeedback = await loadLatestDepartmentPhotoFeedback(supabase, departmentId, reportDate);
+  if (!latestFeedback?.id) {
+    latestFeedback = await loadLatestDepartmentPhotoFeedbackByPhotoReportDate(
+      supabase,
+      departmentId,
+      reportDate
+    );
+  }
+  if (!latestFeedback?.id) {
+    const session = getAndroidIntakeSessionContext();
+    latestFeedback = await loadLatestDepartmentPhotoFeedbackForSession(
+      supabase,
+      departmentId,
+      session.sessionStartIso,
+      session.sessionEndIso
+    );
+  }
   if (!latestFeedback?.id) {
     return null;
   }
