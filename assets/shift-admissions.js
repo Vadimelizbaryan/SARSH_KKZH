@@ -315,6 +315,28 @@
     return valid.sort().slice(-1)[0] || "";
   }
 
+  function normalizeDraftRecord(record) {
+    const rows = buildEmptyRows();
+    let hasRows = false;
+
+    if (record && record.rows && typeof record.rows === "object") {
+      config.departmentDefinitions.forEach((department) => {
+        COLUMNS.forEach((column) => {
+          const nextValue = sanitizeNumber(record.rows?.[department.id]?.[column.key]);
+          rows[department.id][column.key] = nextValue;
+          hasRows = hasRows || nextValue > 0;
+        });
+      });
+    }
+
+    return {
+      reportDateTime: normalizeReportDateTime(record?.reportDateTime, getYerevanDateTime()),
+      savedAt: String(record?.savedAt || "").trim(),
+      rows,
+      hasRows
+    };
+  }
+
   function combineDrafts(records) {
     const rows = buildEmptyRows();
     let hasRows = false;
@@ -355,6 +377,10 @@
       if (result && result.draft) {
         records.push(result.draft);
       }
+    }
+    if (mode === "admission" && records.length) {
+      const normalized = records.map(normalizeDraftRecord);
+      return normalized.find((record) => record.hasRows) || normalized[0];
     }
     return combineDrafts(records);
   }
