@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-05-28T13:56:26.3332509Z",
+    "generatedAtUtc":  "2026-05-28T14:14:19.8250185Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -63,8 +63,8 @@
                   },
                   {
                       "path":  "assets/shift-admissions.js",
-                      "size":  23522,
-                      "sha256":  "A1FA63EC9706711B921C41F27B6DB8264F6FE2DE3EF5E40A7E47DE385D80EC49"
+                      "size":  24594,
+                      "sha256":  "227B45D45FDF93F3DEC4ECFB25544909B614FBB6C628F19FB4AC857CE96C4EBB"
                   },
                   {
                       "path":  "assets/templates/SHARSH_KKZH_template.xlsx",
@@ -234,7 +234,7 @@
                   {
                       "path":  "day.html",
                       "size":  714,
-                      "sha256":  "F21BE36A6CBE2A8604E733E2F412956FB207CB3E77364639E4732DC983BE2E2E"
+                      "sha256":  "A25CBD31428207473F4BA02CBF1888B24BB8D09039B708290F20EBC913BCC405"
                   },
                   {
                       "path":  "day-shift.html",
@@ -264,7 +264,7 @@
                   {
                       "path":  "discharge.html",
                       "size":  722,
-                      "sha256":  "779E45473B3DBE2157E0DACDF02EC6C284F87A4F4C91978B034987F062291CAC"
+                      "sha256":  "BFF2EF285091CE738CC54F25F5DC417576D6B481FB024C96ECD73A2A207035FB"
                   },
                   {
                       "path":  "eti77ylq.html",
@@ -299,12 +299,12 @@
                   {
                       "path":  "Mainflow.dll",
                       "size":  83456,
-                      "sha256":  "0B7C9F693F41B7BBEE97478BEC75334757826A4565002E033960C0E1A619D7B2"
+                      "sha256":  "C1C0CDA6AD0490105AE46CD6CE71B3E327442817BF226D4AFC5234DF197A7356"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "D567A87888DDB989A12490D5EE5F39D4D15B75D95C1D363256EE1060186C98EE"
+                      "sha256":  "D9384B14938B22D2E32E6CB432FBA1B18142A87CD3BF92B082C00643C36EDACF"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",

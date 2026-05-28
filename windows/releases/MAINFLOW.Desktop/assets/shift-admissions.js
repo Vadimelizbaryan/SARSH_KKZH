@@ -128,6 +128,10 @@
     return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
   }
 
+  function getYerevanDateText() {
+    return getYerevanDateTime().slice(0, 10);
+  }
+
   function normalizeReportDateTime(value, fallback = getYerevanDateTime()) {
     const raw = String(value ?? "").trim().replace(/\s+/g, " ");
     if (!raw) {
@@ -149,6 +153,38 @@
     }
 
     return `${day}.${month}.${year} ${match[4].padStart(2, "0")}:${match[5]}`;
+  }
+
+  function normalizeCurrentReportDateTime(value, fallback = getYerevanDateTime()) {
+    const normalized = normalizeReportDateTime(value, fallback);
+    return normalized.slice(0, 10) === getYerevanDateText() ? normalized : fallback;
+  }
+
+  function formatSavedAt(value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) {
+      return "";
+    }
+
+    const reportLike = raw.match(/^(\d{1,2})[.,/](\d{1,2})[.,/](\d{2,4})(?:[\s,]+(\d{1,2}):(\d{2}))?$/);
+    if (reportLike) {
+      return normalizeReportDateTime(raw, raw);
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isFinite(parsed.getTime())) {
+      return new Intl.DateTimeFormat("ru-RU", {
+        timeZone: "Asia/Yerevan",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+      }).format(parsed).replace(",", "");
+    }
+
+    return raw;
   }
 
   function getMainPageHref() {
@@ -198,7 +234,7 @@
       }
 
       return {
-        reportDateTime: normalizeReportDateTime(parsed?.reportDateTime, fallbackReportDateTime),
+        reportDateTime: normalizeCurrentReportDateTime(parsed?.reportDateTime, fallbackReportDateTime),
         savedAt: typeof parsed?.savedAt === "string" ? parsed.savedAt : "",
         rows
       };
@@ -232,7 +268,7 @@
   }
 
   function saveState() {
-    state.reportDateTime = normalizeReportDateTime(state.reportDateTime);
+    state.reportDateTime = normalizeCurrentReportDateTime(state.reportDateTime);
     state.savedAt = getYerevanDateTime();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
@@ -253,7 +289,7 @@
     });
 
     state.rows = rows;
-    state.reportDateTime = normalizeReportDateTime(draft.reportDateTime, state.reportDateTime);
+    state.reportDateTime = normalizeCurrentReportDateTime(draft.reportDateTime, state.reportDateTime);
     state.savedAt = typeof draft.savedAt === "string" && draft.savedAt.trim()
       ? draft.savedAt.trim()
       : state.savedAt;
@@ -330,7 +366,7 @@
     }
 
     return {
-      reportDateTime: normalizeReportDateTime(record?.reportDateTime, getYerevanDateTime()),
+      reportDateTime: normalizeCurrentReportDateTime(record?.reportDateTime, getYerevanDateTime()),
       savedAt: String(record?.savedAt || "").trim(),
       rows,
       hasRows
@@ -355,7 +391,7 @@
     });
 
     return {
-      reportDateTime: normalizeReportDateTime(records.find((record) => record?.reportDateTime)?.reportDateTime, getYerevanDateTime()),
+      reportDateTime: normalizeCurrentReportDateTime(records.find((record) => record?.reportDateTime)?.reportDateTime, getYerevanDateTime()),
       savedAt: getLatestSavedAt(records),
       rows,
       hasRows
@@ -419,7 +455,7 @@
 
     const saved = app.querySelector("[data-shift-saved-at]");
     if (saved) {
-      saved.textContent = state.savedAt || "դեռ չի պահպանվել";
+      saved.textContent = formatSavedAt(state.savedAt) || "դեռ չի պահպանվել";
     }
   }
 
@@ -475,7 +511,7 @@
           <div class="night-meta">
             <span>Ամսաթիվ և ժամ</span>
             <strong>${escapeHtml(state.reportDateTime)}</strong>
-            <em>Վերջին պահպանումը: <b data-shift-saved-at>${escapeHtml(state.savedAt || "դեռ չի պահպանվել")}</b></em>
+            <em>Վերջին պահպանումը: <b data-shift-saved-at>${escapeHtml(formatSavedAt(state.savedAt) || "դեռ չի պահպանվել")}</b></em>
           </div>
         </section>
 
