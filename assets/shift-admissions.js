@@ -3,12 +3,18 @@
   const sync = window.SHARSH_SYNC || null;
   const app = document.getElementById("app");
   const queryParams = new URLSearchParams(window.location.search);
-  const view = queryParams.get("view");
-  const bodyView = document.body.dataset.view || "";
-  const mode = view === "discharge" || bodyView === "discharge-shift" || bodyView === "morning-discharge" ? "discharge"
-    : view === "day" || bodyView === "day-shift" ? "day"
-      : view === "night" || bodyView === "night-shift" ? "night"
-        : "";
+  const view = (queryParams.get("view") || "").trim().toLowerCase();
+  const bodyView = (document.body.dataset.view || "").trim().toLowerCase();
+  const isDischargeView =
+    view === "discharge"
+    || bodyView === "discharge-shift"
+    || bodyView === "morning-discharge";
+  const isAdmissionView =
+    view === "day"
+    || view === "night"
+    || bodyView === "day-shift"
+    || bodyView === "night-shift";
+  const mode = isDischargeView ? "discharge" : (isAdmissionView ? "admission" : "");
 
   if (!config || !app || !mode) {
     return;
@@ -19,80 +25,74 @@
     { key: "spa", label: "ՍՊԱ" },
     { key: "paym", label: "ՊԱՅՄ" },
     { key: "zh", label: "Զ/Հ" },
-    { key: "family", label: "Զ/Ծ ԸՆՏ" },
+    { key: "family", label: "Զ/Ծ ընտ" },
     { key: "zp", label: "Զ/Պ" },
-    { key: "qi", label: "ք-ի" }
+    { key: "qi", label: "Ք-ի" }
   ];
 
   const MODES = {
-    night: {
-      storage: "night-shift",
-      title: "Ночная смена",
-      lead: "Поступления по всем отделениям. Выписки ночью не учитываются.",
-      kicker: "Черновик перед утренним переносом",
-      subtitle: "Добавляем только поступивших за ночь",
-      help: "Telegram форма сохраняет значения сюда. Перенос в основную таблицу выполняется только кнопкой Сохранить на этой странице.",
-      clearLabel: "Очистить ночь",
-      totalLabel: "Итого за ночь",
-      noValues: "Ночная смена сохранена локально. Для переноса в основную таблицу нет значений.",
-      syncMissing: "Перенос в основную таблицу пока недоступен: модуль синхронизации не загружен.",
-      saving: "Переношу ночную смену в основную таблицу...",
-      saved: "Ночная смена перенесена в основную таблицу",
-      cleared: "Ночная таблица очищена.",
-      loadOk: "Загружены данные ночной смены, отправленные через Telegram форму.",
-      loadFail: "Не удалось загрузить ночную смену из Telegram формы.",
-      confirmClear: "Очистить все значения ночной смены?",
-      applyFn: "applyNightShiftToMain",
-      loadFn: "loadNightShiftDraft"
-    },
-    day: {
+    admission: {
       storage: "day-shift",
-      title: "Дневная смена",
-      lead: "Дневной прием пациентов по всем отделениям. Сейчас формулы такие же, как у ночного приема.",
-      kicker: "Черновик дневного приема",
-      subtitle: "Добавляем поступивших за дневную смену",
-      help: "Telegram форма дневной смены сохраняет значения сюда. Перенос в основную таблицу выполняется только кнопкой Сохранить на этой странице.",
-      clearLabel: "Очистить день",
-      totalLabel: "Итого за день",
-      noValues: "Дневная смена сохранена локально. Для переноса в основную таблицу нет значений.",
-      syncMissing: "Перенос в основную таблицу пока недоступен: модуль синхронизации не загружен.",
-      saving: "Переношу дневную смену в основную таблицу...",
-      saved: "Дневная смена перенесена в основную таблицу",
-      cleared: "Дневная таблица очищена.",
-      loadOk: "Загружены данные дневной смены, отправленные через Telegram форму.",
-      loadFail: "Не удалось загрузить дневную смену из Telegram формы.",
-      confirmClear: "Очистить все значения дневной смены?",
+      legacyStorage: "night-shift",
+      title: "Ընդունում",
+      lead: "Օրվա ընթացքում գրանցեք ընդունված հիվանդների քանակը ըստ բաժանմունքների։",
+      kicker: "Օրվա աշխատանքային էջ",
+      subtitle: "Լրացրեք ընդունվածների թվերը, պահեք էջում և օրվա վերջում փոխանցեք հիմնական աղյուսակին",
+      help: "Այս էջը կարող է բաց մնալ ընդունման պատասխանատու աշխատակցի մոտ։ Օրվա ընթացքում պահեք թվերը որպես черновик, իսկ օրվա վերջում սեղմեք փոխանցման կոճակը։",
+      clearLabel: "Մաքրել",
+      saveLabel: "Պահպանել էջում",
+      transferLabel: "Տեղադրել հիմնական աղյուսակում",
+      totalLabel: "Ընդամենը ընդունվել է",
+      noValues: "Ընդունման էջում դեռ արժեքներ չկան։",
+      syncMissing: "Չհաջողվեց աշխատել ընդունման էջի սինխրոնացման հետ։",
+      saving: "Պահպանում եմ ընդունման черновик-ը...",
+      saved: "Ընդունման черновик-ը պահպանվել է",
+      transferring: "Տեղափոխում եմ ընդունման տվյալները հիմնական աղյուսակ...",
+      transferred: "Ընդունման տվյալները ավելացվել են հիմնական աղյուսակին",
+      cleared: "Ընդունման աղյուսակը մաքրվել է։",
+      loadOk: "Բեռնվել են ընդունման էջի պահված տվյալները։",
+      loadFail: "Չհաջողվեց բեռնել ընդունման էջի տվյալները։",
+      confirmClear: "Մաքրե՞լ ընդունման աղյուսակի բոլոր արժեքները։",
+      saveFn: "saveDayShiftDraft",
       applyFn: "applyDayShiftToMain",
-      loadFn: "loadDayShiftDraft"
+      loadFns: ["loadDayShiftDraft", "loadNightShiftDraft"],
+      clearFns: ["clearDayShiftDraft", "clearNightShiftDraft"],
+      consolidateClearFns: ["clearNightShiftDraft"]
     },
     discharge: {
       storage: "discharge-shift",
-      title: "Утренняя выписка",
-      lead: "Выписка из стационара по всем отделениям. Формулы переноса будут добавлены отдельно.",
-      kicker: "Черновик утренней выписки",
-      subtitle: "Заполняем выписанных утром пациентов",
-      help: "Telegram форма утренней выписки сохраняет значения сюда. Перенос в основную таблицу пока выключен до добавления формул.",
-      clearLabel: "Очистить выписку",
-      totalLabel: "Итого выписано",
-      noValues: "Утренняя выписка сохранена локально. Для переноса в основную таблицу пока нет значений.",
-      syncMissing: "Перенос в основную таблицу пока недоступен: модуль синхронизации не загружен.",
-      saving: "Сохраняю утреннюю выписку...",
-      saved: "Утренняя выписка сохранена",
-      cleared: "Таблица утренней выписки очищена.",
-      loadOk: "Загружены данные утренней выписки, отправленные через Telegram форму.",
-      loadFail: "Не удалось загрузить утреннюю выписку из Telegram формы.",
-      confirmClear: "Очистить все значения утренней выписки?",
-      transferPending: true,
-      transferPendingText: "Формулы переноса утренней выписки ещё не заданы. Данные оставлены на этой странице и не перенесены в основную таблицу.",
-      applyFn: "",
-      loadFn: "loadDischargeShiftDraft",
+      title: "Դուրսգրում",
+      lead: "Օրվա ընթացքում գրանցեք դուրս գրված հիվանդների քանակը ըստ բաժանմունքների։",
+      kicker: "Օրվա աշխատանքային էջ",
+      subtitle: "Լրացրեք դուրսգրվածների թվերը, պահեք էջում և օրվա վերջում փոխանցեք հիմնական աղյուսակին",
+      help: "Այս էջը կարող է բաց մնալ դուրսգրման պատասխանատու աշխատակցի մոտ։ Օրվա ընթացքում պահեք թվերը որպես черновик, իսկ օրվա վերջում սեղմեք փոխանցման կոճակը։",
+      clearLabel: "Մաքրել",
+      saveLabel: "Պահպանել էջում",
+      transferLabel: "Տեղադրել հիմնական աղյուսակում",
+      totalLabel: "Ընդամենը դուրս է գրվել",
+      noValues: "Դուրսգրման էջում դեռ արժեքներ չկան։",
+      syncMissing: "Չհաջողվեց աշխատել դուրսգրման էջի սինխրոնացման հետ։",
+      saving: "Պահպանում եմ դուրսգրման черновик-ը...",
+      saved: "Դուրսգրման черновик-ը պահպանվել է",
+      transferring: "Տեղափոխում եմ դուրսգրման տվյալները հիմնական աղյուսակ...",
+      transferred: "Դուրսգրման տվյալները ավելացվել են հիմնական աղյուսակին",
+      cleared: "Դուրսգրման աղյուսակը մաքրվել է։",
+      loadOk: "Բեռնվել են դուրսգրման էջի պահված տվյալները։",
+      loadFail: "Չհաջողվեց բեռնել դուրսգրման էջի տվյալները։",
+      confirmClear: "Մաքրե՞լ դուրսգրման աղյուսակի բոլոր արժեքները։",
       saveFn: "saveDischargeShiftDraft",
-      clearFn: "clearDischargeShiftDraft"
+      applyFn: "applyDischargeShiftToMain",
+      loadFns: ["loadDischargeShiftDraft"],
+      clearFns: ["clearDischargeShiftDraft"],
+      consolidateClearFns: []
     }
   };
 
   const copy = MODES[mode];
-  const STORAGE_KEY = `${config.STORAGE_NAMESPACE}:${copy.storage}:v1`;
+  const STORAGE_KEY = `${config.STORAGE_NAMESPACE}:${copy.storage}:v3`;
+  const LEGACY_STORAGE_KEY = copy.legacyStorage
+    ? `${config.STORAGE_NAMESPACE}:${copy.legacyStorage}:v1`
+    : "";
   const state = loadState();
   let statusText = "";
   let statusIsError = false;
@@ -144,9 +144,6 @@
     const day = match[1].padStart(2, "0");
     const month = match[2].padStart(2, "0");
     const year = match[3].length === 2 ? `20${match[3]}` : match[3];
-    if (day === "05" && month === "05" && year === "2026") {
-      return fallback;
-    }
     if (!dateTimeMatch) {
       return fallback;
     }
@@ -178,15 +175,19 @@
     );
   }
 
-  function loadState() {
-    const fallback = {
-      reportDateTime: getYerevanDateTime(),
-      savedAt: "",
-      rows: buildEmptyRows()
-    };
+  function rowsHaveValues(rows) {
+    return config.departmentDefinitions.some((department) =>
+      COLUMNS.some((column) => sanitizeNumber(rows?.[department.id]?.[column.key]) > 0)
+    );
+  }
+
+  function parseStoredState(rawValue, fallbackReportDateTime) {
+    if (!rawValue) {
+      return null;
+    }
 
     try {
-      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      const parsed = JSON.parse(rawValue);
       const rows = buildEmptyRows();
       if (parsed && parsed.rows && typeof parsed.rows === "object") {
         config.departmentDefinitions.forEach((department) => {
@@ -195,14 +196,39 @@
           });
         });
       }
+
       return {
-        reportDateTime: normalizeReportDateTime(parsed?.reportDateTime, fallback.reportDateTime),
+        reportDateTime: normalizeReportDateTime(parsed?.reportDateTime, fallbackReportDateTime),
         savedAt: typeof parsed?.savedAt === "string" ? parsed.savedAt : "",
         rows
       };
     } catch (_error) {
-      return fallback;
+      return null;
     }
+  }
+
+  function loadState() {
+    const fallback = {
+      reportDateTime: getYerevanDateTime(),
+      savedAt: "",
+      rows: buildEmptyRows()
+    };
+
+    const current = parseStoredState(localStorage.getItem(STORAGE_KEY), fallback.reportDateTime);
+    if (current) {
+      return current;
+    }
+
+    if (LEGACY_STORAGE_KEY) {
+      const legacy = parseStoredState(localStorage.getItem(LEGACY_STORAGE_KEY), fallback.reportDateTime);
+      if (legacy && rowsHaveValues(legacy.rows)) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(legacy));
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+        return legacy;
+      }
+    }
+
+    return fallback;
   }
 
   function saveState() {
@@ -215,6 +241,7 @@
     if (!draft || !draft.rows || typeof draft.rows !== "object") {
       return false;
     }
+
     const rows = buildEmptyRows();
     let hasRows = false;
     config.departmentDefinitions.forEach((department) => {
@@ -224,6 +251,7 @@
         hasRows = hasRows || value > 0;
       });
     });
+
     state.rows = rows;
     state.reportDateTime = normalizeReportDateTime(draft.reportDateTime, state.reportDateTime);
     state.savedAt = typeof draft.savedAt === "string" && draft.savedAt.trim()
@@ -233,17 +261,23 @@
     return hasRows;
   }
 
-  function clearRowsAfterTransfer() {
-    state.reportDateTime = getYerevanDateTime();
-    state.rows = buildEmptyRows();
-    saveState();
-  }
-
   function resetState() {
     state.reportDateTime = getYerevanDateTime();
     state.savedAt = "";
     state.rows = buildEmptyRows();
     saveState();
+    if (LEGACY_STORAGE_KEY) {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
+  }
+
+  function clearStateRows() {
+    state.rows = buildEmptyRows();
+    state.savedAt = getYerevanDateTime();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (LEGACY_STORAGE_KEY) {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
   }
 
   function getCell(departmentId, key) {
@@ -274,6 +308,69 @@
     statusIsError = Boolean(isError);
   }
 
+  function getLatestSavedAt(records) {
+    const valid = records
+      .map((record) => String(record?.savedAt || "").trim())
+      .filter(Boolean);
+    return valid.sort().slice(-1)[0] || "";
+  }
+
+  function combineDrafts(records) {
+    const rows = buildEmptyRows();
+    let hasRows = false;
+
+    records.forEach((record) => {
+      if (!record || !record.rows || typeof record.rows !== "object") {
+        return;
+      }
+      config.departmentDefinitions.forEach((department) => {
+        COLUMNS.forEach((column) => {
+          const nextValue = sanitizeNumber(record.rows?.[department.id]?.[column.key]);
+          rows[department.id][column.key] += nextValue;
+          hasRows = hasRows || nextValue > 0;
+        });
+      });
+    });
+
+    return {
+      reportDateTime: normalizeReportDateTime(records.find((record) => record?.reportDateTime)?.reportDateTime, getYerevanDateTime()),
+      savedAt: getLatestSavedAt(records),
+      rows,
+      hasRows
+    };
+  }
+
+  async function callSyncFunction(functionName, ...args) {
+    const fn = sync && sync[functionName];
+    if (typeof fn !== "function") {
+      throw new Error(copy.syncMissing);
+    }
+    return await fn(...args);
+  }
+
+  async function loadRemoteDrafts() {
+    const records = [];
+    for (const functionName of copy.loadFns) {
+      const result = await callSyncFunction(functionName);
+      if (result && result.draft) {
+        records.push(result.draft);
+      }
+    }
+    return combineDrafts(records);
+  }
+
+  async function clearRemoteDraftsBestEffort(reportDateTime, functionNames) {
+    const warnings = [];
+    for (const functionName of functionNames) {
+      try {
+        await callSyncFunction(functionName, reportDateTime);
+      } catch (error) {
+        warnings.push(error instanceof Error ? error.message : String(error || ""));
+      }
+    }
+    return warnings;
+  }
+
   function updateTotals() {
     config.departmentDefinitions.forEach((department) => {
       const target = app.querySelector(`[data-shift-row-total="${department.id}"]`);
@@ -296,7 +393,7 @@
 
     const saved = app.querySelector("[data-shift-saved-at]");
     if (saved) {
-      saved.textContent = state.savedAt || "ещё не сохранено";
+      saved.textContent = state.savedAt || "դեռ չի պահպանվել";
     }
   }
 
@@ -335,10 +432,11 @@
             <p>${escapeHtml(copy.lead)}</p>
           </div>
           <div class="toolbar-actions">
-            <a class="button-link" href="${escapeHtml(getMainPageHref())}">К главному</a>
-            <button type="button" id="shiftPrintBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(getMainPageHref())}">Դեպի գլխավոր էջ</a>
+            <button type="button" id="shiftPrintBtn">Տպել</button>
             <button type="button" id="shiftResetBtn">${escapeHtml(copy.clearLabel)}</button>
-            <button type="button" id="shiftSaveBtn">Сохранить</button>
+            <button type="button" id="shiftSaveBtn">${escapeHtml(copy.saveLabel)}</button>
+            <button type="button" id="shiftTransferBtn">${escapeHtml(copy.transferLabel)}</button>
           </div>
         </div>
 
@@ -349,9 +447,9 @@
             <p>${escapeHtml(copy.help)}</p>
           </div>
           <div class="night-meta">
-            <span>Дата и время</span>
+            <span>Ամսաթիվ և ժամ</span>
             <strong>${escapeHtml(state.reportDateTime)}</strong>
-            <em>Последнее сохранение: <b data-shift-saved-at>${escapeHtml(state.savedAt || "ещё не сохранено")}</b></em>
+            <em>Վերջին պահպանումը: <b data-shift-saved-at>${escapeHtml(state.savedAt || "դեռ չի պահպանվել")}</b></em>
           </div>
         </section>
 
@@ -362,9 +460,9 @@
             <table class="night-table">
               <thead>
                 <tr>
-                  <th scope="col">Отделение</th>
+                  <th scope="col">Բաժանմունք</th>
                   ${COLUMNS.map((column) => `<th scope="col">${escapeHtml(column.label)}</th>`).join("")}
-                  <th scope="col">Итого</th>
+                  <th scope="col">Ընդամենը</th>
                 </tr>
               </thead>
               <tbody>
@@ -403,44 +501,6 @@
       return;
     }
 
-    if (copy.transferPending) {
-      const saveFn = sync && sync[copy.saveFn];
-      if (typeof saveFn !== "function") {
-        setStatus(copy.syncMissing, true);
-        render();
-        return;
-      }
-
-      if (button instanceof HTMLButtonElement) {
-        button.disabled = true;
-      }
-      setStatus(copy.saving, false);
-      render();
-
-      try {
-        const result = await saveFn(state.rows, state.reportDateTime);
-        const draft = result && result.draft ? result.draft : null;
-        if (draft && typeof draft.savedAt === "string" && draft.savedAt) {
-          state.savedAt = draft.savedAt;
-          saveState();
-        }
-        const sourceText = result && result.source === "remote" ? "онлайн" : "локально";
-        setStatus(`${copy.saved} (${sourceText}). ${copy.transferPendingText}`, false);
-        render();
-      } catch (error) {
-        setStatus(error instanceof Error ? error.message : copy.syncMissing, true);
-        render();
-      }
-      return;
-    }
-
-    const applyFn = sync && sync[copy.applyFn];
-    if (typeof applyFn !== "function") {
-      setStatus(copy.syncMissing, true);
-      render();
-      return;
-    }
-
     if (button instanceof HTMLButtonElement) {
       button.disabled = true;
     }
@@ -448,22 +508,28 @@
     render();
 
     try {
-      const result = await applyFn(state.rows, state.reportDateTime);
-      clearRowsAfterTransfer();
-      const sourceText = result && result.source === "remote" ? "онлайн" : "локально";
-      setStatus(`${copy.saved} (${sourceText}). ${copy.cleared}`, false);
+      const result = await callSyncFunction(copy.saveFn, state.rows, state.reportDateTime);
+      const draft = result && result.draft ? result.draft : null;
+      if (draft && typeof draft.savedAt === "string" && draft.savedAt) {
+        state.savedAt = draft.savedAt;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+      const clearWarnings = await clearRemoteDraftsBestEffort(state.reportDateTime, copy.consolidateClearFns);
+      const sourceText = result && result.source === "remote" ? "առցանց" : "տեղային";
+      const warningText = clearWarnings.length ? ` Զգուշացում: ${clearWarnings.join(" | ")}` : "";
+      setStatus(`${copy.saved} (${sourceText})։${warningText}`, false);
       render();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Не удалось перенести данные в основную таблицу.", true);
+      setStatus(error instanceof Error ? error.message : copy.syncMissing, true);
       render();
     }
   }
 
-  async function handleReset(button) {
-    resetState();
-    const clearFn = sync && sync[copy.clearFn];
-    if (typeof clearFn !== "function") {
-      setStatus(copy.cleared, false);
+  async function handleTransfer(button) {
+    saveState();
+
+    if (!getGrandTotal()) {
+      setStatus(copy.noValues, false);
       render();
       return;
     }
@@ -471,16 +537,35 @@
     if (button instanceof HTMLButtonElement) {
       button.disabled = true;
     }
+    setStatus(copy.transferring, false);
     render();
 
     try {
-      const result = await clearFn(state.reportDateTime);
-      const draft = result && result.draft ? result.draft : null;
-      if (draft && typeof draft.savedAt === "string") {
-        state.savedAt = draft.savedAt;
-        saveState();
-      }
-      setStatus(copy.cleared, false);
+      const result = await callSyncFunction(copy.applyFn, state.rows, state.reportDateTime);
+      const clearWarnings = await clearRemoteDraftsBestEffort(state.reportDateTime, copy.clearFns);
+      clearStateRows();
+      const sourceText = result && result.source === "remote" ? "առցանց" : "տեղային";
+      const warningText = clearWarnings.length ? ` Զգուշացում: ${clearWarnings.join(" | ")}` : "";
+      setStatus(`${copy.transferred} (${sourceText})։${warningText}`, false);
+      render();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : copy.syncMissing, true);
+      render();
+    }
+  }
+
+  async function handleReset(button) {
+    resetState();
+
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = true;
+    }
+    render();
+
+    try {
+      const clearWarnings = await clearRemoteDraftsBestEffort(state.reportDateTime, copy.clearFns);
+      const warningText = clearWarnings.length ? ` Զգուշացում: ${clearWarnings.join(" | ")}` : "";
+      setStatus(`${copy.cleared}${warningText}`, false);
       render();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : copy.cleared, true);
@@ -495,6 +580,10 @@
     }
     if (target.id === "shiftSaveBtn") {
       handleSave(target);
+      return;
+    }
+    if (target.id === "shiftTransferBtn") {
+      handleTransfer(target);
       return;
     }
     if (target.id === "shiftResetBtn") {
@@ -512,12 +601,11 @@
     if (window.SHARSH_AUTH_READY) {
       await window.SHARSH_AUTH_READY;
     }
-    const loadFn = sync && sync[copy.loadFn];
-    if (sync && typeof sync.hasRemoteSync === "function" && sync.hasRemoteSync() && typeof loadFn === "function") {
+    if (sync && typeof sync.hasRemoteSync === "function" && sync.hasRemoteSync()) {
       try {
-        const result = await loadFn();
-        const hasRows = applyDraft(result && result.draft);
-        if (hasRows) {
+        const combined = await loadRemoteDrafts();
+        if (combined.hasRows) {
+          applyDraft(combined);
           setStatus(copy.loadOk, false);
         }
       } catch (error) {

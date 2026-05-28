@@ -1285,8 +1285,8 @@ function getTelegramNightFormUrl(reportDateTime: string) {
 
 function getNightShiftBrowserUrl() {
   const params = new URLSearchParams();
-  params.set("view", "night");
-  return `${getPublicSiteBaseUrl()}/night.html?${params.toString()}`;
+  params.set("view", "day");
+  return `${getPublicSiteBaseUrl()}/day.html?${params.toString()}`;
 }
 
 function getTelegramDayFormUrl(reportDateTime: string) {
@@ -6729,7 +6729,7 @@ function buildColleagueStartText(firstName = "") {
     "1. Ուղարկեք բաժանմունքի կոդը, օրինակ՝ SR-7։",
     "2. Բոտը կուղարկի ընթացիկ PDF-ը և Telegram ձևը բացելու կոճակը։",
     "3. Լրացրեք ձևը և ուղարկեք բլանկի լուսանկարը։",
-    "Գիշերային հերթափոխի համար օգտագործեք /night հրամանը, ցերեկայինի համար՝ /day, իսկ առավոտյան դուրսգրման համար՝ /discharge։",
+    "Ընդունման ձևի համար օգտագործեք /day, իսկ դուրսգրման ձևի համար՝ /discharge։ /night հրամանը նույնպես բացում է ընդունման նույն ձևը։",
     "",
     "SR-? հրամանը ցույց կտա բաժանմունքների ցանկը։",
     "",
@@ -6760,9 +6760,9 @@ function buildAdminHelpText() {
     "SR-? — ցույց տալ բաժանմունքների SR կոդերի ցանկը։",
     "SR-7 կամ r7 — ուղարկել ընթացիկ տվյալների PDF-ը և Telegram ձևի կոճակը։",
     "/form SR-7 — ընթացիկ տվյալների PDF + Telegram ձևի կոճակ։",
-    "/night — բացել գիշերային հերթափոխի Telegram ձևը։",
-    "/day — բացել ցերեկային հերթափոխի Telegram ձևը։",
-    "/discharge — բացել առավոտյան դուրսգրման Telegram ձևը։",
+    "/day — բացել ընդունման Telegram ձևը։",
+    "/discharge — բացել դուրսգրման Telegram ձևը։",
+    "/night — հին համատեղելի հրաման է և նույնպես բացում է ընդունման ձևը։",
     "/civil — բացել Քաղ. ԲԿ բազայի Telegram ձևը։",
     "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը։",
     "/duty — նշել, որ կոլեգան գիշերային հերթապահ է։",
@@ -6799,9 +6799,9 @@ function buildHelpText() {
     "/pdf — գլխավոր ֆայլի հղումը",
     "/done — նույնն է, ինչ /pdf",
     "/form SR-4 — ստանալ ընթացիկ տվյալների PDF-ը և բացել Telegram Web App ձևը",
-    "/night — բացել գիշերային հերթափոխի Telegram Web App ձևը",
-    "/day — բացել ցերեկային հերթափոխի Telegram Web App ձևը",
-    "/discharge — բացել առավոտյան դուրսգրման Telegram Web App ձևը",
+    "/day — բացել ընդունման Telegram Web App ձևը",
+    "/discharge — բացել դուրսգրման Telegram Web App ձևը",
+    "/night — հին համատեղելի հրաման է և նույնպես բացում է ընդունման ձևը",
     "/civil — բացել Քաղ. ԲԿ բազայի Telegram Web App ձևը",
     "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը",
     "/duty — նշել գիշերային հերթապահությունը",
@@ -7196,7 +7196,7 @@ function buildTelegramNightFormReplyMarkup(formUrl: string) {
     inline_keyboard: [
       [
         {
-          text: "Բացել գիշերային ձևը",
+          text: "Բացել ընդունման ձևը",
           web_app: { url: formUrl }
         }
       ]
@@ -7222,7 +7222,7 @@ function buildTelegramDayFormReplyMarkup(formUrl: string) {
     inline_keyboard: [
       [
         {
-          text: "Բացել ցերեկային ձևը",
+          text: "Բացել ընդունման ձևը",
           web_app: { url: formUrl }
         }
       ]
@@ -7235,7 +7235,7 @@ function buildTelegramDischargeFormReplyMarkup(formUrl: string) {
     inline_keyboard: [
       [
         {
-          text: "Բացել դուրսգրման ձևը",
+          text: "Բացել Դուրսգրում ձևը",
           web_app: { url: formUrl }
         }
       ]
@@ -7375,9 +7375,9 @@ async function sendTelegramNightShiftForm(chatId: number | string) {
   await sendTelegramMessageWithReplyMarkup(
     chatId,
     [
-      "Գիշերային հերթափոխի ձևը պատրաստ է։",
-      "Լրացրեք միայն այն բաժանմունքները, որտեղ գիշերվա ընթացքում ընդունում է եղել։",
-      "Ուղարկելուց հետո տվյալները կպահպանվեն կայքի «Գիշերային հերթափոխ» էջում և Վադիմ Աշոտիչին կուղարկվի ամփոփում։",
+      "Ընդունման ձևը պատրաստ է։",
+      "Լրացրեք միայն այն բաժանմունքները, որտեղ ընդունում է եղել։",
+      "Ուղարկելուց հետո տվյալները կպահպանվեն կայքի «Ընդունում» էջում և Վադիմ Աշոտիչին կուղարկվի ամփոփում։",
       "",
       `Ժամանակ: ${reportDateTime}`
     ].join("\n"),
@@ -7391,9 +7391,9 @@ async function sendTelegramDayShiftForm(chatId: number | string) {
   await sendTelegramMessageWithReplyMarkup(
     chatId,
     [
-      "Ցերեկային հերթափոխի ձևը պատրաստ է։",
-      "Լրացրեք միայն այն բաժանմունքները, որտեղ ցերեկվա ընթացքում ընդունում է եղել։",
-      "Ուղարկելուց հետո տվյալները կպահպանվեն կայքի «Ցերեկային հերթափոխ» էջում և Վադիմ Աշոտիչին կուղարկվի ամփոփում։",
+      "Ընդունման ձևը պատրաստ է։",
+      "Լրացրեք միայն այն բաժանմունքները, որտեղ ընդունում է եղել։",
+      "Ուղարկելուց հետո տվյալները կպահպանվեն կայքի «Ընդունում» էջում և Վադիմ Աշոտիչին կուղարկվի ամփոփում։",
       "",
       `Ժամանակ: ${reportDateTime}`
     ].join("\n"),
@@ -7407,10 +7407,9 @@ async function sendTelegramDischargeShiftForm(chatId: number | string) {
   await sendTelegramMessageWithReplyMarkup(
     chatId,
     [
-      "Առավոտյան դուրսգրման ձևը պատրաստ է։",
+      "Դուրսգրման ձևը պատրաստ է։",
       "Լրացրեք միայն այն բաժանմունքները, որտեղ ստացիոնարից դուրսգրում է եղել։",
-      "Ուղարկելուց հետո տվյալները կպահպանվեն կայքի «Առավոտյան դուրսգրում» էջում և Վադիմ Աշոտիչին կուղարկվի ամփոփում։",
-      "Հիմնական աղյուսակ տեղափոխումը դեռ անջատված է՝ մինչև բանաձևերի ավելացումը։",
+      "Ուղարկելուց հետո տվյալները կպահպանվեն կայքի «Դուրսգրում» էջում և Վադիմ Աշոտիչին կուղարկվի ամփոփում։",
       "",
       `Ժամանակ: ${reportDateTime}`
     ].join("\n"),
@@ -7773,7 +7772,7 @@ function buildNightShiftSummaryText(
   const nightPageUrl = getNightShiftBrowserUrl();
 
   return [
-    "Գիշերային հերթափոխի տվյալներ են ստացվել։",
+    "Ընդունման տվյալներ են ստացվել։",
     `Ժամանակ: ${reportDateTime}`,
     userName ? `Ուղարկող: ${userName}` : "",
     `Լրացված բաժանմունքներ: ${filledDepartments.length}`,
@@ -7785,8 +7784,8 @@ function buildNightShiftSummaryText(
     ...(totalLines.length ? totalLines : ["- Չկա"]),
     "",
     `Ընդամենը: ${grandTotal}`,
-    `Գիշերային հերթափոխի էջը: ${nightPageUrl}`,
-    "Տվյալները պահպանվել են միայն «Գիշերային հերթափոխ» էջում։ Հիմնական աղյուսակ տեղափոխումը կատարեք կայքի էջից։"
+    `Ընդունման էջը: ${nightPageUrl}`,
+    "Տվյալները պահպանվել են միայն «Ընդունում» էջում։ Հիմնական աղյուսակ տեղափոխումը կատարեք կայքի էջից։"
   ].filter((line) => line !== "").join("\n");
 }
 
@@ -7822,7 +7821,7 @@ function buildDayShiftSummaryText(
     .map((key) => `- ${NIGHT_SHIFT_LABELS[key]}: ${safeNumber(columnTotals[key])}`);
 
   return [
-    "Ցերեկային հերթափոխի տվյալներ են ստացվել։",
+    "Ընդունման տվյալներ են ստացվել։",
     `Ժամանակ: ${reportDateTime}`,
     userName ? `Ուղարկող: ${userName}` : "",
     `Լրացված բաժանմունքներ: ${filledDepartments.length}`,
@@ -7834,7 +7833,7 @@ function buildDayShiftSummaryText(
     ...(totalLines.length ? totalLines : ["- Չկա"]),
     "",
     `Ընդամենը: ${grandTotal}`,
-    "Տվյալները պահպանվել են միայն «Ցերեկային հերթափոխ» էջում։ Հիմնական աղյուսակ տեղափոխումը կատարեք կայքի էջից։"
+    "Տվյալները պահպանվել են միայն «Ընդունում» էջում։ Հիմնական աղյուսակ տեղափոխումը կատարեք կայքի էջից։"
   ].filter((line) => line !== "").join("\n");
 }
 
@@ -7870,7 +7869,7 @@ function buildDischargeShiftSummaryText(
     .map((key) => `- ${NIGHT_SHIFT_LABELS[key]}: ${safeNumber(columnTotals[key])}`);
 
   return [
-    "Առավոտյան դուրսգրման տվյալներ են ստացվել։",
+    "Դուրսգրման տվյալներ են ստացվել։",
     `Ժամանակ: ${reportDateTime}`,
     userName ? `Ուղարկող: ${userName}` : "",
     `Լրացված բաժանմունքներ: ${filledDepartments.length}`,
@@ -7882,7 +7881,7 @@ function buildDischargeShiftSummaryText(
     ...(totalLines.length ? totalLines : ["- Չկա"]),
     "",
     `Ընդամենը: ${grandTotal}`,
-    "Տվյալները պահպանվել են միայն «Առավոտյան դուրսգրում» էջում։ Հիմնական աղյուսակ տեղափոխման բանաձևերը դեռ ավելացված չեն։"
+    "Տվյալները պահպանվել են միայն «Դուրսգրում» էջում։ Հիմնական աղյուսակ տեղափոխումը կատարեք կայքի էջից։"
   ].filter((line) => line !== "").join("\n");
 }
 
@@ -8278,7 +8277,7 @@ async function handleTelegramNightFormSubmit(request: Request) {
         await sendTelegramMessage(
           verifiedUser.userId,
           [
-            `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Գիշերային հերթափոխի տվյալները պահպանվել են։`,
+            `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Ընդունման տվյալները պահպանվել են։`,
             "Շատ լավ աշխատանք է։ Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
           ].join("\n")
         );
@@ -8287,7 +8286,7 @@ async function handleTelegramNightFormSubmit(request: Request) {
 
     return jsonResponse({
       ok: true,
-      message: "Գիշերային հերթափոխի տվյալները պահպանվել են։",
+      message: "Ընդունման տվյալները պահպանվել են։",
       filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
       summary: summaryText
     });
@@ -8312,7 +8311,7 @@ async function handleTelegramNightFormSubmit(request: Request) {
       await sendTelegramMessage(
         verifiedUser.userId,
         [
-          `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Գիշերային հերթափոխի տվյալները պահպանվել են։`,
+          `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Ընդունման տվյալները պահպանվել են։`,
           "Շատ լավ աշխատանք է։ Առավոտյան ամենակարեւոր բաներից մեկը կարգավորված տվյալներն են, եւ Դուք դա արդեն արեցիք։",
           "Թող հերթափոխի ավարտը լինի հանգիստ, իսկ սուրճը՝ արժանիորեն տաք։",
           "Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
@@ -8324,7 +8323,7 @@ async function handleTelegramNightFormSubmit(request: Request) {
 
     return jsonResponse({
       ok: true,
-      message: "Գիշերային հերթափոխի տվյալները պահպանվել են։",
+      message: "Ընդունման տվյալները պահպանվել են։",
       filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
       summary: summaryText
     });
@@ -8507,7 +8506,7 @@ async function handleTelegramDayFormSubmit(request: Request) {
         await sendTelegramMessage(
           verifiedUser.userId,
           [
-            `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Ցերեկային հերթափոխի տվյալները պահպանվել են։`,
+            `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Ընդունման տվյալները պահպանվել են։`,
             "Տվյալները արդեն հասանելի են կայքում։ Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
           ].join("\n")
         );
@@ -8516,7 +8515,7 @@ async function handleTelegramDayFormSubmit(request: Request) {
 
     return jsonResponse({
       ok: true,
-      message: "Ցերեկային հերթափոխի տվյալները պահպանվել են։",
+      message: "Ընդունման տվյալները պահպանվել են։",
       filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
       summary: summaryText
     });
@@ -8528,8 +8527,8 @@ async function handleTelegramDayFormSubmit(request: Request) {
       await sendTelegramMessage(
         verifiedUser.userId,
         [
-          `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Ցերեկային հերթափոխի տվյալները պահպանվել են։`,
-          "Շատ լավ է։ Տվյալները արդեն հասանելի են կայքի «Ցերեկային հերթափոխ» էջում։",
+          `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Ընդունման տվյալները պահպանվել են։`,
+          "Շատ լավ է։ Տվյալները արդեն հասանելի են կայքի «Ընդունում» էջում։",
           "Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
         ].join("\n")
       ).catch((error) => {
@@ -8539,7 +8538,7 @@ async function handleTelegramDayFormSubmit(request: Request) {
 
     return jsonResponse({
       ok: true,
-      message: "Ցերեկային հերթափոխի տվյալները պահպանվել են։",
+      message: "Ընդունման տվյալները պահպանվել են։",
       filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
       summary: summaryText
     });
@@ -8592,7 +8591,7 @@ async function handleTelegramDischargeFormSubmit(request: Request) {
         await sendTelegramMessage(
           verifiedUser.userId,
           [
-            `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Առավոտյան դուրսգրման տվյալները պահպանվել են։`,
+            `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Դուրսգրման տվյալները պահպանվել են։`,
             "Տվյալները արդեն հասանելի են կայքում։ Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
           ].join("\n")
         );
@@ -8601,7 +8600,7 @@ async function handleTelegramDischargeFormSubmit(request: Request) {
 
     return jsonResponse({
       ok: true,
-      message: "Առավոտյան դուրսգրման տվյալները պահպանվել են։",
+      message: "Դուրսգրման տվյալները պահպանվել են։",
       filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
       summary: summaryText
     });
@@ -8613,8 +8612,8 @@ async function handleTelegramDischargeFormSubmit(request: Request) {
       await sendTelegramMessage(
         verifiedUser.userId,
         [
-          `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Առավոտյան դուրսգրման տվյալները պահպանվել են։`,
-          "Շատ լավ աշխատանք է։ Տվյալները արդեն հասանելի են կայքի «Առավոտյան դուրսգրում» էջում։",
+          `Շնորհակալություն, ${verifiedUser.firstName || "հարգելի կոլեգա"}։ Դուրսգրման տվյալները պահպանվել են։`,
+          "Շատ լավ աշխատանք է։ Տվյալները արդեն հասանելի են կայքի «Դուրսգրում» էջում։",
           "Եթե անհրաժեշտ է, կարող եք նորից բացել ձևը և ուղարկել ճշգրտված տարբերակը։"
         ].join("\n")
       ).catch((error) => {
@@ -8624,7 +8623,7 @@ async function handleTelegramDischargeFormSubmit(request: Request) {
 
     return jsonResponse({
       ok: true,
-      message: "Առավոտյան դուրսգրման տվյալները պահպանվել են։",
+      message: "Դուրսգրման տվյալները պահպանվել են։",
       filledDepartments: Object.values(rows).filter((row) => getNightShiftRowTotal(row) > 0).length,
       summary: summaryText
     });
@@ -9236,7 +9235,7 @@ async function handleTelegramCallbackQuery(
   }
 
   if (data === TELEGRAM_APPLY_NIGHT_SHIFT_CALLBACK) {
-    await answerTelegramCallbackQuery(callbackQueryId, "Տեղափոխում եմ գիշերային տվյալները…").catch(() => null);
+    await answerTelegramCallbackQuery(callbackQueryId, "Տեղափոխում եմ ընդունման տվյալները…").catch(() => null);
     try {
       const result = await applyNightShiftDraftToMainFromTelegram(supabase);
       const pdfResult = await sendMainPdfsToTelegram(supabase, { force: true, source: "night_shift_apply" });
@@ -9250,7 +9249,7 @@ async function handleTelegramCallbackQuery(
         await sendTelegramMessage(
           callbackMessageChatId,
           [
-            "Գիշերային հերթափոխի տվյալների տեղափոխումն ավարտված է։",
+            "Ընդունման տվյալների տեղափոխումն ավարտված է։",
             `Ժամանակ: ${result.reportDateTime}`,
             `Թարմացված բաժանմունքներ: ${result.applied}`,
             "",
@@ -9266,7 +9265,7 @@ async function handleTelegramCallbackQuery(
       if (callbackMessageChatId !== null) {
         await sendTelegramMessage(
           callbackMessageChatId,
-          `Չհաջողվեց տեղափոխել գիշերային տվյալները: ${sanitizePublicErrorMessage(error)}`
+          `Չհաջողվեց տեղափոխել ընդունման տվյալները: ${sanitizePublicErrorMessage(error)}`
         ).catch(() => null);
       }
       console.error("Failed to apply night shift from Telegram callback:", sanitizePublicErrorMessage(error));
@@ -9342,12 +9341,12 @@ async function handleTelegramCallbackQuery(
       targetChatId,
       [
         `${getTelegramColleagueFirstName(colleague)}, Mainflow բոտի հասանելիությունը բացված է։`,
-        "Բարի գալուստ։ Ես արդեն իմ փոքրիկ պոստում եմ՝ ընդունում եմ բլանկների լուսանկարներ, ձևեր և գիշերային հերթափոխի տվյալներ։",
+        "Բարի գալուստ։ Ես արդեն իմ փոքրիկ պոստում եմ՝ ընդունում եմ բլանկների լուսանկարներ, ձևեր, ընդունման և դուրսգրման տվյալներ։",
         "Եթե առաջին լուսանկարը կատարյալ չստացվի, մի անհանգստացեք. ես կհուշեմ, ինչպես նկարել ավելի լավ։ Սա լուսանկարչության քննություն չէ, այլ թիմային աշխատանք։",
         "",
         gpsEnabled
           ? "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը եւ ուղարկեք geolocation-ը։"
-          : `Գիշերային հերթափոխի ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
+          : `Ընդունման ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
       ].join("\n"),
       buildWorkplaceLocationReplyMarkup(gpsEnabled)
     ).catch((error) => {
@@ -9677,7 +9676,7 @@ async function handleTelegramCommand(
         "",
         gpsEnabled
           ? "Եթե արդեն հիվանդանոցում եք, սեղմեք «Ես աշխատանքի եմ» կոճակը։"
-          : `Գիշերային հերթափոխի ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
+          : `Ընդունման ձևի համար սեղմեք «${TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT}» կոճակը։`
       ].join("\n"),
       buildWorkplaceLocationReplyMarkup(gpsEnabled)
     );
@@ -9715,15 +9714,15 @@ async function handleTelegramCommand(
         await sendTelegramNightShiftForm(accessChatId);
         await sendTelegramMessage(
           chatId,
-          `${firstName}, գիշերային հերթափոխի ձևը ուղարկեցի Ձեր անձնական չատում։`
+          `${firstName}, ընդունման ձևը ուղարկեցի Ձեր անձնական չատում։`
         );
       } catch (error) {
         console.error("Failed to send Telegram night form privately from group:", sanitizePublicErrorMessage(error));
         await sendTelegramMessage(
           chatId,
           [
-            `${firstName}, տեսնում եմ /night հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
-            "Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք /night։"
+            `${firstName}, տեսնում եմ ընդունման հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
+            "Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք /day կամ /night։"
           ].join("\n")
         );
       }
@@ -9741,13 +9740,13 @@ async function handleTelegramCommand(
         await sendTelegramDayShiftForm(accessChatId);
         await sendTelegramMessage(
           chatId,
-          `${firstName}, ցերեկային հերթափոխի ձևը ուղարկեցի Ձեր անձնական չատում։`
+          `${firstName}, ընդունման ձևը ուղարկեցի Ձեր անձնական չատում։`
         );
       } catch (error) {
         await sendTelegramMessage(
           chatId,
           [
-            `${firstName}, տեսնում եմ /day հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
+            `${firstName}, տեսնում եմ ընդունման հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
             "Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք /day։"
           ].join("\n")
         );
@@ -9766,13 +9765,13 @@ async function handleTelegramCommand(
         await sendTelegramDischargeShiftForm(accessChatId);
         await sendTelegramMessage(
           chatId,
-          `${firstName}, առավոտյան դուրսգրման ձևը ուղարկեցի Ձեր անձնական չատում։`
+          `${firstName}, դուրսգրման ձևը ուղարկեցի Ձեր անձնական չատում։`
         );
       } catch (error) {
         await sendTelegramMessage(
           chatId,
           [
-            `${firstName}, տեսնում եմ /discharge հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
+            `${firstName}, տեսնում եմ դուրսգրման հրամանը, բայց չեմ կարող անձնական չատում ձև ուղարկել։`,
             "Խնդրում եմ մեկ անգամ բացեք բոտը անձնական չատում և ուղարկեք /start, հետո այստեղ կրկին գրեք /discharge։"
           ].join("\n")
         );

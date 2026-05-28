@@ -8673,9 +8673,8 @@ function buildInitialPhotoLightboxState() {
               <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
             </div>
             <div class="main-toolbar-group">
-              <a class="button-link" href="${escapeHtml(getNightShiftPath())}" target="_blank" rel="noopener">Էջ՝ գիշ. ընդուն.</a>
-              <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. ընդուն.</a>
-              <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Էջ՝ ցեր. դուրսգր.</a>
+              <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Ընդունում</a>
+              <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Դուրսգրում</a>
               <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}" target="_blank" rel="noopener">Քաղ. ԲԿ բազա</a>
               <a class="button-link" href="${escapeHtml(getSetupPath())}">Կարգավ.</a>
             </div>

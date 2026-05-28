@@ -1287,12 +1287,19 @@
       getLocalRowNumber(values, "qhBaseSoldier") !== 0
       || getLocalRowNumber(values, "qhBaseOfficer") !== 0
       || getLocalRowNumber(values, "qhBaseContract") !== 0;
+    const hasQhFlowValues =
+      getLocalRowNumber(values, "qhIncomingSoldier") !== 0
+      || getLocalRowNumber(values, "qhIncomingOfficer") !== 0
+      || getLocalRowNumber(values, "qhIncomingContract") !== 0
+      || getLocalRowNumber(values, "qhDischargedSoldier") !== 0
+      || getLocalRowNumber(values, "qhDischargedOfficer") !== 0
+      || getLocalRowNumber(values, "qhDischargedContract") !== 0;
     const hasCurrentValues =
       getLocalRowNumber(values, "currentShar") !== 0
       || getLocalRowNumber(values, "currentSpa") !== 0
       || getLocalRowNumber(values, "currentPaym") !== 0;
 
-    if (!hasBaseValues && hasCurrentValues) {
+    if (!hasBaseValues && !hasQhFlowValues && hasCurrentValues) {
       values.qhBaseSoldier = getLocalRowNumber(values, "currentShar");
       values.qhBaseOfficer = getLocalRowNumber(values, "currentSpa");
       values.qhBaseContract = getLocalRowNumber(values, "currentPaym");

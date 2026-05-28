@@ -492,6 +492,15 @@
           }),
           source: "remote"
         };
+      case "apply_discharge_shift":
+        return {
+          snapshot: await postRemote({
+            type: "apply_discharge_shift",
+            reportDate: payload.reportDate,
+            rows: sanitizeNightShiftRows(payload.rows)
+          }),
+          source: "remote"
+        };
       case "rollover_main_after_archive": {
         const responsePayload = await postRemotePayload(
           {
@@ -1278,6 +1287,10 @@
     values[key] = config.normalizeCellValue(values[key]) + config.normalizeCellValue(amount);
   }
 
+  function subtractCell(values, key, amount) {
+    values[key] = Math.max(0, getLocalRowNumber(values, key) - config.normalizeCellValue(amount));
+  }
+
   function getLocalRowNumber(values, key) {
     return config.normalizeCellValue(values && values[key]) || 0;
   }
@@ -1287,12 +1300,19 @@
       getLocalRowNumber(values, "qhBaseSoldier") !== 0
       || getLocalRowNumber(values, "qhBaseOfficer") !== 0
       || getLocalRowNumber(values, "qhBaseContract") !== 0;
+    const hasQhFlowValues =
+      getLocalRowNumber(values, "qhIncomingSoldier") !== 0
+      || getLocalRowNumber(values, "qhIncomingOfficer") !== 0
+      || getLocalRowNumber(values, "qhIncomingContract") !== 0
+      || getLocalRowNumber(values, "qhDischargedSoldier") !== 0
+      || getLocalRowNumber(values, "qhDischargedOfficer") !== 0
+      || getLocalRowNumber(values, "qhDischargedContract") !== 0;
     const hasCurrentValues =
       getLocalRowNumber(values, "currentShar") !== 0
       || getLocalRowNumber(values, "currentSpa") !== 0
       || getLocalRowNumber(values, "currentPaym") !== 0;
 
-    if (!hasBaseValues && hasCurrentValues) {
+    if (!hasBaseValues && !hasQhFlowValues && hasCurrentValues) {
       values.qhBaseSoldier = getLocalRowNumber(values, "currentShar");
       values.qhBaseOfficer = getLocalRowNumber(values, "currentSpa");
       values.qhBaseContract = getLocalRowNumber(values, "currentPaym");
@@ -1641,6 +1661,64 @@
     return applyNightShiftRowsToSnapshot(snapshot, rows, reportDate);
   }
 
+  function applyDischargeShiftRowsToSnapshot(snapshot, rows, reportDate) {
+    const normalized = config.buildSnapshotFromSaved(snapshot);
+    const dischargeRows = sanitizeNightShiftRows(rows);
+    const now = new Date().toISOString();
+
+    normalized.rows.forEach((row) => {
+      const requested1 = getNightValue(dischargeRows, row.id, "shar");
+      const requested2 = getNightValue(dischargeRows, row.id, "spa");
+      const requested3 = getNightValue(dischargeRows, row.id, "paym");
+      const requested4 = getNightValue(dischargeRows, row.id, "zh");
+      const requested5 = getNightValue(dischargeRows, row.id, "family");
+      const requested6 = getNightValue(dischargeRows, row.id, "zp");
+      const requested7 = getNightValue(dischargeRows, row.id, "qi");
+      const values = config.normalizeRowValues(row.values);
+      const n1 = Math.min(requested1, getLocalRowNumber(values, "currentShar"));
+      const n2 = Math.min(requested2, getLocalRowNumber(values, "currentSpa"));
+      const n3 = Math.min(requested3, getLocalRowNumber(values, "currentPaym"));
+      const n4 = Math.min(requested4, getLocalRowNumber(values, "currentZh"));
+      const n5 = Math.min(requested5, getLocalRowNumber(values, "family"));
+      const n6 = Math.min(requested6, getLocalRowNumber(values, "officer"));
+      const n7 = Math.min(requested7, getLocalRowNumber(values, "civil"));
+      const dischargeTotal = n1 + n2 + n3 + n4 + n5 + n6 + n7;
+
+      if (!dischargeTotal) {
+        return;
+      }
+
+      addCell(values, "dgSeries", n1);
+      addCell(values, "dgTotal", dischargeTotal);
+      addCell(values, "dgSoldier", n1 + n2 + n3);
+
+      if (QH_CALC_DEPARTMENT_IDS.has(row.id)) {
+        addCell(values, "qhDischargedSoldier", n1);
+        addCell(values, "qhDischargedOfficer", n2);
+        addCell(values, "qhDischargedContract", n3);
+        syncQhMorningCalculatedValues(row.id, values);
+      } else {
+        subtractCell(values, "currentShar", n1);
+        subtractCell(values, "currentSpa", n2);
+        subtractCell(values, "currentPaym", n3);
+      }
+
+      subtractCell(values, "currentZh", n4);
+      subtractCell(values, "family", n5);
+      subtractCell(values, "officer", n6);
+      subtractCell(values, "civil", n7);
+
+      row.values = values;
+      row.updatedAt = now;
+    });
+
+    if (typeof reportDate === "string" && reportDate.trim()) {
+      normalized.reportDate = reportDate.trim();
+    }
+    normalized.updatedAt = now;
+    return normalized;
+  }
+
   async function applyDayShiftToMain(rows, reportDate) {
     const dayRows = sanitizeNightShiftRows(rows);
 
@@ -1687,6 +1765,56 @@
       const snapshot = applyDayShiftRowsToSnapshot(loadLocalSnapshot(), dayRows, reportDate);
       writeLocalSnapshot(snapshot);
       enqueuePendingMutation("apply_day_shift", queuePayload, error instanceof Error ? error.message : "");
+      return buildPendingSyncResult(snapshot, error instanceof Error ? error.message : "");
+    }
+  }
+
+  async function applyDischargeShiftToMain(rows, reportDate) {
+    const dischargeRows = sanitizeNightShiftRows(rows);
+
+    if (hasRemoteSync()) {
+      const snapshot = await postRemote({
+        type: "apply_discharge_shift",
+        reportDate,
+        rows: dischargeRows
+      });
+      return {
+        snapshot,
+        source: "remote"
+      };
+    }
+
+    const snapshot = applyDischargeShiftRowsToSnapshot(loadLocalSnapshot(), dischargeRows, reportDate);
+    writeLocalSnapshot(snapshot);
+    return {
+      snapshot,
+      source: "local-only"
+    };
+  }
+
+  async function queueAwareApplyDischargeShiftToMain(rows, reportDate) {
+    const dischargeRows = sanitizeNightShiftRows(rows);
+    const queuePayload = {
+      reportDate,
+      rows: dischargeRows
+    };
+
+    if (shouldEnqueueMutationNow()) {
+      const snapshot = applyDischargeShiftRowsToSnapshot(loadLocalSnapshot(), dischargeRows, reportDate);
+      writeLocalSnapshot(snapshot);
+      enqueuePendingMutation("apply_discharge_shift", queuePayload);
+      return buildPendingSyncResult(snapshot);
+    }
+
+    try {
+      return await applyDischargeShiftToMain(rows, reportDate);
+    } catch (error) {
+      if (!shouldQueueRemoteError(error)) {
+        throw error;
+      }
+      const snapshot = applyDischargeShiftRowsToSnapshot(loadLocalSnapshot(), dischargeRows, reportDate);
+      writeLocalSnapshot(snapshot);
+      enqueuePendingMutation("apply_discharge_shift", queuePayload, error instanceof Error ? error.message : "");
       return buildPendingSyncResult(snapshot, error instanceof Error ? error.message : "");
     }
   }
@@ -2314,6 +2442,7 @@
     saveNightShiftDraft,
     clearNightShiftDraft,
     applyDayShiftToMain: queueAwareApplyDayShiftToMain,
+    applyDischargeShiftToMain: queueAwareApplyDischargeShiftToMain,
     loadDayShiftDraft,
     saveDayShiftDraft,
     clearDayShiftDraft,

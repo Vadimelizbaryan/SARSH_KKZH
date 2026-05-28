@@ -635,6 +635,10 @@ function addValue(values: Record<string, number | null>, key: string, amount: nu
   values[key] = safeNumber(values[key]) + safeNumber(amount);
 }
 
+function subtractValue(values: Record<string, number | null>, key: string, amount: number) {
+  values[key] = Math.max(0, safeNumber(values[key]) - safeNumber(amount));
+}
+
 function applyNightShiftValues(
   departmentId: string,
   values: Record<string, unknown> | null | undefined,
@@ -686,17 +690,72 @@ function applyDayShiftValues(
   return applyNightShiftValues(departmentId, values, dayRow);
 }
 
+function applyDischargeShiftValues(
+  departmentId: string,
+  values: Record<string, unknown> | null | undefined,
+  dischargeRow: Record<typeof NIGHT_SHIFT_VALUE_KEYS[number], number> | undefined
+) {
+  const requested1 = safeNumber(dischargeRow?.shar);
+  const requested2 = safeNumber(dischargeRow?.spa);
+  const requested3 = safeNumber(dischargeRow?.paym);
+  const requested4 = safeNumber(dischargeRow?.zh);
+  const requested5 = safeNumber(dischargeRow?.family);
+  const requested6 = safeNumber(dischargeRow?.zp);
+  const requested7 = safeNumber(dischargeRow?.qi);
+  const output = sanitizeValues(values);
+  const n1 = Math.min(requested1, safeNumber(output.currentShar));
+  const n2 = Math.min(requested2, safeNumber(output.currentSpa));
+  const n3 = Math.min(requested3, safeNumber(output.currentPaym));
+  const n4 = Math.min(requested4, safeNumber(output.currentZh));
+  const n5 = Math.min(requested5, safeNumber(output.family));
+  const n6 = Math.min(requested6, safeNumber(output.officer));
+  const n7 = Math.min(requested7, safeNumber(output.civil));
+  const dischargeTotal = n1 + n2 + n3 + n4 + n5 + n6 + n7;
+
+  if (!dischargeTotal) {
+    return null;
+  }
+
+  addValue(output, "dgSeries", n1);
+  addValue(output, "dgTotal", dischargeTotal);
+  addValue(output, "dgSoldier", n1 + n2 + n3);
+
+  if (QH_CALC_DEPARTMENT_IDS.has(departmentId)) {
+    addValue(output, "qhDischargedSoldier", n1);
+    addValue(output, "qhDischargedOfficer", n2);
+    addValue(output, "qhDischargedContract", n3);
+    syncQhMorningCalculatedValues(departmentId, output);
+  } else {
+    subtractValue(output, "currentShar", n1);
+    subtractValue(output, "currentSpa", n2);
+    subtractValue(output, "currentPaym", n3);
+  }
+
+  subtractValue(output, "currentZh", n4);
+  subtractValue(output, "family", n5);
+  subtractValue(output, "officer", n6);
+  subtractValue(output, "civil", n7);
+  return output;
+}
+
 function primeQhMorningBaseValues(values: Record<string, number | null>) {
   const hasBaseValues =
     safeNumber(values.qhBaseSoldier) !== 0
     || safeNumber(values.qhBaseOfficer) !== 0
     || safeNumber(values.qhBaseContract) !== 0;
+  const hasQhFlowValues =
+    safeNumber(values.qhIncomingSoldier) !== 0
+    || safeNumber(values.qhIncomingOfficer) !== 0
+    || safeNumber(values.qhIncomingContract) !== 0
+    || safeNumber(values.qhDischargedSoldier) !== 0
+    || safeNumber(values.qhDischargedOfficer) !== 0
+    || safeNumber(values.qhDischargedContract) !== 0;
   const hasCurrentValues =
     safeNumber(values.currentShar) !== 0
     || safeNumber(values.currentSpa) !== 0
     || safeNumber(values.currentPaym) !== 0;
 
-  if (!hasBaseValues && hasCurrentValues) {
+  if (!hasBaseValues && !hasQhFlowValues && hasCurrentValues) {
     values.qhBaseSoldier = safeNumber(values.currentShar);
     values.qhBaseOfficer = safeNumber(values.currentSpa);
     values.qhBaseContract = safeNumber(values.currentPaym);
@@ -3064,6 +3123,55 @@ Deno.serve(async (request) => {
       }
 
       await clearDayShiftDraft(supabase, reportDate);
+      return jsonResponse(await loadSnapshot(supabase));
+    }
+
+    if (type === "apply_discharge_shift") {
+      const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()
+        ? payload.reportDate.trim()
+        : DEFAULT_DATE;
+      const dischargeRows = sanitizeNightShiftRows(payload.rows);
+      const snapshot = await loadSnapshot(supabase);
+      const now = new Date().toISOString();
+      const updates = snapshot.rows.flatMap((row) => {
+        const values = applyDischargeShiftValues(row.id, row.values, dischargeRows[row.id]);
+        if (!values) {
+          return [];
+        }
+        const departmentMeta = DEPARTMENTS[row.id as keyof typeof DEPARTMENTS];
+        return [{
+          department_id: row.id,
+          department_name: departmentMeta.department,
+          department_group: departmentMeta.group,
+          values,
+          updated_at: now,
+          photo_workflow_status: "processed_discharge_shift"
+        }];
+      });
+
+      if (updates.length) {
+        const { error } = await supabase
+          .from("sharsh_departments")
+          .upsert(updates);
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      const { error: metaError } = await supabase
+        .from("sharsh_report_meta")
+        .upsert({
+          report_key: "main",
+          report_date: reportDate,
+          updated_at: now
+        });
+
+      if (metaError) {
+        throw metaError;
+      }
+
+      await clearDischargeShiftDraft(supabase, reportDate);
       return jsonResponse(await loadSnapshot(supabase));
     }
 
