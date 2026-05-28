@@ -5223,6 +5223,28 @@ async function loadLatestDepartmentPhotoFeedback(
   };
 }
 
+async function loadLatestDepartmentPhotoPreview(
+  supabase: ReturnType<typeof createClient>,
+  departmentId: DepartmentId,
+  reportDate: string
+) {
+  const latestFeedback = await loadLatestDepartmentPhotoFeedback(supabase, departmentId, reportDate);
+  if (!latestFeedback?.id) {
+    return null;
+  }
+
+  const preview = await loadAcceptedFeedbackPreview(supabase, latestFeedback.id, departmentId);
+  if (!preview || typeof preview.imageDataUrl !== "string" || !preview.imageDataUrl.startsWith("data:image/")) {
+    return null;
+  }
+
+  return {
+    ...preview,
+    imageName: latestFeedback.imageName || preview.imageName,
+    createdAt: latestFeedback.createdAt || preview.createdAt
+  };
+}
+
 async function insertAcceptedFeedback(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
@@ -10552,6 +10574,32 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "feedback_photo_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
+    }
+
+    if (action === "latest-department-photo") {
+      try {
+        const currentUrl = new URL(request.url);
+        const departmentId = parseDepartmentId(currentUrl.searchParams.get("departmentId"));
+        const reportDate = (currentUrl.searchParams.get("reportDate") || DEFAULT_DATE).trim() || DEFAULT_DATE;
+        if (!departmentId) {
+          return jsonResponse({ ok: false, error: "Department is required." }, 400);
+        }
+
+        const supabase = createSupabaseAdmin();
+        const record = await loadLatestDepartmentPhotoPreview(
+          supabase,
+          departmentId,
+          reportDate
+        );
+        return jsonResponse({ ok: true, record });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "latest_department_photo_failed",
           error: error instanceof Error ? error.message : String(error)
         }, 500);
       }

@@ -274,6 +274,209 @@
     return new URL("android/releases/MAINFORM.apk", window.location.href).href;
   }
 
+  const latestDepartmentPhotoState = {
+    isLoading: false,
+    record: null,
+    error: "",
+    requestId: 0,
+    modalOpen: false
+  };
+
+  function getTelegramFunctionBaseUrl() {
+    const baseUrl = String(runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co").replace(/\/+$/, "");
+    return `${baseUrl}/functions/v1/Mainflow-telegram`;
+  }
+
+  function getLatestDepartmentPhotoUrl(departmentId, reportDate) {
+    const url = new URL(getTelegramFunctionBaseUrl());
+    url.searchParams.set("action", "latest-department-photo");
+    url.searchParams.set("departmentId", String(departmentId || ""));
+    url.searchParams.set("reportDate", String(reportDate || ""));
+    return url.toString();
+  }
+
+  function formatLatestDepartmentPhotoTimestamp(value) {
+    const rawValue = String(value || "").trim();
+    if (!rawValue) {
+      return "";
+    }
+    const parsed = new Date(rawValue);
+    if (Number.isNaN(parsed.getTime())) {
+      return rawValue;
+    }
+    try {
+      return new Intl.DateTimeFormat("ru-RU", {
+        timeZone: "Asia/Yerevan",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(parsed);
+    } catch (_error) {
+      return rawValue;
+    }
+  }
+
+  function renderLatestDepartmentPhotoPanel() {
+    const panel = root.querySelector("[data-latest-photo-panel]");
+    if (!panel) {
+      return;
+    }
+    if (!isAndroidMode()) {
+      panel.hidden = true;
+      panel.innerHTML = "";
+      return;
+    }
+
+    if (latestDepartmentPhotoState.isLoading) {
+      panel.hidden = false;
+      panel.innerHTML = `
+        <div class="tg-last-photo-card is-loading">
+          <span class="tg-last-photo-card__label">Последнее отправленное фото</span>
+          <div class="tg-last-photo-card__loading">Загружаю снимок...</div>
+        </div>
+      `;
+      return;
+    }
+
+    const record = latestDepartmentPhotoState.record;
+    if (!record || typeof record.imageDataUrl !== "string" || !record.imageDataUrl.startsWith("data:image/")) {
+      panel.hidden = true;
+      panel.innerHTML = "";
+      return;
+    }
+
+    panel.hidden = false;
+    panel.innerHTML = `
+      <div class="tg-last-photo-card">
+        <span class="tg-last-photo-card__label">Последнее отправленное фото</span>
+        <button
+          type="button"
+          class="tg-last-photo-card__button"
+          data-latest-photo-open
+          aria-label="${escapeHtml(`Открыть последнее фото ${record.imageName || ""}`)}"
+        >
+          <img
+            src="${escapeHtml(record.imageDataUrl)}"
+            alt="${escapeHtml(record.imageName || "Последнее отправленное фото")}"
+          >
+        </button>
+        <div class="tg-last-photo-card__meta">
+          ${record.createdAt ? `<span>Отправлено: ${escapeHtml(formatLatestDepartmentPhotoTimestamp(record.createdAt))}</span>` : ""}
+          ${record.imageName ? `<span>Файл: ${escapeHtml(record.imageName)}</span>` : ""}
+          <span>Коснитесь фото для повторного просмотра.</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderLatestDepartmentPhotoModal() {
+    const modal = root.querySelector("[data-latest-photo-modal]");
+    if (!modal) {
+      return;
+    }
+
+    const record = latestDepartmentPhotoState.record;
+    const isOpen = latestDepartmentPhotoState.modalOpen
+      && record
+      && typeof record.imageDataUrl === "string"
+      && record.imageDataUrl.startsWith("data:image/");
+
+    modal.hidden = !isOpen;
+    if (!isOpen) {
+      modal.innerHTML = "";
+      return;
+    }
+
+    modal.innerHTML = `
+      <div class="tg-last-photo-modal__dialog" role="dialog" aria-modal="true" aria-label="Последнее отправленное фото">
+        <button type="button" class="tg-last-photo-modal__close" data-latest-photo-close aria-label="Закрыть фото">×</button>
+        <img
+          src="${escapeHtml(record.imageDataUrl)}"
+          alt="${escapeHtml(record.imageName || "Последнее отправленное фото")}"
+        >
+        <div class="tg-last-photo-modal__meta">
+          ${record.createdAt ? `<span>Отправлено: ${escapeHtml(formatLatestDepartmentPhotoTimestamp(record.createdAt))}</span>` : ""}
+          ${record.imageName ? `<span>${escapeHtml(record.imageName)}</span>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  function openLatestDepartmentPhotoModal() {
+    if (!latestDepartmentPhotoState.record) {
+      return;
+    }
+    latestDepartmentPhotoState.modalOpen = true;
+    renderLatestDepartmentPhotoModal();
+  }
+
+  function closeLatestDepartmentPhotoModal() {
+    if (!latestDepartmentPhotoState.modalOpen) {
+      return;
+    }
+    latestDepartmentPhotoState.modalOpen = false;
+    renderLatestDepartmentPhotoModal();
+  }
+
+  async function loadLatestDepartmentPhoto() {
+    const department = getDepartment();
+    const reportDate = getReportDate();
+    if (!department || !isAndroidMode()) {
+      latestDepartmentPhotoState.isLoading = false;
+      latestDepartmentPhotoState.record = null;
+      latestDepartmentPhotoState.error = "";
+      latestDepartmentPhotoState.modalOpen = false;
+      renderLatestDepartmentPhotoPanel();
+      renderLatestDepartmentPhotoModal();
+      return;
+    }
+
+    const requestId = latestDepartmentPhotoState.requestId + 1;
+    latestDepartmentPhotoState.requestId = requestId;
+    latestDepartmentPhotoState.isLoading = true;
+    latestDepartmentPhotoState.error = "";
+    renderLatestDepartmentPhotoPanel();
+
+    try {
+      const response = await fetch(getLatestDepartmentPhotoUrl(department.id, reportDate), {
+        method: "GET"
+      });
+      const payload = await response.json().catch(() => null);
+      if (requestId !== latestDepartmentPhotoState.requestId) {
+        return;
+      }
+      if (!response.ok || !payload || payload.ok !== true) {
+        throw new Error(payload && payload.error ? payload.error : "Не удалось загрузить последнее фото.");
+      }
+
+      const record = payload && payload.record && typeof payload.record === "object"
+        ? payload.record
+        : null;
+      latestDepartmentPhotoState.record = record
+        && typeof record.imageDataUrl === "string"
+        && record.imageDataUrl.startsWith("data:image/")
+        ? record
+        : null;
+      latestDepartmentPhotoState.modalOpen = false;
+      latestDepartmentPhotoState.error = "";
+    } catch (error) {
+      if (requestId !== latestDepartmentPhotoState.requestId) {
+        return;
+      }
+      latestDepartmentPhotoState.record = null;
+      latestDepartmentPhotoState.modalOpen = false;
+      latestDepartmentPhotoState.error = error instanceof Error ? error.message : "Не удалось загрузить последнее фото.";
+    } finally {
+      if (requestId === latestDepartmentPhotoState.requestId) {
+        latestDepartmentPhotoState.isLoading = false;
+        renderLatestDepartmentPhotoPanel();
+        renderLatestDepartmentPhotoModal();
+      }
+    }
+  }
+
   function getPatientNotesStorageKey(department, reportDate) {
     const departmentId = department && department.id ? department.id : "unknown";
     return `sharsh:tg-form:patient-notes:${departmentId}:${reportDate || ""}`;
@@ -1223,6 +1426,7 @@
         telegram.HapticFeedback && telegram.HapticFeedback.notificationOccurred("success");
         telegram.MainButton && telegram.MainButton.setText("Փակել").show().onClick(() => telegram.close());
       }
+      void loadLatestDepartmentPhoto();
     } catch (error) {
       if (message) {
         message.className = "tg-form-message error";
@@ -1254,16 +1458,20 @@
 
     root.innerHTML = `
       <section class="tg-form-card">
-        <header class="tg-form-head">
-          <div>
-            <p class="tg-form-kicker">${escapeHtml(department.marker || department.id)}</p>
-            <h1 class="tg-form-title">${escapeHtml(department.department)}</h1>
+        <header class="tg-form-head${isAndroidMode() ? " tg-form-head--with-photo" : ""}">
+          <div class="tg-form-head-main">
+            <div>
+              <p class="tg-form-kicker">${escapeHtml(department.marker || department.id)}</p>
+              <h1 class="tg-form-title">${escapeHtml(department.department)}</h1>
+            </div>
+            <div class="tg-form-meta">
+              <span class="tg-form-pill">Ամսաթիվ: ${escapeHtml(reportDate)}</span>
+              <span class="tg-form-pill">Telegram ձև</span>
+            </div>
           </div>
-          <div class="tg-form-meta">
-            <span class="tg-form-pill">Ամսաթիվ: ${escapeHtml(reportDate)}</span>
-            <span class="tg-form-pill">Telegram ձև</span>
-          </div>
+          ${isAndroidMode() ? '<aside class="tg-last-photo-panel" data-latest-photo-panel hidden></aside>' : ""}
         </header>
+        ${isAndroidMode() ? '<div class="tg-last-photo-modal" data-latest-photo-modal hidden></div>' : ""}
 
         <form data-form>
           <div class="tg-sheet-layout" aria-label="Բաժանմունքի ձև">
@@ -1365,6 +1573,30 @@
         syncFieldLockState();
       });
     }
+    root.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      if (target.closest("[data-latest-photo-open]")) {
+        event.preventDefault();
+        openLatestDepartmentPhotoModal();
+        return;
+      }
+
+      if (target.closest("[data-latest-photo-close]")) {
+        event.preventDefault();
+        closeLatestDepartmentPhotoModal();
+        return;
+      }
+
+      const modal = target.closest("[data-latest-photo-modal]");
+      if (modal && target === modal) {
+        event.preventDefault();
+        closeLatestDepartmentPhotoModal();
+      }
+    });
     root.querySelectorAll("[data-patient-note-input]").forEach((input) => {
       input.addEventListener("input", () => {
         const notes = readPatientNotes();
@@ -1401,6 +1633,7 @@
     refreshCalculatorUi();
     updateControl();
     syncFieldLockState();
+    void loadLatestDepartmentPhoto();
   }
 
   if (telegram) {

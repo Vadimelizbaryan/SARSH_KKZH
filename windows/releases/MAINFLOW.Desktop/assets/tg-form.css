@@ -60,6 +60,16 @@ input {
   margin-bottom: 12px;
 }
 
+.tg-form-head--with-photo {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  align-items: start;
+}
+
+.tg-form-head-main {
+  display: grid;
+  gap: 10px;
+}
+
 .tg-form-title {
   margin: 0;
   font-size: clamp(20px, 5vw, 34px);
@@ -79,6 +89,128 @@ input {
   padding: 6px 10px;
   font-size: 13px;
   font-weight: 800;
+}
+
+.tg-last-photo-panel[hidden],
+.tg-last-photo-modal[hidden] {
+  display: none;
+}
+
+.tg-last-photo-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(15, 139, 76, 0.16);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 222, 139, 0.18), rgba(255, 255, 255, 0.96)),
+    #fffdf8;
+}
+
+.tg-last-photo-card.is-loading {
+  min-height: 180px;
+  align-content: start;
+}
+
+.tg-last-photo-card__label {
+  color: var(--tg-accent);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tg-last-photo-card__button {
+  display: block;
+  width: 100%;
+  border: 1px solid rgba(31, 42, 36, 0.14);
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.tg-last-photo-card__button img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.tg-last-photo-card__meta {
+  display: grid;
+  gap: 4px;
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tg-last-photo-card__loading {
+  display: grid;
+  place-items: center;
+  min-height: 132px;
+  border: 1px dashed rgba(31, 42, 36, 0.16);
+  border-radius: 14px;
+  color: var(--tg-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tg-last-photo-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(18, 24, 20, 0.78);
+}
+
+.tg-last-photo-modal__dialog {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  width: min(96vw, 980px);
+  max-height: 92vh;
+  padding: 14px;
+  border-radius: 20px;
+  background: #fffdf8;
+  box-shadow: var(--tg-shadow);
+}
+
+.tg-last-photo-modal__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(31, 42, 36, 0.08);
+  color: var(--tg-ink);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tg-last-photo-modal__dialog img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(92vh - 100px);
+  margin: 0 auto;
+  border-radius: 16px;
+  object-fit: contain;
+}
+
+.tg-last-photo-modal__meta {
+  display: grid;
+  gap: 4px;
+  color: var(--tg-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .tg-form-muted {
@@ -1128,6 +1260,10 @@ input {
 }
 
 @media (max-width: 720px) {
+  .tg-form-head--with-photo {
+    grid-template-columns: 1fr;
+  }
+
   .tg-form-root {
     padding: 8px;
   }
@@ -1266,5 +1402,19 @@ input {
   .tg-civil-new-add {
     min-height: 34px;
     font-size: 13px;
+  }
+
+  .tg-last-photo-card__button img {
+    max-height: 220px;
+  }
+
+  .tg-last-photo-modal {
+    padding: 10px;
+  }
+
+  .tg-last-photo-modal__dialog {
+    width: min(100vw, 100%);
+    max-height: 96vh;
+    padding: 12px;
   }
 }
