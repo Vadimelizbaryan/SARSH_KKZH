@@ -5533,6 +5533,12 @@ function buildAndroidIntakePhotoSourceLabel(notes: string[]) {
   return "Լուսանկար";
 }
 
+function normalizeAndroidIntakeFeedbackNotes(notes: unknown) {
+  return Array.isArray(notes)
+    ? notes.map((item) => String(item || ""))
+    : [];
+}
+
 async function listAndroidIntakeSessionPhotoRecords(
   supabase: ReturnType<typeof createClient>,
   sessionStartIso: string,
@@ -5569,7 +5575,7 @@ async function listAndroidIntakeSessionPhotoRecords(
 
   return Array.from(latestByDepartment.values()).map((row) => {
     const departmentId = parseDepartmentId(row.department_id) as DepartmentId;
-    const notes = normalizeOcrFeedbackNotes(row.notes);
+    const notes = normalizeAndroidIntakeFeedbackNotes(row.notes);
     return {
       departmentId,
       departmentName: typeof row.department_name === "string" ? row.department_name : DEPARTMENTS[departmentId].department,
