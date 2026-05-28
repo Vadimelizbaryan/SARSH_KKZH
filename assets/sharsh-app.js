@@ -2632,6 +2632,17 @@ function buildInitialPhotoLightboxState() {
     return normalized === "telegram-web-app-form" || normalized === "telegram-qh-form";
   }
 
+  function isAndroidMainTablePhotoRecord(record) {
+    const notes = Array.isArray(record?.notes)
+      ? record.notes.map((item) => String(item || "").trim()).filter(Boolean)
+      : [];
+    const sourceText = record?.sourceMeta && typeof record.sourceMeta.text === "string"
+      ? record.sourceMeta.text
+      : "";
+    return notes.some((note) => /Android MAINFORM/i.test(note))
+      || /Android MAINFORM/i.test(sourceText);
+  }
+
   function getMainTablePhotoGallerySourceMeta(record) {
     const notes = Array.isArray(record?.notes)
       ? record.notes.map((item) => String(item || "").trim()).filter(Boolean)
@@ -2878,7 +2889,7 @@ function buildInitialPhotoLightboxState() {
 
   function getMainTablePhotoGalleryItems(rows) {
     return getMainTablePhotoGalleryTodayItems(rows)
-      .filter((item) => item?.sourceMeta?.kind !== "android");
+      .filter((item) => !isAndroidMainTablePhotoRecord(item));
   }
 
   function getMainTablePhotoGalleryBulkDeleteMeta(displayContext = getMainTableDisplaySnapshotContext()) {
@@ -2939,7 +2950,7 @@ function buildInitialPhotoLightboxState() {
   function buildMainTableAndroidAppItems(displayContext = getMainTableDisplaySnapshotContext()) {
     const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
     return getMainTablePhotoGalleryTodayItems(rows)
-      .filter((item) => item?.sourceMeta?.kind === "android")
+      .filter((item) => isAndroidMainTablePhotoRecord(item))
       .map((item) => {
         const previewValues = buildPhotoPreviewValuesFromRecord(item);
         const recognizedKeys = Array.isArray(item.recognizedKeys) && item.recognizedKeys.length
