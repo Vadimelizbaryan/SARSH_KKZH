@@ -37,56 +37,65 @@
       title: "Ընդունում",
       lead: "Օրվա ընթացքում գրանցեք ընդունված հիվանդների քանակը ըստ բաժանմունքների։",
       kicker: "Օրվա աշխատանքային էջ",
-      subtitle: "Լրացրեք ընդունվածների թվերը և պահեք էջում",
-      help: "Այս էջը կարող է բաց մնալ ընդունման պատասխանատու աշխատակցի մոտ։ Օրվա վերջում պահված տվյալներով կլրացնեք հիմնական աղյուսակը։",
+      subtitle: "Լրացրեք ընդունվածների թվերը, պահեք էջում և օրվա վերջում փոխանցեք հիմնական աղյուսակին",
+      help: "Այս էջը կարող է բաց մնալ ընդունման պատասխանատու աշխատակցի մոտ։ Օրվա ընթացքում պահեք թվերը որպես черновик, իսկ օրվա վերջում սեղմեք փոխանցման կոճակը։",
       clearLabel: "Մաքրել",
-      saveLabel: "Պահպանել",
+      saveLabel: "Պահպանել էջում",
+      transferLabel: "Տեղադրել հիմնական աղյուսակում",
       totalLabel: "Ընդամենը ընդունվել է",
       noValues: "Ընդունման էջում դեռ արժեքներ չկան։",
-      syncMissing: "Չհաջողվեց պահպանել ընդունման էջի տվյալները։",
-      saving: "Պահպանում եմ ընդունման տվյալները...",
-      saved: "Ընդունման տվյալները պահպանվել են",
+      syncMissing: "Չհաջողվեց աշխատել ընդունման էջի սինխրոնացման հետ։",
+      saving: "Պահպանում եմ ընդունման черновик-ը...",
+      saved: "Ընդունման черновик-ը պահպանվել է",
+      transferring: "Տեղափոխում եմ ընդունման տվյալները հիմնական աղյուսակ...",
+      transferred: "Ընդունման տվյալները ավելացվել են հիմնական աղյուսակին",
       cleared: "Ընդունման աղյուսակը մաքրվել է։",
       loadOk: "Բեռնվել են ընդունման էջի պահված տվյալները։",
       loadFail: "Չհաջողվեց բեռնել ընդունման էջի տվյալները։",
       confirmClear: "Մաքրե՞լ ընդունման աղյուսակի բոլոր արժեքները։",
-      loadFn: "loadDayShiftDraft",
       saveFn: "saveDayShiftDraft",
-      clearFn: "clearDayShiftDraft"
+      applyFn: "applyDayShiftToMain",
+      loadFns: ["loadDayShiftDraft", "loadNightShiftDraft"],
+      clearFns: ["clearDayShiftDraft", "clearNightShiftDraft"],
+      consolidateClearFns: ["clearNightShiftDraft"]
     },
     discharge: {
       storage: "discharge-shift",
       title: "Դուրսգրում",
       lead: "Օրվա ընթացքում գրանցեք դուրս գրված հիվանդների քանակը ըստ բաժանմունքների։",
       kicker: "Օրվա աշխատանքային էջ",
-      subtitle: "Լրացրեք դուրսգրվածների թվերը և պահեք էջում",
-      help: "Այս էջը կարող է բաց մնալ դուրսգրման պատասխանատու աշխատակցի մոտ։ Օրվա վերջում պահված տվյալներով կլրացնեք հիմնական աղյուսակը։",
+      subtitle: "Լրացրեք դուրսգրվածների թվերը, պահեք էջում և օրվա վերջում փոխանցեք հիմնական աղյուսակին",
+      help: "Այս էջը կարող է բաց մնալ դուրսգրման պատասխանատու աշխատակցի մոտ։ Օրվա ընթացքում պահեք թվերը որպես черновик, իսկ օրվա վերջում սեղմեք փոխանցման կոճակը։",
       clearLabel: "Մաքրել",
-      saveLabel: "Պահպանել",
+      saveLabel: "Պահպանել էջում",
+      transferLabel: "Տեղադրել հիմնական աղյուսակում",
       totalLabel: "Ընդամենը դուրս է գրվել",
       noValues: "Դուրսգրման էջում դեռ արժեքներ չկան։",
-      syncMissing: "Չհաջողվեց պահպանել դուրսգրման էջի տվյալները։",
-      saving: "Պահպանում եմ դուրսգրման տվյալները...",
-      saved: "Դուրսգրման տվյալները պահպանվել են",
+      syncMissing: "Չհաջողվեց աշխատել դուրսգրման էջի սինխրոնացման հետ։",
+      saving: "Պահպանում եմ դուրսգրման черновик-ը...",
+      saved: "Դուրսգրման черновик-ը պահպանվել է",
+      transferring: "Տեղափոխում եմ դուրսգրման տվյալները հիմնական աղյուսակ...",
+      transferred: "Դուրսգրման տվյալները ավելացվել են հիմնական աղյուսակին",
       cleared: "Դուրսգրման աղյուսակը մաքրվել է։",
       loadOk: "Բեռնվել են դուրսգրման էջի պահված տվյալները։",
       loadFail: "Չհաջողվեց բեռնել դուրսգրման էջի տվյալները։",
       confirmClear: "Մաքրե՞լ դուրսգրման աղյուսակի բոլոր արժեքները։",
-      loadFn: "loadDischargeShiftDraft",
       saveFn: "saveDischargeShiftDraft",
-      clearFn: "clearDischargeShiftDraft"
+      applyFn: "applyDischargeShiftToMain",
+      loadFns: ["loadDischargeShiftDraft"],
+      clearFns: ["clearDischargeShiftDraft"],
+      consolidateClearFns: []
     }
   };
 
   const copy = MODES[mode];
-  const STORAGE_KEY = `${config.STORAGE_NAMESPACE}:${copy.storage}:v2`;
+  const STORAGE_KEY = `${config.STORAGE_NAMESPACE}:${copy.storage}:v3`;
   const LEGACY_STORAGE_KEY = copy.legacyStorage
     ? `${config.STORAGE_NAMESPACE}:${copy.legacyStorage}:v1`
     : "";
-
+  const state = loadState();
   let statusText = "";
   let statusIsError = false;
-  const state = loadState();
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -214,6 +223,7 @@
       const legacy = parseStoredState(localStorage.getItem(LEGACY_STORAGE_KEY), fallback.reportDateTime);
       if (legacy && rowsHaveValues(legacy.rows)) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(legacy));
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
         return legacy;
       }
     }
@@ -256,6 +266,18 @@
     state.savedAt = "";
     state.rows = buildEmptyRows();
     saveState();
+    if (LEGACY_STORAGE_KEY) {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
+  }
+
+  function clearStateRows() {
+    state.rows = buildEmptyRows();
+    state.savedAt = getYerevanDateTime();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (LEGACY_STORAGE_KEY) {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
   }
 
   function getCell(departmentId, key) {
@@ -284,6 +306,69 @@
   function setStatus(message, isError = false) {
     statusText = message || "";
     statusIsError = Boolean(isError);
+  }
+
+  function getLatestSavedAt(records) {
+    const valid = records
+      .map((record) => String(record?.savedAt || "").trim())
+      .filter(Boolean);
+    return valid.sort().slice(-1)[0] || "";
+  }
+
+  function combineDrafts(records) {
+    const rows = buildEmptyRows();
+    let hasRows = false;
+
+    records.forEach((record) => {
+      if (!record || !record.rows || typeof record.rows !== "object") {
+        return;
+      }
+      config.departmentDefinitions.forEach((department) => {
+        COLUMNS.forEach((column) => {
+          const nextValue = sanitizeNumber(record.rows?.[department.id]?.[column.key]);
+          rows[department.id][column.key] += nextValue;
+          hasRows = hasRows || nextValue > 0;
+        });
+      });
+    });
+
+    return {
+      reportDateTime: normalizeReportDateTime(records.find((record) => record?.reportDateTime)?.reportDateTime, getYerevanDateTime()),
+      savedAt: getLatestSavedAt(records),
+      rows,
+      hasRows
+    };
+  }
+
+  async function callSyncFunction(functionName, ...args) {
+    const fn = sync && sync[functionName];
+    if (typeof fn !== "function") {
+      throw new Error(copy.syncMissing);
+    }
+    return await fn(...args);
+  }
+
+  async function loadRemoteDrafts() {
+    const records = [];
+    for (const functionName of copy.loadFns) {
+      const result = await callSyncFunction(functionName);
+      if (result && result.draft) {
+        records.push(result.draft);
+      }
+    }
+    return combineDrafts(records);
+  }
+
+  async function clearRemoteDraftsBestEffort(reportDateTime, functionNames) {
+    const warnings = [];
+    for (const functionName of functionNames) {
+      try {
+        await callSyncFunction(functionName, reportDateTime);
+      } catch (error) {
+        warnings.push(error instanceof Error ? error.message : String(error || ""));
+      }
+    }
+    return warnings;
   }
 
   function updateTotals() {
@@ -351,6 +436,7 @@
             <button type="button" id="shiftPrintBtn">Տպել</button>
             <button type="button" id="shiftResetBtn">${escapeHtml(copy.clearLabel)}</button>
             <button type="button" id="shiftSaveBtn">${escapeHtml(copy.saveLabel)}</button>
+            <button type="button" id="shiftTransferBtn">${escapeHtml(copy.transferLabel)}</button>
           </div>
         </div>
 
@@ -415,13 +501,6 @@
       return;
     }
 
-    const saveFn = sync && sync[copy.saveFn];
-    if (typeof saveFn !== "function") {
-      setStatus(copy.syncMissing, true);
-      render();
-      return;
-    }
-
     if (button instanceof HTMLButtonElement) {
       button.disabled = true;
     }
@@ -429,14 +508,45 @@
     render();
 
     try {
-      const result = await saveFn(state.rows, state.reportDateTime);
+      const result = await callSyncFunction(copy.saveFn, state.rows, state.reportDateTime);
       const draft = result && result.draft ? result.draft : null;
       if (draft && typeof draft.savedAt === "string" && draft.savedAt) {
         state.savedAt = draft.savedAt;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
+      const clearWarnings = await clearRemoteDraftsBestEffort(state.reportDateTime, copy.consolidateClearFns);
       const sourceText = result && result.source === "remote" ? "առցանց" : "տեղային";
-      setStatus(`${copy.saved} (${sourceText})։`, false);
+      const warningText = clearWarnings.length ? ` Զգուշացում: ${clearWarnings.join(" | ")}` : "";
+      setStatus(`${copy.saved} (${sourceText})։${warningText}`, false);
+      render();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : copy.syncMissing, true);
+      render();
+    }
+  }
+
+  async function handleTransfer(button) {
+    saveState();
+
+    if (!getGrandTotal()) {
+      setStatus(copy.noValues, false);
+      render();
+      return;
+    }
+
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = true;
+    }
+    setStatus(copy.transferring, false);
+    render();
+
+    try {
+      const result = await callSyncFunction(copy.applyFn, state.rows, state.reportDateTime);
+      const clearWarnings = await clearRemoteDraftsBestEffort(state.reportDateTime, copy.clearFns);
+      clearStateRows();
+      const sourceText = result && result.source === "remote" ? "առցանց" : "տեղային";
+      const warningText = clearWarnings.length ? ` Զգուշացում: ${clearWarnings.join(" | ")}` : "";
+      setStatus(`${copy.transferred} (${sourceText})։${warningText}`, false);
       render();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : copy.syncMissing, true);
@@ -446,12 +556,6 @@
 
   async function handleReset(button) {
     resetState();
-    const clearFn = sync && sync[copy.clearFn];
-    if (typeof clearFn !== "function") {
-      setStatus(copy.cleared, false);
-      render();
-      return;
-    }
 
     if (button instanceof HTMLButtonElement) {
       button.disabled = true;
@@ -459,13 +563,9 @@
     render();
 
     try {
-      const result = await clearFn(state.reportDateTime);
-      const draft = result && result.draft ? result.draft : null;
-      if (draft && typeof draft.savedAt === "string") {
-        state.savedAt = draft.savedAt;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      }
-      setStatus(copy.cleared, false);
+      const clearWarnings = await clearRemoteDraftsBestEffort(state.reportDateTime, copy.clearFns);
+      const warningText = clearWarnings.length ? ` Զգուշացում: ${clearWarnings.join(" | ")}` : "";
+      setStatus(`${copy.cleared}${warningText}`, false);
       render();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : copy.cleared, true);
@@ -480,6 +580,10 @@
     }
     if (target.id === "shiftSaveBtn") {
       handleSave(target);
+      return;
+    }
+    if (target.id === "shiftTransferBtn") {
+      handleTransfer(target);
       return;
     }
     if (target.id === "shiftResetBtn") {
@@ -497,12 +601,11 @@
     if (window.SHARSH_AUTH_READY) {
       await window.SHARSH_AUTH_READY;
     }
-    const loadFn = sync && sync[copy.loadFn];
-    if (sync && typeof sync.hasRemoteSync === "function" && sync.hasRemoteSync() && typeof loadFn === "function") {
+    if (sync && typeof sync.hasRemoteSync === "function" && sync.hasRemoteSync()) {
       try {
-        const result = await loadFn();
-        const hasRows = applyDraft(result && result.draft);
-        if (hasRows) {
+        const combined = await loadRemoteDrafts();
+        if (combined.hasRows) {
+          applyDraft(combined);
           setStatus(copy.loadOk, false);
         }
       } catch (error) {

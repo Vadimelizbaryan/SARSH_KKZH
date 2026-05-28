@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-05-28T04:46:36.5773079Z",
+    "generatedAtUtc":  "2026-05-28T13:46:51.5032549Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -8,8 +8,8 @@
                   },
                   {
                       "path":  "archive-print.html",
-                      "size":  647,
-                      "sha256":  "72DC0FC6E1629DFAE7585C9263A430E9B34C18E3363D0462239D928E2F1420E0"
+                      "size":  660,
+                      "sha256":  "6BB281C32673BF7117B980967490D9AC365F72DF7FEA728B1BACDC4D32DA6CAB"
                   },
                   {
                       "path":  "assets/civil-referrals.js",
@@ -28,13 +28,13 @@
                   },
                   {
                       "path":  "assets/sharsh.css",
-                      "size":  86211,
-                      "sha256":  "7CB407760C84C888572644C2681A87E651BACA5B7FEDC329722595C9DC4F1E90"
+                      "size":  87613,
+                      "sha256":  "A5AEBC560E1D6D1FB2040148665082BC6985AD530952A093E5F44BE13A9FD72F"
                   },
                   {
                       "path":  "assets/sharsh-app.js",
-                      "size":  625357,
-                      "sha256":  "F72D70BF28FDD892487E092143620259CE4F16D6C91C9A9C9C28F720051DD824"
+                      "size":  631283,
+                      "sha256":  "4B368342B10C4FABF6EE8E92D11CB3061A2DB6AB7813053962879399BECAF968"
                   },
                   {
                       "path":  "assets/sharsh-auth.js",
@@ -58,13 +58,13 @@
                   },
                   {
                       "path":  "assets/sharsh-sync.js",
-                      "size":  78042,
-                      "sha256":  "B182ECA9DB73100860A9277610B58C2A2ACD4A816F4A7AB617652E3A9972B802"
+                      "size":  78452,
+                      "sha256":  "07C4776280C36460BA06CE1F3ABE4F33A09711FF0D59AA0E3BE15E2F8F505345"
                   },
                   {
                       "path":  "assets/shift-admissions.js",
-                      "size":  18272,
-                      "sha256":  "125B14D4D90624B5C23BFB2A9EE9E82C3DEFA64140F54C884022E21680966046"
+                      "size":  22646,
+                      "sha256":  "9BD2FA8AB217D9D682FE0E4E6E27180EF54E77D4FB6826525E712EE679506C2A"
                   },
                   {
                       "path":  "assets/templates/SHARSH_KKZH_template.xlsx",
@@ -113,88 +113,88 @@
                   },
                   {
                       "path":  "bgej6lyx/08xa44ew.html",
-                      "size":  3628870,
-                      "sha256":  "29C8FB6A7054294A4F9ABC57FAD1DF99966F4C49D4706941E16C4F7E01D75F9E"
+                      "size":  3628880,
+                      "sha256":  "AB9F0FE065762B9EDFB6154A9A237210B9755DCDE23DD070305F89D88B2DB5B9"
                   },
                   {
                       "path":  "bgej6lyx/1ei6dnv2.html",
-                      "size":  4315887,
-                      "sha256":  "723625ACE67304165268DD7A3D8993EEB487E4A5D932546847CC69AD99E5D8F8"
+                      "size":  4315897,
+                      "sha256":  "4B2CCAC32572036FFA34EA630100FAFE284037BA731EE6552D9745D69016D1A2"
                   },
                   {
                       "path":  "bgej6lyx/3ofsacp6.html",
-                      "size":  746717,
-                      "sha256":  "849499B7B1056A10B774534C201F5A6D7F535EAA86F279DFB2AA50A6B2A8780D"
+                      "size":  746727,
+                      "sha256":  "00E08F7EA5B6C826494FEF00366DEB7FDC49026E1944615B3D68F6ACDDFA6E62"
                   },
                   {
                       "path":  "bgej6lyx/4k6uv2xu.html",
-                      "size":  5375866,
-                      "sha256":  "B689D3CE512B1ACF5C4EBAE508B83B14BD381C2B70BB543D7B63FDCF0774C90D"
+                      "size":  5375876,
+                      "sha256":  "17BA7D5A035406C826994C3CDAEDD74BC7EDCDF1E4ACBA20F0FCEF1AE3FE6C2B"
                   },
                   {
                       "path":  "bgej6lyx/4zby7qi3.html",
-                      "size":  2625649,
-                      "sha256":  "098AAFF1FD52AE233C54D0A77A8A7BF6059A1E153C241C2C33DA92EB2CACA371"
+                      "size":  2625659,
+                      "sha256":  "316AE35B9E5F4A08D925D29D15767A1ACB35B55E9A1873726B218520AC62995F"
                   },
                   {
                       "path":  "bgej6lyx/5s7rrwg9.html",
-                      "size":  883102,
-                      "sha256":  "C011D31FECDC5A1C3E87A5D9F20CDA9ED126251847F6707A595092C6139C3968"
+                      "size":  883112,
+                      "sha256":  "CE3968D3057DE656CBDC9A26290EE8F43AE095BE85D8D5E85C068261517D66FF"
                   },
                   {
                       "path":  "bgej6lyx/9htuxle8.html",
-                      "size":  4531131,
-                      "sha256":  "C6FBDB83EDCB48FF9889294A8EE1C6EFAF25431A3DA1AF52D7D8F3AAE72061CC"
+                      "size":  4531141,
+                      "sha256":  "36C7321734805D4ACE1EB0AA8C736A2B38812691B5445643C948C3C80790E574"
                   },
                   {
                       "path":  "bgej6lyx/c3usp3r9.html",
-                      "size":  3139453,
-                      "sha256":  "407EDC5ECE544F0412B0ABA279AB9DF82351120066957C7ABFC29337398211CE"
+                      "size":  3139463,
+                      "sha256":  "5D75FDE3427666A591326208724FF1C2E7B9C6688FAEB971A2C6B27334818A9F"
                   },
                   {
                       "path":  "bgej6lyx/c5mv5bh4.html",
-                      "size":  1085204,
-                      "sha256":  "C78AADA22F0543166FD0D598ED9F1370B9139411F0BCE373ADD5E6AD39FD092C"
+                      "size":  1085214,
+                      "sha256":  "E43289753CB916FF8EE34C92EF15B3420D3A45BFBA886E84510E3C78AB14C8E9"
                   },
                   {
                       "path":  "bgej6lyx/du9wa6oq.html",
-                      "size":  3512423,
-                      "sha256":  "DA76F5141833C3575DC341E268E1149B323A6F8F52791E0C1200810653CAF696"
+                      "size":  3512433,
+                      "sha256":  "176FD10654016BFE16692E5CE93B85668CC02A57E2963FACBF0B940A060D4DCA"
                   },
                   {
                       "path":  "bgej6lyx/g5u3jca0.html",
-                      "size":  3664295,
-                      "sha256":  "BE89CBEC87AD9CDC2C0B39E907D7081CEBF7E8CC2537F4923F9A2385CC85150C"
+                      "size":  3664305,
+                      "sha256":  "449FBE67ED8ED71E9C90B631FDF7E1287EBD305C9BAC04D14B29793996F94F9E"
                   },
                   {
                       "path":  "bgej6lyx/ldvp99z7.html",
-                      "size":  4001840,
-                      "sha256":  "E6290F937EACCD5E4E5979FBC3FF1D9648CCA0ECE5ECA83D5180F0504D034B4D"
+                      "size":  4001850,
+                      "sha256":  "45EF8C91DBE3C54F1336B05DEE11D875F03901DA62CA66809B9AB887266E2FFB"
                   },
                   {
                       "path":  "bgej6lyx/ltndeohl.html",
-                      "size":  2746547,
-                      "sha256":  "6FF92F8FF3E4D13887D7F209F7B122423D22C5FCBDB55B8D5229543807DCA28E"
+                      "size":  2746557,
+                      "sha256":  "AE3551D0A574E3D3A8A46EC57774C27C47244CDE7D592708C2E5785F26F6A122"
                   },
                   {
                       "path":  "bgej6lyx/ptf9nvbv.html",
-                      "size":  2158331,
-                      "sha256":  "0F871EC0376C989520D9827B58585458DDE2B6FEDD6A7C023F8843A5A33D97F6"
+                      "size":  2158341,
+                      "sha256":  "6F97E87300F7B9EB48C6BCF7E865AF067AB45DD1941DB2A2BCA041C8A039A5D4"
                   },
                   {
                       "path":  "bgej6lyx/te9625wg.html",
-                      "size":  3727667,
-                      "sha256":  "D0D5985D056616D94C7AB6B21874CCAC593C2C134C7760787354DB52E793C464"
+                      "size":  3727677,
+                      "sha256":  "7A19126E876C0955EE343A3B51CDAFFA66C745A56E6F9971B6B5AE0D8CAD3CBA"
                   },
                   {
                       "path":  "bgej6lyx/v1914tm9.html",
-                      "size":  4805302,
-                      "sha256":  "325C08A96F2640848043ACFF3DF8963395533333C3A1DBDE5ECD82FCB10FA890"
+                      "size":  4805312,
+                      "sha256":  "4A178CDBC5203407340D729C7641F0C40DC09387F7079B9246656FC9FEE3DAFB"
                   },
                   {
                       "path":  "bgej6lyx/zzphaoqo.html",
-                      "size":  4118290,
-                      "sha256":  "9654E82E90BA9F5215B7A7031C1BF1B229390DEB78986059F7ED42236A094040"
+                      "size":  4118300,
+                      "sha256":  "96BD142AB0C824B35B784FC32069186A9287CFF8911F03277F8993FD71909042"
                   },
                   {
                       "path":  "civil-referrals.html",
@@ -234,12 +234,12 @@
                   {
                       "path":  "day.html",
                       "size":  714,
-                      "sha256":  "23544271C5EA7B7E8D092A3A1AD0A0D139DA8985C938046A0426DF11601BE729"
+                      "sha256":  "52662DFB5A6AA01A3F1EC6506F2BE84868C699ABC8580817528A9883BE650D9C"
                   },
                   {
                       "path":  "day-shift.html",
-                      "size":  714,
-                      "sha256":  "23544271C5EA7B7E8D092A3A1AD0A0D139DA8985C938046A0426DF11601BE729"
+                      "size":  576,
+                      "sha256":  "CDC9D077B10D415F6967C76F91DB67FFE229580E03416FCBE230E9CED3A07173"
                   },
                   {
                       "path":  "department-instructions.html",
@@ -264,7 +264,7 @@
                   {
                       "path":  "discharge.html",
                       "size":  722,
-                      "sha256":  "05BDF75BFB76A59A6F4ACD1E37584F5C2CD9F3EEC75ACD35845000D59A531746"
+                      "sha256":  "6E51A39FE641C7EF031B082B628E34E99039F0D4F564BDC2D6DE8AF6C9D837FB"
                   },
                   {
                       "path":  "eti77ylq.html",
@@ -273,8 +273,8 @@
                   },
                   {
                       "path":  "hospital-report.html",
-                      "size":  736,
-                      "sha256":  "A5E002FD79C9E344F5F087B13C87DED31C5BE71220CB56C00DEFE302CBE70EAB"
+                      "size":  772,
+                      "sha256":  "B070E548110F27FCD0AFE202E876E303925D677AA6863A8542FAA0026A807C2C"
                   },
                   {
                       "path":  "hostfxr.dll",
@@ -288,8 +288,8 @@
                   },
                   {
                       "path":  "index.html",
-                      "size":  1039,
-                      "sha256":  "0E9A5D72EED3B6B389BD1F3F3A201909072DD1B0B147EE34DC1933086CD81F80"
+                      "size":  1049,
+                      "sha256":  "E6EDAD98CA5832A11ADD8A9392DB0C0F7986276EB0D21C397231B9720B1FBDEC"
                   },
                   {
                       "path":  "Mainflow.deps.json",
@@ -299,12 +299,12 @@
                   {
                       "path":  "Mainflow.dll",
                       "size":  83456,
-                      "sha256":  "FECA88FC5530F47F2CEB5B64D127FD959854AF65624ADF5C54E1982A1F3E576B"
+                      "sha256":  "C8A6B394CE3FC9D93F087FA719AD2C726BA81E6ECA2B5FE137F101042CA7EC1D"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "A47EF3B59569472B0B728303CB1AD25C6D884B31CA4379B46F28E170CC7A1B06"
+                      "sha256":  "B7556D708BA57808640A6C6B64B773ED0A6E0EC9CBB4EF41F6C1CC245494B407"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",
@@ -388,8 +388,8 @@
                   },
                   {
                       "path":  "morning-discharge.html",
-                      "size":  724,
-                      "sha256":  "6723593B890A7A7E8C77D6090D83C11D67BA29D8A65829933F6BAE7223F92674"
+                      "size":  596,
+                      "sha256":  "68D7EB17228C3713C2C496EE1BC933819D971083EFEB56E504494655082AF393"
                   },
                   {
                       "path":  "mscordaccore.dll",
@@ -428,18 +428,18 @@
                   },
                   {
                       "path":  "night.html",
-                      "size":  714,
-                      "sha256":  "23544271C5EA7B7E8D092A3A1AD0A0D139DA8985C938046A0426DF11601BE729"
+                      "size":  576,
+                      "sha256":  "CDC9D077B10D415F6967C76F91DB67FFE229580E03416FCBE230E9CED3A07173"
                   },
                   {
                       "path":  "night-shift.html",
-                      "size":  714,
-                      "sha256":  "23544271C5EA7B7E8D092A3A1AD0A0D139DA8985C938046A0426DF11601BE729"
+                      "size":  576,
+                      "sha256":  "CDC9D077B10D415F6967C76F91DB67FFE229580E03416FCBE230E9CED3A07173"
                   },
                   {
                       "path":  "ocr-feedback.html",
-                      "size":  978,
-                      "sha256":  "C55DA11BECA850DA07238D9A0E35AEEA5E9F3372C6D3E79C66067198B0D85B27"
+                      "size":  988,
+                      "sha256":  "4EAE7477DEC938B673CD9A83E9E7B992211E321124A4A906E3DDD61EE51C870D"
                   },
                   {
                       "path":  "PenImc_cor3.dll",

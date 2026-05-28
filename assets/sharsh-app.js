@@ -65,6 +65,7 @@
   const MAIN_PHOTO_ROUTE_TRANSFER_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:main-photo-route-transfer:`;
   const OCR_FEEDBACK_IMAGE_OVERRIDE_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:ocr-feedback-image-override:`;
   const MAIN_SAVE_NOTICE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-save-notice:v1`;
+  const MAIN_PAGE_COLLAPSE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-panel-collapse:v1`;
   const REMOTE_AUX_PANEL_REFRESH_MS = 45 * 1000;
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
@@ -630,6 +631,185 @@ function buildInitialPhotoLightboxState() {
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
+  }
+
+  function readMainPageCollapseState() {
+    try {
+      const raw = localStorage.getItem(MAIN_PAGE_COLLAPSE_STORAGE_KEY);
+      if (!raw) {
+        return {};
+      }
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function writeMainPageCollapseState(nextState) {
+    try {
+      localStorage.setItem(MAIN_PAGE_COLLAPSE_STORAGE_KEY, JSON.stringify(nextState && typeof nextState === "object" ? nextState : {}));
+    } catch (_error) {
+      // Ignore local storage errors and keep the current UI state in memory only.
+    }
+  }
+
+  function getMainPagePanelCollapsed(panelId, defaultCollapsed = false) {
+    const savedState = readMainPageCollapseState();
+    if (Object.prototype.hasOwnProperty.call(savedState, panelId)) {
+      return Boolean(savedState[panelId]);
+    }
+    return defaultCollapsed;
+  }
+
+  function setMainPagePanelCollapsed(panelId, collapsed) {
+    const savedState = readMainPageCollapseState();
+    savedState[panelId] = Boolean(collapsed);
+    writeMainPageCollapseState(savedState);
+  }
+
+  function setMainPagePanelToggleState(panel, toggle, collapsed) {
+    if (!(panel instanceof HTMLElement) || !(toggle instanceof HTMLButtonElement)) {
+      return;
+    }
+    panel.classList.toggle("main-collapsible-panel--collapsed", collapsed);
+    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    toggle.setAttribute("title", collapsed ? "Развернуть блок" : "Свернуть блок");
+    const text = toggle.querySelector("[data-panel-toggle-text]");
+    if (text) {
+      text.textContent = collapsed ? "Развернуть" : "Свернуть";
+    }
+  }
+
+  function buildMainPagePanelToggleButton() {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "main-collapsible-panel__toggle";
+    toggle.innerHTML = `
+      <span class="main-collapsible-panel__toggle-icon" aria-hidden="true"></span>
+      <span class="main-collapsible-panel__toggle-text" data-panel-toggle-text>Свернуть</span>
+    `;
+    return toggle;
+  }
+
+  function findDirectPanelChild(panel, selector) {
+    return Array.from(panel.children).find((child) => child instanceof Element && child.matches(selector)) || null;
+  }
+
+  function enhanceMainPageCollapsiblePanel(panel, config) {
+    if (!(panel instanceof HTMLElement) || panel.dataset.mainCollapsibleReady === "1") {
+      return;
+    }
+
+    const directPersistent = findDirectPanelChild(panel, config.persistentSelector);
+    const headingElement = directPersistent || findDirectPanelChild(panel, "h2") || findDirectPanelChild(panel, "h3");
+    if (!(headingElement instanceof HTMLElement)) {
+      return;
+    }
+
+    let header = headingElement;
+    if (/^H[1-6]$/i.test(headingElement.tagName)) {
+      header = document.createElement("div");
+      header.className = "main-collapsible-panel__header";
+      panel.insertBefore(header, headingElement);
+      header.appendChild(headingElement);
+    } else {
+      header.classList.add("main-collapsible-panel__header");
+    }
+
+    const body = document.createElement("div");
+    body.className = "main-collapsible-panel__body";
+    const childNodes = Array.from(panel.childNodes);
+    childNodes.forEach((node) => {
+      if (node === header) {
+        return;
+      }
+      body.appendChild(node);
+    });
+    panel.appendChild(body);
+
+    const toggle = buildMainPagePanelToggleButton();
+    toggle.dataset.mainPanelToggle = config.id;
+    header.appendChild(toggle);
+
+    panel.classList.add("main-collapsible-panel");
+    panel.dataset.mainPanelCollapseId = config.id;
+    panel.dataset.mainCollapsibleReady = "1";
+
+    const collapsed = getMainPagePanelCollapsed(config.id, Boolean(config.defaultCollapsed));
+    setMainPagePanelToggleState(panel, toggle, collapsed);
+
+    toggle.addEventListener("click", () => {
+      const nextCollapsed = !panel.classList.contains("main-collapsible-panel--collapsed");
+      setMainPagePanelCollapsed(config.id, nextCollapsed);
+      setMainPagePanelToggleState(panel, toggle, nextCollapsed);
+    });
+  }
+
+  function enhanceMainPageCollapsiblePanels() {
+    if (mode !== "main") {
+      return;
+    }
+
+    [
+      {
+        selector: ".main-table-photo-gallery-panel",
+        id: "photo-gallery",
+        persistentSelector: ".main-table-photo-gallery-panel__head",
+        defaultCollapsed: true
+      },
+      {
+        selector: ".main-table-telegram-form-panel",
+        id: "telegram-forms",
+        persistentSelector: "h2",
+        defaultCollapsed: true
+      },
+      {
+        selector: ".main-department-calc-panel",
+        id: "main-calculator",
+        persistentSelector: ".main-department-calc-panel__head",
+        defaultCollapsed: true
+      },
+      {
+        selector: ".main-summary-panel",
+        id: "summary",
+        persistentSelector: "h2",
+        defaultCollapsed: false
+      },
+      {
+        selector: ".photo-import-panel",
+        id: "photo-routing",
+        persistentSelector: "h2",
+        defaultCollapsed: true
+      },
+      {
+        selector: ".updates-panel",
+        id: "department-updates",
+        persistentSelector: "h2",
+        defaultCollapsed: true
+      },
+      {
+        selector: ".main-daily-archive-panel",
+        id: "daily-archive",
+        persistentSelector: "h2",
+        defaultCollapsed: true
+      },
+      {
+        selector: ".department-pdf-archive-panel",
+        id: "department-pdf-archive",
+        persistentSelector: "h2",
+        defaultCollapsed: true
+      },
+      {
+        selector: ".main-links-panel",
+        id: "department-links",
+        persistentSelector: "h2",
+        defaultCollapsed: true
+      }
+    ].forEach((definition) => {
+      const panel = document.querySelector(definition.selector);
+      enhanceMainPageCollapsiblePanel(panel, definition);
+    });
   }
 
   function shortenText(value, maxLength = 8) {
@@ -8792,7 +8972,7 @@ function buildInitialPhotoLightboxState() {
 
         <div class="layout-grid split">
           <div class="info-stack">
-            <div class="panel no-print">
+            <div class="panel no-print main-summary-panel">
               <h2>Сводка и дата</h2>
               <div class="meta-row">
                 <div class="inline-field static-field">
@@ -8843,7 +9023,7 @@ function buildInitialPhotoLightboxState() {
                 ${state.snapshot.rows.map((row) => buildDepartmentUpdateItem(row)).join("")}
               </div>
             </section>
-            <section class="panel no-print archive-panel">
+            <section class="panel no-print archive-panel main-daily-archive-panel">
               <h2>Ежедневный архив 10:00</h2>
               <p id="archiveSummaryText">${
                 latestArchive
@@ -8869,7 +9049,7 @@ function buildInitialPhotoLightboxState() {
             </section>
           </div>
 
-          <aside class="panel no-print">
+          <aside class="panel no-print main-links-panel">
             <h2>Ссылки отделений</h2>
             <p>У каждого отделения своя отдельная HTML-страница. Им можно отправлять только свою ссылку.</p>
             <div class="link-grid">
@@ -10646,6 +10826,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     document.title = getAppDocumentTitle();
+    enhanceMainPageCollapsiblePanels();
     attachCommonEvents();
     applyZoom(loadZoom());
     if (mode === "archive") {
