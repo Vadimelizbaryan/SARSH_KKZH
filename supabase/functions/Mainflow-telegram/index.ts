@@ -19,6 +19,9 @@ const TELEGRAM_PENDING_COLLEAGUE_CHATS_META_KEY = "telegram_pending_colleague_ch
 const ANDROID_APPROVED_DEVICES_META_KEY = "android_approved_devices";
 const ANDROID_PENDING_DEVICES_META_KEY = "android_pending_devices";
 const ANDROID_BLOCKED_DEVICES_META_KEY = "android_blocked_devices";
+const ANDROID_DEVICE_NOTIFICATIONS_META_KEY = "android_device_notifications";
+const ANDROID_OCR_SUCCESS_NOTIFICATION_MESSAGE = "\u041A\u043E\u043D\u0442\u0440\u043E\u043B \u0441\u0443\u043C \u043F\u0440\u043E\u0439\u0434\u0435\u043D, \u0434\u0430\u043D\u043D\u044B\u0435 \u0432\u0432\u0435\u0434\u0435\u043D\u044B \u0432 \u043E\u0441\u043D\u043E\u0432\u043D\u0443\u044E \u0442\u0430\u0431\u043B\u0438\u0446\u0443.";
+const ANDROID_OCR_FAILURE_NOTIFICATION_MESSAGE = "\u041A\u043E\u043D\u0442\u0440\u043E\u043B \u0441\u0443\u043C \u043D\u0435 \u043F\u0440\u043E\u0439\u0434\u0435\u043D, \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E \u0432\u0430\u0448\u0435\u0439 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043E\u0442\u0434\u0435\u043B\u0435\u043D\u0438\u044F \u043D\u0430 MAINFORM.app.";
 const TELEGRAM_WORKPLACE_LOCATION_META_KEY = "telegram_workplace_location";
 const TELEGRAM_WORKPLACE_SETUP_PENDING_META_KEY = "telegram_workplace_setup_pending";
 const TELEGRAM_COLLEAGUE_PRESENCE_META_KEY = "telegram_colleague_presence";
@@ -2184,6 +2187,20 @@ type AndroidDeviceAccessRecord = {
   lastDepartmentId: string;
 };
 
+type AndroidDeviceNotificationRecord = {
+  id: string;
+  deviceId: string;
+  departmentId: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  deliveredAt: string;
+  level: "success" | "warning";
+  source: string;
+  feedbackId: string;
+  reportDate: string;
+};
+
 type TelegramPhotoHandlingOptions = {
   approved?: boolean;
   skipAdminPhotoCopy?: boolean;
@@ -2419,6 +2436,58 @@ function parseAndroidDeviceAccessRecords(raw: unknown): AndroidDeviceAccessRecor
   }
 }
 
+function parseAndroidDeviceNotificationRecords(raw: unknown): AndroidDeviceNotificationRecord[] {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    const notifications: AndroidDeviceNotificationRecord[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+      const record = item as Record<string, unknown>;
+      const id = typeof record.id === "string" ? record.id.trim() : "";
+      const deviceId = sanitizeAndroidDeviceId(record.deviceId);
+      const departmentId = parseDepartmentId(record.departmentId);
+      if (!id || !deviceId || !departmentId) {
+        continue;
+      }
+
+      const createdAt = typeof record.createdAt === "string" ? record.createdAt : "";
+      const createdTime = Date.parse(createdAt);
+      if (Number.isFinite(createdTime) && createdTime < cutoff) {
+        continue;
+      }
+
+      notifications.push({
+        id,
+        deviceId,
+        departmentId,
+        title: typeof record.title === "string" ? record.title.slice(0, 200) : "",
+        message: typeof record.message === "string" ? record.message.slice(0, 1000) : "",
+        createdAt,
+        deliveredAt: typeof record.deliveredAt === "string" ? record.deliveredAt : "",
+        level: record.level === "warning" ? "warning" : "success",
+        source: typeof record.source === "string" ? record.source.slice(0, 100) : "",
+        feedbackId: typeof record.feedbackId === "string" ? record.feedbackId : "",
+        reportDate: typeof record.reportDate === "string" ? record.reportDate : ""
+      });
+    }
+
+    return notifications.slice(0, 500);
+  } catch (_error) {
+    return [];
+  }
+}
+
 async function loadTelegramColleagueChats(supabase: ReturnType<typeof createClient>) {
   const { data, error } = await supabase
     .from("sharsh_report_meta")
@@ -2550,6 +2619,42 @@ async function saveBlockedAndroidDevices(
   records: AndroidDeviceAccessRecord[]
 ) {
   await saveAndroidDeviceAccessRecords(supabase, ANDROID_BLOCKED_DEVICES_META_KEY, records);
+}
+
+async function loadAndroidDeviceNotifications(supabase: any) {
+  const { data, error } = await supabase
+    .from("sharsh_report_meta")
+    .select("report_date")
+    .eq("report_key", ANDROID_DEVICE_NOTIFICATIONS_META_KEY)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return parseAndroidDeviceNotificationRecords(data?.report_date);
+}
+
+async function saveAndroidDeviceNotifications(
+  supabase: any,
+  notifications: AndroidDeviceNotificationRecord[]
+) {
+  const uniqueNotifications = Array.from(new Map(notifications.map((item) => [item.id, item])).values())
+    .sort((left, right) => {
+      return Date.parse(right.createdAt || "") - Date.parse(left.createdAt || "");
+    })
+    .slice(0, 500);
+  const { error } = await supabase
+    .from("sharsh_report_meta")
+    .upsert({
+      report_key: ANDROID_DEVICE_NOTIFICATIONS_META_KEY,
+      report_date: JSON.stringify(uniqueNotifications),
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    throw error;
+  }
 }
 
 async function loadTelegramWorkplaceLocation(supabase: ReturnType<typeof createClient>) {
@@ -3031,6 +3136,104 @@ async function getAndroidDeviceAccessState(
   return { status: "pending" as const, record: createdPendingRecord };
 }
 
+function buildAndroidDepartmentNotificationTitle(departmentId: DepartmentId, level: "success" | "warning") {
+  const department = DEPARTMENTS[departmentId];
+  const prefix = level === "success" ? "OCR сохранен" : "OCR требует проверки";
+  return `${prefix}: ${department.marker} ${department.department}`;
+}
+
+function buildAndroidDepartmentNotificationTitleFixed(departmentId: DepartmentId, level: "success" | "warning") {
+  const department = DEPARTMENTS[departmentId];
+  const prefix = level === "success"
+    ? "\u041A\u043E\u043D\u0442\u0440\u043E\u043B \u0441\u0443\u043C \u043F\u0440\u043E\u0439\u0434\u0435\u043D"
+    : "\u041A\u043E\u043D\u0442\u0440\u043E\u043B \u0441\u0443\u043C \u043D\u0435 \u043F\u0440\u043E\u0439\u0434\u0435\u043D";
+  return `${prefix}: ${department.marker} ${department.department}`;
+}
+
+async function queueAndroidDepartmentNotifications(
+  supabase: any,
+  departmentId: DepartmentId,
+  payload: {
+    level: "success" | "warning";
+    message: string;
+    feedbackId?: string;
+    reportDate?: string;
+    source?: string;
+  }
+) {
+  const approvedDevices = await loadApprovedAndroidDevices(supabase);
+  const targetDevices = approvedDevices.filter((item) => item.lastDepartmentId === departmentId);
+  if (!targetDevices.length) {
+    return [];
+  }
+
+  const existing = await loadAndroidDeviceNotifications(supabase);
+  const createdAt = new Date().toISOString();
+  const newEvents = targetDevices.map((item) => ({
+    id: crypto.randomUUID(),
+    deviceId: item.deviceId,
+    departmentId,
+    title: buildAndroidDepartmentNotificationTitleFixed(departmentId, payload.level),
+    message: payload.message,
+    createdAt,
+    deliveredAt: "",
+    level: payload.level,
+    source: payload.source || "android-intake-ocr",
+    feedbackId: payload.feedbackId || "",
+    reportDate: payload.reportDate || ""
+  } satisfies AndroidDeviceNotificationRecord));
+
+  await saveAndroidDeviceNotifications(supabase, [...newEvents, ...existing]);
+  return newEvents;
+}
+
+async function listPendingAndroidDeviceNotifications(
+  supabase: any,
+  deviceId: string
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  if (!normalizedDeviceId) {
+    return [];
+  }
+
+  const notifications = await loadAndroidDeviceNotifications(supabase);
+  return notifications
+    .filter((item) => item.deviceId === normalizedDeviceId && !item.deliveredAt)
+    .sort((left, right) => Date.parse(left.createdAt || "") - Date.parse(right.createdAt || ""));
+}
+
+async function acknowledgeAndroidDeviceNotifications(
+  supabase: any,
+  deviceId: string,
+  notificationIds: string[]
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  if (!normalizedDeviceId || !notificationIds.length) {
+    return 0;
+  }
+
+  const notifications = await loadAndroidDeviceNotifications(supabase);
+  const notificationIdsSet = new Set(notificationIds);
+  const deliveredAt = new Date().toISOString();
+  let updated = 0;
+  const nextNotifications = notifications.map((item) => {
+    if (item.deviceId !== normalizedDeviceId || !notificationIdsSet.has(item.id) || item.deliveredAt) {
+      return item;
+    }
+    updated += 1;
+    return {
+      ...item,
+      deliveredAt
+    };
+  });
+
+  if (updated > 0) {
+    await saveAndroidDeviceNotifications(supabase, nextNotifications);
+  }
+
+  return updated;
+}
+
 type DepartmentFormAccessContext = {
   mode: "telegram" | "android";
   telegramUser: Awaited<ReturnType<typeof verifyTelegramWebAppInitData>> | null;
@@ -3259,7 +3462,7 @@ async function handleAndroidIntakeState(request: Request) {
         departmentId,
         marker: meta.marker,
         departmentName: meta.department,
-        latestPhoto: latestByDepartment.get(departmentId) || null
+        latestPhoto: latestByDepartment.get(departmentId as DepartmentId) || null
       }))
     });
   } catch (error) {
@@ -3309,6 +3512,12 @@ async function handleAndroidIntakePhotoSubmit(request: Request) {
       recognized,
       liveDepartmentRow?.values
     );
+    const outcomeNote = evaluation.isControlPassed
+      ? "\u041A\u043E\u043D\u0442\u0440\u043E\u043B \u0441\u0443\u043C \u043F\u0440\u043E\u0439\u0434\u0435\u043D. \u0414\u0430\u043D\u043D\u044B\u0435 OCR \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u044B \u0432 \u043E\u0441\u043D\u043E\u0432\u043D\u0443\u044E \u0442\u0430\u0431\u043B\u0438\u0446\u0443."
+      : "\u041A\u043E\u043D\u0442\u0440\u043E\u043B \u0441\u0443\u043C \u043D\u0435 \u043F\u0440\u043E\u0439\u0434\u0435\u043D. \u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u0440\u0443\u0447\u043D\u0430\u044F \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u043A\u0430 \u0438\u0437 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043E\u0442\u0434\u0435\u043B\u0435\u043D\u0438\u044F.";
+    const responseMessage = evaluation.isControlPassed
+      ? ANDROID_OCR_SUCCESS_NOTIFICATION_MESSAGE
+      : ANDROID_OCR_FAILURE_NOTIFICATION_MESSAGE;
     const feedbackId = await insertAcceptedFeedback(
       supabase,
       departmentId,
@@ -3322,11 +3531,43 @@ async function handleAndroidIntakePhotoSubmit(request: Request) {
         "Admission hub Android photo.",
         `Device: ${access.deviceName}`,
         "OCR review required before manual save to the main table.",
+        outcomeNote,
         ...preparedPhoto.orientationNotes,
         ...recognized.notes
       ]
     );
-    await markDepartmentPhotoPending(supabase, departmentId, feedbackId, preparedPhoto.fileName);
+    let autoPdfSent = false;
+    if (evaluation.isControlPassed) {
+      await saveDepartmentSnapshot(supabase, departmentId, reportDate, recognized.values, "photo");
+      await markDepartmentPhotoProcessed(supabase, departmentId, feedbackId, preparedPhoto.fileName, "processed_photo");
+      const savedSnapshot = await loadSnapshot(supabase);
+      if (savedSnapshot) {
+        try {
+          const autoPdfResult = await maybeAutoSendMainPdfsWhenSnapshotReady(supabase, savedSnapshot);
+          autoPdfSent = Boolean(autoPdfResult?.sent);
+        } catch (error) {
+          console.error("Failed to auto-send main PDFs after Android intake OCR save:", sanitizePublicErrorMessage(error));
+        }
+      }
+      await queueAndroidDepartmentNotifications(supabase, departmentId, {
+        level: "success",
+        message: "Контрол сум пройден, данные введены в основную таблицу.",
+        message: ANDROID_OCR_SUCCESS_NOTIFICATION_MESSAGE,
+        feedbackId,
+        reportDate,
+        source: "android-intake-ocr"
+      });
+    } else {
+      await markDepartmentPhotoPending(supabase, departmentId, feedbackId, preparedPhoto.fileName);
+      await queueAndroidDepartmentNotifications(supabase, departmentId, {
+        level: "warning",
+        message: "Контрол сум не пройден, отправте данные с помошю вашей таблицы отделения на MAINFORM.app.",
+        message: ANDROID_OCR_FAILURE_NOTIFICATION_MESSAGE,
+        feedbackId,
+        reportDate,
+        source: "android-intake-ocr"
+      });
+    }
     const preview = await loadAcceptedFeedbackPreview(supabase, feedbackId, departmentId);
 
     return jsonResponse({
@@ -3346,6 +3587,73 @@ async function handleAndroidIntakePhotoSubmit(request: Request) {
       ok: false,
       service: "Mainflow-telegram",
       status: "android_intake_photo_submit_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
+async function handleAndroidDeviceNotifications(request: Request) {
+  try {
+    const currentUrl = new URL(request.url);
+    const deviceId = sanitizeAndroidDeviceId(currentUrl.searchParams.get("deviceId"));
+    const deviceName = sanitizeAndroidDeviceName(currentUrl.searchParams.get("deviceName")) || "Android MAINFORM";
+    const departmentId = parseDepartmentId(currentUrl.searchParams.get("departmentId"));
+    if (!deviceId || !departmentId) {
+      return jsonResponse({ ok: false, error: "Device and department are required." }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const accessState = await getAndroidDeviceAccessState(supabase, deviceId, deviceName, departmentId);
+    if (accessState.status !== "approved") {
+      return jsonResponse({ ok: false, error: "access_denied" }, 403);
+    }
+
+    const notifications = await listPendingAndroidDeviceNotifications(supabase, deviceId);
+    return jsonResponse({
+      ok: true,
+      notifications
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_device_notifications_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
+async function handleAndroidDeviceNotificationsAck(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const deviceId = sanitizeAndroidDeviceId(payload?.deviceId);
+    const deviceName = sanitizeAndroidDeviceName(payload?.deviceName) || "Android MAINFORM";
+    const departmentId = parseDepartmentId(payload?.departmentId);
+    const notificationIds = Array.isArray(payload?.notificationIds)
+      ? payload.notificationIds
+        .map((item) => typeof item === "string" ? item.trim() : "")
+        .filter(Boolean)
+      : [];
+    if (!deviceId || !departmentId || !notificationIds.length) {
+      return jsonResponse({ ok: false, error: "Device, department and notification ids are required." }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const accessState = await getAndroidDeviceAccessState(supabase, deviceId, deviceName, departmentId);
+    if (accessState.status !== "approved") {
+      return jsonResponse({ ok: false, error: "access_denied" }, 403);
+    }
+
+    const updated = await acknowledgeAndroidDeviceNotifications(supabase, deviceId, notificationIds);
+    return jsonResponse({
+      ok: true,
+      updated
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_device_notifications_ack_failed",
       error: getErrorText(error)
     }, 500);
   }
@@ -3504,27 +3812,62 @@ function getAndroidIntakeSessionContext(date = new Date()) {
   let month = shifted.getUTCMonth();
   let day = shifted.getUTCDate();
   const hour = shifted.getUTCHours();
+  const minute = shifted.getUTCMinutes();
+  const minutesOfDay = (hour * 60) + minute;
+  const morningStartMinutes = (10 * 60) + 5;
+  const eveningStartMinutes = 19 * 60;
 
-  if (hour < 19) {
+  if (minutesOfDay >= eveningStartMinutes) {
+    const sessionStartShiftedMs = Date.UTC(year, month, day, 19, 0, 0);
+    const sessionEndShiftedMs = Date.UTC(year, month, day + 1, 10, 5, 0);
+    const sessionStartUtcMs = sessionStartShiftedMs - YEREVAN_UTC_OFFSET_MS;
+    const sessionEndUtcMs = sessionEndShiftedMs - YEREVAN_UTC_OFFSET_MS;
+    const sessionDate = new Date(sessionStartUtcMs);
+    const parts = getYerevanDateParts(sessionDate);
+
+    return {
+      sessionKey: `${parts.year}-${parts.month}-${parts.day}-evening`,
+      sessionStartIso: new Date(sessionStartUtcMs).toISOString(),
+      sessionEndIso: new Date(sessionEndUtcMs).toISOString(),
+      sessionLabel: `${parts.day}.${parts.month}.${parts.year} 19:00`
+    };
+  }
+
+  if (minutesOfDay >= morningStartMinutes) {
+    const sessionStartShiftedMs = Date.UTC(year, month, day, 10, 5, 0);
+    const sessionEndShiftedMs = Date.UTC(year, month, day, 19, 0, 0);
+    const sessionStartUtcMs = sessionStartShiftedMs - YEREVAN_UTC_OFFSET_MS;
+    const sessionEndUtcMs = sessionEndShiftedMs - YEREVAN_UTC_OFFSET_MS;
+    const sessionDate = new Date(sessionStartUtcMs);
+    const parts = getYerevanDateParts(sessionDate);
+
+    return {
+      sessionKey: `${parts.year}-${parts.month}-${parts.day}-morning`,
+      sessionStartIso: new Date(sessionStartUtcMs).toISOString(),
+      sessionEndIso: new Date(sessionEndUtcMs).toISOString(),
+      sessionLabel: `${parts.day}.${parts.month}.${parts.year} 10:05`
+    };
+  }
+
+  {
     const previousShifted = new Date(Date.UTC(year, month, day) - (24 * 60 * 60 * 1000));
     year = previousShifted.getUTCFullYear();
     month = previousShifted.getUTCMonth();
     day = previousShifted.getUTCDate();
+    const sessionStartShiftedMs = Date.UTC(year, month, day, 19, 0, 0);
+    const sessionEndShiftedMs = Date.UTC(year + 0, month, day + 1, 10, 5, 0);
+    const sessionStartUtcMs = sessionStartShiftedMs - YEREVAN_UTC_OFFSET_MS;
+    const sessionEndUtcMs = sessionEndShiftedMs - YEREVAN_UTC_OFFSET_MS;
+    const sessionDate = new Date(sessionStartUtcMs);
+    const parts = getYerevanDateParts(sessionDate);
+
+    return {
+      sessionKey: `${parts.year}-${parts.month}-${parts.day}-evening`,
+      sessionStartIso: new Date(sessionStartUtcMs).toISOString(),
+      sessionEndIso: new Date(sessionEndUtcMs).toISOString(),
+      sessionLabel: `${parts.day}.${parts.month}.${parts.year} 19:00`
+    };
   }
-
-  const sessionStartShiftedMs = Date.UTC(year, month, day, 19, 0, 0);
-  const sessionEndShiftedMs = sessionStartShiftedMs + (24 * 60 * 60 * 1000);
-  const sessionStartUtcMs = sessionStartShiftedMs - YEREVAN_UTC_OFFSET_MS;
-  const sessionEndUtcMs = sessionEndShiftedMs - YEREVAN_UTC_OFFSET_MS;
-  const sessionDate = new Date(sessionStartUtcMs);
-  const parts = getYerevanDateParts(sessionDate);
-
-  return {
-    sessionKey: `${parts.year}-${parts.month}-${parts.day}`,
-    sessionStartIso: new Date(sessionStartUtcMs).toISOString(),
-    sessionEndIso: new Date(sessionEndUtcMs).toISOString(),
-    sessionLabel: `${parts.day}.${parts.month}.${parts.year} 19:00`
-  };
 }
 
 function isYerevanNightDutyTime(date = new Date()) {
@@ -11059,6 +11402,10 @@ Deno.serve(async (request) => {
       return await handleAndroidIntakeState(request);
     }
 
+    if (action === "android-device-notifications") {
+      return await handleAndroidDeviceNotifications(request);
+    }
+
     if (action === "android-form-url") {
       try {
         const currentUrl = new URL(request.url);
@@ -11159,6 +11506,9 @@ Deno.serve(async (request) => {
   }
   if (postUrl.searchParams.get("action") === "android-intake-photo-submit") {
     return await handleAndroidIntakePhotoSubmit(request);
+  }
+  if (postUrl.searchParams.get("action") === "android-device-notifications-ack") {
+    return await handleAndroidDeviceNotificationsAck(request);
   }
   if (postUrl.searchParams.get("action") === "night-form-load") {
     return await handleTelegramShiftFormLoad(request, "night");
