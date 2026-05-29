@@ -21,6 +21,7 @@ public partial class Form1 : Form
     private const int AutoUpdateIntervalMs = 20 * 60 * 1000;
     private const int InitialVisibleUpdateDelayMs = 90 * 1000;
     private const int InitialBackgroundUpdateDelayMs = 15 * 1000;
+    private const int VisibleAutoUpdateGraceDelayMs = 10 * 1000;
 
     private readonly bool _startInBackground;
     private readonly string _webRootPath;
@@ -444,10 +445,23 @@ public partial class Form1 : Form
             {
                 _lastAnnouncedUpdateToken = remoteToken;
                 ShowTrayBalloon(
-                    "Доступно обновление Mainflow",
-                    "Новая версия уже готова. Она установится автоматически, когда приложение уйдет в фон."
+                    "Обновление Mainflow готово",
+                    $"Новая версия установится автоматически через {VisibleAutoUpdateGraceDelayMs / 1000} сек. Если появятся несохранённые данные, обновление подождёт."
                 );
             }
+
+            await Task.Delay(VisibleAutoUpdateGraceDelayMs);
+            if (IsDisposed || !string.Equals(_pendingUpdateToken, remoteToken, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (await HasBlockingLocalWorkForUpdateAsync())
+            {
+                return;
+            }
+
+            await BeginSilentUpdateAsync();
         }
         catch
         {
@@ -556,8 +570,18 @@ public partial class Form1 : Form
         try
         {
             var rawResult = await webView.CoreWebView2.ExecuteScriptAsync(
-                "window.SHARSH_APP_API?.getPendingSyncStatus ? window.SHARSH_APP_API.getPendingSyncStatus() : null"
+                "window.SHARSH_APP_API?.getDesktopUpdateBlockers ? window.SHARSH_APP_API.getDesktopUpdateBlockers() : (window.SHARSH_APP_API?.getPendingSyncStatus ? window.SHARSH_APP_API.getPendingSyncStatus() : null)"
             );
+            var blockers = DeserializeScriptResult<DesktopUpdateBlockersResult>(rawResult);
+            if (blockers is not null)
+            {
+                return blockers.HasBlockingWork
+                    || blockers.HasBlockingUiWork
+                    || blockers.HasPendingSync
+                    || blockers.IsSyncing
+                    || blockers.PendingCount > 0;
+            }
+
             var result = DeserializeScriptResult<PendingSyncStatusResult>(rawResult);
             return result is not null && (result.HasPending || result.IsSyncing || result.Count > 0);
         }
@@ -801,7 +825,7 @@ public partial class Form1 : Form
     {
         bannerLabel.Text = _shellState.Mode == DesktopMode.Offline
             ? "Оффлайн-режим: ввод и просмотр работают локально на этом ПК. Новые изменения попадают в оффлайн-очередь и после возврата связи отправляются автоматически в фоне."
-            : "Онлайн-режим: локальная копия сайта работает с сервером и получает новые данные автоматически. Оставьте приложение в трее, чтобы получать уведомления и фоновое автообновление.";
+            : "Онлайн-режим: локальная копия сайта работает с сервером и получает новые данные автоматически. Уведомления приходят в фоне, а обновления Mainflow устанавливаются автоматически, когда нет несохранённых изменений.";
     }
 
     private void UpdateNetworkStatus()
@@ -1184,6 +1208,7 @@ public partial class Form1 : Form
 
     private sealed record PendingSyncCommandResult(bool Ok, int SyncedCount, int RemainingCount, string Error);
     private sealed record PendingSyncStatusResult(bool HasPending, int Count, bool IsSyncing);
+    private sealed record DesktopUpdateBlockersResult(bool HasBlockingWork, bool HasBlockingUiWork, bool HasPendingSync, int PendingCount, bool IsSyncing);
 
     private sealed class DesktopPackageManifest
     {

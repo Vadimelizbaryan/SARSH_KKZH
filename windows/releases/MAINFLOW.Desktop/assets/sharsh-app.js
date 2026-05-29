@@ -8929,6 +8929,23 @@ function buildInitialPhotoLightboxState() {
     };
   }
 
+  function getDesktopUpdateBlockers() {
+    const pending = getPendingSyncStatus();
+    const hasBlockingUiWork = hasBlockingLocalWorkForBackgroundSync();
+    return {
+      hasBlockingWork: Boolean(
+        hasBlockingUiWork
+        || pending.hasPending
+        || pending.isSyncing
+        || pending.count > 0
+      ),
+      hasBlockingUiWork,
+      hasPendingSync: Boolean(pending.hasPending),
+      pendingCount: Number(pending.count) || 0,
+      isSyncing: Boolean(pending.isSyncing)
+    };
+  }
+
   function getPendingSyncButtonLabel(status = getPendingSyncStatus()) {
     if (status.isSyncing) {
       return status.count > 0 ? `Синхр. накопл. (${status.count})...` : "Синхр. накопл....";
@@ -16329,7 +16346,8 @@ function buildInitialPhotoLightboxState() {
 
   window.SHARSH_APP_API = {
     syncPendingChanges: runPendingSyncNow,
-    getPendingSyncStatus
+    getPendingSyncStatus,
+    getDesktopUpdateBlockers
   };
 
   init().catch((error) => {
