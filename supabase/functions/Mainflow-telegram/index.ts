@@ -6011,6 +6011,95 @@ function buildDepartmentSubmissionSourceLabel(
   return "Telegram Web App";
 }
 
+function isAndroidMainformFeedbackNotes(notes: unknown) {
+  const normalizedNotes = Array.isArray(notes)
+    ? notes.map((item) => String(item || ""))
+    : [];
+  return normalizedNotes.some((note) => /Submitted via Android MAINFORM/i.test(note));
+}
+
+function getUtcIsoRangeForYerevanDateKey(dateKey: string) {
+  const match = String(dateKey || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+
+  const startUtcMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0) - YEREVAN_UTC_OFFSET_MS;
+  const endUtcMs = startUtcMs + (24 * 60 * 60 * 1000);
+  return {
+    startIso: new Date(startUtcMs).toISOString(),
+    endIso: new Date(endUtcMs).toISOString()
+  };
+}
+
+function buildAndroidMainformFeedbackRecord(row: Record<string, unknown>) {
+  const id = Number(row.id);
+  const departmentId = parseDepartmentId(row.department_id);
+  const imageDataUrl = typeof row.image_data_url === "string" ? row.image_data_url.trim() : "";
+  if (!Number.isFinite(id) || !departmentId || !imageDataUrl.startsWith("data:image/")) {
+    return null;
+  }
+
+  return {
+    id,
+    departmentId,
+    departmentName: typeof row.department_name === "string" && row.department_name.trim()
+      ? row.department_name.trim()
+      : DEPARTMENTS[departmentId].department,
+    reportDate: typeof row.report_date === "string" ? row.report_date : "",
+    photoReportDate: typeof row.photo_report_date === "string" ? row.photo_report_date : "",
+    imageName: typeof row.image_name === "string" ? row.image_name : "",
+    imageDataUrl,
+    createdAt: typeof row.created_at === "string" ? row.created_at : "",
+    saveStatus: typeof row.save_status === "string" ? row.save_status : "",
+    notes: Array.isArray(row.notes) ? row.notes.map((item) => String(item || "")) : [],
+    recognizedKeys: Array.isArray(row.recognized_keys) ? row.recognized_keys.map((item) => String(item || "")) : [],
+    changedKeys: [],
+    recognizedValues: row.ocr_raw && typeof row.ocr_raw === "object" ? row.ocr_raw : {},
+    finalValues: row.final_values && typeof row.final_values === "object" ? row.final_values : {},
+    cellReviews: Array.isArray(row.cell_reviews) ? row.cell_reviews : []
+  };
+}
+
+async function listAndroidMainformFeedbackRecords(
+  supabase: ReturnType<typeof createClient>,
+  createdDateKey: string,
+  limit = 80
+) {
+  const normalizedLimit = Math.min(300, Math.max(1, Number.isFinite(Number(limit)) ? Number(limit) : 80));
+  const range = getUtcIsoRangeForYerevanDateKey(createdDateKey || getYerevanDateKey());
+
+  let query = (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id, department_id, department_name, report_date, photo_report_date, image_name, image_data_url, recognized_keys, ocr_raw, final_values, notes, cell_reviews, save_status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(normalizedLimit);
+
+  if (range) {
+    query = query
+      .gte("created_at", range.startIso)
+      .lt("created_at", range.endIso);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw error;
+  }
+
+  return (Array.isArray(data) ? data : [])
+    .map((row) => row as Record<string, unknown>)
+    .filter((row) => isAndroidMainformFeedbackNotes(row.notes))
+    .map(buildAndroidMainformFeedbackRecord)
+    .filter(Boolean);
+}
+
 async function loadLatestDepartmentSubmissionRecord(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
@@ -11790,6 +11879,28 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "latest_department_submission_failed",
+          error: error instanceof Error ? error.message : String(error)
+        }, 500);
+      }
+    }
+
+    if (action === "android-mainform-feedback") {
+      try {
+        const currentUrl = new URL(request.url);
+        const createdDateKey = String(currentUrl.searchParams.get("createdDateKey") || "").trim() || getYerevanDateKey();
+        const limit = Number(currentUrl.searchParams.get("limit") || 80);
+        const supabase = createSupabaseAdmin();
+        const records = await listAndroidMainformFeedbackRecords(
+          supabase,
+          createdDateKey,
+          limit
+        );
+        return jsonResponse({ ok: true, records });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "android_mainform_feedback_failed",
           error: error instanceof Error ? error.message : String(error)
         }, 500);
       }

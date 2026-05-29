@@ -577,6 +577,16 @@ function buildInitialPhotoLightboxState() {
     };
   }
 
+  function buildInitialMainTableAndroidAppState() {
+    return {
+      records: [],
+      isLoading: false,
+      error: "",
+      loaded: false,
+      lastLoadedAt: 0
+    };
+  }
+
   const state = {
     snapshot: config.buildDefaultSnapshot(),
     loadedSnapshot: config.buildDefaultSnapshot(),
@@ -622,6 +632,7 @@ function buildInitialPhotoLightboxState() {
     feedback: buildInitialFeedbackState(),
     mainTablePhotoGallery: buildInitialMainTablePhotoGalleryState(),
     mainTableTelegramForms: buildInitialMainTableTelegramFormState(),
+    mainTableAndroidApp: buildInitialMainTableAndroidAppState(),
     selectedMainCalcDepartmentId: "",
     departmentTopCellsUnlocked: false,
     shiftAutoTransferEnabled: readShiftAutoTransferEnabled(),
@@ -2825,6 +2836,13 @@ function buildInitialPhotoLightboxState() {
     return state.mainTableTelegramForms.records;
   }
 
+  function ensureMainTableAndroidAppRecordsLoaded() {
+    if (!Array.isArray(state.mainTableAndroidApp.records)) {
+      state.mainTableAndroidApp.records = [];
+    }
+    return state.mainTableAndroidApp.records;
+  }
+
   function getMainTableTelegramFormRecordById(feedbackId) {
     const normalizedFeedbackId = Number(feedbackId);
     return ensureMainTableTelegramFormRecordsLoaded()
@@ -2834,7 +2852,14 @@ function buildInitialPhotoLightboxState() {
 
   function getMainTablePhotoGalleryRecordById(feedbackId) {
     const normalizedFeedbackId = Number(feedbackId);
-    return ensureMainTablePhotoGalleryRecordsLoaded()
+    const photoGalleryRecord = ensureMainTablePhotoGalleryRecordsLoaded()
+      .map((record) => normalizeMainTablePhotoGalleryRecord(record))
+      .find((record) => record && Number(record.id) === normalizedFeedbackId) || null;
+    if (photoGalleryRecord) {
+      return photoGalleryRecord;
+    }
+
+    return ensureMainTableAndroidAppRecordsLoaded()
       .map((record) => normalizeMainTablePhotoGalleryRecord(record))
       .find((record) => record && Number(record.id) === normalizedFeedbackId) || null;
   }
@@ -2947,10 +2972,40 @@ function buildInitialPhotoLightboxState() {
       .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
   }
 
+  function getMainTableAndroidAppTodayItems(rows) {
+    const records = ensureMainTableAndroidAppRecordsLoaded();
+    const todayDateKey = getArchiveDateKey();
+    const rowsById = new Map(
+      (Array.isArray(rows) ? rows : [])
+        .filter((row) => row && typeof row.id === "string")
+        .map((row) => [row.id, row])
+    );
+
+    return records
+      .map((record) => normalizeMainTablePhotoGalleryRecord(record))
+      .filter(Boolean)
+      .filter((record) => getArchiveDateKeyForTimestamp(record.createdAt) === todayDateKey)
+      .map((record) => {
+        const boundRow = rowsById.get(record.departmentId) || null;
+        const sourceMeta = getMainTablePhotoGallerySourceMeta(record);
+        return {
+          ...record,
+          feedbackId: record.id,
+          rowId: boundRow?.id || record.departmentId,
+          departmentId: boundRow?.id || record.departmentId,
+          departmentName: boundRow?.department || record.departmentName || record.departmentId || "Неизвестное отделение",
+          photoSentAt: record.createdAt,
+          sourceMeta,
+          workflowStatus: boundRow?.photoWorkflowStatus || "",
+          freshness: boundRow ? getRowFreshnessMeta(boundRow) : null
+        };
+      })
+      .sort((left, right) => getTimestampSortValue(right.createdAt) - getTimestampSortValue(left.createdAt));
+  }
+
   function buildMainTableAndroidAppItems(displayContext = getMainTableDisplaySnapshotContext()) {
     const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
-    return getMainTablePhotoGalleryTodayItems(rows)
-      .filter((item) => isAndroidMainTablePhotoRecord(item))
+    return getMainTableAndroidAppTodayItems(rows)
       .map((item) => {
         const previewValues = buildPhotoPreviewValuesFromRecord(item);
         const recognizedKeys = Array.isArray(item.recognizedKeys) && item.recognizedKeys.length
@@ -3512,9 +3567,7 @@ function buildInitialPhotoLightboxState() {
         if (!Number.isFinite(feedbackId)) {
           return;
         }
-        const record = ensureMainTablePhotoGalleryRecordsLoaded()
-          .map((item) => normalizeMainTablePhotoGalleryRecord(item))
-          .find((item) => item && item.id === feedbackId);
+        const record = getMainTablePhotoGalleryRecordById(feedbackId);
         if (!record) {
           return;
         }
@@ -3534,9 +3587,7 @@ function buildInitialPhotoLightboxState() {
         if (!Number.isFinite(feedbackId)) {
           return;
         }
-        const record = ensureMainTablePhotoGalleryRecordsLoaded()
-          .map((item) => normalizeMainTablePhotoGalleryRecord(item))
-          .find((item) => item && item.id === feedbackId);
+        const record = getMainTablePhotoGalleryRecordById(feedbackId);
         if (!record) {
           return;
         }
@@ -3720,6 +3771,54 @@ function buildInitialPhotoLightboxState() {
     } finally {
       state.mainTablePhotoGallery.isLoading = false;
       refreshMainTablePhotoGalleryUi(displayContext);
+    }
+  }
+
+  async function refreshMainTableAndroidAppRecordsFromRemote(displayContext = getMainTableDisplaySnapshotContext()) {
+    if (
+      mode !== "main"
+      || state.mainTableAndroidApp.isLoading
+      || !sync.hasRemoteSync?.()
+      || typeof sync.listAndroidMainformFeedback !== "function"
+    ) {
+      refreshMainTableAndroidAppUi(displayContext);
+      return;
+    }
+
+    if (state.mainTableAndroidApp.loaded && ensureMainTableAndroidAppRecordsLoaded().length) {
+      refreshMainTableAndroidAppUi(displayContext);
+    }
+
+    const now = Date.now();
+    if (
+      state.mainTableAndroidApp.loaded
+      && Number.isFinite(state.mainTableAndroidApp.lastLoadedAt)
+      && now - state.mainTableAndroidApp.lastLoadedAt < REMOTE_AUX_PANEL_REFRESH_MS
+    ) {
+      refreshMainTableAndroidAppUi(displayContext);
+      return;
+    }
+
+    state.mainTableAndroidApp.isLoading = true;
+    state.mainTableAndroidApp.error = "";
+    refreshMainTableAndroidAppUi(displayContext);
+
+    try {
+      const records = await sync.listAndroidMainformFeedback(120, {
+        createdDateKey: getArchiveDateKey()
+      });
+      state.mainTableAndroidApp.records = (Array.isArray(records) ? records : [])
+        .map(normalizeMainTablePhotoGalleryRecord)
+        .filter(Boolean);
+      state.mainTableAndroidApp.loaded = true;
+      state.mainTableAndroidApp.error = "";
+      state.mainTableAndroidApp.lastLoadedAt = Date.now();
+    } catch (error) {
+      state.mainTableAndroidApp.loaded = true;
+      state.mainTableAndroidApp.error = error instanceof Error ? error.message : "Не удалось загрузить отправки Android MAINFORM.";
+    } finally {
+      state.mainTableAndroidApp.isLoading = false;
+      refreshMainTableAndroidAppUi(displayContext);
     }
   }
 
@@ -9143,14 +9242,14 @@ function buildInitialPhotoLightboxState() {
   function buildMainTableAndroidAppContent(displayContext = getMainTableDisplaySnapshotContext()) {
     const items = buildMainTableAndroidAppItems(displayContext);
 
-    if (state.mainTablePhotoGallery.error && !items.length) {
+    if (state.mainTableAndroidApp.error && !items.length) {
       return {
-        summary: state.mainTablePhotoGallery.error,
+        summary: state.mainTableAndroidApp.error,
         html: '<div class="archive-empty">Не удалось загрузить отправки Android MAINFORM.</div>'
       };
     }
 
-    if (state.mainTablePhotoGallery.isLoading && !items.length) {
+    if (state.mainTableAndroidApp.isLoading && !items.length) {
       return {
         summary: "Загружаю Android MAINFORM отправки за сегодня...",
         html: '<div class="archive-empty">Загружаю Android MAINFORM данные...</div>'
@@ -11927,6 +12026,8 @@ function buildInitialPhotoLightboxState() {
       syncMainDepartmentPdfArchivePickerUi();
       refreshMainTablePhotoGalleryUi(mainDisplayContext);
       void refreshMainTablePhotoGalleryRecordsFromRemote(mainDisplayContext);
+      refreshMainTableAndroidAppUi(mainDisplayContext);
+      void refreshMainTableAndroidAppRecordsFromRemote(mainDisplayContext);
       refreshMainTableTelegramFormUi();
       void refreshMainTableTelegramFormRecordsFromRemote();
 
@@ -13450,6 +13551,9 @@ function buildInitialPhotoLightboxState() {
     state.mainTablePhotoGallery.records = ensureMainTablePhotoGalleryRecordsLoaded().filter(
       (record) => Number(record?.id) !== normalizedFeedbackId
     );
+    state.mainTableAndroidApp.records = ensureMainTableAndroidAppRecordsLoaded().filter(
+      (record) => Number(record?.id) !== normalizedFeedbackId
+    );
   }
 
   function upsertMainTablePhotoGalleryRecord(record) {
@@ -13473,6 +13577,23 @@ function buildInitialPhotoLightboxState() {
       nextRecords.push(normalizedRecord);
     }
     state.mainTablePhotoGallery.records = nextRecords;
+
+    const nextAndroidRecords = [];
+    let replacedAndroid = false;
+    ensureMainTableAndroidAppRecordsLoaded().forEach((currentRecord) => {
+      if (Number(currentRecord?.id) === normalizedId) {
+        if (isAndroidMainTablePhotoRecord(normalizedRecord)) {
+          nextAndroidRecords.push(normalizedRecord);
+        }
+        replacedAndroid = true;
+        return;
+      }
+      nextAndroidRecords.push(currentRecord);
+    });
+    if (!replacedAndroid && isAndroidMainTablePhotoRecord(normalizedRecord)) {
+      nextAndroidRecords.push(normalizedRecord);
+    }
+    state.mainTableAndroidApp.records = nextAndroidRecords;
   }
 
   async function handleDeleteMainTablePhotoGalleryFeedback(button) {
