@@ -281,6 +281,13 @@
     requestId: 0,
     modalOpen: false
   };
+  const latestDepartmentSubmissionState = {
+    isLoading: false,
+    record: null,
+    error: "",
+    requestId: 0
+  };
+  let latestDepartmentSubmissionPollTimerId = 0;
 
   function getTelegramFunctionBaseUrl() {
     const baseUrl = String(runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co").replace(/\/+$/, "");
@@ -475,6 +482,179 @@
         renderLatestDepartmentPhotoModal();
       }
     }
+  }
+
+  function getLatestDepartmentSubmissionUrl(departmentId, reportDate) {
+    const url = new URL(getTelegramFunctionBaseUrl());
+    url.searchParams.set("action", "latest-department-submission");
+    url.searchParams.set("departmentId", String(departmentId || ""));
+    url.searchParams.set("reportDate", String(reportDate || ""));
+    return url.toString();
+  }
+
+  function formatLatestDepartmentSubmissionTimestamp(value) {
+    const rawValue = String(value || "").trim();
+    if (!rawValue) {
+      return "";
+    }
+    const parsed = new Date(rawValue);
+    if (Number.isNaN(parsed.getTime())) {
+      return rawValue;
+    }
+    try {
+      return new Intl.DateTimeFormat("ru-RU", {
+        timeZone: "Asia/Yerevan",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(parsed);
+    } catch (_error) {
+      return rawValue;
+    }
+  }
+
+  function renderLatestDepartmentSubmissionSections(record) {
+    const values = record && record.values && typeof record.values === "object" ? record.values : {};
+    return sectionDefinitions.map((section) => `
+      <div class="tg-last-submission-section">
+        <div class="tg-last-submission-section__title">${escapeHtml(section.title)}</div>
+        <div class="tg-last-submission-grid">
+          ${section.keys.map((key) => {
+            const field = fieldByKey[key];
+            const value = toNumber(values[key]);
+            return `
+              <div class="tg-last-submission-chip">
+                <span>${escapeHtml(field ? field.label : key)}</span>
+                <strong>${value}</strong>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function renderLatestDepartmentSubmissionPanel() {
+    const panel = root.querySelector("[data-latest-submission-panel]");
+    if (!panel) {
+      return;
+    }
+    if (!isAndroidMode()) {
+      panel.hidden = true;
+      panel.innerHTML = "";
+      return;
+    }
+
+    panel.hidden = false;
+
+    if (latestDepartmentSubmissionState.isLoading) {
+      panel.innerHTML = `
+        <div class="tg-last-submission-card is-loading">
+          <span class="tg-last-submission-card__label">Последняя отправка на сервер</span>
+          <div class="tg-last-submission-card__placeholder">Загружаю последние отправленные данные...</div>
+        </div>
+      `;
+      return;
+    }
+
+    if (latestDepartmentSubmissionState.error) {
+      panel.innerHTML = `
+        <div class="tg-last-submission-card">
+          <span class="tg-last-submission-card__label">Последняя отправка на сервер</span>
+          <div class="tg-last-submission-card__placeholder is-error">${escapeHtml(latestDepartmentSubmissionState.error)}</div>
+        </div>
+      `;
+      return;
+    }
+
+    const record = latestDepartmentSubmissionState.record;
+    if (!record || !record.values || typeof record.values !== "object") {
+      panel.innerHTML = `
+        <div class="tg-last-submission-card">
+          <span class="tg-last-submission-card__label">Последняя отправка на сервер</span>
+          <div class="tg-last-submission-card__placeholder">На сервере для этого отделения ещё нет отправленных данных.</div>
+        </div>
+      `;
+      return;
+    }
+
+    panel.innerHTML = `
+      <div class="tg-last-submission-card">
+        <div class="tg-last-submission-card__head">
+          <span class="tg-last-submission-card__label">Последняя отправка на сервер</span>
+          <span class="tg-last-submission-card__source">${escapeHtml(record.sourceLabel || "Неизвестный источник")}</span>
+        </div>
+        <div class="tg-last-submission-card__meta">
+          ${record.createdAt ? `<span>Отправлено: ${escapeHtml(formatLatestDepartmentSubmissionTimestamp(record.createdAt))}</span>` : ""}
+          ${record.userName ? `<span>Пользователь: ${escapeHtml(record.userName)}</span>` : ""}
+          <span>Это последняя запись, уже сохранённая на сервере.</span>
+        </div>
+        <div class="tg-last-submission-body">
+          ${renderLatestDepartmentSubmissionSections(record)}
+        </div>
+      </div>
+    `;
+  }
+
+  async function loadLatestDepartmentSubmission() {
+    const department = getDepartment();
+    const reportDate = getReportDate();
+    if (!department || !isAndroidMode()) {
+      latestDepartmentSubmissionState.isLoading = false;
+      latestDepartmentSubmissionState.record = null;
+      latestDepartmentSubmissionState.error = "";
+      renderLatestDepartmentSubmissionPanel();
+      return;
+    }
+
+    const requestId = latestDepartmentSubmissionState.requestId + 1;
+    latestDepartmentSubmissionState.requestId = requestId;
+    latestDepartmentSubmissionState.isLoading = true;
+    latestDepartmentSubmissionState.error = "";
+    renderLatestDepartmentSubmissionPanel();
+
+    try {
+      const response = await fetch(getLatestDepartmentSubmissionUrl(department.id, reportDate), {
+        method: "GET"
+      });
+      const payload = await response.json().catch(() => null);
+      if (requestId !== latestDepartmentSubmissionState.requestId) {
+        return;
+      }
+      if (!response.ok || !payload || payload.ok !== true) {
+        throw new Error(payload && payload.error ? payload.error : "Не удалось загрузить последние отправленные данные.");
+      }
+
+      const record = payload && payload.record && typeof payload.record === "object"
+        ? payload.record
+        : null;
+      latestDepartmentSubmissionState.record = record;
+      latestDepartmentSubmissionState.error = "";
+    } catch (error) {
+      if (requestId !== latestDepartmentSubmissionState.requestId) {
+        return;
+      }
+      latestDepartmentSubmissionState.record = null;
+      latestDepartmentSubmissionState.error = error instanceof Error
+        ? error.message
+        : "Не удалось загрузить последние отправленные данные.";
+    } finally {
+      if (requestId === latestDepartmentSubmissionState.requestId) {
+        latestDepartmentSubmissionState.isLoading = false;
+        renderLatestDepartmentSubmissionPanel();
+      }
+    }
+  }
+
+  function startLatestDepartmentSubmissionPolling() {
+    if (!isAndroidMode() || latestDepartmentSubmissionPollTimerId) {
+      return;
+    }
+    latestDepartmentSubmissionPollTimerId = window.setInterval(() => {
+      void loadLatestDepartmentSubmission();
+    }, 60 * 1000);
   }
 
   function getPatientNotesStorageKey(department, reportDate) {
@@ -1472,6 +1652,7 @@
           ${isAndroidMode() ? '<aside class="tg-last-photo-panel" data-latest-photo-panel hidden></aside>' : ""}
         </header>
         ${isAndroidMode() ? '<div class="tg-last-photo-modal" data-latest-photo-modal hidden></div>' : ""}
+        ${isAndroidMode() ? '<section class="tg-last-submission-panel" data-latest-submission-panel></section>' : ""}
 
         <form data-form>
           <div class="tg-sheet-layout" aria-label="Բաժանմունքի ձև">
@@ -1630,10 +1811,15 @@
     if (form) {
       form.addEventListener("submit", submitForm);
     }
+    renderLatestDepartmentSubmissionPanel();
     refreshCalculatorUi();
     updateControl();
     syncFieldLockState();
     void loadLatestDepartmentPhoto();
+    if (isAndroidMode()) {
+      void loadLatestDepartmentSubmission();
+      startLatestDepartmentSubmissionPolling();
+    }
   }
 
   if (telegram) {
@@ -1655,5 +1841,12 @@
       currentMessage.textContent = getAndroidPhotoMessage();
     }
     updateControl();
+    void loadLatestDepartmentSubmission();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && isAndroidMode()) {
+      void loadLatestDepartmentPhoto();
+      void loadLatestDepartmentSubmission();
+    }
   });
 })();

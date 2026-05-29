@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-05-28T14:14:19.8250185Z",
+    "generatedAtUtc":  "2026-05-29T16:28:52.4725561Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -7,9 +7,24 @@
                       "sha256":  "FFD240DE43019C5366B4C98107033005951C43A91B23A1746045F754488B9C79"
                   },
                   {
+                      "path":  "android-intake.html",
+                      "size":  648,
+                      "sha256":  "09A3EF51C49D1CC6BEAB8ED19BA13CEC1E2EF3A5F0F12C12CEC1813CEA7CB68D"
+                  },
+                  {
                       "path":  "archive-print.html",
                       "size":  660,
                       "sha256":  "6BB281C32673BF7117B980967490D9AC365F72DF7FEA728B1BACDC4D32DA6CAB"
+                  },
+                  {
+                      "path":  "assets/android-intake.css",
+                      "size":  4669,
+                      "sha256":  "E8810C128BC15366D6667C1702B633DFD71358672081777C26A6816608A8CE72"
+                  },
+                  {
+                      "path":  "assets/android-intake.js",
+                      "size":  23804,
+                      "sha256":  "7D4DDB5BEF9803480704AD1B4462DDF0FCDAFFAAA74B354E0ED43CED71983845"
                   },
                   {
                       "path":  "assets/civil-referrals.js",
@@ -28,13 +43,13 @@
                   },
                   {
                       "path":  "assets/sharsh.css",
-                      "size":  87613,
-                      "sha256":  "A5AEBC560E1D6D1FB2040148665082BC6985AD530952A093E5F44BE13A9FD72F"
+                      "size":  92418,
+                      "sha256":  "8CDC2AAF6728CF37260EBD60DD0AFABE8149AB6DA2E7AF0FB77AB1F827B5F620"
                   },
                   {
                       "path":  "assets/sharsh-app.js",
-                      "size":  631283,
-                      "sha256":  "4B368342B10C4FABF6EE8E92D11CB3061A2DB6AB7813053962879399BECAF968"
+                      "size":  663562,
+                      "sha256":  "437588A1CD5E2CBD9A02E09E850BB024606A52894F360E34AC0AF382795488F3"
                   },
                   {
                       "path":  "assets/sharsh-auth.js",
@@ -58,13 +73,13 @@
                   },
                   {
                       "path":  "assets/sharsh-sync.js",
-                      "size":  78452,
-                      "sha256":  "07C4776280C36460BA06CE1F3ABE4F33A09711FF0D59AA0E3BE15E2F8F505345"
+                      "size":  83979,
+                      "sha256":  "93FE364D90D1339C5CD9FB574AA704F3D66484DA8A529E1D1F0FB1B558D5BF35"
                   },
                   {
                       "path":  "assets/shift-admissions.js",
-                      "size":  24594,
-                      "sha256":  "227B45D45FDF93F3DEC4ECFB25544909B614FBB6C628F19FB4AC857CE96C4EBB"
+                      "size":  26348,
+                      "sha256":  "360E4AE78F8055DABCC31BC1C87C6A0E5F5383C8E33DEDE95EB9C908DA728405"
                   },
                   {
                       "path":  "assets/templates/SHARSH_KKZH_template.xlsx",
@@ -78,13 +93,13 @@
                   },
                   {
                       "path":  "assets/tg-form.css",
-                      "size":  21675,
-                      "sha256":  "5A4213621136E461BECA2AF8092D39122AB31A2EAB60E561AB22A13AE5143414"
+                      "size":  25801,
+                      "sha256":  "25C8FF02814819D56FE0B991CD4C124967C1906B5C8058F3AE8EC9B40CEB4220"
                   },
                   {
                       "path":  "assets/tg-form.js",
-                      "size":  61075,
-                      "sha256":  "FF6CCF57714883BF3669E94A350171F196BC155869CEE5DF3AC9C32B5B9E5C54"
+                      "size":  76808,
+                      "sha256":  "8B6D2A7D0D0488575D92A9B26B6E35A6AA251209F8F4310DAC39079102A78E40"
                   },
                   {
                       "path":  "assets/tg-night-form.js",
@@ -93,8 +108,8 @@
                   },
                   {
                       "path":  "assets/tg-qh-form.js",
-                      "size":  39899,
-                      "sha256":  "D9094C7BFE496BC1296764DEA4B573D06F0A8BC9F4E7320AB3D241BFE2891D78"
+                      "size":  54994,
+                      "sha256":  "EDD3599A847F96C45415CD629FECFD3467C4D50CDCA07373F2A181706120C18B"
                   },
                   {
                       "path":  "assets/tg-shift-form.js",
@@ -233,8 +248,8 @@
                   },
                   {
                       "path":  "day.html",
-                      "size":  714,
-                      "sha256":  "A25CBD31428207473F4BA02CBF1888B24BB8D09039B708290F20EBC913BCC405"
+                      "size":  758,
+                      "sha256":  "1C5989B9277C367A848137232B75392092F7D5BBC20876100DF696E1EE4792D5"
                   },
                   {
                       "path":  "day-shift.html",
@@ -263,8 +278,8 @@
                   },
                   {
                       "path":  "discharge.html",
-                      "size":  722,
-                      "sha256":  "BFF2EF285091CE738CC54F25F5DC417576D6B481FB024C96ECD73A2A207035FB"
+                      "size":  766,
+                      "sha256":  "BEF508D5C6CB1418AD1E24420C6781DD934FD10EBABEF6B299CD615B0DB802DE"
                   },
                   {
                       "path":  "eti77ylq.html",
@@ -288,8 +303,8 @@
                   },
                   {
                       "path":  "index.html",
-                      "size":  1049,
-                      "sha256":  "E6EDAD98CA5832A11ADD8A9392DB0C0F7986276EB0D21C397231B9720B1FBDEC"
+                      "size":  1077,
+                      "sha256":  "F9EFCB9D79738BF59DBC1AD7F1FC0AB5898CBD06A6527E31918F21CB89B29253"
                   },
                   {
                       "path":  "Mainflow.deps.json",
@@ -299,12 +314,12 @@
                   {
                       "path":  "Mainflow.dll",
                       "size":  83456,
-                      "sha256":  "C1C0CDA6AD0490105AE46CD6CE71B3E327442817BF226D4AFC5234DF197A7356"
+                      "sha256":  "8A1611C81EE23BF0DB7965CB5E0F0C755EDE036FB12ED4A25F66AB85C6C2D586"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "D9384B14938B22D2E32E6CB432FBA1B18142A87CD3BF92B082C00643C36EDACF"
+                      "sha256":  "F7DAEFF45FE060779798C3546055F2A05835F9D8A8109013F3AFD5AD89C5E70A"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",
@@ -1693,8 +1708,8 @@
                   },
                   {
                       "path":  "tg-form.html",
-                      "size":  901,
-                      "sha256":  "0269802D86B95678B4B15791B461DE62B2592C972AA7B9D76E9C676D87D526E8"
+                      "size":  907,
+                      "sha256":  "EF2AB6E40FC0B44F66ACFACD24BDEA37B2FFD869248BFF3D1E052532587C1EF1"
                   },
                   {
                       "path":  "tg-night-form.html",
@@ -1703,8 +1718,8 @@
                   },
                   {
                       "path":  "tg-qh-form.html",
-                      "size":  929,
-                      "sha256":  "8AAE1FC669BA9AB081FBDBB1F1C6D219A621B34A78A58EABD1A4FF164CA00185"
+                      "size":  935,
+                      "sha256":  "76DC2C8251AFB2ADECF670837690ACC7FFB4F495E65C1A3B04C80B8342CAA5BF"
                   },
                   {
                       "path":  "UIAutomationClient.dll",

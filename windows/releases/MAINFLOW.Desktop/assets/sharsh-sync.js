@@ -2029,6 +2029,37 @@
     return Array.isArray(payload?.records) ? payload.records : [];
   }
 
+  async function listAndroidMainformFeedback(limit, options = {}) {
+    if (!hasRemoteSync()) {
+      return [];
+    }
+
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "android-mainform-feedback");
+    url.searchParams.set(
+      "limit",
+      String(Number.isFinite(Number(limit)) ? Number(limit) : 80)
+    );
+
+    const createdDateKey = typeof options.createdDateKey === "string"
+      ? options.createdDateKey.trim()
+      : "";
+    if (createdDateKey) {
+      url.searchParams.set("createdDateKey", createdDateKey);
+    }
+
+    const response = await fetch(url.toString(), {
+      method: "GET"
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw buildResponseError(response, payload, "Не удалось загрузить отправки Android MAINFORM");
+    }
+
+    return Array.isArray(payload?.records) ? payload.records : [];
+  }
+
   async function loadRuntimePreferences() {
     if (!hasRemoteSync()) {
       return {
@@ -2467,6 +2498,7 @@
     buildTelegramFormPdfUrl,
     buildTelegramFormArchiveDatePdfUrl,
     listOcrFeedback,
+    listAndroidMainformFeedback,
     verifyDepartmentAccess,
     detectDepartmentPhoto,
     recognizeDepartmentPhoto,

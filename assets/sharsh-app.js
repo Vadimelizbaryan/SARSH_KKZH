@@ -2643,6 +2643,41 @@ function buildInitialPhotoLightboxState() {
     return normalized === "telegram-web-app-form" || normalized === "telegram-qh-form";
   }
 
+  function hasAndroidMainformFeedbackMarker(notes) {
+    const normalizedNotes = Array.isArray(notes)
+      ? notes.map((item) => String(item || "").trim()).filter(Boolean)
+      : [];
+    return normalizedNotes.some((note) => /Submitted via Android MAINFORM/i.test(note));
+  }
+
+  function hasTelegramFormFeedbackMarker(imageName, notes) {
+    const normalizedImageName = typeof imageName === "string" ? imageName.trim() : "";
+    const normalizedNotes = Array.isArray(notes)
+      ? notes.map((item) => String(item || "").trim()).filter(Boolean)
+      : [];
+    return isTelegramFormFeedbackImageName(normalizedImageName)
+      || normalizedNotes.some((note) => /Telegram\s+(Web App|QH)\s+form submission\./i.test(note));
+  }
+
+  function inferTelegramFormLabel(record) {
+    const notes = normalizeOcrNotes(record?.notes);
+    const imageName = typeof record?.imageName === "string" ? record.imageName.trim() : "";
+    return imageName === "telegram-qh-form"
+      || notes.some((note) => /Telegram\s+QH\s+form submission\./i.test(note))
+      ? "Telegram QH"
+      : "Telegram Web";
+  }
+
+  function isTelegramFormFeedbackRecord(record) {
+    if (!record || typeof record !== "object") {
+      return false;
+    }
+
+    const notes = normalizeOcrNotes(record.notes);
+    return hasTelegramFormFeedbackMarker(record.imageName, notes)
+      && !hasAndroidMainformFeedbackMarker(notes);
+  }
+
   function isAndroidMainTablePhotoRecord(record) {
     const notes = Array.isArray(record?.notes)
       ? record.notes.map((item) => String(item || "").trim()).filter(Boolean)
@@ -2803,7 +2838,7 @@ function buildInitialPhotoLightboxState() {
 
     const id = Number(record.id);
     const imageName = typeof record.imageName === "string" ? record.imageName.trim() : "";
-    if (!Number.isFinite(id) || !isTelegramFormFeedbackImageName(imageName)) {
+    if (!Number.isFinite(id) || !isTelegramFormFeedbackRecord(record)) {
       return null;
     }
 
@@ -2966,7 +3001,7 @@ function buildInitialPhotoLightboxState() {
           recognizedKeys,
           appliedKeys,
           alreadySaved,
-          formLabel: record.imageName === "telegram-qh-form" ? "Telegram QH" : "Telegram Web"
+          formLabel: inferTelegramFormLabel(record)
         };
       })
       .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());

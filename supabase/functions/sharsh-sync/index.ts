@@ -2291,6 +2291,21 @@ function mapOcrFeedbackRows(rows: Array<Record<string, unknown>> | null | undefi
   }));
 }
 
+function isTelegramFormFeedbackRow(row: Record<string, unknown> | null | undefined) {
+  if (!row || typeof row !== "object") {
+    return false;
+  }
+
+  const imageName = typeof row.image_name === "string" ? row.image_name.trim() : "";
+  const notes = sanitizeFeedbackNotes(row.notes);
+  const hasTelegramFormMarker = imageName === "telegram-web-app-form"
+    || imageName === "telegram-qh-form"
+    || notes.some((note) => /Telegram\s+(Web App|QH)\s+form submission\./i.test(note));
+  const hasAndroidMarker = notes.some((note) => /Submitted via Android MAINFORM/i.test(note));
+
+  return hasTelegramFormMarker && !hasAndroidMarker;
+}
+
 function buildYerevanDateRange(dateKey: unknown) {
   const normalizedDateKey = typeof dateKey === "string" ? dateKey.trim() : "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDateKey)) {
@@ -2348,18 +2363,23 @@ async function listOcrFeedbackRecords(
 
 async function listTelegramFormFeedbackRecords(supabase: ReturnType<typeof createClient>, limit: number) {
   const safeLimit = Math.min(200, Math.max(1, Math.trunc(limit || 80)));
+  const fetchLimit = Math.min(500, Math.max(safeLimit * 4, safeLimit));
   const { data, error } = await supabase
     .from("sharsh_ocr_feedback")
     .select("id, created_at, department_id, department_name, report_date, photo_report_date, save_status, image_name, image_data_url, recognized_keys, changed_keys, ocr_raw, final_values, notes, cell_reviews")
-    .in("image_name", ["telegram-web-app-form", "telegram-qh-form"])
     .order("created_at", { ascending: false })
-    .limit(safeLimit);
+    .limit(fetchLimit);
 
   if (error) {
     throw error;
   }
 
-  return mapOcrFeedbackRows(data as Array<Record<string, unknown>> | null | undefined);
+  const filteredRows = (Array.isArray(data) ? data : [])
+    .map((row) => row as Record<string, unknown>)
+    .filter((row) => isTelegramFormFeedbackRow(row))
+    .slice(0, safeLimit);
+
+  return mapOcrFeedbackRows(filteredRows);
 }
 
 async function listOcrFeedbackRecordsByIds(
