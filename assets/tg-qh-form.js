@@ -682,7 +682,7 @@
     }
     latestDepartmentSubmissionPollTimerId = window.setInterval(() => {
       void loadLatestDepartmentSubmission();
-    }, 60 * 1000);
+    }, 3 * 60 * 1000);
   }
 
   function getPreservedValues() {

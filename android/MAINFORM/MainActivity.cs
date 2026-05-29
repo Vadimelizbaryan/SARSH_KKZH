@@ -41,7 +41,7 @@ public class MainActivity : Activity
     private const int PhotoQuality = 86;
     private const string AndroidIntakeHubDepartmentId = "admission_hub";
     private const string NotificationChannelId = "mainform_ocr_results";
-    private const int NotificationPollIntervalMs = 30000;
+    private const int NotificationPollIntervalMs = 120000;
 
     private static readonly HttpClient BootstrapHttpClient = new()
     {

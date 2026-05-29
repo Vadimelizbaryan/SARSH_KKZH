@@ -9,7 +9,7 @@
 
   const SESSION_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:android-intake-hub:v1`;
   const PREVIEW_TAP_DELAY_MS = 260;
-  const POLL_INTERVAL_MS = 60 * 1000;
+  const POLL_INTERVAL_MS = 3 * 60 * 1000;
   const query = new URLSearchParams(window.location.search);
   const deviceId = String(query.get("androidDeviceId") || "").trim();
   const deviceName = String(query.get("androidDeviceName") || "").trim();

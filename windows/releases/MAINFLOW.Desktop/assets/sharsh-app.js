@@ -5,7 +5,10 @@
   const app = document.getElementById("app");
   const PENDING_SYNC_EVENT_NAME = "sharsh-pending-sync-changed";
   const AUTO_PENDING_SYNC_DELAY_MS = 1500;
-  const AUTO_PENDING_SYNC_RETRY_MS = Math.max(15000, Number(sync?.runtime?.refreshIntervalMs) || 30000);
+  const AUTO_PENDING_SYNC_RETRY_MS = Math.max(
+    15000,
+    Math.min(30000, Number(sync?.runtime?.refreshIntervalMs) || 30000)
+  );
 
   if (!config || !sync || !app) {
     return;
@@ -16053,6 +16056,9 @@ function buildInitialPhotoLightboxState() {
     }
 
     state.refreshIntervalId = window.setInterval(async () => {
+      if (document.hidden) {
+        return;
+      }
       if (mode === "department" && hasDepartmentPendingLocalChanges()) {
         return;
       }
@@ -16109,6 +16115,53 @@ function buildInitialPhotoLightboxState() {
     state.clockIntervalId = window.setInterval(() => {
       refreshTableData();
     }, 30000);
+  }
+
+  async function refreshRemoteDataAfterVisibilityRestore() {
+    if (document.hidden || mode === "archive" || !sync.hasRemoteSync()) {
+      return;
+    }
+    if (mode === "department" && hasDepartmentPendingLocalChanges()) {
+      return;
+    }
+    if (mode === "main" && (state.mainTableUnlocked || hasMainTablePendingLocalChanges())) {
+      return;
+    }
+
+    try {
+      const previousPendingPhotoSignature = mode === "main"
+        ? getPendingPhotoWorkflowSignature(state.snapshot)
+        : "";
+      const result = await sync.loadSnapshot();
+      applyLoadedSnapshot(result);
+      const nextPendingPhotoSignature = mode === "main"
+        ? getPendingPhotoWorkflowSignature(state.snapshot)
+        : "";
+      if (mode === "feedback") {
+        await loadFeedbackRecords(false);
+        renderPage();
+        return;
+      }
+      if (
+        mode === "main"
+        && nextPendingPhotoSignature
+        && nextPendingPhotoSignature !== previousPendingPhotoSignature
+      ) {
+        void playPhotoReceivedSound();
+        triggerBackgroundUpdateAttention("photo");
+      }
+      restorePendingMainSaveNotice();
+      refreshTableData();
+      if (mode === "department") {
+        await maybeLoadTelegramFeedbackValues();
+        cancelAutoAppliedTelegramSelectionIfNeeded();
+        await maybeLoadStoredDepartmentPhotoAdjusted();
+        await maybeAutoRecognizeLoadedTelegramPhoto();
+      }
+    } catch (error) {
+      state.warning = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ.";
+      refreshTableData();
+    }
   }
 
   async function init() {
@@ -16349,6 +16402,12 @@ function buildInitialPhotoLightboxState() {
     getPendingSyncStatus,
     getDesktopUpdateBlockers
   };
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      void refreshRemoteDataAfterVisibilityRestore();
+    }
+  });
 
   init().catch((error) => {
     app.innerHTML = `
