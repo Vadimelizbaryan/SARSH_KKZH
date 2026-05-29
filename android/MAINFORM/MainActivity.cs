@@ -116,6 +116,7 @@ public class MainActivity : Activity
         EnsureNotificationChannel();
         MaybeRequestNotificationPermission();
         StartNotificationPolling();
+        _ = MainformPushSupport.InitializeAndRegisterAsync(this, _selectedDepartment?.DepartmentId);
 
         if (selectDepartmentButton is not null)
         {
@@ -175,6 +176,7 @@ public class MainActivity : Activity
     {
         base.OnResume();
         _ = PollNotificationQueueAsync();
+        _ = MainformPushSupport.InitializeAndRegisterAsync(this, _selectedDepartment?.DepartmentId);
     }
 
     protected override void OnDestroy()
@@ -378,6 +380,7 @@ public class MainActivity : Activity
     {
         _selectedDepartment = option;
         SaveSelectedDepartment(option.Slug);
+        _ = MainformPushSupport.InitializeAndRegisterAsync(this, option.DepartmentId);
         if (clearPhoto)
         {
             ClearSelectedPhoto(showToast: false);

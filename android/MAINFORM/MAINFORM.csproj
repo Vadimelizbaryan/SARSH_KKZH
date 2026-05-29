@@ -6,10 +6,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>com.sarsh.mainform</ApplicationId>
-    <ApplicationVersion>11</ApplicationVersion>
-    <ApplicationDisplayVersion>1.10</ApplicationDisplayVersion>
+    <ApplicationVersion>12</ApplicationVersion>
+    <ApplicationDisplayVersion>1.11</ApplicationDisplayVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Xamarin.AndroidX.Core" Version="1.13.1.1" />
+    <PackageReference Include="Xamarin.AndroidX.Core" Version="1.16.0.2" />
+    <PackageReference Include="Xamarin.Firebase.Messaging" Version="124.1.1.2" />
   </ItemGroup>
 </Project>

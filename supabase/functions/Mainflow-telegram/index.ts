@@ -43,6 +43,8 @@ const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
 const REPORT_PDF_FILE_NAME = "Report.pdf";
 const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarmenian/NotoSansArmenian%5Bwdth,wght%5D.ttf";
 const YEREVAN_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
+const FIREBASE_PUSH_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
+const FIREBASE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const TELEGRAM_DAILY_REMINDERS = {
   midday: {
     label: "12:00",
@@ -64,6 +66,24 @@ const TELEGRAM_DAILY_REMINDERS = {
   }
 } as const;
 type TelegramDailyReminderSlot = keyof typeof TELEGRAM_DAILY_REMINDERS;
+
+type FirebaseAndroidPublicConfig = {
+  enabled: boolean;
+  projectId: string;
+  applicationId: string;
+  senderId: string;
+  apiKey: string;
+  storageBucket: string;
+};
+
+type FirebasePushServiceConfig = FirebaseAndroidPublicConfig & {
+  clientEmail: string;
+  privateKey: string;
+};
+
+let firebasePushAccessTokenCache:
+  | { accessToken: string; expiresAt: number }
+  | null = null;
 
 const VALUE_KEYS = [
   "beenTotal",
@@ -2185,6 +2205,8 @@ type AndroidDeviceAccessRecord = {
   blockedAt: string;
   lastSeenAt: string;
   lastDepartmentId: string;
+  fcmToken: string;
+  fcmTokenUpdatedAt: string;
 };
 
 type AndroidDeviceNotificationRecord = {
@@ -2400,6 +2422,11 @@ function sanitizeAndroidDeviceName(value: unknown) {
   return normalized.slice(0, 160);
 }
 
+function sanitizeAndroidDevicePushToken(value: unknown) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return normalized.slice(0, 4096);
+}
+
 function parseAndroidDeviceAccessRecords(raw: unknown): AndroidDeviceAccessRecord[] {
   if (typeof raw !== "string" || !raw.trim()) {
     return [];
@@ -2427,7 +2454,9 @@ function parseAndroidDeviceAccessRecords(raw: unknown): AndroidDeviceAccessRecor
           approvedAt: typeof record.approvedAt === "string" ? record.approvedAt : "",
           blockedAt: typeof record.blockedAt === "string" ? record.blockedAt : "",
           lastSeenAt: typeof record.lastSeenAt === "string" ? record.lastSeenAt : "",
-          lastDepartmentId: typeof record.lastDepartmentId === "string" ? record.lastDepartmentId : ""
+          lastDepartmentId: typeof record.lastDepartmentId === "string" ? record.lastDepartmentId : "",
+          fcmToken: sanitizeAndroidDevicePushToken(record.fcmToken),
+          fcmTokenUpdatedAt: typeof record.fcmTokenUpdatedAt === "string" ? record.fcmTokenUpdatedAt : ""
         };
       })
       .filter((item): item is AndroidDeviceAccessRecord => item !== null);
@@ -2939,7 +2968,9 @@ async function requestAndroidDeviceApproval(
     approvedAt: "",
     blockedAt: "",
     lastSeenAt: now,
-    lastDepartmentId: departmentId
+    lastDepartmentId: departmentId,
+    fcmToken: pendingDevices.find((item) => item.deviceId === deviceId)?.fcmToken || "",
+    fcmTokenUpdatedAt: pendingDevices.find((item) => item.deviceId === deviceId)?.fcmTokenUpdatedAt || ""
   };
 
   await savePendingAndroidDevices(
@@ -3136,6 +3167,186 @@ async function getAndroidDeviceAccessState(
   return { status: "pending" as const, record: createdPendingRecord };
 }
 
+async function saveAndroidDevicePushToken(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string,
+  deviceName: string,
+  departmentId: DepartmentId,
+  fcmToken: string
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  if (!normalizedDeviceId) {
+    throw new Error("Android device id is missing.");
+  }
+
+  const normalizedDeviceName = sanitizeAndroidDeviceName(deviceName) || "Android MAINFORM";
+  const normalizedToken = sanitizeAndroidDevicePushToken(fcmToken);
+  const now = new Date().toISOString();
+  const [approvedDevices, pendingDevices, blockedDevices] = await Promise.all([
+    loadApprovedAndroidDevices(supabase),
+    loadPendingAndroidDevices(supabase),
+    loadBlockedAndroidDevices(supabase)
+  ]);
+
+  const patchRecord = (record: AndroidDeviceAccessRecord): AndroidDeviceAccessRecord => ({
+    ...record,
+    deviceName: normalizedDeviceName,
+    updatedAt: now,
+    lastSeenAt: now,
+    lastDepartmentId: departmentId,
+    fcmToken: normalizedToken,
+    fcmTokenUpdatedAt: now
+  });
+
+  const approvedRecord = approvedDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (approvedRecord) {
+    const nextRecord = patchRecord(approvedRecord);
+    await saveApprovedAndroidDevices(
+      supabase,
+      [nextRecord, ...approvedDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    );
+    return nextRecord;
+  }
+
+  const pendingRecord = pendingDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (pendingRecord) {
+    const nextRecord = patchRecord(pendingRecord);
+    await savePendingAndroidDevices(
+      supabase,
+      [nextRecord, ...pendingDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    );
+    return nextRecord;
+  }
+
+  const blockedRecord = blockedDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (blockedRecord) {
+    const nextRecord = patchRecord(blockedRecord);
+    await saveBlockedAndroidDevices(
+      supabase,
+      [nextRecord, ...blockedDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    );
+    return nextRecord;
+  }
+
+  const createdPendingRecord = await requestAndroidDeviceApproval(
+    supabase,
+    normalizedDeviceId,
+    normalizedDeviceName,
+    departmentId
+  );
+  const nextRecord = patchRecord(createdPendingRecord);
+  await savePendingAndroidDevices(
+    supabase,
+    [nextRecord, ...pendingDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+  );
+  return nextRecord;
+}
+
+async function clearAndroidDevicePushToken(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  if (!normalizedDeviceId) {
+    return;
+  }
+
+  const [approvedDevices, pendingDevices, blockedDevices] = await Promise.all([
+    loadApprovedAndroidDevices(supabase),
+    loadPendingAndroidDevices(supabase),
+    loadBlockedAndroidDevices(supabase)
+  ]);
+
+  const now = new Date().toISOString();
+  const clearRecord = (record: AndroidDeviceAccessRecord): AndroidDeviceAccessRecord => ({
+    ...record,
+    updatedAt: now,
+    fcmToken: "",
+    fcmTokenUpdatedAt: now
+  });
+
+  const nextApproved = approvedDevices.map((item) =>
+    item.deviceId === normalizedDeviceId ? clearRecord(item) : item
+  );
+  const nextPending = pendingDevices.map((item) =>
+    item.deviceId === normalizedDeviceId ? clearRecord(item) : item
+  );
+  const nextBlocked = blockedDevices.map((item) =>
+    item.deviceId === normalizedDeviceId ? clearRecord(item) : item
+  );
+
+  await Promise.all([
+    saveApprovedAndroidDevices(supabase, nextApproved),
+    savePendingAndroidDevices(supabase, nextPending),
+    saveBlockedAndroidDevices(supabase, nextBlocked)
+  ]);
+}
+
+async function sendAndroidDevicePushNotification(
+  supabase: ReturnType<typeof createClient>,
+  device: AndroidDeviceAccessRecord,
+  notification: AndroidDeviceNotificationRecord
+) {
+  const config = getFirebasePushServiceConfig();
+  if (!config || !device.fcmToken) {
+    return false;
+  }
+
+  try {
+    const accessToken = await getFirebasePushAccessToken(config);
+    const response = await fetch(
+      `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(config.projectId)}/messages:send`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          message: {
+            token: device.fcmToken,
+            notification: {
+              title: notification.title,
+              body: notification.message
+            },
+            android: {
+              priority: "high",
+              notification: {
+                channel_id: "mainform_ocr_results",
+                sound: "default"
+              }
+            },
+            data: {
+              id: notification.id,
+              departmentId: notification.departmentId,
+              title: notification.title,
+              message: notification.message,
+              level: notification.level,
+              feedbackId: notification.feedbackId || "",
+              reportDate: notification.reportDate || "",
+              source: notification.source || ""
+            }
+          }
+        })
+      }
+    );
+
+    if (response.ok) {
+      return true;
+    }
+
+    const errorText = await response.text();
+    console.error("Android Firebase push send failed:", errorText);
+    if (/UNREGISTERED|registration-token-not-registered|Requested entity was not found/i.test(errorText)) {
+      await clearAndroidDevicePushToken(supabase, device.deviceId);
+    }
+  } catch (error) {
+    console.error("Android Firebase push send failed:", sanitizePublicErrorMessage(error));
+  }
+
+  return false;
+}
+
 function buildAndroidDepartmentNotificationTitle(departmentId: DepartmentId, level: "success" | "warning") {
   const department = DEPARTMENTS[departmentId];
   const prefix = level === "success" ? "OCR сохранен" : "OCR требует проверки";
@@ -3184,6 +3395,14 @@ async function queueAndroidDepartmentNotifications(
   } satisfies AndroidDeviceNotificationRecord));
 
   await saveAndroidDeviceNotifications(supabase, [...newEvents, ...existing]);
+  await Promise.all(
+    newEvents.map((event) => {
+      const targetDevice = targetDevices.find((item) => item.deviceId === event.deviceId);
+      return targetDevice
+        ? sendAndroidDevicePushNotification(supabase, targetDevice, event)
+        : Promise.resolve(false);
+    })
+  );
   return newEvents;
 }
 
@@ -3551,7 +3770,6 @@ async function handleAndroidIntakePhotoSubmit(request: Request) {
       }
       await queueAndroidDepartmentNotifications(supabase, departmentId, {
         level: "success",
-        message: "Контрол сум пройден, данные введены в основную таблицу.",
         message: ANDROID_OCR_SUCCESS_NOTIFICATION_MESSAGE,
         feedbackId,
         reportDate,
@@ -3561,7 +3779,6 @@ async function handleAndroidIntakePhotoSubmit(request: Request) {
       await markDepartmentPhotoPending(supabase, departmentId, feedbackId, preparedPhoto.fileName);
       await queueAndroidDepartmentNotifications(supabase, departmentId, {
         level: "warning",
-        message: "Контрол сум не пройден, отправте данные с помошю вашей таблицы отделения на MAINFORM.app.",
         message: ANDROID_OCR_FAILURE_NOTIFICATION_MESSAGE,
         feedbackId,
         reportDate,
@@ -3654,6 +3871,61 @@ async function handleAndroidDeviceNotificationsAck(request: Request) {
       ok: false,
       service: "Mainflow-telegram",
       status: "android_device_notifications_ack_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
+async function handleAndroidFirebaseConfig(_request: Request) {
+  try {
+    return jsonResponse(buildAndroidFirebaseConfigResponse());
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_firebase_config_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
+async function handleAndroidDeviceFcmRegister(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const deviceId = sanitizeAndroidDeviceId(payload?.deviceId);
+    const deviceName = sanitizeAndroidDeviceName(payload?.deviceName) || "Android MAINFORM";
+    const departmentId = parseDepartmentId(payload?.departmentId);
+    const fcmToken = sanitizeAndroidDevicePushToken(payload?.fcmToken);
+    if (!deviceId || !departmentId || !fcmToken) {
+      return jsonResponse({ ok: false, error: "Device, department and fcmToken are required." }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const accessState = await getAndroidDeviceAccessState(supabase, deviceId, deviceName, departmentId);
+    if (accessState.status === "blocked") {
+      return jsonResponse({ ok: false, error: "access_denied" }, 403);
+    }
+
+    const updatedRecord = await saveAndroidDevicePushToken(
+      supabase,
+      deviceId,
+      deviceName,
+      departmentId,
+      fcmToken
+    );
+    return jsonResponse({
+      ok: true,
+      approved: accessState.status === "approved",
+      deviceId: updatedRecord.deviceId,
+      departmentId: updatedRecord.lastDepartmentId,
+      pushEnabled: Boolean(updatedRecord.fcmToken),
+      fcmTokenUpdatedAt: updatedRecord.fcmTokenUpdatedAt
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_device_fcm_register_failed",
       error: getErrorText(error)
     }, 500);
   }
@@ -6010,6 +6282,131 @@ async function listAndroidIntakeSessionPhotoRecords(
       sourceLabel: buildAndroidIntakePhotoSourceLabel(notes)
     };
   });
+}
+
+function getFirebaseAndroidPublicConfig(): FirebaseAndroidPublicConfig {
+  return {
+    enabled: true,
+    projectId: (Deno.env.get("FIREBASE_PROJECT_ID") || "").trim(),
+    applicationId: (Deno.env.get("FIREBASE_ANDROID_APP_ID") || "").trim(),
+    senderId: (Deno.env.get("FIREBASE_ANDROID_SENDER_ID") || "").trim(),
+    apiKey: (Deno.env.get("FIREBASE_ANDROID_API_KEY") || "").trim(),
+    storageBucket: (Deno.env.get("FIREBASE_ANDROID_STORAGE_BUCKET") || "").trim()
+  };
+}
+
+function getFirebasePushServiceConfig(): FirebasePushServiceConfig | null {
+  const publicConfig = getFirebaseAndroidPublicConfig();
+  const clientEmail = (Deno.env.get("FIREBASE_CLIENT_EMAIL") || "").trim();
+  const privateKey = (Deno.env.get("FIREBASE_PRIVATE_KEY") || "").replace(/\\n/g, "\n").trim();
+  if (!publicConfig.projectId || !publicConfig.applicationId || !publicConfig.senderId || !publicConfig.apiKey || !clientEmail || !privateKey) {
+    return null;
+  }
+
+  return {
+    ...publicConfig,
+    enabled: true,
+    clientEmail,
+    privateKey
+  };
+}
+
+function buildAndroidFirebaseConfigResponse() {
+  const config = getFirebaseAndroidPublicConfig();
+  const enabled = Boolean(config.projectId && config.applicationId && config.senderId && config.apiKey);
+  return {
+    ok: true,
+    enabled,
+    projectId: enabled ? config.projectId : "",
+    applicationId: enabled ? config.applicationId : "",
+    senderId: enabled ? config.senderId : "",
+    apiKey: enabled ? config.apiKey : "",
+    storageBucket: enabled ? config.storageBucket : ""
+  };
+}
+
+function base64UrlEncodeBytes(bytes: Uint8Array) {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function base64UrlEncodeText(text: string) {
+  return base64UrlEncodeBytes(new TextEncoder().encode(text));
+}
+
+function decodePemPrivateKey(privateKey: string) {
+  const normalized = privateKey
+    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+    .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\s+/g, "");
+  const binary = atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
+}
+
+async function signFirebaseJwtAssertion(clientEmail: string, privateKey: string) {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const expiresAt = issuedAt + 3600;
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = {
+    iss: clientEmail,
+    scope: FIREBASE_PUSH_SCOPE,
+    aud: FIREBASE_TOKEN_ENDPOINT,
+    iat: issuedAt,
+    exp: expiresAt
+  };
+  const signingInput = `${base64UrlEncodeText(JSON.stringify(header))}.${base64UrlEncodeText(JSON.stringify(payload))}`;
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    decodePemPrivateKey(privateKey),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    cryptoKey,
+    new TextEncoder().encode(signingInput)
+  );
+  return `${signingInput}.${base64UrlEncodeBytes(new Uint8Array(signature))}`;
+}
+
+async function getFirebasePushAccessToken(config: FirebasePushServiceConfig) {
+  if (firebasePushAccessTokenCache && firebasePushAccessTokenCache.expiresAt > Date.now() + 60_000) {
+    return firebasePushAccessTokenCache.accessToken;
+  }
+
+  const assertion = await signFirebaseJwtAssertion(config.clientEmail, config.privateKey);
+  const body = new URLSearchParams({
+    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    assertion
+  });
+  const response = await fetch(FIREBASE_TOKEN_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    body
+  });
+  if (!response.ok) {
+    throw new Error(`Firebase token exchange failed: ${response.status} ${await response.text()}`);
+  }
+
+  const payload = await response.json() as { access_token?: string; expires_in?: number };
+  if (!payload.access_token) {
+    throw new Error("Firebase token exchange returned no access token.");
+  }
+
+  firebasePushAccessTokenCache = {
+    accessToken: payload.access_token,
+    expiresAt: Date.now() + Math.max(300, Number(payload.expires_in || 3600) - 120) * 1000
+  };
+  return payload.access_token;
 }
 
 async function insertAcceptedFeedback(
@@ -11406,6 +11803,10 @@ Deno.serve(async (request) => {
       return await handleAndroidDeviceNotifications(request);
     }
 
+    if (action === "android-firebase-config") {
+      return await handleAndroidFirebaseConfig(request);
+    }
+
     if (action === "android-form-url") {
       try {
         const currentUrl = new URL(request.url);
@@ -11509,6 +11910,9 @@ Deno.serve(async (request) => {
   }
   if (postUrl.searchParams.get("action") === "android-device-notifications-ack") {
     return await handleAndroidDeviceNotificationsAck(request);
+  }
+  if (postUrl.searchParams.get("action") === "android-device-fcm-register") {
+    return await handleAndroidDeviceFcmRegister(request);
   }
   if (postUrl.searchParams.get("action") === "night-form-load") {
     return await handleTelegramShiftFormLoad(request, "night");
