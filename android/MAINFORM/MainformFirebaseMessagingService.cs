@@ -13,6 +13,8 @@ namespace MAINFORM;
 public class MainformFirebaseMessagingService : FirebaseMessagingService
 {
     private const string NotificationChannelId = "mainform_ocr_results";
+    private const string NotificationChannelName = "MAINFORM OCR";
+    private const string NotificationChannelDescription = "OCR results for department photos";
 
     public override void OnNewToken(string token)
     {
@@ -55,6 +57,8 @@ public class MainformFirebaseMessagingService : FirebaseMessagingService
             return;
         }
 
+        EnsureNotificationChannel(context);
+
         var launchIntent = context.PackageManager?.GetLaunchIntentForPackage(context.PackageName);
         PendingIntent? pendingIntent = null;
         if (launchIntent is not null)
@@ -87,5 +91,35 @@ public class MainformFirebaseMessagingService : FirebaseMessagingService
             Environment.TickCount & int.MaxValue,
             builder.Build()
         );
+    }
+
+    private static void EnsureNotificationChannel(Context context)
+    {
+        if (global::Android.OS.Build.VERSION.SdkInt < global::Android.OS.BuildVersionCodes.O)
+        {
+            return;
+        }
+
+        var manager = (NotificationManager?)context.GetSystemService(Context.NotificationService);
+        if (manager is null)
+        {
+            return;
+        }
+
+        var existing = manager.GetNotificationChannel(NotificationChannelId);
+        if (existing is not null)
+        {
+            return;
+        }
+
+        var channel = new NotificationChannel(
+            NotificationChannelId,
+            NotificationChannelName,
+            NotificationImportance.High)
+        {
+            Description = NotificationChannelDescription
+        };
+
+        manager.CreateNotificationChannel(channel);
     }
 }

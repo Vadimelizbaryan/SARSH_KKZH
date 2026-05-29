@@ -6,11 +6,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>com.sarsh.mainform</ApplicationId>
-    <ApplicationVersion>13</ApplicationVersion>
-    <ApplicationDisplayVersion>1.12</ApplicationDisplayVersion>
+    <ApplicationVersion>14</ApplicationVersion>
+    <ApplicationDisplayVersion>1.13</ApplicationDisplayVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Xamarin.AndroidX.Core" Version="1.16.0.2" />
     <PackageReference Include="Xamarin.Firebase.Messaging" Version="124.1.1.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <GoogleServicesJson Include="google-services.json" Condition="Exists('google-services.json')" />
   </ItemGroup>
 </Project>

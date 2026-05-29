@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "254752572901",
+    "project_id": "mainform-push",
+    "storage_bucket": "mainform-push.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:254752572901:android:9b846b559c8d456ed19b0c",
+        "android_client_info": {
+          "package_name": "com.sarsh.mainform"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqbVmCXV0NEThNWz-ECi1Mrz9xj0YyXm4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
