@@ -30,7 +30,7 @@
 
   function escapeHtml(text) {
     return String(text)
-      .replaceAll("&", "&amp;")
+      .replaceAll("&", "&")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");

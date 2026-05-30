@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   const config = window.SHARSH_CONFIG;
   const sync = window.SHARSH_SYNC;
   const auth = window.SHARSH_AUTH || null;
@@ -33,16 +33,16 @@
   const departmentArchiveKeyFromQuery = queryParams.get("departmentArchive") || "";
   const departmentArchiveDateFromQuery = queryParams.get("departmentArchiveDate") || "";
   const archiveAutoPrint = queryParams.get("autoprint") !== "0";
-  const PRINT_REPORT_TITLE = "Ô¿Ô¿Ô¶Õ€-Õ‡Õ¡Ö€Õªâ€¤";
+  const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
   const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
-  const SAVE_RULE_NAME = "ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒ 13-22";
-  const SOLDIER_COUNT_RULE_NAME = "ÐšÐ¾Ð»Ð¸Ñ‡ÐµÑÑ‚Ð²Ð¾ ÑÑ€Ð¾Ñ‡Ð½Ð¸ÐºÐ¾Ð²";
+  const SAVE_RULE_NAME = "Контроль 13-22";
+  const SOLDIER_COUNT_RULE_NAME = "Количество срочников";
   const SOLDIER_COUNT_RULE_TEXT = "(3 + 6) - 9 = 13 + 20";
-  const MILITARY_COUNT_RULE_NAME = "ÐšÐ¾Ð»Ð¸Ñ‡ÐµÑÑ‚Ð²Ð¾ Ð²Ð¾ÐµÐ½Ð½Ð¾ÑÐ»ÑƒÐ¶Ð°Ñ‰Ð¸Ñ…";
+  const MILITARY_COUNT_RULE_NAME = "Количество военнослужащих";
   const MILITARY_COUNT_RULE_TEXT = "(2 + 5) - 8 = 13 + 14 + 15 + 20 + 21 + 22";
-  const OCR_TOP_CELLS_RULE_NAME = "ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒ OCR 1-3";
-  const OCR_TOP_CELLS_RULE_TEXT = "OCR 1 = Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° 1; OCR 2 = Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° 2; OCR 3 = Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° 3";
-  const SAVE_RULE_TEXT_SHORT = "ÑÑƒÐ¼Ð¼Ð° Ð±Ð»Ð¾ÐºÐ° ÐÐ ÐšÐ Ð­ = (1 + 4 + 11) - (7 + 10)";
+  const OCR_TOP_CELLS_RULE_NAME = "Контроль OCR 1-3";
+  const OCR_TOP_CELLS_RULE_TEXT = "OCR 1 = таблица 1; OCR 2 = таблица 2; OCR 3 = таблица 3";
+  const SAVE_RULE_TEXT_SHORT = "сумма блока АРКА Э = (1 + 4 + 11) - (7 + 10)";
   const DEPARTMENT_MORNING_CONTROL_KEYS = ["beenTotal", "beenSoldier", "beenSeries"];
   const DEPARTMENT_MORNING_CONTROL_KEY_SET = new Set(DEPARTMENT_MORNING_CONTROL_KEYS);
   const ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-archive:v1`;
@@ -114,7 +114,7 @@
   const QH_CALC_COLUMNS = [
     {
       type: "soldier",
-      label: "Õ‡Ô±Õ",
+      label: "ՇԱՐ",
       currentKey: "currentShar",
       incomingKey: "qhIncomingSoldier",
       dischargedKey: "qhDischargedSoldier",
@@ -127,7 +127,7 @@
     },
     {
       type: "officer",
-      label: "ÕÕŠÔ±",
+      label: "ՍՊԱ",
       currentKey: "currentSpa",
       incomingKey: "qhIncomingOfficer",
       dischargedKey: "qhDischargedOfficer",
@@ -140,7 +140,7 @@
     },
     {
       type: "contract",
-      label: "ÕŠÔ±Õ…Õ„",
+      label: "ՊԱՅՄ",
       currentKey: "currentPaym",
       incomingKey: "qhIncomingContract",
       dischargedKey: "qhDischargedContract",
@@ -153,7 +153,7 @@
     },
     {
       type: "zh",
-      label: "Ô¶/Õ€",
+      label: "Զ/Հ",
       currentKey: "currentZh",
       incomingKey: "qhIncomingZh",
       dischargedKey: "qhDischargedZh",
@@ -166,7 +166,7 @@
     },
     {
       type: "family",
-      label: "Ô¶/Ô¾ Õ¨Õ¶Õ¿",
+      label: "Զ/Ծ ընտ",
       currentKey: "family",
       incomingKey: "qhIncomingFamily",
       dischargedKey: "qhDischargedFamily",
@@ -179,7 +179,7 @@
     },
     {
       type: "reserve",
-      label: "Ô¶/ÕŠ",
+      label: "Զ/Պ",
       currentKey: "officer",
       incomingKey: "qhIncomingReserve",
       dischargedKey: "qhDischargedReserve",
@@ -192,7 +192,7 @@
     },
     {
       type: "civil",
-      label: "Õ”-Õ«",
+      label: "Ք-ի",
       currentKey: "civil",
       incomingKey: "qhIncomingCivil",
       dischargedKey: "qhDischargedCivil",
@@ -210,7 +210,7 @@
   }, {});
   const QH_CALC_FIELD_ROWS = [
     {
-      label: "Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¾Õ¥Õ¬ Õ§",
+      label: "Ընդունվել է",
       cells: QH_CALC_COLUMNS.map((column) => ({
         key: column.incomingKey,
         marker: column.incomingMarker,
@@ -218,7 +218,7 @@
       }))
     },
     {
-      label: "Ô´Õ¸Ö‚Ö€Õ½ Õ§ Õ£Ö€Õ¾Õ¥Õ¬",
+      label: "Դուրս է գրվել",
       cells: QH_CALC_COLUMNS.map((column) => ({
         key: column.dischargedKey,
         marker: column.dischargedMarker,
@@ -226,7 +226,7 @@
       }))
     },
     {
-      label: "ÔµÕ²Õ¥Õ¬ Õ§",
+      label: "Եղել է",
       cells: QH_CALC_COLUMNS.map((column) => ({
         key: column.baseKey,
         marker: column.baseMarker,
@@ -234,7 +234,7 @@
       }))
     },
     {
-      label: "Õ€Õ¡Õ·Õ¾Õ¡Ö€Õ¯",
+      label: "Հաշվարկ",
       cells: QH_CALC_COLUMNS.map((column) => ({
         key: column.outputKey,
         marker: column.outputMarker,
@@ -266,7 +266,7 @@
   const LEAVE_CALC_COLUMNS = [
     {
       type: "sharq",
-      label: "Õ‡Ô±Õ",
+      label: "ՇԱՐ",
       presentKey: "currentShar",
       leaveKey: "leaveSharq",
       sentKey: "leaveCalcSentSharq",
@@ -279,7 +279,7 @@
     },
     {
       type: "spa",
-      label: "ÕÕŠÔ±",
+      label: "ՍՊԱ",
       presentKey: "currentSpa",
       leaveKey: "leaveSpa",
       sentKey: "leaveCalcSentSpa",
@@ -292,7 +292,7 @@
     },
     {
       type: "paym",
-      label: "ÕŠÔ±Õ…Õ„",
+      label: "ՊԱՅՄ",
       presentKey: "currentPaym",
       leaveKey: "leavePaym",
       sentKey: "leaveCalcSentPaym",
@@ -310,7 +310,7 @@
   const TRANSFER_CALC_COLUMNS = [
     {
       type: "soldier",
-      label: "Õ‡Ô±Õ",
+      label: "ՇԱՐ",
       currentKey: "currentShar",
       incomingKey: "transferCalcIncomingSoldier",
       outgoingKey: "transferCalcOutgoingSoldier",
@@ -322,7 +322,7 @@
     },
     {
       type: "officer",
-      label: "ÕÕŠÔ±",
+      label: "ՍՊԱ",
       currentKey: "currentSpa",
       incomingKey: "transferCalcIncomingOfficer",
       outgoingKey: "transferCalcOutgoingOfficer",
@@ -334,7 +334,7 @@
     },
     {
       type: "contract",
-      label: "ÕŠÔ±Õ…Õ„",
+      label: "ՊԱՅՄ",
       currentKey: "currentPaym",
       incomingKey: "transferCalcIncomingContract",
       outgoingKey: "transferCalcOutgoingContract",
@@ -346,7 +346,7 @@
     },
     {
       type: "zh",
-      label: "Ô¶/Õ€",
+      label: "Զ/Հ",
       currentKey: "currentZh",
       incomingKey: "transferCalcIncomingZh",
       outgoingKey: "transferCalcOutgoingZh",
@@ -358,7 +358,7 @@
     },
     {
       type: "family",
-      label: "Ô¶/Ô¾ Õ¨Õ¶Õ¿",
+      label: "Զ/Ծ ընտ",
       currentKey: "family",
       incomingKey: "transferCalcIncomingFamily",
       outgoingKey: "transferCalcOutgoingFamily",
@@ -370,7 +370,7 @@
     },
     {
       type: "reserve",
-      label: "Ô¶/ÕŠ",
+      label: "Զ/Պ",
       currentKey: "officer",
       incomingKey: "transferCalcIncomingReserve",
       outgoingKey: "transferCalcOutgoingReserve",
@@ -382,7 +382,7 @@
     },
     {
       type: "civil",
-      label: "Õ”-Õ«",
+      label: "Ք-ի",
       currentKey: "civil",
       incomingKey: "transferCalcIncomingCivil",
       outgoingKey: "transferCalcOutgoingCivil",
@@ -397,52 +397,52 @@
     TRANSFER_CALC_COLUMNS.flatMap((column) => [column.incomingKey, column.outgoingKey])
   );
   const HOSPITAL_REPORT_PRIMARY_ITEMS = [
-    { key: "beenTotal", cell: 1, label: "Õ€Õ¸Õ½ÕºÕ«Õ¿Õ¡Õ¬Õ¸Ö‚Õ´ Õ¥Õ²Õ¥Õ¬ Õ§" },
-    { key: "admittedTotal", cell: 4, label: "Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¾Õ¥Õ¬ Õ§" },
-    { key: "dgTotal", cell: 7, label: "Ô´Õ¸Ö‚Ö€Õ½ Õ§ Õ£Ö€Õ¾Õ¥Õ¬" },
-    { key: "presentTotal", cell: 12, label: "Ô±Õ¼Õ¯Õ¡ Õ§" },
-    { divider: true, label: "ÕˆÖ€Õ«Ö" },
-    { key: "currentShar", cell: 13, label: "ÔºÕ¡Õ´Õ¯Õ¥Õ¿Õ¡ÕµÕ«Õ¶ Õ¦/Õ®" },
-    { key: "currentSpa", cell: 14, label: "ÕÕºÕ¡" },
-    { key: "currentPaym", cell: 15, label: "ÕŠÕ¡ÕµÕ´Õ¡Õ¶Õ¡Õ£Ö€" },
-    { key: "currentZh", cell: 16, label: "Ô¶Õ«Õ¶Õ°Õ¡Õ·Õ´Õ¡Õ¶Õ¤Õ¡Õ´" },
-    { key: "family", cell: 17, label: "Ô¶Õ«Õ¶Õ®Õ¡Õ¼Õ¡Õµâ€¤Õ¨Õ¶Õ¿â€¤Õ¡Õ¶Õ¤â€¤" },
-    { key: "officer", cell: 18, label: "Ô¶Õ«Õ¶Õ¡ÕºÕ¡Ö€Õ¿" },
-    { key: "civil", cell: 19, label: "Õ”Õ¡Õ²Õ¡Ö„Õ¡ÖÕ«" },
-    { divider: true, label: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ¸Ö‚Õ´ Õ¡Õ¼Õ¯Õ¡ Õ§", totalKey: "leaveTotal" },
-    { key: "leaveSharq", cell: 20, label: "ÔºÕ¡Õ´Õ¯Õ¥Õ¿Õ¡ÕµÕ«Õ¶ Õ¦/Õ®" },
-    { key: "leaveSpa", cell: 21, label: "ÕÕºÕ¡" },
-    { key: "leavePaym", cell: 22, label: "ÕŠÕ¡ÕµÕ´Õ¡Õ¶Õ¡Õ£Ö€Õ¡ÕµÕ«Õ¶" }
+    { key: "beenTotal", cell: 1, label: "Հոսպիտալում եղել է" },
+    { key: "admittedTotal", cell: 4, label: "Ընդունվել է" },
+    { key: "dgTotal", cell: 7, label: "Դուրս է գրվել" },
+    { key: "presentTotal", cell: 12, label: "Առկա է" },
+    { divider: true, label: "Որից" },
+    { key: "currentShar", cell: 13, label: "Ժամկետային զ/ծ" },
+    { key: "currentSpa", cell: 14, label: "Սպա" },
+    { key: "currentPaym", cell: 15, label: "Պայմանագր" },
+    { key: "currentZh", cell: 16, label: "Զինհաշմանդամ" },
+    { key: "family", cell: 17, label: "Զինծառայ․ընտ․անդ․" },
+    { key: "officer", cell: 18, label: "Զինապարտ" },
+    { key: "civil", cell: 19, label: "Քաղաքացի" },
+    { divider: true, label: "Արձակուրդում առկա է", totalKey: "leaveTotal" },
+    { key: "leaveSharq", cell: 20, label: "Ժամկետային զ/ծ" },
+    { key: "leaveSpa", cell: 21, label: "Սպա" },
+    { key: "leavePaym", cell: 22, label: "Պայմանագրային" }
   ];
   const HOSPITAL_REPORT_SPECIAL_GROUPS = [
     {
       rowId: "r19",
-      title: "Ô»Õ†Ö†-Õ¸Ö‚Õ´ Õ¡Õ¼Õ¯Õ¡ Õ§",
+      title: "ԻՆֆ-ում առկա է",
       items: [
-        { key: "presentTotal", cell: 12, label: "Ô»Õ†Ö†-Õ¸Ö‚Õ´ Õ¡Õ¼Õ¯Õ¡ Õ§" },
-        { key: "currentShar", cell: 13, label: "ÔºÕ¡Õ´Õ¯Õ¥Õ¿Õ¡ÕµÕ«Õ¶" },
-        { key: "currentSpa", cell: 14, label: "ÕÕºÕ¡" },
-        { key: "currentPaym", cell: 15, label: "ÕŠÕ¡ÕµÕ´" }
+        { key: "presentTotal", cell: 12, label: "ԻՆֆ-ում առկա է" },
+        { key: "currentShar", cell: 13, label: "Ժամկետային" },
+        { key: "currentSpa", cell: 14, label: "Սպա" },
+        { key: "currentPaym", cell: 15, label: "Պայմ" }
       ]
     },
     {
       rowId: "r21",
-      title: "Õ”Õ¡Õ²Õ¡Ö„Õ¡ÖÕ«Õ¡Õ¯Õ¡Õ¶  Õ°Õ«Õ¾Õ¡Õ¶Õ¤Õ¡Õ¶â€¤ Õ¡Õ¼Õ¯Õ¡ Õ§",
+      title: "Քաղաքացիական  հիվանդան․ առկա է",
       items: [
-        { key: "presentTotal", cell: 12, label: "Õ”Õ¡Õ²Õ¡Ö„Õ¡ÖÕ«Õ¡Õ¯Õ¡Õ¶  Õ°Õ«Õ¾Õ¡Õ¶Õ¤Õ¡Õ¶â€¤ Õ¡Õ¼Õ¯Õ¡ Õ§" },
-        { key: "currentShar", cell: 13, label: "ÔºÕ¡Õ´Õ¯Õ¥Õ¿Õ¡ÕµÕ«Õ¶ Õ¦/Õ®" },
-        { key: "currentSpa", cell: 14, label: "ÕÕºÕ¡" },
-        { key: "currentPaym", cell: 15, label: "ÕŠÕ¡ÕµÕ´Õ¡Õ¶Õ¡Õ£Ö€Õ¡ÕµÕ«Õ¶" }
+        { key: "presentTotal", cell: 12, label: "Քաղաքացիական  հիվանդան․ առկա է" },
+        { key: "currentShar", cell: 13, label: "Ժամկետային զ/ծ" },
+        { key: "currentSpa", cell: 14, label: "Սպա" },
+        { key: "currentPaym", cell: 15, label: "Պայմանագրային" }
       ]
     },
     {
       rowId: "r20",
-      title: "Ô±ÕÔ´-Õ¸Ö‚Õ´ Õ¡Õ¼Õ¯Õ¡ Õ§",
+      title: "ԱՏԴ-ում առկա է",
       items: [
-        { key: "presentTotal", cell: 12, label: "Ô±ÕÔ´-Õ¸Ö‚Õ´ Õ¡Õ¼Õ¯Õ¡ Õ§" },
-        { key: "currentShar", cell: 13, label: "ÔºÕ¡Õ´Õ¯Õ¥Õ¿Õ¡ÕµÕ«Õ¶" },
-        { key: "currentSpa", cell: 14, label: "ÕÕºÕ¡" },
-        { key: "currentPaym", cell: 15, label: "ÕŠÕ¡ÕµÕ´Õ¡Õ¶Õ¡Õ£Ö€Õ¡ÕµÕ«Õ¶" }
+        { key: "presentTotal", cell: 12, label: "ԱՏԴ-ում առկա է" },
+        { key: "currentShar", cell: 13, label: "Ժամկետային" },
+        { key: "currentSpa", cell: 14, label: "Սպա" },
+        { key: "currentPaym", cell: 15, label: "Պայմանագրային" }
       ]
     }
   ];
@@ -527,7 +527,7 @@ function buildInitialPhotoLightboxState() {
     return {
       open: false,
       imageDataUrl: "",
-      alt: "Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°",
+      alt: "Фото бланка",
       sourceKind: "",
       sourceId: "",
       selectedDepartmentId: "",
@@ -653,7 +653,7 @@ function buildInitialPhotoLightboxState() {
 
   function escapeHtml(text) {
     return String(text)
-      .replaceAll("&", "&amp;")
+      .replaceAll("&", "&")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
@@ -704,14 +704,14 @@ function buildInitialPhotoLightboxState() {
     return modeKey === "day"
       ? {
         modeKey: "day",
-        label: "Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´",
+        label: "Ընդունում",
         loadFn: "loadDayShiftDraft",
         applyFn: "applyDayShiftToMain",
         storageKeys: [SHIFT_DRAFT_DAY_STORAGE_KEY, SHIFT_DRAFT_DAY_LEGACY_STORAGE_KEY]
       }
       : {
         modeKey: "discharge",
-        label: "Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´",
+        label: "Դուրսգրում",
         loadFn: "loadDischargeShiftDraft",
         applyFn: "applyDischargeShiftToMain",
         storageKeys: [SHIFT_DRAFT_DISCHARGE_STORAGE_KEY]
@@ -881,10 +881,10 @@ function buildInitialPhotoLightboxState() {
     }
     panel.classList.toggle("main-collapsible-panel--collapsed", collapsed);
     toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
-    toggle.setAttribute("title", collapsed ? "Ð Ð°Ð·Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ð±Ð»Ð¾Ðº" : "Ð¡Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ð±Ð»Ð¾Ðº");
+    toggle.setAttribute("title", collapsed ? "Развернуть блок" : "Свернуть блок");
     const text = toggle.querySelector("[data-panel-toggle-text]");
     if (text) {
-      text.textContent = collapsed ? "Ð Ð°Ð·Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ" : "Ð¡Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ";
+      text.textContent = collapsed ? "Развернуть" : "Свернуть";
     }
   }
 
@@ -894,7 +894,7 @@ function buildInitialPhotoLightboxState() {
     toggle.className = "main-collapsible-panel__toggle";
     toggle.innerHTML = `
       <span class="main-collapsible-panel__toggle-icon" aria-hidden="true"></span>
-      <span class="main-collapsible-panel__toggle-text" data-panel-toggle-text>Ð¡Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ</span>
+      <span class="main-collapsible-panel__toggle-text" data-panel-toggle-text>Свернуть</span>
     `;
     return toggle;
   }
@@ -1037,45 +1037,45 @@ function buildInitialPhotoLightboxState() {
     text = text
       .replace(
         /^Cell (\d+) is cut off at the far left in the filled crop and unreadable; cell 12 not returned\.?$/i,
-        (_match, cell) => `Ð¯Ñ‡ÐµÐ¹ÐºÐ° ${cell} Ð¾Ð±Ñ€ÐµÐ·Ð°Ð½Ð° ÑÐ»ÐµÐ²Ð° Ð½Ð° Ð·Ð°Ð¿Ð¾Ð»Ð½ÐµÐ½Ð½Ð¾Ð¼ Ñ„Ñ€Ð°Ð³Ð¼ÐµÐ½Ñ‚Ðµ Ð¸ Ð½Ðµ Ñ‡Ð¸Ñ‚Ð°ÐµÑ‚ÑÑ; ÑÑ‡ÐµÐ¹ÐºÐ° 12 Ð½Ðµ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ÑÑ.`
+        (_match, cell) => `Ячейка ${cell} обрезана слева на заполненном фрагменте и не читается; ячейка 12 не возвращается.`
       )
       .replace(
         /^Cell (\d+) is cut off at the far left and unreadable\.?$/i,
-        (_match, cell) => `Ð¯Ñ‡ÐµÐ¹ÐºÐ° ${cell} Ð¾Ð±Ñ€ÐµÐ·Ð°Ð½Ð° ÑÐ»ÐµÐ²Ð° Ð¸ Ð½Ðµ Ñ‡Ð¸Ñ‚Ð°ÐµÑ‚ÑÑ.`
+        (_match, cell) => `Ячейка ${cell} обрезана слева и не читается.`
       )
       .replace(
         /^Cell (\d+) appears blank in the provided crop; the visible (.+?) is read as cell (\d+), and cell 12 is ignored\.?$/i,
-        (_match, cell, valueText, targetCell) => `Ð¯Ñ‡ÐµÐ¹ÐºÐ° ${cell} Ð²Ñ‹Ð³Ð»ÑÐ´Ð¸Ñ‚ Ð¿ÑƒÑÑ‚Ð¾Ð¹ Ð½Ð° Ð²Ñ‹Ñ€ÐµÐ·Ð°Ð½Ð½Ð¾Ð¼ Ñ„Ñ€Ð°Ð³Ð¼ÐµÐ½Ñ‚Ðµ; Ð²Ð¸Ð´Ð¸Ð¼Ð¾Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ðµ ${String(valueText).trim()} Ñ‡Ð¸Ñ‚Ð°ÐµÑ‚ÑÑ ÐºÐ°Ðº ÑÑ‡ÐµÐ¹ÐºÐ° ${targetCell}, Ð° ÑÑ‡ÐµÐ¹ÐºÐ° 12 Ð¸Ð³Ð½Ð¾Ñ€Ð¸Ñ€ÑƒÐµÑ‚ÑÑ.`
+        (_match, cell, valueText, targetCell) => `Ячейка ${cell} выглядит пустой на вырезанном фрагменте; видимое значение ${String(valueText).trim()} читается как ячейка ${targetCell}, а ячейка 12 игнорируется.`
       )
       .replace(
         /^Cell (\d+) appears blank in the provided crop and unreadable\.?$/i,
-        (_match, cell) => `Ð¯Ñ‡ÐµÐ¹ÐºÐ° ${cell} Ð²Ñ‹Ð³Ð»ÑÐ´Ð¸Ñ‚ Ð¿ÑƒÑÑ‚Ð¾Ð¹ Ð½Ð° Ð²Ñ‹Ñ€ÐµÐ·Ð°Ð½Ð½Ð¾Ð¼ Ñ„Ñ€Ð°Ð³Ð¼ÐµÐ½Ñ‚Ðµ Ð¸ Ð½Ðµ Ñ‡Ð¸Ñ‚Ð°ÐµÑ‚ÑÑ.`
+        (_match, cell) => `Ячейка ${cell} выглядит пустой на вырезанном фрагменте и не читается.`
       )
       .replace(
         /^Cell (\d+) appears blank in the provided crop\.?$/i,
-        (_match, cell) => `Ð¯Ñ‡ÐµÐ¹ÐºÐ° ${cell} Ð²Ñ‹Ð³Ð»ÑÐ´Ð¸Ñ‚ Ð¿ÑƒÑÑ‚Ð¾Ð¹ Ð½Ð° Ð²Ñ‹Ñ€ÐµÐ·Ð°Ð½Ð½Ð¾Ð¼ Ñ„Ñ€Ð°Ð³Ð¼ÐµÐ½Ñ‚Ðµ.`
+        (_match, cell) => `Ячейка ${cell} выглядит пустой на вырезанном фрагменте.`
       )
       .replace(
         /^Cell (\d+) is unreadable\.?$/i,
-        (_match, cell) => `Ð¯Ñ‡ÐµÐ¹ÐºÐ° ${cell} Ð½Ðµ Ñ‡Ð¸Ñ‚Ð°ÐµÑ‚ÑÑ.`
+        (_match, cell) => `Ячейка ${cell} не читается.`
       )
       .replace(
         /^Cell (\d+) was not returned\.?$/i,
-        (_match, cell) => `Ð¯Ñ‡ÐµÐ¹ÐºÐ° ${cell} Ð½Ðµ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ÑÑ.`
+        (_match, cell) => `Ячейка ${cell} не возвращается.`
       )
       .replace(
         /^Cell (\d+) not returned\.?$/i,
-        (_match, cell) => `Ð¯Ñ‡ÐµÐ¹ÐºÐ° ${cell} Ð½Ðµ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ÑÑ.`
+        (_match, cell) => `Ячейка ${cell} не возвращается.`
       );
 
     text = text
-      .replace(/cell 12 not returned/gi, "ÑÑ‡ÐµÐ¹ÐºÐ° 12 Ð½Ðµ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ÑÑ")
-      .replace(/cell 12 is ignored/gi, "ÑÑ‡ÐµÐ¹ÐºÐ° 12 Ð¸Ð³Ð½Ð¾Ñ€Ð¸Ñ€ÑƒÐµÑ‚ÑÑ")
-      .replace(/appears blank in the provided crop/gi, "Ð²Ñ‹Ð³Ð»ÑÐ´Ð¸Ñ‚ Ð¿ÑƒÑÑ‚Ð¾Ð¹ Ð½Ð° Ð²Ñ‹Ñ€ÐµÐ·Ð°Ð½Ð½Ð¾Ð¼ Ñ„Ñ€Ð°Ð³Ð¼ÐµÐ½Ñ‚Ðµ")
-      .replace(/is cut off at the far left/gi, "Ð¾Ð±Ñ€ÐµÐ·Ð°Ð½Ð° ÑÐ»ÐµÐ²Ð°")
-      .replace(/and unreadable/gi, "Ð¸ Ð½Ðµ Ñ‡Ð¸Ñ‚Ð°ÐµÑ‚ÑÑ")
-      .replace(/is unreadable/gi, "Ð½Ðµ Ñ‡Ð¸Ñ‚Ð°ÐµÑ‚ÑÑ")
-      .replace(/not returned/gi, "Ð½Ðµ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ÑÑ");
+      .replace(/cell 12 not returned/gi, "ячейка 12 не возвращается")
+      .replace(/cell 12 is ignored/gi, "ячейка 12 игнорируется")
+      .replace(/appears blank in the provided crop/gi, "выглядит пустой на вырезанном фрагменте")
+      .replace(/is cut off at the far left/gi, "обрезана слева")
+      .replace(/and unreadable/gi, "и не читается")
+      .replace(/is unreadable/gi, "не читается")
+      .replace(/not returned/gi, "не возвращается");
 
     return text;
   }
@@ -1116,9 +1116,9 @@ function buildInitialPhotoLightboxState() {
     return notes.some((item) => {
       const text = String(item || "").toLowerCase();
       return /\brotated\b/.test(text)
-        || text.includes("Ð¿ÐµÑ€ÐµÐ²ÐµÑ€")
-        || text.includes("Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÑ‚")
-        || text.includes("Ð¿Ð¾Ð²Ñ‘Ñ€Ð½ÑƒÑ‚");
+        || text.includes("перевер")
+        || text.includes("повернут")
+        || text.includes("повёрнут");
     });
   }
 
@@ -1229,8 +1229,8 @@ function buildInitialPhotoLightboxState() {
 
     const baseTitle = getAppDocumentTitle();
     const alertTitle = kind === "complete"
-      ? "ðŸ”” Ð’ÑÐµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ñ‹"
-      : "ðŸ”” Ð•ÑÑ‚ÑŒ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ðµ";
+      ? "🔔 Все отделения обновлены"
+      : "🔔 Есть обновление";
     let showAlert = true;
 
     document.title = alertTitle;
@@ -1435,21 +1435,21 @@ function buildInitialPhotoLightboxState() {
     return PHOTO_FIELD_DEFINITIONS.find((item) => item.key === key) || null;
   }
 
-  const SAVE_RULE_DISPLAY_NAME = "Ô±Õ¼Õ¯Õ¡ Õ§";
-  const SOLDIER_COUNT_DISPLAY_NAME = "Õ‡Õ¡Ö€Ö„Õ¡ÕµÕ«Õ¶Õ¶Õ¥Ö€";
-  const MILITARY_COUNT_DISPLAY_NAME = "Ô¶Õ«Õ¶Õ®Õ¡Õ¼Õ¡ÕµÕ¸Õ²Õ¶Õ¥Ö€";
-  const OCR_TOP_CELLS_DISPLAY_NAME = "ÔµÕ²Õ¥Õ¬ Õ§";
+  const SAVE_RULE_DISPLAY_NAME = "Առկա է";
+  const SOLDIER_COUNT_DISPLAY_NAME = "Շարքայիններ";
+  const MILITARY_COUNT_DISPLAY_NAME = "Զինծառայողներ";
+  const OCR_TOP_CELLS_DISPLAY_NAME = "Եղել է";
 
   function buildPresentBalanceFailureMessage(actual, expected) {
-    return `${SAVE_RULE_DISPLAY_NAME} Ð½Ðµ ÑÐ¾ÑˆÐ»Ð¾ÑÑŒ: ÑÑƒÐ¼Ð¼Ð° ÑÑ‡ÐµÐµÐº 13-22 ÑÐµÐ¹Ñ‡Ð°Ñ ${actual}, Ð´Ð¾Ð»Ð¶Ð½Ð° Ð±Ñ‹Ñ‚ÑŒ ${expected}. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒ ÑÑ‡ÐµÐ¹ÐºÐ¸ 1, 4, 7, 10, 11 Ð¸ Ð±Ð»Ð¾Ðº 13-22.`;
+    return `${SAVE_RULE_DISPLAY_NAME} не сошлось: сумма ячеек 13-22 сейчас ${actual}, должна быть ${expected}. Проверь ячейки 1, 4, 7, 10, 11 и блок 13-22.`;
   }
 
   function buildSoldierCountFailureMessage(actual, expected) {
-    return `${SOLDIER_COUNT_DISPLAY_NAME} Ð½Ðµ ÑÐ¾ÑˆÐ»Ð¸ÑÑŒ: Ð¿Ð¾ ÑÑ‡ÐµÐ¹ÐºÐ°Ð¼ 3, 6 Ð¸ 9 Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ð»Ð¾ÑÑŒ ${actual}, Ð° Ð¿Ð¾ ÑÑ‡ÐµÐ¹ÐºÐ°Ð¼ 13 Ð¸ 20 ÑÐµÐ¹Ñ‡Ð°Ñ ${expected}. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒ ÑÑ‡ÐµÐ¹ÐºÐ¸ 3, 6, 9, 13 Ð¸ 20.`;
+    return `${SOLDIER_COUNT_DISPLAY_NAME} не сошлись: по ячейкам 3, 6 и 9 получилось ${actual}, а по ячейкам 13 и 20 сейчас ${expected}. Проверь ячейки 3, 6, 9, 13 и 20.`;
   }
 
   function buildMilitaryCountFailureMessage(actual, expected) {
-    return `${MILITARY_COUNT_DISPLAY_NAME} Ð½Ðµ ÑÐ¾ÑˆÐ»Ð¸ÑÑŒ: Ð¿Ð¾ ÑÑ‡ÐµÐ¹ÐºÐ°Ð¼ 2, 5 Ð¸ 8 Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ð»Ð¾ÑÑŒ ${actual}, Ð° Ð¿Ð¾ ÑÑ‡ÐµÐ¹ÐºÐ°Ð¼ 13, 14, 15, 20, 21 Ð¸ 22 ÑÐµÐ¹Ñ‡Ð°Ñ ${expected}. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒ ÑÑ‡ÐµÐ¹ÐºÐ¸ 2, 5, 8, 13, 14, 15, 20, 21 Ð¸ 22.`;
+    return `${MILITARY_COUNT_DISPLAY_NAME} не сошлись: по ячейкам 2, 5 и 8 получилось ${actual}, а по ячейкам 13, 14, 15, 20, 21 и 22 сейчас ${expected}. Проверь ячейки 2, 5, 8, 13, 14, 15, 20, 21 и 22.`;
   }
 
   function buildOcrTopCellsFailureMessage(mismatches = []) {
@@ -1460,11 +1460,11 @@ function buildInitialPhotoLightboxState() {
     const details = mismatches
       .map((item) => {
         const cellLabel = getPhotoFieldMetaByKey(item.key)?.label || item.key;
-        return `ÑÑ‡ÐµÐ¹ÐºÐ° ${cellLabel}: OCR ${item.ocrValue}, Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ ${item.tableValue}`;
+        return `ячейка ${cellLabel}: OCR ${item.ocrValue}, в таблице ${item.tableValue}`;
       })
       .join("; ");
 
-    return `${OCR_TOP_CELLS_DISPLAY_NAME}: OCR 1-3 Ð½Ðµ ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÐµÑ‚ Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†ÐµÐ¹ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ: ${details}.`;
+    return `${OCR_TOP_CELLS_DISPLAY_NAME}: OCR 1-3 не совпадает с таблицей отделения: ${details}.`;
   }
 
   function formatDepartmentValidationSuccessMessage(check) {
@@ -1480,7 +1480,7 @@ function buildInitialPhotoLightboxState() {
       case "military-count":
         return `${MILITARY_COUNT_DISPLAY_NAME}: ${check.actual} = ${check.expected}.`;
       case "ocr-top-cells":
-        return `${OCR_TOP_CELLS_DISPLAY_NAME}: OCR 1-3 ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÐµÑ‚ Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†ÐµÐ¹.`;
+        return `${OCR_TOP_CELLS_DISPLAY_NAME}: OCR 1-3 совпадает с таблицей.`;
       default:
         return "";
     }
@@ -1494,8 +1494,8 @@ function buildInitialPhotoLightboxState() {
         .filter(Boolean);
 
       return successParts.length
-        ? `ÐŸÑ€Ð¾Ð²ÐµÑ€ÐºÐ° Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½Ð°. ${successParts.join(" ")}`
-        : "ÐŸÑ€Ð¾Ð²ÐµÑ€ÐºÐ° Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½Ð°.";
+        ? `Проверка пройдена. ${successParts.join(" ")}`
+        : "Проверка пройдена.";
     }
 
     const failureParts = failedChecks
@@ -1503,8 +1503,8 @@ function buildInitialPhotoLightboxState() {
       .filter(Boolean);
 
     return failureParts.length
-      ? `Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½Ð¾. ${failureParts.join(" ")}`
-      : "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½Ð¾. Ð˜ÑÐ¿Ñ€Ð°Ð²ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸ Ð¿Ð¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹ ÑÐ½Ð¾Ð²Ð°.";
+      ? `Сохранение заблокировано. ${failureParts.join(" ")}`
+      : "Сохранение заблокировано. Исправь данные и попробуй снова.";
   }
 
   function getPhotoFieldReviewStatus(key) {
@@ -1588,7 +1588,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     setInfo(
-      message || "ÐŸÐ¾Ð´ÑÑ‚Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¿Ð¾ÐºÐ° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾. Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð¿Ñ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð¸Ñ… Ð¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ.",
+      message || "Подставленные значения пока сохранены только локально. Сначала проверьте их и нажмите Сохранить.",
       false
     );
     return true;
@@ -1603,7 +1603,7 @@ function buildInitialPhotoLightboxState() {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => reject(new Error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ñ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚ÑŒ Ñ„Ð°Ð¹Ð» Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ."));
+      reader.onerror = () => reject(new Error("Не удалось прочитать файл изображения."));
       reader.readAsDataURL(file);
     });
   }
@@ -1612,7 +1612,7 @@ function buildInitialPhotoLightboxState() {
     return new Promise((resolve, reject) => {
       const image = new Image();
       image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑŒ Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ðµ Ð´Ð»Ñ Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð²Ð°Ð½Ð¸Ñ."));
+      image.onerror = () => reject(new Error("Не удалось подготовить изображение для распознавания."));
       image.src = dataUrl;
     });
   }
@@ -1735,7 +1735,7 @@ function buildInitialPhotoLightboxState() {
     canvas.height = swapSides ? sourceWidth : sourceHeight;
     const context = canvas.getContext("2d");
     if (!context) {
-      throw new Error("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÑƒ Ñ„Ð¾Ñ‚Ð¾.");
+      throw new Error("Браузер не поддерживает подготовку фото.");
     }
 
     context.fillStyle = "#ffffff";
@@ -1762,7 +1762,7 @@ function buildInitialPhotoLightboxState() {
 
   async function rotateImageDataUrl(sourceDataUrl, rotation = 90) {
     if (typeof sourceDataUrl !== "string" || !sourceDataUrl.startsWith("data:image/")) {
-      throw new Error("ÐÑƒÐ¶Ð½Ð¾ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð»ÐµÐ½Ð½Ð¾Ðµ Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ðµ Ð´Ð»Ñ Ð¿Ð¾Ð²Ð¾Ñ€Ð¾Ñ‚Ð°.");
+      throw new Error("Нужно подготовленное изображение для поворота.");
     }
 
     const image = await loadImageFromDataUrl(sourceDataUrl);
@@ -2008,7 +2008,7 @@ function buildInitialPhotoLightboxState() {
     canvas.height = height;
     const context = canvas.getContext("2d");
     if (!context) {
-      throw new Error("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÑƒ Ñ„Ð¾Ñ‚Ð¾.");
+      throw new Error("Браузер не поддерживает подготовку фото.");
     }
 
     context.fillStyle = "#ffffff";
@@ -2024,14 +2024,14 @@ function buildInitialPhotoLightboxState() {
 
   async function normalizeImageDataUrl(sourceDataUrl) {
     if (!sourceDataUrl.startsWith("data:image/")) {
-      throw new Error("ÐÑƒÐ¶ÐµÐ½ Ñ„Ð°Ð¹Ð» Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Нужен файл изображения.");
     }
 
     const image = await loadImageFromDataUrl(sourceDataUrl);
     const originalWidth = image.naturalWidth || image.width;
     const originalHeight = image.naturalHeight || image.height;
     if (!originalWidth || !originalHeight) {
-      throw new Error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ Ñ€Ð°Ð·Ð¼ÐµÑ€ Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Не удалось определить размер изображения.");
     }
 
     if (!runtime.autoRotateImages) {
@@ -2055,7 +2055,7 @@ function buildInitialPhotoLightboxState() {
     });
 
     if (!bestCanvas) {
-      throw new Error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾.");
+      throw new Error("Не удалось подготовить фото.");
     }
 
     return buildPreparedPhotoResultFromCanvas(bestCanvas, bestRotation);
@@ -2120,7 +2120,7 @@ function buildInitialPhotoLightboxState() {
     canvas.height = bounds.height;
     const context = canvas.getContext("2d");
     if (!context) {
-      throw new Error("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÑƒ OCR-Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
     }
 
     context.fillStyle = "#ffffff";
@@ -2229,7 +2229,7 @@ function buildInitialPhotoLightboxState() {
     const destinationHeight = Math.max(1, Math.round(((leftEdgeLength + rightEdgeLength) / 2) * scale));
     const sourceContext = sourceCanvas.getContext("2d");
     if (!sourceContext) {
-      throw new Error("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÑƒ OCR-Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
     }
 
     const sourceImageData = sourceContext.getImageData(0, 0, sourceWidth, sourceHeight);
@@ -2238,7 +2238,7 @@ function buildInitialPhotoLightboxState() {
     destinationCanvas.height = destinationHeight;
     const destinationContext = destinationCanvas.getContext("2d");
     if (!destinationContext) {
-      throw new Error("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÑƒ OCR-Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
     }
 
     const destinationImageData = destinationContext.createImageData(destinationWidth, destinationHeight);
@@ -2266,7 +2266,7 @@ function buildInitialPhotoLightboxState() {
 
   async function buildAlignedTableImageDataUrl(sourceDataUrl) {
     if (typeof sourceDataUrl !== "string" || !sourceDataUrl.startsWith("data:image/")) {
-      throw new Error("ÐÑƒÐ¶ÐµÐ½ Ñ„Ð°Ð¹Ð» Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Нужен файл изображения.");
     }
 
     const image = await loadImageFromDataUrl(sourceDataUrl);
@@ -2279,7 +2279,7 @@ function buildInitialPhotoLightboxState() {
     analysisCanvas.height = analysisHeight;
     const analysisContext = analysisCanvas.getContext("2d");
     if (!analysisContext) {
-      throw new Error("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÑƒ OCR-Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
     }
 
     analysisContext.fillStyle = "#ffffff";
@@ -2329,14 +2329,14 @@ function buildInitialPhotoLightboxState() {
 
   async function buildFocusedOcrImageDataUrl(sourceDataUrl) {
     if (typeof sourceDataUrl !== "string" || !sourceDataUrl.startsWith("data:image/")) {
-      throw new Error("ÐÑƒÐ¶ÐµÐ½ Ñ„Ð°Ð¹Ð» Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Нужен файл изображения.");
     }
 
     const image = await loadImageFromDataUrl(sourceDataUrl);
     const sourceWidth = image.naturalWidth || image.width;
     const sourceHeight = image.naturalHeight || image.height;
     if (!sourceWidth || !sourceHeight) {
-      throw new Error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ Ñ€Ð°Ð·Ð¼ÐµÑ€ Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ Ð´Ð»Ñ OCR.");
+      throw new Error("Не удалось определить размер изображения для OCR.");
     }
 
     const bounds = buildCropBounds(sourceWidth, sourceHeight, OCR_FOCUS_CROP);
@@ -2352,7 +2352,7 @@ function buildInitialPhotoLightboxState() {
     canvas.height = height;
     const context = canvas.getContext("2d");
     if (!context) {
-      throw new Error("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÑƒ OCR-Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
     }
 
     context.fillStyle = "#ffffff";
@@ -2374,14 +2374,14 @@ function buildInitialPhotoLightboxState() {
 
   async function buildCroppedImageDataUrl(sourceDataUrl, cropConfig) {
     if (typeof sourceDataUrl !== "string" || !sourceDataUrl.startsWith("data:image/")) {
-      throw new Error("ÐÑƒÐ¶ÐµÐ½ Ñ„Ð°Ð¹Ð» Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Нужен файл изображения.");
     }
 
     const image = await loadImageFromDataUrl(sourceDataUrl);
     const sourceWidth = image.naturalWidth || image.width;
     const sourceHeight = image.naturalHeight || image.height;
     if (!sourceWidth || !sourceHeight) {
-      throw new Error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ Ñ€Ð°Ð·Ð¼ÐµÑ€ Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ Ð´Ð»Ñ OCR.");
+      throw new Error("Не удалось определить размер изображения для OCR.");
     }
 
     const bounds = buildCropBounds(sourceWidth, sourceHeight, cropConfig);
@@ -2397,7 +2397,7 @@ function buildInitialPhotoLightboxState() {
     canvas.height = height;
     const context = canvas.getContext("2d");
     if (!context) {
-      throw new Error("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÑƒ OCR-Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ.");
+      throw new Error("Браузер не поддерживает подготовку OCR-изображения.");
     }
 
     context.fillStyle = "#ffffff";
@@ -2423,7 +2423,7 @@ function buildInitialPhotoLightboxState() {
     const sourceWidth = image.naturalWidth || image.width;
     const sourceHeight = image.naturalHeight || image.height;
     if (!sourceWidth || !sourceHeight) {
-      throw new Error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ Ñ€Ð°Ð·Ð¼ÐµÑ€ Ð¿Ñ€Ð°Ð²Ð¾Ð³Ð¾ OCR-Ñ„Ñ€Ð°Ð³Ð¼ÐµÐ½Ñ‚Ð°.");
+      throw new Error("Не удалось определить размер правого OCR-фрагмента.");
     }
 
     const {
@@ -2464,7 +2464,7 @@ function buildInitialPhotoLightboxState() {
       canvas.height = cropHeight;
       const context = canvas.getContext("2d");
       if (!context) {
-        throw new Error("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÑƒ OCR-ÑÑ‡ÐµÐ¹ÐºÐ¸.");
+        throw new Error("Браузер не поддерживает подготовку OCR-ячейки.");
       }
 
       context.fillStyle = "#ffffff";
@@ -2566,7 +2566,7 @@ function buildInitialPhotoLightboxState() {
     if (!sync.hasRemoteSync() || typeof sync.listOcrFeedback !== "function") {
       state.feedback.records = [];
       state.feedback.loaded = true;
-      state.feedback.error = "Ð–ÑƒÑ€Ð½Ð°Ð» OCR feedback Ð´Ð¾ÑÑ‚ÑƒÐ¿ÐµÐ½ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.";
+      state.feedback.error = "Журнал OCR feedback доступен только в онлайн-режиме владельца.";
       state.feedback.isLoading = false;
       return;
     }
@@ -2595,7 +2595,7 @@ function buildInitialPhotoLightboxState() {
     } catch (error) {
       state.feedback.records = [];
       state.feedback.loaded = true;
-      state.feedback.error = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ OCR feedback.";
+      state.feedback.error = error instanceof Error ? error.message : "Не удалось загрузить OCR feedback.";
     } finally {
       state.feedback.isLoading = false;
     }
@@ -2697,12 +2697,12 @@ function buildInitialPhotoLightboxState() {
     const notes = Array.isArray(record?.notes)
       ? record.notes.map((item) => String(item || "").trim()).filter(Boolean)
       : [];
-    const explicitSource = notes.find((note) => /^Ð˜ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº:\s*/i.test(note));
+    const explicitSource = notes.find((note) => /^Источник:\s*/i.test(note));
     if (explicitSource) {
-      const sourceText = explicitSource.replace(/^Ð˜ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº:\s*/i, "").trim();
+      const sourceText = explicitSource.replace(/^Источник:\s*/i, "").trim();
       if (sourceText) {
         return {
-          text: `Ð˜ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº: ${sourceText}`,
+          text: `Источник: ${sourceText}`,
           kind: /Android MAINFORM/i.test(sourceText) ? "android" : "default"
         };
       }
@@ -2713,8 +2713,8 @@ function buildInitialPhotoLightboxState() {
       const deviceMatch = androidNote.match(/Android MAINFORM\s*:?\s*(.+)$/i);
       return {
         text: deviceMatch && deviceMatch[1] && !/^Submitted via/i.test(androidNote)
-          ? `Ð˜ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº: Android MAINFORM ${deviceMatch[1].trim()}`
-          : "Ð˜ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº: Android MAINFORM",
+          ? `Источник: Android MAINFORM ${deviceMatch[1].trim()}`
+          : "Источник: Android MAINFORM",
         kind: "android"
       };
     }
@@ -2755,7 +2755,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     const visibleNames = names.slice(0, 3).join(", ");
-    const extra = names.length > 3 ? ` Ð¸ ÐµÑ‰Ñ‘ ${names.length - 3}` : "";
+    const extra = names.length > 3 ? ` и ещё ${names.length - 3}` : "";
     return `${prefix}: ${visibleNames}${extra}.`;
   }
 
@@ -2790,8 +2790,8 @@ function buildInitialPhotoLightboxState() {
         message: buildDesktopNotificationDepartmentSummary(
           androidRecords,
           androidRecords.length > 1
-            ? "ÐŸÐ¾Ð»ÑƒÑ‡ÐµÐ½Ñ‹ Ð½Ð¾Ð²Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Android MAINFORM"
-            : "ÐŸÐ¾Ð»ÑƒÑ‡ÐµÐ½Ñ‹ Ð½Ð¾Ð²Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Android MAINFORM"
+            ? "Получены новые данные из Android MAINFORM"
+            : "Получены новые данные из Android MAINFORM"
         )
       });
     }
@@ -2799,12 +2799,12 @@ function buildInitialPhotoLightboxState() {
     if (photoRecords.length) {
       postDesktopHostMessage("desktop-notification", {
         category: "photo-update",
-        title: "MAINFLOW: Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°",
+        title: "MAINFLOW: Фото бланка",
         message: buildDesktopNotificationDepartmentSummary(
           photoRecords,
           photoRecords.length > 1
-            ? "ÐŸÐ¾Ð»ÑƒÑ‡ÐµÐ½Ñ‹ Ð½Ð¾Ð²Ñ‹Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð²"
-            : "ÐŸÐ¾Ð»ÑƒÑ‡ÐµÐ½Ð¾ Ð½Ð¾Ð²Ð¾Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°"
+            ? "Получены новые фото бланков"
+            : "Получено новое фото бланка"
         )
       });
     }
@@ -2825,12 +2825,12 @@ function buildInitialPhotoLightboxState() {
 
     postDesktopHostMessage("desktop-notification", {
       category: "telegram-form",
-      title: "MAINFLOW: Telegram Ñ„Ð¾Ñ€Ð¼Ð°",
+      title: "MAINFLOW: Telegram форма",
       message: buildDesktopNotificationDepartmentSummary(
         addedRecords,
         addedRecords.length > 1
-          ? "ÐŸÐ¾Ð»ÑƒÑ‡ÐµÐ½Ñ‹ Ð½Ð¾Ð²Ñ‹Ðµ Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹"
-          : "ÐŸÐ¾Ð»ÑƒÑ‡ÐµÐ½Ð° Ð½Ð¾Ð²Ð°Ñ Telegram Ñ„Ð¾Ñ€Ð¼Ð°"
+          ? "Получены новые Telegram формы"
+          : "Получена новая Telegram форма"
       )
     });
   }
@@ -3080,7 +3080,7 @@ function buildInitialPhotoLightboxState() {
           feedbackId: record.id,
           rowId: boundRow?.id || record.departmentId,
           departmentId: boundRow?.id || record.departmentId,
-          departmentName: boundRow?.department || record.departmentName || record.departmentId || "ÐÐµÐ¸Ð·Ð²ÐµÑÑ‚Ð½Ð¾Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ",
+          departmentName: boundRow?.department || record.departmentName || record.departmentId || "Неизвестное отделение",
           photoSentAt: record.createdAt,
           sourceMeta,
           workflowStatus: boundRow?.photoWorkflowStatus || "",
@@ -3107,13 +3107,13 @@ function buildInitialPhotoLightboxState() {
       isDeletingAll,
       isDisabled: !canUseRemoteDelete || !items.length || state.mainTablePhotoGallery.isLoading || isDeletingAll || Boolean(state.mainTablePhotoGallery.error),
       label: isDeletingAll
-        ? `Ð£Ð´Ð°Ð»ÑÑŽ Ñ„Ð¾Ñ‚Ð¾ (${items.length})...`
-        : `Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ð²ÑÐµ Ñ„Ð¾Ñ‚Ð¾${items.length ? ` (${items.length})` : ""}`,
+        ? `Удаляю фото (${items.length})...`
+        : `Удалить все фото${items.length ? ` (${items.length})` : ""}`,
       title: !canUseRemoteDelete
-        ? "ÐœÐ°ÑÑÐ¾Ð²Ð¾Ðµ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ðµ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°."
+        ? "Массовое удаление доступно только в онлайн-режиме владельца."
         : (!items.length
-          ? "Ð”Ð»Ñ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Ð½ÐµÑ‚ Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½Ð½Ñ‹Ñ… Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ."
-          : "Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ñ ÑÐµÑ€Ð²ÐµÑ€Ð° Ð²ÑÐµ Ñ„Ð¾Ñ‚Ð¾, Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½Ð½Ñ‹Ðµ Ð² ÑÑ‚Ð¾Ð¼ Ð±Ð»Ð¾ÐºÐµ.")
+          ? "Для текущей таблицы нет загруженных фото для удаления."
+          : "Удалить с сервера все фото, показанные в этом блоке.")
     };
   }
 
@@ -3171,7 +3171,7 @@ function buildInitialPhotoLightboxState() {
           feedbackId: record.id,
           rowId: boundRow?.id || record.departmentId,
           departmentId: boundRow?.id || record.departmentId,
-          departmentName: boundRow?.department || record.departmentName || record.departmentId || "ÐÐµÐ¸Ð·Ð²ÐµÑÑ‚Ð½Ð¾Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ",
+          departmentName: boundRow?.department || record.departmentName || record.departmentId || "Неизвестное отделение",
           photoSentAt: record.createdAt,
           sourceMeta,
           workflowStatus: boundRow?.photoWorkflowStatus || "",
@@ -3223,13 +3223,13 @@ function buildInitialPhotoLightboxState() {
       isDeletingAll,
       isDisabled: !canUseRemoteDelete || !items.length || state.mainTableTelegramForms.isLoading || isDeletingAll || Boolean(state.mainTableTelegramForms.error),
       label: isDeletingAll
-        ? `Ð£Ð´Ð°Ð»ÑÑŽ Ñ„Ð¾Ñ€Ð¼Ñ‹ (${items.length})...`
-        : `Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ð²ÑÐµ Ñ„Ð¾Ñ€Ð¼Ñ‹${items.length ? ` (${items.length})` : ""}`,
+        ? `Удаляю формы (${items.length})...`
+        : `Удалить все формы${items.length ? ` (${items.length})` : ""}`,
       title: !canUseRemoteDelete
-        ? "ÐœÐ°ÑÑÐ¾Ð²Ð¾Ðµ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ðµ Telegram Web Ñ„Ð¾Ñ€Ð¼ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°."
+        ? "Массовое удаление Telegram Web форм доступно только в онлайн-режиме владельца."
         : (!items.length
-          ? "Ð—Ð° ÑÐµÐ³Ð¾Ð´Ð½Ñ Ð½ÐµÑ‚ Telegram Web Ñ„Ð¾Ñ€Ð¼ Ñ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð¹ Ð¿Ñ€Ð¸Ð²ÑÐ·ÐºÐ¾Ð¹ Ð´Ð»Ñ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ."
-          : "Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ñ ÑÐµÑ€Ð²ÐµÑ€Ð° Ð²ÑÐµ ÑÐµÐ³Ð¾Ð´Ð½ÑÑˆÐ½Ð¸Ðµ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹, Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½Ð½Ñ‹Ðµ Ð² ÑÑ‚Ð¾Ð¼ Ð±Ð»Ð¾ÐºÐµ.")
+          ? "За сегодня нет Telegram Web форм с корректной привязкой для удаления."
+          : "Удалить с сервера все сегодняшние Telegram Web формы, показанные в этом блоке.")
     };
   }
 
@@ -3357,59 +3357,59 @@ function buildInitialPhotoLightboxState() {
   function getPhotoPreviewGroups() {
     return [
       {
-        title: "ÔµÕ‚ÔµÔ¼ Ô·",
+        title: "ԵՂԵԼ Է",
         keys: [
-          { key: "beenTotal", label: "Ô¸Õ†Ô´" },
-          { key: "beenSoldier", label: "Ô¶/Ô¾" },
-          { key: "beenSeries", label: "Õ‡Ô±Õ" }
+          { key: "beenTotal", label: "ԸՆԴ" },
+          { key: "beenSoldier", label: "Զ/Ծ" },
+          { key: "beenSeries", label: "ՇԱՐ" }
         ]
       },
       {
-        title: "Ô¸Õ†Ô´ÕˆÕ’Õ†ÕŽÔµÔ¼ Ô·",
+        title: "ԸՆԴՈՒՆՎԵԼ Է",
         keys: [
-          { key: "admittedTotal", label: "Ô¸Õ†Ô´" },
-          { key: "admittedSoldier", label: "Ô¶/Ô¾" },
-          { key: "admittedSeries", label: "Õ‡Ô±Õ" }
+          { key: "admittedTotal", label: "ԸՆԴ" },
+          { key: "admittedSoldier", label: "Զ/Ծ" },
+          { key: "admittedSeries", label: "ՇԱՐ" }
         ]
       },
       {
-        title: "Ô´/Ô³",
+        title: "Դ/Գ",
         keys: [
-          { key: "dgTotal", label: "Ô¸Õ†Ô´" },
-          { key: "dgSoldier", label: "Ô¶/Ô¾" },
-          { key: "dgSeries", label: "Õ‡Ô±Õ" }
+          { key: "dgTotal", label: "ԸՆԴ" },
+          { key: "dgSoldier", label: "Զ/Ծ" },
+          { key: "dgSeries", label: "ՇԱՐ" }
         ]
       },
       {
-        title: "ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­",
+        title: "Տեղափոխ",
         keys: [
-          { key: "transferFromDepartment", label: "Ô´Õ¸Ö‚Ö€Õ½" },
-          { key: "transferToDepartment", label: "Õ†Õ¥Ö€Õ½" }
+          { key: "transferFromDepartment", label: "Դուրս" },
+          { key: "transferToDepartment", label: "Ներս" }
         ]
       },
       {
-        title: "Ô±Õ¼Õ¯Õ¡ Õ§",
+        title: "Առկա է",
         keys: [
-          { key: "presentTotal", label: "Ô¸Õ¶Õ¤Õ°." },
-          { key: "currentShar", label: "Õ‡Ô±Õ" },
-          { key: "currentSpa", label: "ÕÕŠÔ±" },
-          { key: "currentPaym", label: "ÕŠÔ±Õ…Õ„" },
-          { key: "currentZh", label: "Ô¶/Õ€" },
-          { key: "family", label: "Ô¶/Ô¾ Õ¨Õ¶Õ¿" },
-          { key: "officer", label: "Ô¶/ÕŠ" },
-          { key: "civil", label: "Õ”-Õ«" }
+          { key: "presentTotal", label: "Ընդհ." },
+          { key: "currentShar", label: "ՇԱՐ" },
+          { key: "currentSpa", label: "ՍՊԱ" },
+          { key: "currentPaym", label: "ՊԱՅՄ" },
+          { key: "currentZh", label: "Զ/Հ" },
+          { key: "family", label: "Զ/Ծ ընտ" },
+          { key: "officer", label: "Զ/Պ" },
+          { key: "civil", label: "Ք-ի" }
         ]
       },
       {
-        title: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ¸Ö‚Õ´",
+        title: "Արձակուրդում",
         keys: [
-          { key: "leaveSharq", label: "Õ‡Ô±Õ" },
-          { key: "leaveSpa", label: "ÕÕŠÔ±" },
-          { key: "leavePaym", label: "ÕŠÔ±Õ…Õ„" }
+          { key: "leaveSharq", label: "ՇԱՐ" },
+          { key: "leaveSpa", label: "ՍՊԱ" },
+          { key: "leavePaym", label: "ՊԱՅՄ" }
         ]
       },
       {
-        label: "Ô±Õ¼Õ¯Õ¡ Õ§",
+        label: "Առկա է",
         cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.presentKey, marker: column.presentOutputMarker, role: "present-output" }))
       }
     ];
@@ -3438,10 +3438,10 @@ function buildInitialPhotoLightboxState() {
     return `
       <div class="photo-lightbox-department-table">
         <div class="photo-lightbox-ocr__head">
-          <h3>Ð¢ÐµÐºÑƒÑ‰Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ</h3>
+          <h3>Текущая таблица отделения</h3>
         </div>
         <div class="photo-import-mini-table-wrap photo-lightbox-department-table__wrap">
-          <table class="photo-import-mini-table photo-lightbox-department-mini-table" aria-label="Ð¢ÐµÐºÑƒÑ‰Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ">
+          <table class="photo-import-mini-table photo-lightbox-department-mini-table" aria-label="Текущая таблица отделения">
             <thead>
               <tr>${groupHeaders}</tr>
               <tr>${subHeaders}</tr>
@@ -3463,26 +3463,26 @@ function buildInitialPhotoLightboxState() {
     if (state.mainTablePhotoGallery.error) {
       return {
         summary: state.mainTablePhotoGallery.error,
-        html: '<div class="archive-empty">ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ð´Ð»Ñ ÑÑ‚Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹.</div>'
+        html: '<div class="archive-empty">Не удалось загрузить фото бланков для этой таблицы.</div>'
       };
     }
 
     if (state.mainTablePhotoGallery.isLoading && !items.length) {
       return {
-        summary: "Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÑŽ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ð´Ð»Ñ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ ÑÐ²Ð¾Ð´ÐºÐ¸...",
-        html: '<div class="archive-empty">Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÑŽ Ñ„Ð¾Ñ‚Ð¾...</div>'
+        summary: "Загружаю фото бланков для текущей сводки...",
+        html: '<div class="archive-empty">Загружаю фото...</div>'
       };
     }
 
     if (!items.length) {
       return {
-        summary: "Ð”Ð»Ñ Ñ‚ÐµÐºÑƒÑ‰Ð¸Ñ… ÑÑƒÑ‚Ð¾Ðº Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚ ÑÐ²ÑÐ·Ð°Ð½Ð½Ñ‹Ñ… Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð².",
-        html: '<div class="archive-empty">Ð¡ÐµÐ³Ð¾Ð´Ð½ÑÑˆÐ½Ð¸Ñ… ÑÐ²ÑÐ·Ð°Ð½Ð½Ñ‹Ñ… Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚.</div>'
+        summary: "Для текущих суток пока нет связанных фото бланков.",
+        html: '<div class="archive-empty">Сегодняшних связанных фото бланков пока нет.</div>'
       };
     }
 
     return {
-      summary: `ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½Ð¾ ÑÐµÐ³Ð¾Ð´Ð½ÑÑˆÐ½Ð¸Ñ… Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ð¸Ð· Telegram-Ð±Ð¾Ñ‚Ð°: ${items.length}. ÐžÐ´Ð¸Ð½ ÐºÐ»Ð¸Ðº Ð¾Ñ‚ÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ Ñ„Ð¾Ñ‚Ð¾, Ð´Ð²Ð¾Ð¹Ð½Ð¾Ð¹ ÐºÐ»Ð¸Ðº â€” ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.`,
+      summary: `Показано сегодняшних фото бланков из Telegram-бота: ${items.length}. Один клик открывает фото, двойной клик — страницу отделения.`,
       html: `
         <div class="main-table-photo-gallery-grid">
           ${items.map((item) => `
@@ -3492,35 +3492,35 @@ function buildInitialPhotoLightboxState() {
                 class="main-table-photo-thumb-delete"
                 data-main-table-photo-delete="${escapeHtml(String(item.feedbackId))}"
                 data-main-table-photo-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
-                aria-label="${escapeHtml(`Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ ${item.departmentName}`)}"
-                title="Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾"
+                aria-label="${escapeHtml(`Удалить фото ${item.departmentName}`)}"
+                title="Удалить фото"
                 ${isDeletingAll ? "disabled" : ""}
-              >Ã—</button>
+              >×</button>
               <button
                 type="button"
                 class="main-table-photo-thumb"
                 data-main-table-photo-open="${escapeHtml(String(item.feedbackId))}"
                 data-main-table-photo-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
-                aria-label="${escapeHtml(`ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ° ${item.departmentName}`)}"
+                aria-label="${escapeHtml(`Открыть фото бланка ${item.departmentName}`)}"
                 title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `
-Ð”Ð°Ñ‚Ð° Ð½Ð° Ñ„Ð¾Ñ‚Ð¾: ${item.photoReportDate}` : ""}${item.photoSentAt ? `
-ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¾: ${formatTimestamp(item.photoSentAt)}` : ""}`)}"
+Дата на фото: ${item.photoReportDate}` : ""}${item.photoSentAt ? `
+Отправлено: ${formatTimestamp(item.photoSentAt)}` : ""}`)}"
                 ${isDeletingAll ? "disabled" : ""}
               >
                 <img
                   src="${escapeHtml(item.imageDataUrl)}"
-                  alt="${escapeHtml(`Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ° ${item.departmentName}`)}"
+                  alt="${escapeHtml(`Фото бланка ${item.departmentName}`)}"
                   loading="lazy"
                   decoding="async"
                 >
               </button>
               <div class="main-table-photo-thumb__meta">
                 <span class="main-table-photo-thumb__caption">${escapeHtml(item.departmentName)}</span>
-                ${item.photoSentAt ? `<span class="main-table-photo-thumb__updated">ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¾ ${escapeHtml(formatTimestamp(item.photoSentAt))}</span>` : ""}
+                ${item.photoSentAt ? `<span class="main-table-photo-thumb__updated">Отправлено ${escapeHtml(formatTimestamp(item.photoSentAt))}</span>` : ""}
                 ${item.sourceMeta?.text ? `<span class="main-table-photo-thumb__source${item.sourceMeta.kind === "android" ? " main-table-photo-thumb__source--android" : ""}">${escapeHtml(item.sourceMeta.text)}</span>` : ""}
-                ${item.imageName ? `<span class="main-table-photo-thumb__file">Ð¤Ð°Ð¹Ð»: ${escapeHtml(item.imageName)}</span>` : ""}
+                ${item.imageName ? `<span class="main-table-photo-thumb__file">Файл: ${escapeHtml(item.imageName)}</span>` : ""}
                 <label class="main-table-photo-thumb__department-picker">
-                  <span>ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ</span>
+                  <span>Отделение</span>
                   <select
                     data-main-table-photo-department-select="${escapeHtml(String(item.feedbackId))}"
                     data-current-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
@@ -3545,29 +3545,29 @@ function buildInitialPhotoLightboxState() {
 
     if (!remoteAvailable && !desktopMirrorAvailable && !items.length) {
       return {
-        summary: "Ð‘Ð»Ð¾Ðº Telegram Web Ñ„Ð¾Ñ€Ð¼ Ð´Ð¾ÑÑ‚ÑƒÐ¿ÐµÐ½ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.",
-        html: '<div class="archive-empty">Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€Ðµ Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹ Ð² Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð¼ Ñ€ÐµÐ¶Ð¸Ð¼Ðµ.</div>'
+        summary: "Блок Telegram Web форм доступен только в онлайн-режиме владельца.",
+        html: '<div class="archive-empty">Telegram Web формы на сервере недоступны в локальном режиме.</div>'
       };
     }
 
     if (state.mainTableTelegramForms.error) {
       return {
         summary: state.mainTableTelegramForms.error,
-        html: '<div class="archive-empty">ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑÐµÐ³Ð¾Ð´Ð½ÑÑˆÐ½Ð¸Ðµ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹.</div>'
+        html: '<div class="archive-empty">Не удалось загрузить сегодняшние Telegram Web формы.</div>'
       };
     }
 
     if (state.mainTableTelegramForms.isLoading && !items.length) {
       return {
-        summary: "Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÑŽ ÑÐµÐ³Ð¾Ð´Ð½ÑÑˆÐ½Ð¸Ðµ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹...",
-        html: '<div class="archive-empty">Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÑŽ Ñ„Ð¾Ñ€Ð¼Ñ‹...</div>'
+        summary: "Загружаю сегодняшние Telegram Web формы...",
+        html: '<div class="archive-empty">Загружаю формы...</div>'
       };
     }
 
     if (!items.length) {
       return {
-        summary: "Ð—Ð° Ñ‚ÐµÐºÑƒÑ‰Ð¸Ðµ ÑÑƒÑ‚ÐºÐ¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ñ… Telegram Web Ñ„Ð¾Ñ€Ð¼ Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚.",
-        html: '<div class="archive-empty">Ð¡ÐµÐ³Ð¾Ð´Ð½ÑÑˆÐ½Ð¸Ðµ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð¿Ð¾ÐºÐ° Ð½Ðµ Ð¿Ð¾ÑÑ‚ÑƒÐ¿Ð°Ð»Ð¸.</div>'
+        summary: "За текущие сутки отправленных Telegram Web форм пока нет.",
+        html: '<div class="archive-empty">Сегодняшние Telegram Web формы пока не поступали.</div>'
       };
     }
 
@@ -3576,7 +3576,7 @@ function buildInitialPhotoLightboxState() {
     const hasDirtyMainRows = dirtyMainRows.length > 0;
 
     return {
-      summary: `ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½Ð¾ ÑÐµÐ³Ð¾Ð´Ð½ÑÑˆÐ½Ð¸Ñ… Telegram Web Ñ„Ð¾Ñ€Ð¼: ${items.length}. Ð”Ð»Ñ ÐºÐ°Ð¶Ð´Ð¾Ð¹ Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð¼Ð¾Ð¶Ð½Ð¾ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¸Ð»Ð¸ ÑƒÐ´Ð°Ð»Ð¸Ñ‚ÑŒ ÐµÑ‘ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ð¾.`,
+      summary: `Показано сегодняшних Telegram Web форм: ${items.length}. Для каждой формы можно обновить основную таблицу или удалить её отдельно.`,
       html: `
         <div class="main-table-telegram-form-list">
           ${items.map((item) => {
@@ -3586,27 +3586,27 @@ function buildInitialPhotoLightboxState() {
               && !state.mainTableSaveInFlight
               && !isDeletingAll;
             const statusText = item.alreadySaved
-              ? "Ð£Ð¶Ðµ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ"
-              : (item.liveRow ? "Ð“Ð¾Ñ‚Ð¾Ð²Ð° Ðº Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸ÑŽ" : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ñ‚ÑŒ Ðº ÑÑ‚Ñ€Ð¾ÐºÐµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ");
+              ? "Уже в основной таблице"
+              : (item.liveRow ? "Готова к обновлению" : "Не удалось привязать к строке отделения");
             const statusClass = item.alreadySaved
               ? "main-table-telegram-form-card__status--saved"
               : (item.liveRow ? "main-table-telegram-form-card__status--pending" : "main-table-telegram-form-card__status--error");
             const reportDateText = item.reportDate
-              ? `Ð”Ð°Ñ‚Ð° Ð¾Ñ‚Ñ‡Ñ‘Ñ‚Ð°: ${item.reportDate}`
-              : "Ð”Ð°Ñ‚Ð° Ð¾Ñ‚Ñ‡Ñ‘Ñ‚Ð° Ð½Ðµ ÑƒÐºÐ°Ð·Ð°Ð½Ð°";
+              ? `Дата отчёта: ${item.reportDate}`
+              : "Дата отчёта не указана";
             const createdAtText = item.createdAt
-              ? `ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¾: ${formatTimestamp(item.createdAt)}`
-              : "Ð’Ñ€ÐµÐ¼Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð½Ðµ ÑƒÐºÐ°Ð·Ð°Ð½Ð¾";
+              ? `Отправлено: ${formatTimestamp(item.createdAt)}`
+              : "Время отправки не указано";
             const disabledReason = isDeletingAll
-              ? "Ð”Ð¾Ð¶Ð´Ð¸Ñ‚ÐµÑÑŒ Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¸Ñ Ð¼Ð°ÑÑÐ¾Ð²Ð¾Ð³Ð¾ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ Ñ„Ð¾Ñ€Ð¼."
+              ? "Дождитесь завершения массового удаления форм."
               : (archivePreviewActive
-              ? "Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð²ÐµÑ€Ð½Ð¸Ñ‚ÐµÑÑŒ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ."
+              ? "Сначала вернитесь к текущей таблице."
               : (hasDirtyMainRows
-                ? "Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¸Ð»Ð¸ Ð¾Ñ‚Ð¼ÐµÐ½Ð¸Ñ‚Ðµ Ñ€ÑƒÑ‡Ð½Ñ‹Ðµ Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ."
+                ? "Сначала сохраните или отмените ручные правки в главной таблице."
                 : (!item.liveRow
-                  ? "Ð£ Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð½ÐµÑ‚ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð¹ Ð¿Ñ€Ð¸Ð²ÑÐ·ÐºÐ¸ Ðº ÑÑ‚Ñ€Ð¾ÐºÐµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ."
+                  ? "У формы нет корректной привязки к строке отделения."
                   : (!item.appliedKeys.length
-                    ? "Ð’ ÑÑ‚Ð¾Ð¹ Ñ„Ð¾Ñ€Ð¼Ðµ Ð½ÐµÑ‚ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ð¹ Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ."
+                    ? "В этой форме нет значений для записи в основную таблицу."
                     : ""))));
             return `
               <article class="main-table-telegram-form-card">
@@ -3624,19 +3624,19 @@ function buildInitialPhotoLightboxState() {
                     type="button"
                     data-main-table-telegram-form-apply="${escapeHtml(String(item.id))}"
                     ${canApply ? "" : "disabled"}
-                    title="${escapeHtml(disabledReason || "Ð—Ð°Ð¿Ð¸ÑÐ°Ñ‚ÑŒ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ ÑÑ‚Ð¾Ð¹ Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ")}"
-                  >ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ</button>
+                    title="${escapeHtml(disabledReason || "Записать значения этой формы в основную таблицу")}"
+                  >Обновить основную таблицу</button>
                   <button
                     type="button"
                     class="main-table-telegram-form-card__delete"
                     data-main-table-telegram-form-delete="${escapeHtml(String(item.id))}"
                     data-main-table-telegram-form-department-id="${escapeHtml(item.departmentId || "")}"
                     ${isDeletingAll ? "disabled" : ""}
-                    title="${escapeHtml(isDeletingAll ? "Ð”Ð¾Ð¶Ð´Ð¸Ñ‚ÐµÑÑŒ Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¸Ñ Ð¼Ð°ÑÑÐ¾Ð²Ð¾Ð³Ð¾ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ Ñ„Ð¾Ñ€Ð¼." : "Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ ÑÑ‚Ñƒ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñƒ")}"
-                  >Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ</button>
+                    title="${escapeHtml(isDeletingAll ? "Дождитесь завершения массового удаления форм." : "Удалить эту Telegram Web форму")}"
+                  >Удалить</button>
                 </div>
                 ${disabledReason && !canApply ? `<div class="main-table-telegram-form-card__hint">${escapeHtml(disabledReason)}</div>` : ""}
-                ${item.previewRow ? renderMainTableTelegramFormPreviewTable(item, item.previewRow) : '<div class="archive-empty">ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ð±Ñ€Ð°Ñ‚ÑŒ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¿Ñ€ÐµÐ´Ð¿Ñ€Ð¾ÑÐ¼Ð¾Ñ‚Ñ€Ð° Ð´Ð»Ñ ÑÑ‚Ð¾Ð¹ Ñ„Ð¾Ñ€Ð¼Ñ‹.</div>'}
+                ${item.previewRow ? renderMainTableTelegramFormPreviewTable(item, item.previewRow) : '<div class="archive-empty">Не удалось собрать таблицу предпросмотра для этой формы.</div>'}
               </article>
             `;
           }).join("")}
@@ -3828,19 +3828,19 @@ function buildInitialPhotoLightboxState() {
     const items = Array.isArray(bulkDeleteMeta.items) ? [...bulkDeleteMeta.items] : [];
 
     if (!items.length) {
-      setInfo("Ð—Ð° ÑÐµÐ³Ð¾Ð´Ð½Ñ Ð½ÐµÑ‚ Telegram Web Ñ„Ð¾Ñ€Ð¼ Ð´Ð»Ñ Ð¼Ð°ÑÑÐ¾Ð²Ð¾Ð³Ð¾ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ.", false);
+      setInfo("За сегодня нет Telegram Web форм для массового удаления.", false);
       return;
     }
     if (bulkDeleteMeta.isDeletingAll) {
       return;
     }
     if (typeof sync.deleteDepartmentFeedback !== "function" || !sync.hasRemoteSync?.()) {
-      setInfo("ÐœÐ°ÑÑÐ¾Ð²Ð¾Ðµ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ðµ Telegram Web Ñ„Ð¾Ñ€Ð¼ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.", true);
+      setInfo("Массовое удаление Telegram Web форм доступно только в онлайн-режиме владельца.", true);
       return;
     }
 
     const confirmed = window.confirm(
-      `Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ñ ÑÐµÑ€Ð²ÐµÑ€Ð° Ð²ÑÐµ ÑÐµÐ³Ð¾Ð´Ð½ÑÑˆÐ½Ð¸Ðµ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð¸Ð· ÑÑ‚Ð¾Ð³Ð¾ Ð±Ð»Ð¾ÐºÐ°? Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð±ÑƒÐ´ÐµÑ‚ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¾: ${items.length}.`
+      `Удалить с сервера все сегодняшние Telegram Web формы из этого блока? Сейчас будет удалено: ${items.length}.`
     );
     if (!confirmed) {
       return;
@@ -3857,7 +3857,7 @@ function buildInitialPhotoLightboxState() {
       for (let index = 0; index < items.length; index += 1) {
         const item = items[index];
         const departmentName = item.departmentName || item.departmentId || `feedback ${item.id}`;
-        setInfo(`Ð£Ð´Ð°Ð»ÑÑŽ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñƒ ${index + 1} Ð¸Ð· ${items.length}: ${departmentName}...`, false);
+        setInfo(`Удаляю Telegram Web форму ${index + 1} из ${items.length}: ${departmentName}...`, false);
         try {
           const result = await sync.deleteDepartmentFeedback(item.departmentId || "", item.id);
           lastResult = result;
@@ -3880,14 +3880,14 @@ function buildInitialPhotoLightboxState() {
           .slice(0, 3)
           .map(({ item, error }) => {
             const departmentName = item.departmentName || item.departmentId || `feedback ${item.id}`;
-            const reason = error instanceof Error && error.message ? error.message : "Ð¾ÑˆÐ¸Ð±ÐºÐ° ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ";
+            const reason = error instanceof Error && error.message ? error.message : "ошибка удаления";
             return `${departmentName} (${reason})`;
           })
           .join("; ");
-        const extraFailures = failedItems.length > 3 ? ` Ð•Ñ‰Ñ‘ Ð¾ÑˆÐ¸Ð±Ð¾Ðº: ${failedItems.length - 3}.` : "";
-        setInfo(`Ð£Ð´Ð°Ð»ÐµÐ½Ð¾ Telegram Web Ñ„Ð¾Ñ€Ð¼: ${deletedCount} Ð¸Ð· ${items.length}. ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑƒÐ´Ð°Ð»Ð¸Ñ‚ÑŒ: ${failureSummary}.${extraFailures}`, true);
+        const extraFailures = failedItems.length > 3 ? ` Ещё ошибок: ${failedItems.length - 3}.` : "";
+        setInfo(`Удалено Telegram Web форм: ${deletedCount} из ${items.length}. Не удалось удалить: ${failureSummary}.${extraFailures}`, true);
       } else {
-        setInfo(`Ð’ÑÐµ ÑÐµÐ³Ð¾Ð´Ð½ÑÑˆÐ½Ð¸Ðµ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹ ÑƒÐ´Ð°Ð»ÐµÐ½Ñ‹: ${deletedCount}.`, false);
+        setInfo(`Все сегодняшние Telegram Web формы удалены: ${deletedCount}.`, false);
       }
     } finally {
       state.mainTableTelegramForms.isDeletingAll = false;
@@ -3957,7 +3957,7 @@ function buildInitialPhotoLightboxState() {
       }
     } catch (error) {
       state.mainTablePhotoGallery.loaded = true;
-      state.mainTablePhotoGallery.error = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð².";
+      state.mainTablePhotoGallery.error = error instanceof Error ? error.message : "Не удалось загрузить фото бланков.";
     } finally {
       state.mainTablePhotoGallery.isLoading = false;
       refreshMainTablePhotoGalleryUi(displayContext);
@@ -4015,7 +4015,7 @@ function buildInitialPhotoLightboxState() {
       state.mainTableAndroidApp.lastLoadedAt = Date.now();
     } catch (error) {
       state.mainTableAndroidApp.loaded = true;
-      state.mainTableAndroidApp.error = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Android MAINFORM.";
+      state.mainTableAndroidApp.error = error instanceof Error ? error.message : "Не удалось загрузить отправки Android MAINFORM.";
     } finally {
       state.mainTableAndroidApp.isLoading = false;
       refreshMainTableAndroidAppUi(displayContext);
@@ -4077,7 +4077,7 @@ function buildInitialPhotoLightboxState() {
       }
     } catch (error) {
       state.mainTableTelegramForms.loaded = true;
-      state.mainTableTelegramForms.error = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹.";
+      state.mainTableTelegramForms.error = error instanceof Error ? error.message : "Не удалось загрузить Telegram Web формы.";
     } finally {
       state.mainTableTelegramForms.isLoading = false;
       refreshMainTableTelegramFormUi();
@@ -4378,11 +4378,11 @@ function buildInitialPhotoLightboxState() {
 
   function formatTimestamp(value) {
     if (!value) {
-      return "ÐµÑ‰Ðµ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐ»Ð¾ÑÑŒ";
+      return "еще не отправлялось";
     }
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
-      return "ÐµÑ‰Ðµ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐ»Ð¾ÑÑŒ";
+      return "еще не отправлялось";
     }
     return date.toLocaleString("ru-RU", {
       year: "numeric",
@@ -4643,12 +4643,12 @@ function buildInitialPhotoLightboxState() {
       }
       const archiveLabel = record.archiveLabel || record.archiveKey;
       setInfo(result && result.rolloverAlreadyApplied
-        ? `ÐÑ€Ñ…Ð¸Ð² ${archiveLabel} ÑƒÐ¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½, ÑƒÑ‚Ñ€ÐµÐ½Ð½Ð¸Ð¹ Ð¿ÐµÑ€ÐµÐ½Ð¾Ñ ÑƒÐ¶Ðµ Ð±Ñ‹Ð» Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½.`
-        : `ÐÑ€Ñ…Ð¸Ð² ${archiveLabel} ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½. Ð£Ñ‚Ñ€ÐµÐ½Ð½Ð¸Ð¹ Ð¿ÐµÑ€ÐµÐ½Ð¾Ñ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½: 12â†’1, 13+20â†’3, 13+14+15+20+21+22â†’2, 4â€“11 Ð¾Ð±Ð½ÑƒÐ»ÐµÐ½Ñ‹.`,
+        ? `Архив ${archiveLabel} уже сохранён, утренний перенос уже был выполнен.`
+        : `Архив ${archiveLabel} сохранён. Утренний перенос выполнен: 12→1, 13+20→3, 13+14+15+20+21+22→2, 4–11 обнулены.`,
       false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || "Ð½ÐµÐ¸Ð·Ð²ÐµÑÑ‚Ð½Ð°Ñ Ð¾ÑˆÐ¸Ð±ÐºÐ°");
-      setInfo(`ÐÑ€Ñ…Ð¸Ð² ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½, Ð½Ð¾ ÑƒÑ‚Ñ€ÐµÐ½Ð½Ð¸Ð¹ Ð¿ÐµÑ€ÐµÐ½Ð¾Ñ Ð¿Ð¾ÐºÐ° Ð½Ðµ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½: ${message}`, true);
+      const message = error instanceof Error ? error.message : String(error || "неизвестная ошибка");
+      setInfo(`Архив сохранён, но утренний перенос пока не выполнен: ${message}`, true);
     } finally {
       state.morningRolloverInFlight = false;
     }
@@ -4661,7 +4661,7 @@ function buildInitialPhotoLightboxState() {
           <strong>${escapeHtml(record.archiveLabel)}</strong>
           <span>${escapeHtml(formatTimestamp(record.capturedAt))}</span>
         </div>
-        <div class="archive-item-subtext">Ð¡Ð½Ð¸Ð¼Ð¾Ðº Ð³Ð»Ð°Ð²Ð½Ð¾Ð³Ð¾ Ñ„Ð°Ð¹Ð»Ð°: ${escapeHtml(record.reportDate)}</div>
+        <div class="archive-item-subtext">Снимок главного файла: ${escapeHtml(record.reportDate)}</div>
         <div class="archive-item-actions">
           <a href="${escapeHtml(getArchivePrintPath(record.archiveKey))}" target="_blank" rel="noopener">PDF</a>
         </div>
@@ -4689,24 +4689,24 @@ function buildInitialPhotoLightboxState() {
 
   function getArchiveSummaryText(records) {
     if (!Array.isArray(records) || !records.length) {
-      return "ÐÑ€Ñ…Ð¸Ð²Ð¾Ð² Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚. ÐŸÐµÑ€Ð²Ñ‹Ð¹ ÑÐ½Ð¸Ð¼Ð¾Ðº Ð¿Ð¾ÑÐ²Ð¸Ñ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð¿Ð¾ÑÐ»Ðµ 10:00 Ð¿Ð¾ Ð•Ñ€ÐµÐ²Ð°Ð½Ñƒ.";
+      return "Архивов пока нет. Первый снимок появится автоматически после 10:00 по Еревану.";
     }
 
     const latestArchive = records[0];
-    return `ÐÑ€Ñ…Ð¸Ð²Ð¾Ð²: ${records.length}. ÐŸÐ¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¹ ÑÐ½Ð¸Ð¼Ð¾Ðº: ${latestArchive.archiveLabel}, ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½ ${formatTimestamp(latestArchive.capturedAt)}.`;
+    return `Архивов: ${records.length}. Последний снимок: ${latestArchive.archiveLabel}, сохранён ${formatTimestamp(latestArchive.capturedAt)}.`;
   }
 
   function getArchiveSelectionText(record) {
     if (!record) {
-      return "Ð’Ñ‹Ð±ÐµÑ€Ð¸ Ð´Ð°Ñ‚Ñƒ Ð°Ñ€Ñ…Ð¸Ð²Ð°, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚ Ð² PDF.";
+      return "Выбери дату архива, чтобы открыть документ в PDF.";
     }
-    return `Ð’Ñ‹Ð±Ñ€Ð°Ð½ Ð°Ñ€Ñ…Ð¸Ð² ${record.archiveLabel}. Ð”Ð°Ñ‚Ð° Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ð°: ${record.reportDate}. Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½: ${formatTimestamp(record.capturedAt)}.`;
+    return `Выбран архив ${record.archiveLabel}. Дата документа: ${record.reportDate}. Сохранён: ${formatTimestamp(record.capturedAt)}.`;
   }
 
   function buildArchiveOptions(records, selectedArchiveKey) {
     return records.map((record) => `
       <option value="${escapeHtml(record.archiveKey)}"${record.archiveKey === selectedArchiveKey ? " selected" : ""}>
-        ${escapeHtml(`${record.archiveLabel} â€” ${formatTimestamp(record.capturedAt)}`)}
+        ${escapeHtml(`${record.archiveLabel} — ${formatTimestamp(record.capturedAt)}`)}
       </option>
     `).join("");
   }
@@ -4714,14 +4714,14 @@ function buildInitialPhotoLightboxState() {
   function buildArchivePicker(records) {
     const selectedRecord = getSelectedArchiveRecord(records);
     if (!selectedRecord) {
-      return '<div class="archive-empty">ÐŸÐ¾ÐºÐ° Ð½ÐµÑ‚ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ñ… Ð´Ð°Ñ‚.</div>';
+      return '<div class="archive-empty">Пока нет сохранённых дат.</div>';
     }
 
     return `
       <div class="archive-selector">
         <div class="archive-selector-row">
           <label class="archive-picker" for="archiveSelect">
-            <span>Ð”Ð°Ñ‚Ð° Ð°Ñ€Ñ…Ð¸Ð²Ð°</span>
+            <span>Дата архива</span>
             <select id="archiveSelect">
               ${buildArchiveOptions(records, selectedRecord.archiveKey)}
             </select>
@@ -4974,16 +4974,16 @@ function buildInitialPhotoLightboxState() {
 
   function buildMainTableSavedSelectionText(record) {
     if (!record) {
-      return "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ñ… Ñ‚Ð°Ð±Ð»Ð¸Ñ† Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚.";
+      return "Сохранённых таблиц пока нет.";
     }
-    return `${record.dateLabel} ${record.slotLabel} â€” ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾ ${formatTimestamp(record.savedAt)}`;
+    return `${record.dateLabel} ${record.slotLabel} — сохранено ${formatTimestamp(record.savedAt)}`;
   }
 
   function buildMainTableSavedMetaText(record) {
     if (!record) {
-      return "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð³Ð»Ð°Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¿Ð¾Ñ‚Ð¾Ð¼ Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÑ‚Ð°Ñ€Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ.";
+      return "Сохраните главную таблицу, чтобы потом быстро открыть старые данные.";
     }
-    return `Ð”Ð°Ñ‚Ð° Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ð°: ${record.reportDate}. Ð­Ñ‚Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ð¹ ÑÐ½Ð¸Ð¼Ð¾Ðº Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Ð´Ð»Ñ Ð¾ÐºÐ½Ð° ${record.slotLabel}.`;
+    return `Дата документа: ${record.reportDate}. Это сохранённый снимок главной таблицы для окна ${record.slotLabel}.`;
   }
 
   function buildMainTableSavedDisplayMetaText(record) {
@@ -4991,25 +4991,25 @@ function buildInitialPhotoLightboxState() {
       return buildMainTableSavedMetaText(record);
     }
     if (state.activeMainTableSavedPreviewKey === record.snapshotKey) {
-      return `Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð½Ð° Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½ ÑÐ½Ð¸Ð¼Ð¾Ðº Ð·Ð° Ð¾ÐºÐ½Ð¾ ${record.slotLabel}. Ð”Ð°Ñ‚Ð° Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ð°: ${record.reportDate}.`;
+      return `Сейчас на таблице показан снимок за окно ${record.slotLabel}. Дата документа: ${record.reportDate}.`;
     }
-    return `Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½Ð° Ñ‚ÐµÐºÑƒÑ‰Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð°. Ð¡Ð½Ð¸Ð¼Ð¾Ðº ${record.slotLabel} Ð¼Ð¾Ð¶Ð½Ð¾ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÑ‚Ñ€ÐµÐ»ÐºÐ°Ð¼Ð¸ Ð¿Ñ€ÑÐ¼Ð¾ Ð·Ð´ÐµÑÑŒ Ð¸Ð»Ð¸ Ð² Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ð¾Ð¹ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ðµ.`;
+    return `Сейчас показана текущая таблица. Снимок ${record.slotLabel} можно открыть стрелками прямо здесь или в отдельной странице.`;
   }
 
   function buildMainTableSavedNavigator(records) {
     const selectedRecord = getSelectedMainTableSavedRecord(records);
     if (!selectedRecord) {
-      return '<div class="archive-empty">Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ñ… Ñ‚Ð°Ð±Ð»Ð¸Ñ† Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚.</div>';
+      return '<div class="archive-empty">Сохранённых таблиц пока нет.</div>';
     }
 
     return `
       <div class="archive-selector archive-selector--compact">
         <div class="archive-selector-row archive-selector-row--nav">
-          <button type="button" class="archive-open-link archive-nav-button" data-main-saved-nav="-1" aria-label="ÐÐ°Ð·Ð°Ð´">â†</button>
+          <button type="button" class="archive-open-link archive-nav-button" data-main-saved-nav="-1" aria-label="Назад">←</button>
           <div class="archive-current-stamp" id="mainTableSavedStamp">${escapeHtml(buildMainTableSavedSelectionText(selectedRecord))}</div>
-          <button type="button" class="archive-open-link archive-nav-button" data-main-saved-nav="1" aria-label="Ð’Ð¿ÐµÑ€Ñ‘Ð´">â†’</button>
-          <button type="button" class="archive-open-link archive-open-link--secondary" id="mainTableSavedLiveBtn">Ð¢ÐµÐºÑƒÑ‰Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð°</button>
-          <a class="archive-open-link archive-open-link--secondary" id="mainTableSavedOpenLink" href="${escapeHtml(getMainTableSavedSnapshotPath(selectedRecord.snapshotKey))}" target="_blank" rel="noopener">ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ</a>
+          <button type="button" class="archive-open-link archive-nav-button" data-main-saved-nav="1" aria-label="Вперёд">→</button>
+          <button type="button" class="archive-open-link archive-open-link--secondary" id="mainTableSavedLiveBtn">Текущая таблица</button>
+          <a class="archive-open-link archive-open-link--secondary" id="mainTableSavedOpenLink" href="${escapeHtml(getMainTableSavedSnapshotPath(selectedRecord.snapshotKey))}" target="_blank" rel="noopener">Открыть</a>
         </div>
         <div class="archive-selected-meta" id="mainTableSavedMeta">${escapeHtml(buildMainTableSavedDisplayMetaText(selectedRecord))}</div>
       </div>
@@ -5044,7 +5044,7 @@ function buildInitialPhotoLightboxState() {
       const previewActive = Boolean(state.activeMainTableSavedPreviewKey);
       liveBtn.disabled = !previewActive;
       liveBtn.setAttribute("aria-disabled", String(!previewActive));
-      liveBtn.textContent = previewActive ? "Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ" : "Ð¢ÐµÐºÑƒÑ‰Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð°";
+      liveBtn.textContent = previewActive ? "Вернуться к текущей таблице" : "Текущая таблица";
     }
 
     const selectedIndex = selectedRecord
@@ -5545,19 +5545,19 @@ function buildInitialPhotoLightboxState() {
 
   function getDepartmentPdfArchiveSummaryText(records) {
     if (!Array.isArray(records) || !records.length) {
-      return "PDF-Ð°Ñ€Ñ…Ð¸Ð² Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ Ð¿Ð¾ÐºÐ° Ð¿ÑƒÑÑ‚. ÐžÐ½ Ð½Ð°Ñ‡Ð½ÐµÑ‚ Ð·Ð°Ð¿Ð¾Ð»Ð½ÑÑ‚ÑŒÑÑ Ð¿Ð¾ÑÐ»Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹.";
+      return "PDF-архив отделений пока пуст. Он начнет заполняться после сохранения отделений.";
     }
     const groups = getDepartmentPdfArchiveDateGroups(records);
     const latest = groups[0];
-    return `PDF-Ð±Ð»Ð°Ð½ÐºÐ¾Ð²: ${records.length}. Ð”Ð°Ñ‚: ${groups.length}. ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ Ð´Ð°Ñ‚Ð°: ${latest ? latest.label : "-"}.`;
+    return `PDF-бланков: ${records.length}. Дат: ${groups.length}. Последняя дата: ${latest ? latest.label : "-"}.`;
   }
 
   function getDepartmentPdfArchiveSelectionText(record) {
     if (!record) {
-      return "ÐŸÐ¾ÑÐ»Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð·Ð´ÐµÑÑŒ Ð¿Ð¾ÑÐ²ÑÑ‚ÑÑ PDF-Ð±Ð»Ð°Ð½ÐºÐ¸ ÑÑ‚Ð¾Ð³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.";
+      return "После сохранения отделения здесь появятся PDF-бланки этого отделения.";
     }
     const marker = record.departmentMarker ? `${record.departmentMarker} ` : "";
-    return `${marker}${record.departmentName}: ${record.archiveLabel}. Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾: ${formatTimestamp(record.capturedAt)}.`;
+    return `${marker}${record.departmentName}: ${record.archiveLabel}. Сохранено: ${formatTimestamp(record.capturedAt)}.`;
   }
 
   function buildDepartmentPdfArchiveOptions(records, selectedArchiveKey) {
@@ -5571,7 +5571,7 @@ function buildInitialPhotoLightboxState() {
   function buildDepartmentPdfArchiveDateOptions(groups, selectedDateKey) {
     return groups.map((group) => `
       <option value="${escapeHtml(group.dateKey)}"${group.dateKey === selectedDateKey ? " selected" : ""}>
-        ${escapeHtml(`${group.label} - Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹: ${group.departmentCount}`)}
+        ${escapeHtml(`${group.label} - отделений: ${group.departmentCount}`)}
       </option>
     `).join("");
   }
@@ -5581,13 +5581,13 @@ function buildInitialPhotoLightboxState() {
     const selectedRecord = getSelectedDepartmentPdfArchiveRecord(row.id);
     return `
       <section class="panel no-print archive-panel department-pdf-archive-panel">
-        <h2>ÐÑ€Ñ…Ð¸Ð² PDF Ð±Ð»Ð°Ð½ÐºÐ¾Ð²</h2>
-        <p class="hint">Ð—Ð´ÐµÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÑŽÑ‚ÑÑ PDF-Ð±Ð»Ð°Ð½ÐºÐ¸ ÑÑ‚Ð¾Ð³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¿Ð¾ÑÐ»Ðµ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾Ð³Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð´Ð°Ð½Ð½Ñ‹Ñ….</p>
+        <h2>Архив PDF бланков</h2>
+        <p class="hint">Здесь сохраняются PDF-бланки этого отделения после успешного сохранения данных.</p>
         ${records.length ? `
           <div class="archive-selector">
             <div class="archive-selector-row">
               <label class="archive-picker" for="departmentPdfArchiveSelect">
-                <span>Ð‘Ð»Ð°Ð½Ðº Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ</span>
+                <span>Бланк отделения</span>
                 <select id="departmentPdfArchiveSelect">
                   ${buildDepartmentPdfArchiveOptions(records, selectedRecord ? selectedRecord.archiveKey : "")}
                 </select>
@@ -5596,7 +5596,7 @@ function buildInitialPhotoLightboxState() {
             </div>
             <div class="archive-selected-meta" id="departmentPdfArchiveSelectedMeta">${escapeHtml(getDepartmentPdfArchiveSelectionText(selectedRecord))}</div>
           </div>
-        ` : '<div class="archive-empty">ÐŸÐ¾ÐºÐ° Ð½ÐµÑ‚ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð½Ñ‹Ñ… PDF-Ð±Ð»Ð°Ð½ÐºÐ¾Ð² ÑÑ‚Ð¾Ð³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.</div>'}
+        ` : '<div class="archive-empty">Пока нет сохраненных PDF-бланков этого отделения.</div>'}
       </section>
     `;
   }
@@ -5605,22 +5605,22 @@ function buildInitialPhotoLightboxState() {
     const groups = getDepartmentPdfArchiveDateGroups(records);
     const selectedGroup = getSelectedDepartmentPdfArchiveDateGroup(groups);
     if (!selectedGroup) {
-      return '<div class="archive-empty">ÐŸÐ¾ÐºÐ° Ð½ÐµÑ‚ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð½Ñ‹Ñ… PDF-Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹.</div>';
+      return '<div class="archive-empty">Пока нет сохраненных PDF-бланков отделений.</div>';
     }
 
     return `
       <div class="archive-selector">
         <div class="archive-selector-row">
           <label class="archive-picker" for="departmentPdfArchiveDateSelect">
-            <span>Ð”Ð°Ñ‚Ð° Ð±Ð»Ð°Ð½ÐºÐ¾Ð²</span>
+            <span>Дата бланков</span>
             <select id="departmentPdfArchiveDateSelect">
               ${buildDepartmentPdfArchiveDateOptions(groups, selectedGroup.dateKey)}
             </select>
           </label>
-          <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchiveDatePdfLink" href="${escapeHtml(getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey))}" target="_blank" rel="noopener">ÐžÐ±Ñ‰Ð¸Ð¹ PDF</a>
+          <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchiveDatePdfLink" href="${escapeHtml(getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey))}" target="_blank" rel="noopener">Общий PDF</a>
         </div>
         <div class="archive-selected-meta" id="departmentPdfArchiveDateSelectedMeta">
-          ${escapeHtml(`Ð”Ð°Ñ‚Ð°: ${selectedGroup.label}. ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ Ð² PDF: ${selectedGroup.departmentCount}. Ð‘Ð»Ð°Ð½ÐºÐ¾Ð² Ð² Ð°Ñ€Ñ…Ð¸Ð²Ðµ: ${selectedGroup.count}.`)}
+          ${escapeHtml(`Дата: ${selectedGroup.label}. Отделений в PDF: ${selectedGroup.departmentCount}. Бланков в архиве: ${selectedGroup.count}.`)}
         </div>
       </div>
     `;
@@ -5674,8 +5674,8 @@ function buildInitialPhotoLightboxState() {
     }
     if (meta) {
       meta.textContent = selectedGroup
-        ? `Ð”Ð°Ñ‚Ð°: ${selectedGroup.label}. ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ Ð² PDF: ${selectedGroup.departmentCount}. Ð‘Ð»Ð°Ð½ÐºÐ¾Ð² Ð² Ð°Ñ€Ñ…Ð¸Ð²Ðµ: ${selectedGroup.count}.`
-        : "Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð´Ð°Ñ‚Ñƒ PDF-Ð°Ñ€Ñ…Ð¸Ð²Ð° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹.";
+        ? `Дата: ${selectedGroup.label}. Отделений в PDF: ${selectedGroup.departmentCount}. Бланков в архиве: ${selectedGroup.count}.`
+        : "Выберите дату PDF-архива отделений.";
     }
   }
 
@@ -5717,28 +5717,28 @@ function buildInitialPhotoLightboxState() {
   function formatAge(value) {
     const date = parseTimestamp(value);
     if (!date) {
-      return "Ð½ÐµÑ‚ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸";
+      return "нет отправки";
     }
 
     const diffMs = Math.max(0, Date.now() - date.getTime());
     const totalMinutes = Math.floor(diffMs / 60000);
 
     if (totalMinutes < 1) {
-      return "Ð¼ÐµÐ½ÑŒÑˆÐµ Ð¼Ð¸Ð½ÑƒÑ‚Ñ‹ Ð½Ð°Ð·Ð°Ð´";
+      return "меньше минуты назад";
     }
     if (totalMinutes < 60) {
-      return `${totalMinutes} Ð¼Ð¸Ð½ Ð½Ð°Ð·Ð°Ð´`;
+      return `${totalMinutes} мин назад`;
     }
 
     const totalHours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     if (totalHours < 24) {
-      return minutes ? `${totalHours} Ñ‡ ${minutes} Ð¼Ð¸Ð½ Ð½Ð°Ð·Ð°Ð´` : `${totalHours} Ñ‡ Ð½Ð°Ð·Ð°Ð´`;
+      return minutes ? `${totalHours} ч ${minutes} мин назад` : `${totalHours} ч назад`;
     }
 
     const totalDays = Math.floor(totalHours / 24);
     const hours = totalHours % 24;
-    return hours ? `${totalDays} Ð´ ${hours} Ñ‡ Ð½Ð°Ð·Ð°Ð´` : `${totalDays} Ð´ Ð½Ð°Ð·Ð°Ð´`;
+    return hours ? `${totalDays} д ${hours} ч назад` : `${totalDays} д назад`;
   }
 
   function rowHasSubmittedData(row) {
@@ -5768,9 +5768,9 @@ function buildInitialPhotoLightboxState() {
     if (!hasData) {
       return {
         level: "missing",
-        label: "ÐÐµÑ‚ Ð´Ð°Ð½Ð½Ñ‹Ñ…",
-        timestamp: "ÐµÑ‰Ðµ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐ»Ð¾ÑÑŒ",
-        age: "ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ ÐµÑ‰Ðµ Ð½Ðµ Ð¿Ñ€Ð¸ÑÑ‹Ð»Ð°Ð»Ð¾ Ð´Ð°Ð½Ð½Ñ‹Ðµ."
+        label: "Нет данных",
+        timestamp: "еще не отправлялось",
+        age: "Отделение еще не присылало данные."
       };
     }
 
@@ -5778,9 +5778,9 @@ function buildInitialPhotoLightboxState() {
     if (!date) {
       return {
         level: "missing",
-        label: "ÐÐµÑ‚ Ð´Ð°Ð½Ð½Ñ‹Ñ…",
-        timestamp: "ÐµÑ‰Ðµ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐ»Ð¾ÑÑŒ",
-        age: "ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ ÐµÑ‰Ðµ Ð½Ðµ Ð¿Ñ€Ð¸ÑÑ‹Ð»Ð°Ð»Ð¾ Ð´Ð°Ð½Ð½Ñ‹Ðµ."
+        label: "Нет данных",
+        timestamp: "еще не отправлялось",
+        age: "Отделение еще не присылало данные."
       };
     }
 
@@ -5791,26 +5791,26 @@ function buildInitialPhotoLightboxState() {
     if (missedSlots <= 0) {
       return {
         level: "fresh",
-        label: "Ð¡Ð²ÐµÐ¶Ð¸Ðµ",
+        label: "Свежие",
         timestamp: formatTimestamp(updatedAt),
-        age: `ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾ ${formatAge(updatedAt)}`
+        age: `Обновлено ${formatAge(updatedAt)}`
       };
     }
 
     if (missedSlots === 1) {
       return {
         level: "warning",
-        label: "ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ",
+        label: "Проверить",
         timestamp: formatTimestamp(updatedAt),
-        age: `ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÐµÐµ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ðµ ${formatAge(updatedAt)}. ÐÐµÑ‚ Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð·Ð° Ð¾ÐºÐ½Ð¾ ${getUpdateSlotLabel(expectedSlotOrdinal)}.`
+        age: `Последнее обновление ${formatAge(updatedAt)}. Нет данных за окно ${getUpdateSlotLabel(expectedSlotOrdinal)}.`
       };
     }
 
     return {
       level: "stale",
-      label: "Ð¡Ñ‚Ð°Ñ€Ñ‹Ðµ",
+      label: "Старые",
       timestamp: formatTimestamp(updatedAt),
-      age: `Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð½Ðµ Ð¾Ð±Ð½Ð¾Ð²Ð»ÑÐ»Ð¸ÑÑŒ ${formatAge(updatedAt)}. ÐŸÑ€Ð¾Ð¿ÑƒÑ‰ÐµÐ½Ð¾ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð¾Ð´Ð½Ð¾Ð³Ð¾ Ð¾ÐºÐ½Ð° Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ.`
+      age: `Данные не обновлялись ${formatAge(updatedAt)}. Пропущено больше одного окна обновления.`
     };
   }
 
@@ -5822,7 +5822,7 @@ function buildInitialPhotoLightboxState() {
     if (!row) {
       return {
         tone: "neutral",
-        label: "Ð‘ÐµÐ· Ð½Ð¾Ð²Ð¾Ð³Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°"
+        label: "Без нового бланка"
       };
     }
 
@@ -5830,7 +5830,7 @@ function buildInitialPhotoLightboxState() {
       const isTelegramForm = row.photoName === "telegram-web-app-form";
       return {
         tone: "pending",
-        label: isTelegramForm ? "ÐÐ¾Ð²Ð°Ñ Telegram Ñ„Ð¾Ñ€Ð¼Ð°" : "ÐÐ¾Ð²Ñ‹Ð¹ Ð±Ð»Ð°Ð½Ðº"
+        label: isTelegramForm ? "Новая Telegram форма" : "Новый бланк"
       };
     }
 
@@ -5838,13 +5838,13 @@ function buildInitialPhotoLightboxState() {
     if (String(row.photoWorkflowStatus || "").startsWith("processed") && row.photoFeedbackId && freshness.level !== "stale" && freshness.level !== "missing") {
       return {
         tone: "processed",
-        label: "ÐŸÑ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð¾"
+        label: "Проверено"
       };
     }
 
     return {
       tone: "neutral",
-      label: "Ð‘ÐµÐ· Ð½Ð¾Ð²Ð¾Ð³Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°"
+      label: "Без нового бланка"
     };
   }
 
@@ -5854,21 +5854,21 @@ function buildInitialPhotoLightboxState() {
 
     if (hasTelegramFormFeedback && hasPhotoFeedback) {
       return {
-        label: "Ð¤Ð¾Ñ‚Ð¾ + Telegram",
+        label: "Фото + Telegram",
         tone: "both"
       };
     }
 
     if (hasPhotoFeedback) {
       return {
-        label: "Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°",
+        label: "Фото бланка",
         tone: "photo"
       };
     }
 
     if (hasTelegramFormFeedback) {
       return {
-        label: "Telegram Ñ„Ð¾Ñ€Ð¼Ð°",
+        label: "Telegram форма",
         tone: "form"
       };
     }
@@ -5893,7 +5893,7 @@ function buildInitialPhotoLightboxState() {
 
     if (source === "photo" || source === "processed_photo") {
       return {
-        label: "Ð¤Ð¾Ñ‚Ð¾",
+        label: "Фото",
         tone: "photo"
       };
     }
@@ -5977,23 +5977,23 @@ function buildInitialPhotoLightboxState() {
     if (allUpdated) {
       return {
         level: "fresh",
-        label: "Ð’ÑÐµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ñ‹",
-        detail: `Ð¡Ð²ÐµÐ¶Ð¸Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ ÐµÑÑ‚ÑŒ Ñƒ Ð²ÑÐµÑ… ${totalRows} Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹.`
+        label: "Все отделения обновлены",
+        detail: `Свежие данные есть у всех ${totalRows} отделений.`
       };
     }
 
     if (staleCount > 0 || missingCount > 0) {
       return {
         level: "stale",
-        label: "Ð•ÑÑ‚ÑŒ ÑƒÑÑ‚Ð°Ñ€ÐµÐ²ÑˆÐ¸Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ",
-        detail: `Ð¡Ð²ÐµÐ¶Ð¸Ðµ: ${freshCount} Ð¸Ð· ${totalRows}. ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ: ${warningCount}, ÑÑ‚Ð°Ñ€Ñ‹Ðµ: ${staleCount}, Ð½ÐµÑ‚ Ð´Ð°Ð½Ð½Ñ‹Ñ…: ${missingCount}.`
+        label: "Есть устаревшие отделения",
+        detail: `Свежие: ${freshCount} из ${totalRows}. Проверить: ${warningCount}, старые: ${staleCount}, нет данных: ${missingCount}.`
       };
     }
 
     return {
       level: "warning",
-      label: "ÐÑƒÐ¶Ð½Ð¾ Ð¿Ñ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ Ñ‡Ð°ÑÑ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹",
-      detail: `Ð¡Ð²ÐµÐ¶Ð¸Ðµ: ${freshCount} Ð¸Ð· ${totalRows}. ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ: ${warningCount}, ÑÑ‚Ð°Ñ€Ñ‹Ðµ: ${staleCount}, Ð½ÐµÑ‚ Ð´Ð°Ð½Ð½Ñ‹Ñ…: ${missingCount}.`
+      label: "Нужно проверить часть отделений",
+      detail: `Свежие: ${freshCount} из ${totalRows}. Проверить: ${warningCount}, старые: ${staleCount}, нет данных: ${missingCount}.`
     };
   }
 
@@ -6160,16 +6160,16 @@ function buildInitialPhotoLightboxState() {
     if (validation && validation.applicable && !validation.isValid) {
       return {
         tone: "control-error",
-        label: "ÐžÑˆÐ¸Ð±ÐºÐ° ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ñ‹Ñ… ÑÑƒÐ¼Ð¼",
-        title: "Ð’ ÑÑ‚Ñ€Ð¾ÐºÐµ ÐµÑÑ‚ÑŒ Ð¾ÑˆÐ¸Ð±ÐºÐ° ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ñ‹Ñ… ÑÑƒÐ¼Ð¼."
+        label: "Ошибка контрольных сумм",
+        title: "В строке есть ошибка контрольных сумм."
       };
     }
 
     if (hasPendingTelegramPhotoUpdate(row)) {
       return {
         tone: "photo-pending",
-        label: "ÐÐ¾Ð²Ð¾Ðµ Ñ„Ð¾Ñ‚Ð¾, Ð¿Ñ€Ð¾Ð²ÐµÑ€ÑŒ OCR",
-        title: "ÐŸÑ€Ð¸ÑˆÐ»Ð¾ Ð½Ð¾Ð²Ð¾Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð¸Ð· Telegram. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒ OCR Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸ ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ."
+        label: "Новое фото, проверь OCR",
+        title: "Пришло новое фото из Telegram. Проверь OCR и сохрани строку отделения."
       };
     }
 
@@ -6177,8 +6177,8 @@ function buildInitialPhotoLightboxState() {
     if (freshness.level === "warning" || freshness.level === "stale" || freshness.level === "missing") {
       return {
         tone: "waiting",
-        label: "ÐÐµÑ‚ Ð½Ð¾Ð²Ñ‹Ñ… Ð´Ð°Ð½Ð½Ñ‹Ñ…",
-        title: "Ð—Ð° Ñ‚ÐµÐºÑƒÑ‰ÐµÐµ Ð¾ÐºÐ½Ð¾ Ð½Ð¾Ð²Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ ÐµÑ‰Ñ‘ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹."
+        label: "Нет новых данных",
+        title: "За текущее окно новые данные ещё не отправлены."
       };
     }
 
@@ -6189,8 +6189,8 @@ function buildInitialPhotoLightboxState() {
     if (source === "telegram-form" || source === "processed_telegram" || source === "photo" || source === "processed_photo") {
       return {
         tone: "auto",
-        label: "ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸",
-        title: "Ð¡Ñ‚Ñ€Ð¾ÐºÐ° Ð¾Ð±Ð½Ð¾Ð²Ð¸Ð»Ð°ÑÑŒ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð¸Ð· Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð¸Ð»Ð¸ Ñ„Ð¾Ñ‚Ð¾."
+        label: "Обновлено автоматически",
+        title: "Строка обновилась автоматически из Telegram формы или фото."
       };
     }
 
@@ -6202,8 +6202,8 @@ function buildInitialPhotoLightboxState() {
     ) {
       return {
         tone: "manual",
-        label: "ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾ Ð²Ñ€ÑƒÑ‡Ð½ÑƒÑŽ",
-        title: "Ð¡Ñ‚Ñ€Ð¾ÐºÐ° Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð° Ð²Ñ€ÑƒÑ‡Ð½ÑƒÑŽ Ð¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»ÐµÐ¼."
+        label: "Обновлено вручную",
+        title: "Строка обновлена вручную пользователем."
       };
     }
 
@@ -6340,15 +6340,15 @@ function buildInitialPhotoLightboxState() {
 
     if (constraint.kind === "sent") {
       if (constraint.blocked) {
-        return `ÐŸÐ¾ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸ ${constraint.column.label} Ð½ÐµÑ‚ Ð½Ð°Ð»Ð¸Ñ‡Ð¸Ñ Ð² Ð±Ð¾Ð»ÑŒÐ½Ð¸Ñ†Ðµ. ÐžÑ‚Ð¿Ñ€Ð°Ð²ÐºÐ° Ð² Ð¾Ñ‚Ð¿ÑƒÑÐº Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½Ð°.`;
+        return `По категории ${constraint.column.label} нет наличия в больнице. Отправка в отпуск заблокирована.`;
       }
-      return `ÐŸÐ¾ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸ ${constraint.column.label} Ð¼Ð¾Ð¶Ð½Ð¾ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð² Ð¾Ñ‚Ð¿ÑƒÑÐº Ð½Ðµ Ð±Ð¾Ð»ÑŒÑˆÐµ ${constraint.limit}.`;
+      return `По категории ${constraint.column.label} можно отправить в отпуск не больше ${constraint.limit}.`;
     }
 
     if (constraint.blocked) {
-      return `ÐŸÐ¾ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸ ${constraint.column.label} Ð½ÐµÑ‚ Ð±Ð¾Ð»ÑŒÐ½Ñ‹Ñ… Ð² Ð»ÐµÑ‡ÐµÐ±Ð½Ð¾Ð¼ Ð¾Ñ‚Ð¿ÑƒÑÐºÐµ. Ð’Ð¾Ð·Ð²Ñ€Ð°Ñ‚ Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½.`;
+      return `По категории ${constraint.column.label} нет больных в лечебном отпуске. Возврат заблокирован.`;
     }
-    return `ÐŸÐ¾ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸ ${constraint.column.label} Ð¼Ð¾Ð¶Ð½Ð¾ Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ð¸Ð· Ð¾Ñ‚Ð¿ÑƒÑÐºÐ° Ð½Ðµ Ð±Ð¾Ð»ÑŒÑˆÐµ ${constraint.limit}.`;
+    return `По категории ${constraint.column.label} можно вернуть из отпуска не больше ${constraint.limit}.`;
   }
 
   function calcQhRemainingValue(row, type, snapshot = state.snapshot) {
@@ -6510,14 +6510,14 @@ function buildInitialPhotoLightboxState() {
     }
 
     if (constraint.blocked) {
-      return `ÐŸÐ¾ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸ ${constraint.column.label} Ð½ÐµÑ‚ Ð½Ð°Ð»Ð¸Ñ‡Ð¸Ñ. Ð’Ñ‹Ð¿Ð¸ÑÐºÐ° Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½Ð°.`;
+      return `По категории ${constraint.column.label} нет наличия. Выписка заблокирована.`;
     }
 
-    return `ÐŸÐ¾ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸ ${constraint.column.label} Ð¼Ð¾Ð¶Ð½Ð¾ Ð²Ñ‹Ð¿Ð¸ÑÐ°Ñ‚ÑŒ Ð½Ðµ Ð±Ð¾Ð»ÑŒÑˆÐµ ${constraint.limit}.`;
+    return `По категории ${constraint.column.label} можно выписать не больше ${constraint.limit}.`;
   }
 
   function getDepartmentAdmissionCalcActiveMessage() {
-    return "Õ€Õ¡Õ·Õ¾Õ«Õ¹Õ¨ Õ°Õ¡Õ½Õ¡Õ¶Õ¥Õ¬Õ« Õ§Ö‰";
+    return "Հաշվիչը հասանելի է։";
   }
 
   function syncDepartmentRowInput(rowId, key, value) {
@@ -6712,7 +6712,7 @@ function buildInitialPhotoLightboxState() {
       }
     }
     if (shouldAnnounce) {
-      setInfo("Õ€Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¡ÕµÕ«Õ¶ Õ¡Õ²ÕµÕ¸Ö‚Õ½Õ¡Õ¯Õ« Õ¡Ö€ÕªÕ¥Ö„Õ¶Õ¥Ö€Õ¨ Õ¿Õ¥Õ²Õ¡ÖƒÕ¸Õ­Õ¾Õ¥Õ¬ Õ¥Õ¶ Õ°Õ«Õ´Õ¶Õ¡Õ¯Õ¡Õ¶ Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€, Õ«Õ½Õ¯ Õ´Õ¸Ö‚Õ¿Ö„Õ¡ÕµÕ«Õ¶ Õ¤Õ¡Õ·Õ¿Õ¥Ö€Õ¨ Õ¦Ö€Õ¸ÕµÕ¡ÖÕ¾Õ¥Õ¬ Õ¥Õ¶Ö‰ ÕˆÖ‚Õ²Õ¡Ö€Õ¯Õ¥Õ¬Õ¸Ö‚ Õ°Õ¡Õ´Õ¡Ö€ Õ½Õ¥Õ²Õ´Õ¥Ö„ Â«ÕŠÕ¡Õ°ÕºÕ¡Õ¶Õ¥Õ¬Â»Ö‰", false);
+      setInfo("Հաշվարկային աղյուսակի արժեքները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
     }
   }
 
@@ -6737,7 +6737,7 @@ function buildInitialPhotoLightboxState() {
       .filter((item) => item.nextLeave < 0 || item.nextPresent < 0)
       .map((item) => item.column);
     if (invalidColumns.length) {
-      setInfo(`Ô²Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶ Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ« Õ°Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¨ Õ¹Õ« Õ¯Õ¡Ö€Õ¸Õ² Õ¯Õ«Ö€Õ¡Õ¼Õ¾Õ¥Õ¬â€¤ ${invalidColumns.map((column) => column.label).join(", ")} Õ½ÕµÕ¸Ö‚Õ¶Õ¡Õ¯Õ¶Õ¥Ö€Õ¸Ö‚Õ´ Õ½Õ¿Õ¡ÖÕ¾Õ¥Õ¬ Õ§ Õ¢Õ¡ÖÕ¡Õ½Õ¡Õ¯Õ¡Õ¶ Õ¡Ö€ÕªÕ¥Ö„Ö‰`, true);
+      setInfo(`Բուժական արձակուրդի հաշվարկը չի կարող կիրառվել․ ${invalidColumns.map((column) => column.label).join(", ")} սյունակներում ստացվել է բացասական արժեք։`, true);
       return false;
     }
 
@@ -6778,7 +6778,7 @@ function buildInitialPhotoLightboxState() {
       }
     }
     if (shouldAnnounce) {
-      setInfo("Ô²Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶ Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ« Õ°Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¨ Õ¿Õ¥Õ²Õ¡ÖƒÕ¸Õ­Õ¾Õ¥Õ¬ Õ§ Õ°Õ«Õ´Õ¶Õ¡Õ¯Õ¡Õ¶ Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€, Õ«Õ½Õ¯ Õ´Õ¸Ö‚Õ¿Ö„Õ¡ÕµÕ«Õ¶ Õ¤Õ¡Õ·Õ¿Õ¥Ö€Õ¨ Õ¦Ö€Õ¸ÕµÕ¡ÖÕ¾Õ¥Õ¬ Õ¥Õ¶Ö‰ ÕˆÖ‚Õ²Õ¡Ö€Õ¯Õ¥Õ¬Õ¸Ö‚ Õ°Õ¡Õ´Õ¡Ö€ Õ½Õ¥Õ²Õ´Õ¥Ö„ Â«ÕŠÕ¡Õ°ÕºÕ¡Õ¶Õ¥Õ¬Â»Ö‰", false);
+      setInfo("Բուժական արձակուրդի հաշվարկը տեղափոխվել է հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
     }
     return true;
   }
@@ -6800,7 +6800,7 @@ function buildInitialPhotoLightboxState() {
 
     const invalidColumns = getTransferCalcInvalidColumns(row);
     if (invalidColumns.length) {
-      setInfo(`ÐŸÐµÑ€ÐµÐ²Ð¾Ð´Ñ‹ Ð½Ðµ Ð¼Ð¾Ð³ÑƒÑ‚ Ð±Ñ‹Ñ‚ÑŒ Ñ€Ð°ÑÑÑ‡Ð¸Ñ‚Ð°Ð½Ñ‹: ${invalidColumns.map((column) => column.label).join(", ")} Ð´Ð°ÑŽÑ‚ Ð¾Ñ‚Ñ€Ð¸Ñ†Ð°Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ð¹ Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ðº.`, true);
+      setInfo(`Переводы не могут быть рассчитаны: ${invalidColumns.map((column) => column.label).join(", ")} дают отрицательный остаток.`, true);
       return false;
     }
 
@@ -6859,7 +6859,7 @@ function buildInitialPhotoLightboxState() {
       }
     }
     if (shouldAnnounce) {
-      setInfo("Ð Ð°ÑÑ‡Ñ‘Ñ‚ Ð¿ÐµÑ€ÐµÐ²Ð¾Ð´Ð¾Ð² Ð¿ÐµÑ€ÐµÐ½ÐµÑÑ‘Ð½ Ð² ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ. Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð² Ð¾Ð±Ñ‰Ð¸Ð¹ Ñ„Ð°Ð¹Ð» Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Â«Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒÂ».", false);
+      setInfo("Расчёт переводов перенесён в строку отделения. Для отправки в общий файл нажмите «Сохранить».", false);
     }
     return true;
   }
@@ -6907,7 +6907,7 @@ function buildInitialPhotoLightboxState() {
     );
     const invalidCurrentColumns = QH_CALC_COLUMNS.filter((column) => remainingByType[column.type] < 0);
     if (invalidCurrentColumns.length) {
-      setInfo(`Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´/Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´ Õ°Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¨ Õ¹Õ« Õ¯Õ¡Ö€Õ¸Õ² Õ¯Õ«Ö€Õ¡Õ¼Õ¾Õ¥Õ¬â€¤ ${invalidCurrentColumns.map((column) => column.label).join(", ")} Õ½ÕµÕ¸Ö‚Õ¶Õ¡Õ¯Õ¶Õ¥Ö€Õ¸Ö‚Õ´ Õ½Õ¿Õ¡ÖÕ¾Õ¥Õ¬ Õ§ Õ¢Õ¡ÖÕ¡Õ½Õ¡Õ¯Õ¡Õ¶ Õ¡Ö€ÕªÕ¥Ö„Ö‰`, true);
+      setInfo(`Ընդունում/Դուրսգրում հաշվարկը չի կարող կիրառվել․ ${invalidCurrentColumns.map((column) => column.label).join(", ")} սյունակներում ստացվել է բացասական արժեք։`, true);
       return false;
     }
 
@@ -6936,7 +6936,7 @@ function buildInitialPhotoLightboxState() {
       leaveRemainingByType[column.type] < 0 || leavePresentByType[column.type] < 0
     );
     if (invalidLeaveColumns.length) {
-      setInfo(`Ô²Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶ Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ« Õ°Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¨ Õ¹Õ« Õ¯Õ¡Ö€Õ¸Õ² Õ¯Õ«Ö€Õ¡Õ¼Õ¾Õ¥Õ¬â€¤ ${invalidLeaveColumns.map((column) => column.label).join(", ")} Õ½ÕµÕ¸Ö‚Õ¶Õ¡Õ¯Õ¶Õ¥Ö€Õ¸Ö‚Õ´ Õ½Õ¿Õ¡ÖÕ¾Õ¥Õ¬ Õ§ Õ¢Õ¡ÖÕ¡Õ½Õ¡Õ¯Õ¡Õ¶ Õ¡Ö€ÕªÕ¥Ö„Ö‰`, true);
+      setInfo(`Բուժական արձակուրդի հաշվարկը չի կարող կիրառվել․ ${invalidLeaveColumns.map((column) => column.label).join(", ")} սյունակներում ստացվել է բացասական արժեք։`, true);
       return false;
     }
 
@@ -6965,7 +6965,7 @@ function buildInitialPhotoLightboxState() {
     );
     const invalidTransferColumns = TRANSFER_CALC_COLUMNS.filter((column) => transferRemainingByType[column.type] < 0);
     if (invalidTransferColumns.length) {
-      setInfo(`ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­Õ¸Ö‚Õ©ÕµÕ¡Õ¶ Õ°Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¨ Õ¹Õ« Õ¯Õ¡Ö€Õ¸Õ² Õ¯Õ«Ö€Õ¡Õ¼Õ¾Õ¥Õ¬â€¤ ${invalidTransferColumns.map((column) => column.label).join(", ")} Õ½ÕµÕ¸Ö‚Õ¶Õ¡Õ¯Õ¶Õ¥Ö€Õ¸Ö‚Õ´ Õ½Õ¿Õ¡ÖÕ¾Õ¥Õ¬ Õ§ Õ¢Õ¡ÖÕ¡Õ½Õ¡Õ¯Õ¡Õ¶ Õ¡Ö€ÕªÕ¥Ö„Ö‰`, true);
+      setInfo(`Տեղափոխության հաշվարկը չի կարող կիրառվել․ ${invalidTransferColumns.map((column) => column.label).join(", ")} սյունակներում ստացվել է բացասական արժեք։`, true);
       return false;
     }
 
@@ -7047,7 +7047,7 @@ function buildInitialPhotoLightboxState() {
       }
     }
     if (shouldAnnounce) {
-      setInfo("Õ€Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¶Õ¥Ö€Õ¨ Õ¿Õ¥Õ²Õ¡ÖƒÕ¸Õ­Õ¾Õ¥Õ¬ Õ¥Õ¶ Õ°Õ«Õ´Õ¶Õ¡Õ¯Õ¡Õ¶ Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€, Õ«Õ½Õ¯ Õ´Õ¸Ö‚Õ¿Ö„Õ¡ÕµÕ«Õ¶ Õ¤Õ¡Õ·Õ¿Õ¥Ö€Õ¨ Õ¦Ö€Õ¸ÕµÕ¡ÖÕ¾Õ¥Õ¬ Õ¥Õ¶Ö‰ ÕˆÖ‚Õ²Õ¡Ö€Õ¯Õ¥Õ¬Õ¸Ö‚ Õ°Õ¡Õ´Õ¡Ö€ Õ½Õ¥Õ²Õ´Õ¥Ö„ Â«ÕŠÕ¡Õ°ÕºÕ¡Õ¶Õ¥Õ¬Â»Ö‰", false);
+      setInfo("Հաշվարկները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
     }
     return true;
   }
@@ -7084,7 +7084,7 @@ function buildInitialPhotoLightboxState() {
       refreshMainTableSaveState();
       renderPage();
     }
-    setInfo("Õ€Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¶Õ¥Ö€Õ¨ Õ¿Õ¥Õ²Õ¡ÖƒÕ¸Õ­Õ¾Õ¥Õ¬ Õ¥Õ¶ Õ°Õ«Õ´Õ¶Õ¡Õ¯Õ¡Õ¶ Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€, Õ«Õ½Õ¯ Õ´Õ¸Ö‚Õ¿Ö„Õ¡ÕµÕ«Õ¶ Õ¤Õ¡Õ·Õ¿Õ¥Ö€Õ¨ Õ¦Ö€Õ¸ÕµÕ¡ÖÕ¾Õ¥Õ¬ Õ¥Õ¶Ö‰ ÕˆÖ‚Õ²Õ¡Ö€Õ¯Õ¥Õ¬Õ¸Ö‚ Õ°Õ¡Õ´Õ¡Ö€ Õ½Õ¥Õ²Õ´Õ¥Ö„ Â«ÕŠÕ¡Õ°ÕºÕ¡Õ¶Õ¥Õ¬Â»Ö‰", false);
+    setInfo("Հաշվարկները տեղափոխվել են հիմնական բջիջներ, իսկ մուտքային դաշտերը զրոյացվել են։ Ուղարկելու համար սեղմեք «Պահպանել»։", false);
   }
 
   function getPhotoPreviewValue(row, key, sourceValues = null) {
@@ -7213,7 +7213,7 @@ function buildInitialPhotoLightboxState() {
 
     if (!hasValues) {
       next.isError = true;
-      next.status = "Telegram Ñ„Ð¾Ñ€Ð¼Ð° Ð½Ð°Ð¹Ð´ÐµÐ½Ð°, Ð½Ð¾ Ð² Ð½ÐµÐ¹ Ð½ÐµÑ‚ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ð¹ Ð´Ð»Ñ Ð¿Ð¾ÐºÐ°Ð·Ð°.";
+      next.status = "Telegram форма найдена, но в ней нет значений для показа.";
       return next;
     }
 
@@ -7223,14 +7223,14 @@ function buildInitialPhotoLightboxState() {
       next.draftMode = appliedKeys.length > 0;
       next.workflowStatus = "pending";
       next.status = appliedKeys.length > 0
-        ? "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚Ð° Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ð°Ñ Telegram Ñ„Ð¾Ñ€Ð¼Ð°. Ð—Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¿Ð¾Ð´ÑÑ‚Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð¸Ñ… Ð¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ."
-        : "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚Ð° Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ð°Ñ Telegram Ñ„Ð¾Ñ€Ð¼Ð°. Ð—Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹ Ð´Ð»Ñ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸.";
+        ? "Открыта отправленная Telegram форма. Значения подставлены в таблицу отделения. Проверьте их и нажмите Сохранить."
+        : "Открыта отправленная Telegram форма. Значения доступны для проверки.";
       return next;
     }
 
     next.lastAppliedKeys = recognizedKeys.filter((key) => Object.prototype.hasOwnProperty.call(previewValues, key));
     next.draftMode = false;
-    next.status = "ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½Ð° Ð¿Ð¾ÑÐ»ÐµÐ´Ð½ÑÑ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ð°Ñ Telegram Ñ„Ð¾Ñ€Ð¼Ð° Ð´Ð»Ñ ÑÑ‚Ð¾Ð³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.";
+    next.status = "Показана последняя отправленная Telegram форма для этого отделения.";
     return next;
   }
 
@@ -7297,8 +7297,8 @@ function buildInitialPhotoLightboxState() {
       actual,
       expected,
       message: isValid
-        ? `ÐŸÑ€Ð¾Ð²ÐµÑ€ÐºÐ° Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½Ð°: ${SAVE_RULE_TEXT}.`
-        : `Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½Ð¾: ÑÑƒÐ¼Ð¼Ð° 13-22 = ${actual}, Ð° Ð¿Ð¾ Ñ„Ð¾Ñ€Ð¼ÑƒÐ»Ðµ ${SAVE_RULE_TEXT} Ð´Ð¾Ð»Ð¶Ð½Ð¾ Ð±Ñ‹Ñ‚ÑŒ ${expected}.`
+        ? `Проверка пройдена: ${SAVE_RULE_TEXT}.`
+        : `Сохранение заблокировано: сумма 13-22 = ${actual}, а по формуле ${SAVE_RULE_TEXT} должно быть ${expected}.`
     };
   }
 
@@ -7342,8 +7342,8 @@ function buildInitialPhotoLightboxState() {
       .filter(Boolean)
       .map((item) => item.label);
     const suspectReason = labels.length
-      ? `Ð¤Ð¾Ñ€Ð¼ÑƒÐ»Ð° Ð½Ðµ ÑÐ¾ÑˆÐ»Ð°ÑÑŒ. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ ÑÑ‡ÐµÐ¹ÐºÐ¸ ${labels.join(", ")}.`
-      : "Ð¤Ð¾Ñ€Ð¼ÑƒÐ»Ð° Ð½Ðµ ÑÐ¾ÑˆÐ»Ð°ÑÑŒ. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð±Ð»Ð¾Ðº ÑÑ‡ÐµÐµÐº 13-22.";
+      ? `Формула не сошлась. Проверьте ячейки ${labels.join(", ")}.`
+      : "Формула не сошлась. Проверьте блок ячеек 13-22.";
 
     return {
       suspectKeys,
@@ -7505,7 +7505,7 @@ function buildInitialPhotoLightboxState() {
       .map((item) => {
         const fieldMeta = getPhotoFieldMetaByKey(item.key);
         const cellLabel = fieldMeta?.label || item.key;
-        return `OCR ${cellLabel} = ${item.ocrValue}, Ð° Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ ${cellLabel} = ${item.tableValue}`;
+        return `OCR ${cellLabel} = ${item.ocrValue}, а в таблице ${cellLabel} = ${item.tableValue}`;
       })
       .join("; ");
 
@@ -7703,7 +7703,7 @@ function buildInitialPhotoLightboxState() {
         .map((item) => {
           const fieldMeta = getPhotoFieldMetaByKey(item.key);
           const cellLabel = fieldMeta?.label || item.key;
-          return `OCR ${cellLabel} = ${item.ocrValue}, Ð° Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ ${cellLabel} = ${item.tableValue}`;
+          return `OCR ${cellLabel} = ${item.ocrValue}, а в таблице ${cellLabel} = ${item.tableValue}`;
         })
         .join("; ");
 
@@ -7758,20 +7758,20 @@ function buildInitialPhotoLightboxState() {
     if (!applicableCount) {
       return {
         tone: "neutral",
-        text: "OCR ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒ Ð¿Ð¾ÐºÐ° Ð½Ðµ Ð¿Ð¾ÑÑ‡Ð¸Ñ‚Ð°Ð½."
+        text: "OCR контроль пока не посчитан."
       };
     }
 
     if (!failedCount) {
       return {
         tone: "valid",
-        text: `OCR ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒ: ${passedCount}/${applicableCount} Ð¿Ñ€Ð¾Ð²ÐµÑ€Ð¾Ðº Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½Ð¾.`
+        text: `OCR контроль: ${passedCount}/${applicableCount} проверок пройдено.`
       };
     }
 
     return {
       tone: "invalid",
-      text: `OCR ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒ: ${passedCount}/${applicableCount}. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ: ${failedNames.join(", ")}.`
+      text: `OCR контроль: ${passedCount}/${applicableCount}. Проверьте: ${failedNames.join(", ")}.`
     };
   }
 
@@ -7934,15 +7934,15 @@ function buildInitialPhotoLightboxState() {
       if (check.id === "soldier-count" || check.id === "military-count") {
         suspectReasonParts.push(
           labels.length
-            ? `ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ð°Ñ ÑÑƒÐ¼Ð¼Ð° Â«${check.name}Â» Ð½Ðµ ÑÐ¾ÑˆÐ»Ð°ÑÑŒ. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ ÑÑ‡ÐµÐ¹ÐºÐ¸ ${labels.join(", ")}.`
-            : `ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ð°Ñ ÑÑƒÐ¼Ð¼Ð° Â«${check.name}Â» Ð½Ðµ ÑÐ¾ÑˆÐ»Ð°ÑÑŒ.`
+            ? `Контрольная сумма «${check.name}» не сошлась. Проверьте ячейки ${labels.join(", ")}.`
+            : `Контрольная сумма «${check.name}» не сошлась.`
         );
         return;
       }
       suspectReasonParts.push(
         labels.length
-          ? `Ð¤Ð¾Ñ€Ð¼ÑƒÐ»Ð° 13-22 Ð½Ðµ ÑÐ¾ÑˆÐ»Ð°ÑÑŒ. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ ÑÑ‡ÐµÐ¹ÐºÐ¸ ${labels.join(", ")}.`
-          : "Ð¤Ð¾Ñ€Ð¼ÑƒÐ»Ð° 13-22 Ð½Ðµ ÑÐ¾ÑˆÐ»Ð°ÑÑŒ. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð±Ð»Ð¾Ðº ÑÑ‡ÐµÐµÐº 13-22."
+          ? `Формула 13-22 не сошлась. Проверьте ячейки ${labels.join(", ")}.`
+          : "Формула 13-22 не сошлась. Проверьте блок ячеек 13-22."
       );
     });
 
@@ -7957,7 +7957,7 @@ function buildInitialPhotoLightboxState() {
     if (!savedRow) {
       return {
         ok: false,
-        reason: "Ð¡ÐµÑ€Ð²ÐµÑ€ Ð½Ðµ Ð²ÐµÑ€Ð½ÑƒÐ» ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½ÑƒÑŽ ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ."
+        reason: "Сервер не вернул сохранённую строку отделения."
       };
     }
 
@@ -7974,7 +7974,7 @@ function buildInitialPhotoLightboxState() {
       if (expectedNormalized[key] !== savedNormalized[key]) {
         return {
           ok: false,
-          reason: `ÐŸÐ¾ÑÐ»Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð¿Ð¾Ð»Ðµ ${key} Ð²ÐµÑ€Ð½ÑƒÐ»Ð¾ÑÑŒ ÐºÐ°Ðº ${savedNormalized[key] ?? ""}, Ð¾Ð¶Ð¸Ð´Ð°Ð»Ð¾ÑÑŒ ${expectedNormalized[key] ?? ""}.`
+          reason: `После сохранения поле ${key} вернулось как ${savedNormalized[key] ?? ""}, ожидалось ${expectedNormalized[key] ?? ""}.`
         };
       }
     }
@@ -7982,7 +7982,7 @@ function buildInitialPhotoLightboxState() {
     if (!savedRow.updatedAt) {
       return {
         ok: false,
-        reason: "Ð¡ÐµÑ€Ð²ÐµÑ€ Ð½Ðµ Ð¿Ñ€Ð¸ÑÐ»Ð°Ð» Ð²Ñ€ÐµÐ¼Ñ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾Ð³Ð¾ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ."
+        reason: "Сервер не прислал время успешного обновления отделения."
       };
     }
 
@@ -8138,49 +8138,49 @@ function buildInitialPhotoLightboxState() {
     return `
       <thead>
         <tr>
-          <th rowspan="2" class="hdr-peach dept-head">Ô²Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„</th>
-          <th colspan="3" rowspan="2" class="hdr-peach group-end">ÔµÕ‚ÔµÔ¼ Õ§</th>
-          <th colspan="3" rowspan="2" class="hdr-peach group-end">Ô¸Õ†ÕˆÕ’Õ†ÕŽÔµÔ¼ Ô·</th>
-          <th colspan="3" rowspan="2" class="hdr-peach group-end">Ô´/Ô³</th>
-          <th colspan="2" rowspan="2" class="hdr-peach group-end major-left">ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­</th>
-          <th colspan="8" class="hdr-peach major-left">Ô±ÕŒÔ¿Ô± Ô·</th>
-          <th colspan="3" class="hdr-peach major-left">Õ¸Ö€Õ¸Õ¶ÖÕ«Ö Õ¢Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶</th>
+          <th rowspan="2" class="hdr-peach dept-head">Բաժանմունք</th>
+          <th colspan="3" rowspan="2" class="hdr-peach group-end">ԵՂԵԼ է</th>
+          <th colspan="3" rowspan="2" class="hdr-peach group-end">ԸՆՈՒՆՎԵԼ Է</th>
+          <th colspan="3" rowspan="2" class="hdr-peach group-end">Դ/Գ</th>
+          <th colspan="2" rowspan="2" class="hdr-peach group-end major-left">Տեղափոխ</th>
+          <th colspan="8" class="hdr-peach major-left">ԱՌԿԱ Է</th>
+          <th colspan="3" class="hdr-peach major-left">որոնցից բուժական</th>
           <th class="hdr-yellow major-left">&nbsp;</th>
         </tr>
         <tr>
-          <th rowspan="2" class="hdr-yellow major-left">Ô¸Õ†Ô´Ô±Õ„</th>
-          <th colspan="3" class="hdr-peach">Ô¶Õ«Õ¶Õ®Õ¡Õ¼Õ¡ÕµÕ¸Õ²</th>
-          <th rowspan="2" class="hdr-peach">Ô¶/Õ€</th>
-          <th rowspan="2" class="hdr-peach">Ô¶/Ô¾ Ô¸Õ†Õ</th>
-          <th rowspan="2" class="hdr-peach">Ô¶/ÕŠ</th>
-          <th rowspan="2" class="hdr-peach">Õ”-Õ«</th>
-          <th colspan="3" class="hdr-peach major-left">Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ¸Ö‚Õ´</th>
-          <th rowspan="2" class="hdr-yellow major-left">Ô¸Õ¶Õ¤Õ°Õ¡Õ¶Õ¸Ö‚Ö€</th>
+          <th rowspan="2" class="hdr-yellow major-left">ԸՆԴԱՄ</th>
+          <th colspan="3" class="hdr-peach">Զինծառայող</th>
+          <th rowspan="2" class="hdr-peach">Զ/Հ</th>
+          <th rowspan="2" class="hdr-peach">Զ/Ծ ԸՆՏ</th>
+          <th rowspan="2" class="hdr-peach">Զ/Պ</th>
+          <th rowspan="2" class="hdr-peach">Ք-ի</th>
+          <th colspan="3" class="hdr-peach major-left">արձակուրդում</th>
+          <th rowspan="2" class="hdr-yellow major-left">Ընդհանուր</th>
         </tr>
         <tr>
           <th class="hdr-peach dept-head">
-            <div class="sheet-datetime" id="sheetDateDisplay" aria-label="Ð¢ÐµÐºÑƒÑ‰Ð°Ñ Ð´Ð°Ñ‚Ð° Ð¸ Ð²Ñ€ÐµÐ¼Ñ">
+            <div class="sheet-datetime" id="sheetDateDisplay" aria-label="Текущая дата и время">
               <span class="sheet-datetime-date" id="sheetDateText">${escapeHtml(currentDateTime.date)}</span>
               <span class="sheet-datetime-time" id="sheetTimeText">${escapeHtml(currentDateTime.time)}</span>
             </div>
           </th>
-          <th class="hdr-peach">Ô¸Õ†Ô´</th>
-          <th class="hdr-peach-dark">Ô¶/Ô¾</th>
-          <th class="hdr-peach group-end">Õ‡Ô±Õ</th>
-          <th class="hdr-peach">Ô¸Õ†Ô´</th>
-          <th class="hdr-peach-dark">Ô¶/Ô¾</th>
-          <th class="hdr-peach group-end">Õ‡Ô±Õ</th>
-          <th class="hdr-peach">Ô¸Õ†Ô´</th>
-          <th class="hdr-peach-dark">Ô¶/Ô¾</th>
-          <th class="hdr-peach group-end">Õ‡Ô±Õ</th>
-          <th class="hdr-peach major-left">ÕÕ¥Õ²Õ¡Öƒ Õ¢Õ¡ÕªÕ¶Õ«Ö</th>
-          <th class="hdr-peach group-end">ÕÕ¥Õ²Õ¡Öƒ Õ¢Õ¡ÕªÕ«Õ¶</th>
-          <th class="hdr-peach">Õ‡Ô±Õ</th>
-          <th class="hdr-peach">ÕÕŠÔ±</th>
-          <th class="hdr-peach">ÕŠÔ±Õ…Õ„</th>
-          <th class="hdr-peach major-left">Õ‡Ô±ÕÕ”</th>
-          <th class="hdr-peach">ÕÕŠÔ±</th>
-          <th class="hdr-peach">ÕŠÔ±Õ…Õ„</th>
+          <th class="hdr-peach">ԸՆԴ</th>
+          <th class="hdr-peach-dark">Զ/Ծ</th>
+          <th class="hdr-peach group-end">ՇԱՐ</th>
+          <th class="hdr-peach">ԸՆԴ</th>
+          <th class="hdr-peach-dark">Զ/Ծ</th>
+          <th class="hdr-peach group-end">ՇԱՐ</th>
+          <th class="hdr-peach">ԸՆԴ</th>
+          <th class="hdr-peach-dark">Զ/Ծ</th>
+          <th class="hdr-peach group-end">ՇԱՐ</th>
+          <th class="hdr-peach major-left">Տեղափ բաժնից</th>
+          <th class="hdr-peach group-end">Տեղափ բաժին</th>
+          <th class="hdr-peach">ՇԱՐ</th>
+          <th class="hdr-peach">ՍՊԱ</th>
+          <th class="hdr-peach">ՊԱՅՄ</th>
+          <th class="hdr-peach major-left">ՇԱՐՔ</th>
+          <th class="hdr-peach">ՍՊԱ</th>
+          <th class="hdr-peach">ՊԱՅՄ</th>
         </tr>
       </thead>
     `;
@@ -8327,14 +8327,14 @@ function buildInitialPhotoLightboxState() {
       const extraRows = rows.filter((row) => row.group === "extra");
       bodyHtml = [
         ...primaryRows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode, renderOptions)),
-        renderSummaryRow("subtotal", "Ô¸Õ¶Õ¤Õ¡Õ´Õ¥Õ¶Õ¨", "subtotal-row", snapshot, primaryRows),
+        renderSummaryRow("subtotal", "Ընդամենը", "subtotal-row", snapshot, primaryRows),
         ...extraRows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode, renderOptions)),
-        renderSummaryRow("grand", "Ô¸Õ¶Õ¤Õ¡Õ´Õ¥Õ¶Õ¨", "grand-row", snapshot, rows)
+        renderSummaryRow("grand", "Ընդամենը", "grand-row", snapshot, rows)
       ].join("");
     } else {
       bodyHtml = [
         ...rows.map((row) => renderDetailRow(snapshot, row, interactive, options.viewMode, renderOptions)),
-        renderSummaryRow("single", "Ð˜Ñ‚Ð¾Ð³ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ", "single-total-row", snapshot, rows)
+        renderSummaryRow("single", "Итог отделения", "single-total-row", snapshot, rows)
       ].join("");
     }
 
@@ -8467,9 +8467,9 @@ function buildInitialPhotoLightboxState() {
       status.className = `qh-calc-status${invalidColumns.length ? " qh-calc-status--bad" : ""}`;
       status.innerHTML = invalidColumns.length
         ? invalidColumns.map((column) => (
-          `<div>${escapeHtml(`${column.label}: Õ¹Õ« Õ¯Õ¡Ö€Õ¸Õ² Õ¬Õ«Õ¶Õ¥Õ¬ Õ¢Õ¡ÖÕ¡Õ½Õ¡Õ¯Õ¡Õ¶ Õ¡Ö€ÕªÕ¥Ö„`)}</div>`
+          `<div>${escapeHtml(`${column.label}: չի կարող լինել բացասական արժեք`)}</div>`
         )).join("")
-        : `<div>${escapeHtml("Ô±ÕµÕ½ Õ°Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¨ Õ¹Õ« ÖƒÕ¸Õ­Õ¸Ö‚Õ´ Õ¨Õ¶Õ¤Õ°Õ¡Õ¶Õ¸Ö‚Ö€ Ö„Õ¡Õ¶Õ¡Õ¯Õ¨â€¤ ÖƒÕ¸Õ­Õ¾Õ¸Ö‚Õ´ Õ¥Õ¶ Õ´Õ«Õ¡ÕµÕ¶ 13-15 Ö‡ 20-22 Õ¢Õ»Õ«Õ»Õ¶Õ¥Ö€Õ¨Ö‰")}</div>`;
+        : `<div>${escapeHtml("Այս հաշվարկը չի փոխում ընդհանուր քանակը․ փոխվում են միայն 13-15 և 20-22 բջիջները։")}</div>`;
     }
   }
 
@@ -8523,7 +8523,7 @@ function buildInitialPhotoLightboxState() {
     status.className = `qh-calc-status${invalidColumns.length ? " qh-calc-status--bad" : ""}`;
     status.innerHTML = invalidColumns.length
       ? invalidColumns.map((column) => (
-        `<div>${escapeHtml(`${column.label}: Ã•Â¹Ã•Â« Ã•Â¯Ã•Â¡Ã–â‚¬Ã•Â¸Ã•Â² Ã•Â¬Ã•Â«Ã•Â¶Ã•Â¥Ã•Â¬ Ã•Â¢Ã•Â¡Ã–ÂÃ•Â¡Ã•Â½Ã•Â¡Ã•Â¯Ã•Â¡Ã•Â¶ Ã•Â¡Ã–â‚¬Ã•ÂªÃ•Â¥Ã–â€ž`)}</div>`
+        `<div>${escapeHtml(`${column.label}: չի կարող լինել բացասական արժեք`)}</div>`
       )).join("")
       : "";
   }
@@ -8558,10 +8558,10 @@ function buildInitialPhotoLightboxState() {
       dirtyRows,
       failedRows,
       message: failedRows.length
-        ? `Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½Ð¾: ${failedRows.map((item) => `${item.row.department} â€” ${item.validation.failedChecks.map((check) => check.name).join(", ")}`).join("; ")}.`
+        ? `Сохранение заблокировано: ${failedRows.map((item) => `${item.row.department} — ${item.validation.failedChecks.map((check) => check.name).join(", ")}`).join("; ")}.`
         : (dirtyRows.length
-          ? `Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¾ ÑÑ‚Ñ€Ð¾Ðº: ${dirtyRows.length}. ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ñ‹Ðµ ÑÑƒÐ¼Ð¼Ñ‹ Ð² Ð¿Ð¾Ñ€ÑÐ´ÐºÐµ, Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¼Ð¾Ð¶Ð½Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ.`
-          : "Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚.")
+          ? `Изменено строк: ${dirtyRows.length}. Контрольные суммы в порядке, таблицу можно сохранить.`
+          : "Изменений в главной таблице пока нет.")
     };
   }
 
@@ -8577,7 +8577,7 @@ function buildInitialPhotoLightboxState() {
       ? appendQueryParams(config.getDepartmentPagePath(basePath, definition.id), { tgFeedback: openFeedbackId })
       : "";
     const openPath = feedbackPath || relativePath;
-    const openLabel = feedbackPath ? "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ð¾Ðµ" : "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ";
+    const openLabel = feedbackPath ? "Открыть отправленное" : "Открыть отделение";
     return `
       <div class="link-card" data-department-open-card="${definition.id}" data-workflow-tone="${photoWorkflow.tone}" title="${escapeHtml(photoWorkflow.label)}">
         <div class="link-card-heading">
@@ -8592,8 +8592,8 @@ function buildInitialPhotoLightboxState() {
         <div class="link-card-actions">
           <a href="${escapeHtml(openPath)}" target="_blank" rel="noopener" data-department-feedback-link="${definition.id}" data-open-mode="${feedbackPath ? "feedback" : "department"}">${escapeHtml(openLabel)}</a>
           <span class="link-card-feedback-kind" data-department-feedback-source="${definition.id}" data-feedback-source-tone="${escapeHtml(feedbackSource.tone)}"${feedbackSource.label ? "" : " hidden"}>${escapeHtml(feedbackSource.label)}</span>
-          <button type="button" data-delete-feedback="${definition.id}" data-feedback-id="${row && row.photoFeedbackId ? row.photoFeedbackId : ""}"${feedbackPath ? "" : " hidden"}>Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ð¾Ðµ</button>
-          <button type="button" data-copy-link="${escapeHtml(relativePath)}">ÐšÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ</button>
+          <button type="button" data-delete-feedback="${definition.id}" data-feedback-id="${row && row.photoFeedbackId ? row.photoFeedbackId : ""}"${feedbackPath ? "" : " hidden"}>Удалить отправленное</button>
+          <button type="button" data-copy-link="${escapeHtml(relativePath)}">Копировать ссылку</button>
         </div>
       </div>
     `;
@@ -8844,20 +8844,20 @@ function buildInitialPhotoLightboxState() {
     return `
       <section class="hospital-report-print-sheet print-only">
         <div class="hospital-report-print-head">
-          <div class="hospital-report-print-title">Õ•Ö€Õ¾Õ¡ Õ·Õ¡Ö€Õªâ€¤</div>
+          <div class="hospital-report-print-title">Օրվա շարժ․</div>
           <div class="hospital-report-print-meta">
-            <span>Ô±Õ´Õ½Õ¡Õ©Õ«Õ¾: ${escapeHtml(report.reportDate)}</span>
-            <span>Ô¹Õ¡Ö€Õ´Õ¡ÖÕ¾Õ¥Õ¬ Õ§: ${escapeHtml(formatTimestamp(report.updatedAt))}</span>
+            <span>Ամսաթիվ: ${escapeHtml(report.reportDate)}</span>
+            <span>Թարմացվել է: ${escapeHtml(formatTimestamp(report.updatedAt))}</span>
           </div>
         </div>
         <div class="hospital-report-print-grid">
           <table class="hospital-report-print-table">
             <thead>
               <tr>
-                <th>Ô²Õ».</th>
-                <th>Õ‘Õ¸Ö‚ÖÕ«Õ¹</th>
+                <th>Բջ.</th>
+                <th>Ցուցիչ</th>
                 <th></th>
-                <th>Ô¹Õ«Õ¾</th>
+                <th>Թիվ</th>
               </tr>
             </thead>
             <tbody>
@@ -8867,10 +8867,10 @@ function buildInitialPhotoLightboxState() {
           <table class="hospital-report-print-table">
             <thead>
               <tr>
-                <th>Ô²Õ».</th>
-                <th>Ô²Õ¡ÕªÕ«Õ¶ / Õ‘Õ¸Ö‚ÖÕ«Õ¹</th>
+                <th>Բջ.</th>
+                <th>Բաժին / Ցուցիչ</th>
                 <th></th>
-                <th>Ô¹Õ«Õ¾</th>
+                <th>Թիվ</th>
               </tr>
             </thead>
             <tbody>
@@ -8890,13 +8890,13 @@ function buildInitialPhotoLightboxState() {
       <div class="page hospital-report-page">
         <div class="toolbar no-print">
           <div>
-            <h1>Õ•Ö€Õ¾Õ¡ Õ·Õ¡Ö€Õªâ€¤</h1>
-            <p>ÐžÑ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ð¹ Ð¾Ñ‚Ñ‡Ñ‘Ñ‚Ð½Ñ‹Ð¹ Ð»Ð¸ÑÑ‚ Ð¿Ð¾ ÑÑ‚Ñ€Ð¾ÐºÐµ Â«Ô¸Õ¶Õ¤Õ¡Õ´Õ¥Õ¶Õ¨Â» Ð¸ Ð¿Ð¾ ÑÑ‚Ñ€Ð¾ÐºÐ°Ð¼ Ô»Õ†Õ–, Õ”/Õ€, Ô±ÕÔ´.</p>
+            <h1>Օրվա շարժ․</h1>
+            <p>Отдельный отчётный лист по строке «Ընդամենը» и по строкам ԻՆՖ, Ք/Հ, ԱՏԴ.</p>
           </div>
           <div class="toolbar-actions">
             <span class="pill ${getSourceClass()}">${escapeHtml(sync.getSourceLabel(state.source))}</span>
-            <button type="button" id="printBtn">ÐŸÐµÑ‡Ð°Ñ‚ÑŒ / PDF</button>
-            <a class="button-link" href="${escapeHtml(mainPath)}">Ðš Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼Ñƒ</a>
+            <button type="button" id="printBtn">Печать / PDF</button>
+            <a class="button-link" href="${escapeHtml(mainPath)}">К главному</a>
           </div>
         </div>
 
@@ -8904,17 +8904,17 @@ function buildInitialPhotoLightboxState() {
           ${renderHospitalReportPrintTable(report)}
           <header class="hospital-report-header">
             <div>
-              <p class="hospital-report-kicker">Ô¿Ô¿Ô¶Õ€-Õ‡Õ¡Ö€Õªâ€¤</p>
-              <h1>Õ•Ö€Õ¾Õ¡ Õ·Õ¡Ö€Õªâ€¤</h1>
-              <p class="hospital-report-subtitle">Ð¡Ð²Ð¾Ð´Ð½Ñ‹Ð¹ Ð¾Ñ‚Ñ‡Ñ‘Ñ‚ Ð¿Ð¾ Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ</p>
+              <p class="hospital-report-kicker">ԿԿԶՀ-Շարժ․</p>
+              <h1>Օրվա շարժ․</h1>
+              <p class="hospital-report-subtitle">Сводный отчёт по главной таблице</p>
             </div>
             <div class="hospital-report-meta">
               <div class="hospital-report-meta-card">
-                <span>Ð”Ð°Ñ‚Ð° Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ð°</span>
+                <span>Дата документа</span>
                 <strong>${escapeHtml(report.reportDate)}</strong>
               </div>
               <div class="hospital-report-meta-card">
-                <span>ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÐµÐµ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ðµ</span>
+                <span>Последнее обновление</span>
                 <strong>${escapeHtml(formatTimestamp(report.updatedAt))}</strong>
                 <em class="status-chip status-chip--${summaryFreshness.level}">${escapeHtml(summaryFreshness.label)}</em>
               </div>
@@ -8924,8 +8924,8 @@ function buildInitialPhotoLightboxState() {
           <section class="hospital-report-grid">
             <section class="hospital-report-card">
               <div class="hospital-report-card-head">
-                <h2>Ô¸Õ¶Õ¤Õ¡Õ´Õ¥Õ¶Õ¨</h2>
-                <span class="hospital-report-mini-pill">ÑÑ‚Ñ€Ð¾ÐºÐ° 15</span>
+                <h2>Ընդամենը</h2>
+                <span class="hospital-report-mini-pill">строка 15</span>
               </div>
               <div class="hospital-report-rows">
                 ${renderHospitalReportPrimaryItems(report.primaryItems)}
@@ -8942,7 +8942,7 @@ function buildInitialPhotoLightboxState() {
   }
 
   function getFeedbackStatusLabel(status) {
-    return status === "corrected_by_operator" ? "Ð˜ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¾ Ð¾Ð¿ÐµÑ€Ð°Ñ‚Ð¾Ñ€Ð¾Ð¼" : "ÐŸÑ€Ð¸Ð½ÑÑ‚Ð¾ Ð±ÐµÐ· Ð¿Ñ€Ð°Ð²Ð¾Ðº";
+    return status === "corrected_by_operator" ? "Исправлено оператором" : "Принято без правок";
   }
 
   function getFeedbackStatusClass(status) {
@@ -8952,13 +8952,13 @@ function buildInitialPhotoLightboxState() {
   function getFeedbackChangedLabel(changedKeys) {
     const keys = Array.isArray(changedKeys) ? changedKeys.filter((item) => typeof item === "string" && item) : [];
     if (!keys.length) {
-      return "Ð‘ÐµÐ· Ð¸ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¸Ð¹";
+      return "Без исправлений";
     }
 
     return keys
       .map((key) => {
         const meta = getPhotoFieldMetaByKey(key);
-        return meta ? `Ð¯Ñ‡.${meta.label}` : key;
+        return meta ? `Яч.${meta.label}` : key;
       })
       .join(", ");
   }
@@ -8979,15 +8979,15 @@ function buildInitialPhotoLightboxState() {
   function buildFeedbackValueList(values, keys) {
     const list = Array.isArray(keys) && keys.length ? keys : config.valueKeys.filter((key) => values && values[key] !== null);
     if (!list.length) {
-      return '<div class="feedback-value-empty">ÐÐµÑ‚ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ð¹</div>';
+      return '<div class="feedback-value-empty">Нет значений</div>';
     }
 
     return list.map((key) => {
       const meta = getPhotoFieldMetaByKey(key);
       return `
         <div class="feedback-value-item">
-          <span>${escapeHtml(meta ? `Ð¯Ñ‡ÐµÐ¹ÐºÐ° ${meta.label}` : key)}</span>
-          <strong>${escapeHtml(getDisplayValue(values?.[key]) || "â€”")}</strong>
+          <span>${escapeHtml(meta ? `Ячейка ${meta.label}` : key)}</span>
+          <strong>${escapeHtml(getDisplayValue(values?.[key]) || "—")}</strong>
         </div>
       `;
     }).join("");
@@ -9002,15 +9002,15 @@ function buildInitialPhotoLightboxState() {
       <article class="feedback-card">
         <div class="feedback-card-head">
           <div>
-            <strong>${escapeHtml(record.departmentName || record.departmentId || "ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ")}</strong>
-            <div class="feedback-card-meta">${escapeHtml(formatTimestamp(record.createdAt) || "â€”")} â€¢ ${escapeHtml(record.reportDate || "â€”")}</div>
+            <strong>${escapeHtml(record.departmentName || record.departmentId || "Отделение")}</strong>
+            <div class="feedback-card-meta">${escapeHtml(formatTimestamp(record.createdAt) || "—")} • ${escapeHtml(record.reportDate || "—")}</div>
           </div>
           <span class="status-chip status-chip--${statusClass}">${escapeHtml(getFeedbackStatusLabel(record.status))}</span>
         </div>
         <div class="feedback-card-submeta">
-          <span><strong>Ð˜ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ðµ ÑÑ‡ÐµÐ¹ÐºÐ¸:</strong> ${escapeHtml(getFeedbackChangedLabel(changedKeys))}</span>
-          ${record.photoReportDate ? `<span><strong>Ð”Ð°Ñ‚Ð° Ð½Ð° Ñ„Ð¾Ñ‚Ð¾:</strong> ${escapeHtml(record.photoReportDate)}</span>` : ""}
-          ${record.imageName ? `<span><strong>Ð¤Ð°Ð¹Ð»:</strong> ${escapeHtml(record.imageName)}</span>` : ""}
+          <span><strong>Исправленные ячейки:</strong> ${escapeHtml(getFeedbackChangedLabel(changedKeys))}</span>
+          ${record.photoReportDate ? `<span><strong>Дата на фото:</strong> ${escapeHtml(record.photoReportDate)}</span>` : ""}
+          ${record.imageName ? `<span><strong>Файл:</strong> ${escapeHtml(record.imageName)}</span>` : ""}
         </div>
         ${record.imageDataUrl ? `
           <div class="feedback-card-preview">
@@ -9018,16 +9018,16 @@ function buildInitialPhotoLightboxState() {
           </div>
         ` : ""}
         <details class="feedback-card-details">
-          <summary>Ð”ÐµÑ‚Ð°Ð»Ð¸ OCR</summary>
+          <summary>Детали OCR</summary>
           <div class="feedback-values-grid">
             <div class="feedback-values-panel">
-              <h3>OCR Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð»</h3>
+              <h3>OCR распознал</h3>
               <div class="feedback-value-list">
                 ${buildFeedbackValueList(record.recognizedValues || {}, detailKeys)}
               </div>
             </div>
             <div class="feedback-values-panel">
-              <h3>Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾ Ð² Ð¸Ñ‚Ð¾Ð³Ðµ</h3>
+              <h3>Сохранено в итоге</h3>
               <div class="feedback-value-list">
                 ${buildFeedbackValueList(record.finalValues || {}, detailKeys)}
               </div>
@@ -9069,15 +9069,15 @@ function buildInitialPhotoLightboxState() {
 
   function getSyncDescription() {
     if (state.source === "remote") {
-      return "Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ð±ÑŠÐµÐ´Ð¸Ð½ÑÑŽÑ‚ÑÑ Ð¼ÐµÐ¶Ð´Ñƒ ÐºÐ¾Ð¼Ð¿ÑŒÑŽÑ‚ÐµÑ€Ð°Ð¼Ð¸ Ñ‡ÐµÑ€ÐµÐ· Ð¸Ð½Ñ‚ÐµÑ€Ð½ÐµÑ‚.";
+      return "Данные объединяются между компьютерами через интернет.";
     }
     if (state.source === "pending-sync") {
-      return "Ð§Ð°ÑÑ‚ÑŒ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ ÐµÑ‰Ñ‘ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð° Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€. ÐžÐ½Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð¶Ð´ÑƒÑ‚ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.";
+      return "Часть изменений ещё не отправлена на сервер. Они сохранены локально и ждут синхронизации.";
     }
     if (state.source === "local-cache") {
-      return "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¹ ÐºÑÑˆ. Ð¡ÐµÑ€Ð²ÐµÑ€ Ð²Ñ€ÐµÐ¼ÐµÐ½Ð½Ð¾ Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿ÐµÐ½.";
+      return "Сейчас показан локальный кэш. Сервер временно недоступен.";
     }
-    return "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð²ÐºÐ»ÑŽÑ‡ÐµÐ½ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¹ Ñ€ÐµÐ¶Ð¸Ð¼. ÐœÐµÐ¶Ð´Ñƒ Ñ€Ð°Ð·Ð½Ñ‹Ð¼Ð¸ ÐºÐ¾Ð¼Ð¿ÑŒÑŽÑ‚ÐµÑ€Ð°Ð¼Ð¸ Ð´Ð°Ð½Ð½Ñ‹Ðµ ÐµÑ‰Ðµ Ð½Ðµ Ð¾Ð±ÑŠÐµÐ´Ð¸Ð½ÑÑŽÑ‚ÑÑ.";
+    return "Сейчас включен локальный режим. Между разными компьютерами данные еще не объединяются.";
   }
 
   function getPendingSyncStatus() {
@@ -9123,32 +9123,32 @@ function buildInitialPhotoLightboxState() {
 
   function getPendingSyncButtonLabel(status = getPendingSyncStatus()) {
     if (status.isSyncing) {
-      return status.count > 0 ? `Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð». (${status.count})...` : "Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð»....";
+      return status.count > 0 ? `Синхр. накопл. (${status.count})...` : "Синхр. накопл....";
     }
-    return status.count > 0 ? `Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð». (${status.count})` : "Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð».";
+    return status.count > 0 ? `Синхр. накопл. (${status.count})` : "Синхр. накопл.";
   }
 
   function getPendingSyncSummaryText(status = getPendingSyncStatus()) {
     if (status.hasPending) {
       if (!sync.hasRemoteSync()) {
-        return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼, Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¶Ð´ÑƒÑ‚ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸.`;
+        return `В очереди: ${status.count}. Сейчас оффлайн-режим, поэтому изменения ждут отправки.`;
       }
-      return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð² Ñ„Ð¾Ð½Ðµ, Ð° ÐºÐ½Ð¾Ð¿ÐºÐ° Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ Ð´Ð»Ñ Ñ€ÑƒÑ‡Ð½Ð¾Ð¹ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.`;
+      return `В очереди: ${status.count}. Очередь отправится автоматически в фоне, а кнопка остаётся для ручной синхронизации.`;
     }
     if (status.lastSyncedAt) {
-      return `ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ Ð¿ÑƒÑÑ‚Ð°. ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ ÑƒÑÐ¿ÐµÑˆÐ½Ð°Ñ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ñ: ${formatTimestamp(status.lastSyncedAt)}.`;
+      return `Очередь пуста. Последняя успешная синхронизация: ${formatTimestamp(status.lastSyncedAt)}.`;
     }
     return sync.hasRemoteSync()
-      ? "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°. Ð¤Ð¾Ð½Ð¾Ð²Ð°Ñ Ð°Ð²Ñ‚Ð¾ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ñ Ð²ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°."
-      : "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼. ÐÐ¾Ð²Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð±ÑƒÐ´ÑƒÑ‚ Ð½Ð°ÐºÐ°Ð¿Ð»Ð¸Ð²Ð°Ñ‚ÑŒÑÑ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾.";
+      ? "Очередь синхронизации пуста. Фоновая автосинхронизация включена."
+      : "Сейчас оффлайн-режим. Новые изменения будут накапливаться локально.";
   }
 
   function getPendingSyncErrorText(status = getPendingSyncStatus()) {
     if (status.lastError) {
-      return `ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ Ð¾ÑˆÐ¸Ð±ÐºÐ° ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸: ${status.lastError}`;
+      return `Последняя ошибка синхронизации: ${status.lastError}`;
     }
     if (status.hasPending && !sync.hasRemoteSync()) {
-      return "Ð§Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ, Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÐµÑÑŒ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼.";
+      return "Чтобы отправить накопленные изменения, переключитесь в онлайн-режим.";
     }
     return "";
   }
@@ -9156,18 +9156,18 @@ function buildInitialPhotoLightboxState() {
   function getShiftTransferSummaryText() {
     const context = getArchiveContext();
     const completed = [
-      hasShiftAutoTransferCompleted("day", context.key) ? "Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´" : "",
-      hasShiftAutoTransferCompleted("discharge", context.key) ? "Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´" : ""
+      hasShiftAutoTransferCompleted("day", context.key) ? "Ընդունում" : "",
+      hasShiftAutoTransferCompleted("discharge", context.key) ? "Դուրսգրում" : ""
     ].filter(Boolean);
 
     if (state.shiftAutoTransferEnabled) {
-      const base = "ÐÐ²Ñ‚Ð¾Ð¿ÐµÑ€ÐµÐ½Ð¾Ñ Ð²ÐºÐ»ÑŽÑ‡Ñ‘Ð½: Ð¿Ð¾ÑÐ»Ðµ 08:01 Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´ Ð¸ Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð¿ÐµÑ€ÐµÐ¹Ð´ÑƒÑ‚ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ.";
+      const base = "Автоперенос включён: после 08:01 данные из Ընդունում и Դուրսգրում автоматически перейдут в основную таблицу.";
       return completed.length
-        ? `${base} Ð¡ÐµÐ³Ð¾Ð´Ð½Ñ ÑƒÐ¶Ðµ Ð¿ÐµÑ€ÐµÐ½ÐµÑÐµÐ½Ñ‹: ${completed.join(", ")}.`
+        ? `${base} Сегодня уже перенесены: ${completed.join(", ")}.`
         : base;
     }
 
-    return "ÐÐ²Ñ‚Ð¾Ð¿ÐµÑ€ÐµÐ½Ð¾Ñ Ð²Ñ‹ÐºÐ»ÑŽÑ‡ÐµÐ½. Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð´ÐµÐ¹ÑÑ‚Ð²ÑƒÐµÑ‚ Ñ€ÑƒÑ‡Ð½Ð¾Ð¹ Ñ€ÐµÐ¶Ð¸Ð¼: Ð¿ÐµÑ€ÐµÐ½Ð¾Ñ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÑÐµÑ‚ÑÑ ÐºÐ½Ð¾Ð¿ÐºÐ°Ð¼Ð¸ Ð½Ð¸Ð¶Ðµ Ð¸Ð»Ð¸ ÑÐ¾ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ† `Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´` Ð¸ `Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´`.";
+    return "Автоперенос выключен. Сейчас действует ручной режим: перенос выполняется кнопками ниже или со страниц `Ընդունում` и `Դուրսգրում`.";
   }
 
   function getShiftTransferStatusText() {
@@ -9175,7 +9175,7 @@ function buildInitialPhotoLightboxState() {
       return "";
     }
     const meta = getShiftTransferModeMeta(state.shiftTransferInFlightMode);
-    return `ÐŸÐµÑ€ÐµÐ½Ð¾ÑˆÑƒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· ${meta.label} Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ...`;
+    return `Переношу данные из ${meta.label} в основную таблицу...`;
   }
 
   function isMainTableBusyForShiftTransfer() {
@@ -9237,7 +9237,7 @@ function buildInitialPhotoLightboxState() {
 
     if (isMainTableBusyForShiftTransfer()) {
       if (!automatic) {
-        setInfo("Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¸Ð»Ð¸ Ð·Ð°ÐºÑ€Ð¾Ð¹Ñ‚Ðµ Ñ€ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ Ð¾ÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹, Ð¿Ð¾Ñ‚Ð¾Ð¼ Ð¿ÐµÑ€ÐµÐ½Ð¾ÑÐ¸Ñ‚Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´/Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´.", true);
+        setInfo("Сначала сохраните или закройте редактирование основной таблицы, потом переносите данные из Ընդունում/Դուրսգրում.", true);
         refreshTableData();
       }
       return { applied: false, blocked: true };
@@ -9251,14 +9251,14 @@ function buildInitialPhotoLightboxState() {
       const draft = loaded.draft || buildEmptyShiftDraftState();
       if (!shiftDraftHasValues(draft.rows)) {
         if (!automatic) {
-          setInfo(`Ð’ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ðµ ${meta.label} ÑÐµÐ¹Ñ‡Ð°Ñ Ð½ÐµÑ‚ Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð´Ð»Ñ Ð¿ÐµÑ€ÐµÐ½Ð¾ÑÐ°.`, false);
+          setInfo(`В странице ${meta.label} сейчас нет данных для переноса.`, false);
           refreshTableData();
         }
         return { applied: false, empty: true };
       }
 
       if (typeof sync[meta.applyFn] !== "function") {
-        throw new Error(`ÐŸÐµÑ€ÐµÐ½Ð¾Ñ ${meta.label} ÑÐµÐ¹Ñ‡Ð°Ñ Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿ÐµÐ½.`);
+        throw new Error(`Перенос ${meta.label} сейчас недоступен.`);
       }
 
       const effectiveReportDate = typeof draft.reportDateTime === "string" && draft.reportDateTime.trim()
@@ -9275,14 +9275,14 @@ function buildInitialPhotoLightboxState() {
       emitShiftTransferSignal(modeKey, automatic ? "main-auto" : "main-manual", effectiveReportDate);
       setInfo(
         automatic
-          ? `ÐÐ²Ñ‚Ð¾Ð¿ÐµÑ€ÐµÐ½Ð¾Ñ ${meta.label} Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½: Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¸ Ñ‡ÐµÑ€Ð½Ð¾Ð²Ð¸Ðº Ð¾Ñ‡Ð¸Ñ‰ÐµÐ½.`
-          : `Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· ${meta.label} Ð¿ÐµÑ€ÐµÐ½ÐµÑÐµÐ½Ñ‹ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¸ Ñ‡ÐµÑ€Ð½Ð¾Ð²Ð¸Ðº Ð¾Ñ‡Ð¸Ñ‰ÐµÐ½.`,
+          ? `Автоперенос ${meta.label} выполнен: данные добавлены в основную таблицу и черновик очищен.`
+          : `Данные из ${meta.label} перенесены в основную таблицу и черновик очищен.`,
         false
       );
       refreshTableData();
       return { applied: true };
     } catch (error) {
-      const message = error instanceof Error ? error.message : `ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿ÐµÑ€ÐµÐ½ÐµÑÑ‚Ð¸ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· ${meta.label}.`;
+      const message = error instanceof Error ? error.message : `Не удалось перенести данные из ${meta.label}.`;
       if (!automatic || !state.info) {
         setInfo(message, true);
         refreshTableData();
@@ -9324,7 +9324,7 @@ function buildInitialPhotoLightboxState() {
     markShiftAutoTransferCompleted(detail.mode, getArchiveContext().key);
 
     if (isMainTableBusyForShiftTransfer()) {
-      setInfo(`Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· ${getShiftTransferModeMeta(detail.mode).label} ÑƒÐ¶Ðµ Ð¿ÐµÑ€ÐµÐ½ÐµÑÐµÐ½Ñ‹ Ð² Ð´Ñ€ÑƒÐ³Ð¾Ð¹ Ð²ÐºÐ»Ð°Ð´ÐºÐµ. Ð—Ð°Ð²ÐµÑ€ÑˆÐ¸Ñ‚Ðµ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ñ‹Ðµ Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð¸ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚Ðµ ÑÐ²Ð¾Ð´ÐºÑƒ.`, false);
+      setInfo(`Данные из ${getShiftTransferModeMeta(detail.mode).label} уже перенесены в другой вкладке. Завершите локальные правки и обновите сводку.`, false);
       refreshTableData();
       return;
     }
@@ -9333,11 +9333,11 @@ function buildInitialPhotoLightboxState() {
       const result = await sync.loadSnapshot();
       applyLoadedSnapshot(result);
       restorePendingMainSaveNotice();
-      setInfo(`Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð° Ð¿Ð¾ÑÐ»Ðµ Ð¿ÐµÑ€ÐµÐ½Ð¾ÑÐ° Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð¸Ð· ${getShiftTransferModeMeta(detail.mode).label}.`, false);
+      setInfo(`Главная таблица обновлена после переноса данных из ${getShiftTransferModeMeta(detail.mode).label}.`, false);
       refreshTableData();
     } catch (error) {
       setInfo(
-        error instanceof Error ? error.message : `ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð³Ð»Ð°Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¿Ð¾ÑÐ»Ðµ Ð¿ÐµÑ€ÐµÐ½Ð¾ÑÐ° ${getShiftTransferModeMeta(detail.mode).label}.`,
+        error instanceof Error ? error.message : `Не удалось обновить главную таблицу после переноса ${getShiftTransferModeMeta(detail.mode).label}.`,
         true
       );
       refreshTableData();
@@ -9452,7 +9452,7 @@ function buildInitialPhotoLightboxState() {
     return `
       <div class="pending-sync-panel">
         <div class="pending-sync-panel__copy">
-          <strong>ÐžÑ„Ñ„Ð»Ð°Ð¹Ð½-Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ</strong>
+          <strong>Оффлайн-очередь</strong>
           <p id="pendingSyncSummaryText">${escapeHtml(getPendingSyncSummaryText(status))}</p>
           <p class="hint${errorText ? " warning-note" : ""}" id="pendingSyncErrorText">${escapeHtml(errorText)}</p>
         </div>
@@ -9472,41 +9472,41 @@ function buildInitialPhotoLightboxState() {
     if (state.mainTableAndroidApp.error && !items.length) {
       return {
         summary: state.mainTableAndroidApp.error,
-        html: '<div class="archive-empty">ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Android MAINFORM.</div>'
+        html: '<div class="archive-empty">Не удалось загрузить отправки Android MAINFORM.</div>'
       };
     }
 
     if (state.mainTableAndroidApp.isLoading && !items.length) {
       return {
-        summary: "Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÑŽ Android MAINFORM Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð·Ð° ÑÐµÐ³Ð¾Ð´Ð½Ñ...",
-        html: '<div class="archive-empty">Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÑŽ Android MAINFORM Ð´Ð°Ð½Ð½Ñ‹Ðµ...</div>'
+        summary: "Загружаю Android MAINFORM отправки за сегодня...",
+        html: '<div class="archive-empty">Загружаю Android MAINFORM данные...</div>'
       };
     }
 
     if (!items.length) {
       return {
-        summary: "Ð—Ð° Ñ‚ÐµÐºÑƒÑ‰Ð¸Ðµ ÑÑƒÑ‚ÐºÐ¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¾Ðº Android MAINFORM Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚.",
-        html: '<div class="archive-empty">Ð¡ÐµÐ³Ð¾Ð´Ð½ÑÑˆÐ½Ð¸Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Android MAINFORM Ð¿Ð¾ÐºÐ° Ð½Ðµ Ð¿Ð¾ÑÑ‚ÑƒÐ¿Ð°Ð»Ð¸.</div>'
+        summary: "За текущие сутки отправок Android MAINFORM пока нет.",
+        html: '<div class="archive-empty">Сегодняшние отправки Android MAINFORM пока не поступали.</div>'
       };
     }
 
     return {
-      summary: `ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½Ð¾ Android MAINFORM Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¾Ðº Ð·Ð° ÑÐµÐ³Ð¾Ð´Ð½Ñ: ${items.length}. Ð—Ð´ÐµÑÑŒ Ð²Ð¸Ð´Ð½Ñ‹ Ñ„Ð¾Ñ‚Ð¾ Ð¸ Ñ‚Ð°Ð±Ð»Ð¸Ñ‡Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ðµ Ð¿Ñ€Ð¸ÑˆÐ»Ð¸ Ñ‡ÐµÑ€ÐµÐ· Android app.`,
+      summary: `Показано Android MAINFORM отправок за сегодня: ${items.length}. Здесь видны фото и табличные данные, которые пришли через Android app.`,
       html: `
         <div class="main-table-android-list">
           ${items.map((item) => {
             const statusText = item.alreadySaved
-              ? "Ð£Ð¶Ðµ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ"
-              : (item.appliedKeys.length ? "Ð•ÑÑ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Android MAINFORM" : "ÐÐµÑ‚ Ñ‚Ð°Ð±Ð»Ð¸Ñ‡Ð½Ñ‹Ñ… Ð´Ð°Ð½Ð½Ñ‹Ñ…");
+              ? "Уже в основной таблице"
+              : (item.appliedKeys.length ? "Есть данные Android MAINFORM" : "Нет табличных данных");
             const statusClass = item.alreadySaved
               ? "main-table-telegram-form-card__status--saved"
               : (item.appliedKeys.length ? "main-table-telegram-form-card__status--pending" : "main-table-telegram-form-card__status--error");
             const reportDateText = item.reportDate
-              ? `Ð”Ð°Ñ‚Ð° Ð¾Ñ‚Ñ‡Ñ‘Ñ‚Ð°: ${item.reportDate}`
-              : "Ð”Ð°Ñ‚Ð° Ð¾Ñ‚Ñ‡Ñ‘Ñ‚Ð° Ð½Ðµ ÑƒÐºÐ°Ð·Ð°Ð½Ð°";
+              ? `Дата отчёта: ${item.reportDate}`
+              : "Дата отчёта не указана";
             const createdAtText = item.createdAt
-              ? `ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¾: ${formatTimestamp(item.createdAt)}`
-              : "Ð’Ñ€ÐµÐ¼Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð½Ðµ ÑƒÐºÐ°Ð·Ð°Ð½Ð¾";
+              ? `Отправлено: ${formatTimestamp(item.createdAt)}`
+              : "Время отправки не указано";
             return `
               <article class="main-table-android-card">
                 <div class="main-table-android-card__head">
@@ -9515,7 +9515,7 @@ function buildInitialPhotoLightboxState() {
                     <span>Android MAINFORM</span>
                     <span>${escapeHtml(reportDateText)}</span>
                     <span>${escapeHtml(createdAtText)}</span>
-                    ${item.imageName ? `<span>Ð¤Ð°Ð¹Ð»: ${escapeHtml(item.imageName)}</span>` : ""}
+                    ${item.imageName ? `<span>Файл: ${escapeHtml(item.imageName)}</span>` : ""}
                   </div>
                   <span class="main-table-telegram-form-card__status ${statusClass}">${escapeHtml(statusText)}</span>
                 </div>
@@ -9526,12 +9526,12 @@ function buildInitialPhotoLightboxState() {
                       class="main-table-android-card__photo-button"
                       data-main-table-photo-open="${escapeHtml(String(item.feedbackId))}"
                       data-main-table-photo-department-id="${escapeHtml(item.departmentId || item.rowId || "")}"
-                      aria-label="${escapeHtml(`ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Android MAINFORM Ñ„Ð¾Ñ‚Ð¾ ${item.departmentName}`)}"
-                      title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `\nÐ”Ð°Ñ‚Ð° Ð½Ð° Ñ„Ð¾Ñ‚Ð¾: ${item.photoReportDate}` : ""}${item.photoSentAt ? `\nÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¾: ${formatTimestamp(item.photoSentAt)}` : ""}`)}"
+                      aria-label="${escapeHtml(`Открыть Android MAINFORM фото ${item.departmentName}`)}"
+                      title="${escapeHtml(`${item.departmentName}${item.photoReportDate ? `\nДата на фото: ${item.photoReportDate}` : ""}${item.photoSentAt ? `\nОтправлено: ${formatTimestamp(item.photoSentAt)}` : ""}`)}"
                     >
                       <img
                         src="${escapeHtml(item.imageDataUrl)}"
-                        alt="${escapeHtml(`Android MAINFORM Ñ„Ð¾Ñ‚Ð¾ ${item.departmentName}`)}"
+                        alt="${escapeHtml(`Android MAINFORM фото ${item.departmentName}`)}"
                         loading="lazy"
                         decoding="async"
                       >
@@ -9541,7 +9541,7 @@ function buildInitialPhotoLightboxState() {
                   <div class="main-table-android-card__table">
                     ${item.previewRow
                       ? renderMainTableTelegramFormPreviewTable(item, item.previewRow)
-                      : '<div class="archive-empty">Ð’ ÑÑ‚Ð¾Ð¹ Android-Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐµ Ð½ÐµÑ‚ Ñ‚Ð°Ð±Ð»Ð¸Ñ‡Ð½Ñ‹Ñ… Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð´Ð»Ñ Ð¿Ñ€ÐµÐ´Ð¿Ñ€Ð¾ÑÐ¼Ð¾Ñ‚Ñ€Ð°.</div>'}
+                      : '<div class="archive-empty">В этой Android-отправке нет табличных данных для предпросмотра.</div>'}
                   </div>
                 </div>
               </article>
@@ -9558,7 +9558,7 @@ function buildInitialPhotoLightboxState() {
     return `
       <div class="shift-transfer-panel">
         <div class="shift-transfer-panel__copy">
-          <strong>Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´ / Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´</strong>
+          <strong>Ընդունում / Դուրսգրում</strong>
           <p id="shiftTransferSummaryText">${escapeHtml(getShiftTransferSummaryText())}</p>
           <label class="shift-transfer-panel__toggle" for="shiftAutoTransferToggle">
             <input
@@ -9567,13 +9567,13 @@ function buildInitialPhotoLightboxState() {
               ${state.shiftAutoTransferEnabled ? "checked" : ""}
               ${busy ? "disabled" : ""}
             >
-            <span>ÐÐ²Ñ‚Ð¾Ð¿ÐµÑ€ÐµÐ½Ð¾Ñ Ð² 08:01</span>
+            <span>Автоперенос в 08:01</span>
           </label>
           <p class="hint" id="shiftTransferStatusText">${escapeHtml(statusText)}</p>
         </div>
         <div class="shift-transfer-panel__actions">
-          <button type="button" id="applyDayShiftNowBtn" ${busy ? "disabled" : ""}>ÐŸÐµÑ€ÐµÐ½ÐµÑÑ‚Ð¸ Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´</button>
-          <button type="button" id="applyDischargeShiftNowBtn" ${busy ? "disabled" : ""}>ÐŸÐµÑ€ÐµÐ½ÐµÑÑ‚Ð¸ Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´</button>
+          <button type="button" id="applyDayShiftNowBtn" ${busy ? "disabled" : ""}>Перенести Ընդունում</button>
+          <button type="button" id="applyDischargeShiftNowBtn" ${busy ? "disabled" : ""}>Перенести Դուրսգրում</button>
         </div>
       </div>
     `;
@@ -9593,8 +9593,8 @@ function buildInitialPhotoLightboxState() {
       : "";
 
     return `
-      <span class="pill remote">${escapeHtml(email || "ÕÕ¥Ö€")}</span>
-      <button type="button" data-owner-signout>ÔµÕ¬Ö„</button>
+      <span class="pill remote">${escapeHtml(email || "Տեր")}</span>
+      <button type="button" data-owner-signout>Ելք</button>
     `;
   }
 
@@ -9610,8 +9610,8 @@ function buildInitialPhotoLightboxState() {
       if (savedMainKeyFromQuery) {
         const savedRecord = getMainTableSavedRecordByKey(savedMainKeyFromQuery);
         return savedRecord
-          ? `Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ${savedRecord.dateLabel} ${savedRecord.slotLabel} | SARSH_KKZH`
-          : "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° | SARSH_KKZH";
+          ? `Сохранённая таблица ${savedRecord.dateLabel} ${savedRecord.slotLabel} | SARSH_KKZH`
+          : "Сохранённая таблица | SARSH_KKZH";
       }
       if (departmentArchiveKeyFromQuery) {
         const record = getDepartmentPdfArchiveRecordByKey(departmentArchiveKeyFromQuery);
@@ -9660,20 +9660,20 @@ function buildInitialPhotoLightboxState() {
       return "OCR feedback | SARSH_KKZH";
     }
     if (mode === "hospital-report") {
-      return "Õ•Ö€Õ¾Õ¡ Õ·Õ¡Ö€Õªâ€¤ | SARSH_KKZH";
+      return "Օրվա շարժ․ | SARSH_KKZH";
     }
     if (mode === "archive") {
       if (departmentArchiveKeyFromQuery) {
         const record = getDepartmentPdfArchiveRecordByKey(departmentArchiveKeyFromQuery);
         return record
-          ? `PDF Ð°Ñ€Ñ…Ð¸Ð² ${record.departmentMarker || record.departmentName} ${record.archiveLabel} | SARSH_KKZH`
-          : "PDF Ð°Ñ€Ñ…Ð¸Ð² Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ | SARSH_KKZH";
+          ? `PDF архив ${record.departmentMarker || record.departmentName} ${record.archiveLabel} | SARSH_KKZH`
+          : "PDF архив отделения | SARSH_KKZH";
       }
       if (departmentArchiveDateFromQuery) {
-        return `PDF Ð°Ñ€Ñ…Ð¸Ð² Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ ${departmentArchiveDateFromQuery} | SARSH_KKZH`;
+        return `PDF архив отделений ${departmentArchiveDateFromQuery} | SARSH_KKZH`;
       }
       const record = getArchiveRecordByKey(archiveKeyFromQuery);
-      return record ? `ÐÑ€Ñ…Ð¸Ð² ${record.archiveLabel} | SARSH_KKZH` : "ÐÑ€Ñ…Ð¸Ð² | SARSH_KKZH";
+      return record ? `Архив ${record.archiveLabel} | SARSH_KKZH` : "Архив | SARSH_KKZH";
     }
     return "MAINFLOW";
   }
@@ -9729,7 +9729,7 @@ function buildInitialPhotoLightboxState() {
       ? `<a class="button-link" href="${escapeHtml(desktopSetupPath)}" download="Mainflow.exe" target="_blank" rel="noopener">Mainflow.exe</a>`
       : "";
     const downloadMainPdfButtonHtml = mainBlankPdfPath
-      ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">PDF Õ¶Õ¥Ö€Õ¢.</a>`
+      ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">PDF ներբ.</a>`
       : "";
 
     app.innerHTML = `
@@ -9740,14 +9740,14 @@ function buildInitialPhotoLightboxState() {
         <div class="toolbar no-print toolbar--main">
           <div class="toolbar-copy toolbar-copy--main">
             <h1>SARSH_KKZH</h1>
-            <p>Ð“Ð»Ð°Ð²Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» ÑÐ¾Ð±Ð¸Ñ€Ð°ÐµÑ‚ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð²ÑÐµÑ… Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹, Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÑ‚ Ð¾Ð±Ñ‰Ð¸Ð¹ Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚ Ð¸ Ð³Ð¾Ñ‚Ð¾Ð² Ð´Ð»Ñ Ð¿ÐµÑ‡Ð°Ñ‚Ð¸ Ð² PDF.</p>
+            <p>Главный файл собирает данные всех отделений, показывает общий документ и готов для печати в PDF.</p>
           </div>
           <div class="toolbar-actions toolbar-actions--main">
             <div class="main-toolbar-group main-toolbar-group--status">
               <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
               ${buildOwnerAuthActions()}
               <div class="zoom-control">
-                <label for="zoomRange">Õ„Õ¡Õ·Õ¿Õ¡Õ¢</label>
+                <label for="zoomRange">Մաշտաբ</label>
                 <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
                 <span class="zoom-value" id="zoomValue">100%</span>
               </div>
@@ -9755,19 +9755,19 @@ function buildInitialPhotoLightboxState() {
             <div class="main-toolbar-group">
               ${downloadDesktopButtonHtml}
               ${downloadMainPdfButtonHtml}
-              <button type="button" id="sendTelegramPdfsBtn">PDF Õ¸Ö‚Õ²Õ¡Ö€Õ¯Õ¥Õ¬ TG</button>
-              <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Õ€Õ¡Õ·Õ¾Õ¥Õ¿Õ¾.</a>
-              <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR Õ½Õ¿Õ¸Ö‚Õ£.</a>
+              <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
+              <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Հաշվետվ.</a>
+              <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
             </div>
             <div class="main-toolbar-group">
-              <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´</a>
-              <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´</a>
-              <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}" target="_blank" rel="noopener">Õ”Õ¡Õ². Ô²Ô¿ Õ¢Õ¡Õ¦Õ¡</a>
-              <a class="button-link" href="${escapeHtml(getSetupPath())}">Ô¿Õ¡Ö€Õ£Õ¡Õ¾.</a>
+              <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Ընդունում</a>
+              <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Դուրսգրում</a>
+              <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}" target="_blank" rel="noopener">Քաղ. ԲԿ բազա</a>
+              <a class="button-link" href="${escapeHtml(getSetupPath())}">Կարգավ.</a>
             </div>
             <div class="main-toolbar-group main-toolbar-group--actions">
-              <button type="button" id="refreshBtn">Ô¹Õ¡Ö€Õ´.</button>
-              <button type="button" id="printBtn">ÕÕºÕ¥Õ¬</button>
+              <button type="button" id="refreshBtn">Թարմ.</button>
+              <button type="button" id="printBtn">Տպել</button>
             </div>
           </div>
         </div>
@@ -9776,8 +9776,8 @@ function buildInitialPhotoLightboxState() {
               <div class="sheet-shell">
               ${activeMainTableSavedRecord ? `
                 <div class="main-table-edit-panel main-table-edit-panel--table main-table-edit-panel--preview">
-                  <strong>ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ð¹ ÑÐ½Ð¸Ð¼Ð¾Ðº Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹.</strong>
-                  <span>Ð§Ñ‚Ð¾Ð±Ñ‹ Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ Ðº Ð¶Ð¸Ð²Ñ‹Ð¼ Ð´Ð°Ð½Ð½Ñ‹Ð¼ Ð¸ Ñ€ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸ÑŽ, Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Â«Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†ÐµÂ».</span>
+                  <strong>Показан сохранённый снимок главной таблицы.</strong>
+                  <span>Чтобы вернуться к живым данным и редактированию, нажмите «Вернуться к текущей таблице».</span>
                 </div>
               ` : (canEditMainTable ? `
                 <div class="main-table-edit-panel main-table-edit-panel--table">
@@ -9785,23 +9785,23 @@ function buildInitialPhotoLightboxState() {
                     <input type="checkbox" id="mainTableEditToggle"${state.mainTableUnlocked ? " checked" : ""}>
                     <span class="department-top-lock-slider" aria-hidden="true"></span>
                     <span class="department-top-lock-copy">
-                      <strong>Ð ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹</strong>
-                      <span>${escapeHtml(state.mainTableUnlocked ? "Ð ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ Ð²ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¾." : "Ð ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½Ð¾.")}</span>
+                      <strong>Редактирование таблицы</strong>
+                      <span>${escapeHtml(state.mainTableUnlocked ? "Редактирование включено." : "Редактирование заблокировано.")}</span>
                     </span>
                   </label>
                   <div class="photo-import-save-actions main-table-save-actions">
-                    <button type="button" id="mainSaveBtn">Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ</button>
-                    <span id="mainSaveRuleText">Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚.</span>
+                    <button type="button" id="mainSaveBtn">Сохранить таблицу</button>
+                    <span id="mainSaveRuleText">Изменений в главной таблице пока нет.</span>
                   </div>
                 </div>
               ` : "")}
               <div class="main-table-saved-panel no-print">
                 <div class="main-table-saved-panel__head">
-                  <strong>Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ðµ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ 02:00 / 18:00</strong>
+                  <strong>Сохранённые таблицы 02:00 / 18:00</strong>
                   <span id="mainTableSavedSummaryText">${
                     mainTableSavedRecords.length
-                      ? escapeHtml(`Ð¡Ð½Ð¸Ð¼ÐºÐ¾Ð²: ${mainTableSavedRecords.length}.`)
-                      : "Ð¡Ð½Ð¸Ð¼ÐºÐ¾Ð² Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚. ÐŸÐ¾ÑÐ»Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Ð·Ð´ÐµÑÑŒ Ð¿Ð¾ÑÐ²ÑÑ‚ÑÑ Ð²ÐµÑ€ÑÐ¸Ð¸ Ð·Ð° Ð¾ÐºÐ½Ð° 02:00 Ð¸ 18:00."
+                      ? escapeHtml(`Снимков: ${mainTableSavedRecords.length}.`)
+                      : "Снимков пока нет. После сохранения таблицы здесь появятся версии за окна 02:00 и 18:00."
                   }</span>
                 </div>
                 <div class="archive-list" id="mainTableSavedList">
@@ -9809,16 +9809,16 @@ function buildInitialPhotoLightboxState() {
                 </div>
               </div>
               <p class="status-line no-print">
-                <strong>${escapeHtml(activeMainTableSavedRecord ? "ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÐµÐµ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ðµ Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹:" : "ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÐµÐµ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ðµ ÑÐ²Ð¾Ð´ÐºÐ¸:")}</strong>
-                <span id="lastUpdatedText">${escapeHtml(displayedMainTableFreshness.newestRow ? formatTimestamp(getRowEffectiveUpdatedAt(displayedMainTableFreshness.newestRow)) : "ÐµÑ‰Ðµ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐ»Ð¾ÑÑŒ")}</span>
+                <strong>${escapeHtml(activeMainTableSavedRecord ? "Последнее обновление показанной таблицы:" : "Последнее обновление сводки:")}</strong>
+                <span id="lastUpdatedText">${escapeHtml(displayedMainTableFreshness.newestRow ? formatTimestamp(getRowEffectiveUpdatedAt(displayedMainTableFreshness.newestRow)) : "еще не отправлялось")}</span>
                 <span class="status-chip status-chip--${displayedMainTableSummaryFreshness.level}" id="lastUpdatedBadge">${escapeHtml(displayedMainTableSummaryFreshness.label)}</span>
               </p>
               <div class="main-table-state-legend no-print">
-                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--auto"></span>ÐÐ²Ñ‚Ð¾</span>
-                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--manual"></span>Ð’Ñ€ÑƒÑ‡Ð½ÑƒÑŽ</span>
-                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--waiting"></span>ÐÐµÑ‚ Ð½Ð¾Ð²Ñ‹Ñ… Ð´Ð°Ð½Ð½Ñ‹Ñ…</span>
-                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--pending"></span>ÐÐ¾Ð²Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ, Ð¿Ñ€Ð¾Ð²ÐµÑ€ÑŒ OCR</span>
-                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--invalid"></span>ÐžÑˆÐ¸Ð±ÐºÐ° ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»Ñ</span>
+                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--auto"></span>Авто</span>
+                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--manual"></span>Вручную</span>
+                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--waiting"></span>Нет новых данных</span>
+                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--pending"></span>Новые данные, проверь OCR</span>
+                <span class="main-table-state-legend__item"><span class="main-table-state-legend__swatch main-table-state-legend__swatch--invalid"></span>Ошибка контроля</span>
               </div>
                 <div class="table-wrap">
                   ${renderTable(
@@ -9837,7 +9837,7 @@ function buildInitialPhotoLightboxState() {
         <section class="panel no-print main-table-photo-gallery-panel">
           <div class="main-table-photo-gallery-panel__head">
             <div class="main-table-photo-gallery-panel__copy">
-              <h2>Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹</h2>
+              <h2>Фото бланков текущей таблицы</h2>
               <p id="mainTablePhotoGallerySummaryText">${escapeHtml(mainTablePhotoGalleryContent.summary)}</p>
             </div>
             <button
@@ -9854,7 +9854,7 @@ function buildInitialPhotoLightboxState() {
         </section>
 
         <section class="panel no-print main-table-android-panel">
-          <h2>Ð”Ð°Ð½Ð½Ñ‹Ðµ Android MAINFORM Ð·Ð° ÑÐµÐ³Ð¾Ð´Ð½Ñ</h2>
+          <h2>Данные Android MAINFORM за сегодня</h2>
           <p id="mainTableAndroidAppSummaryText">${escapeHtml(mainTableAndroidAppContent.summary)}</p>
           <div class="archive-list" id="mainTableAndroidAppList">
             ${mainTableAndroidAppContent.html}
@@ -9862,7 +9862,7 @@ function buildInitialPhotoLightboxState() {
         </section>
 
         <section class="panel no-print main-table-telegram-form-panel">
-          <h2>Ð¢Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Telegram Web Ñ„Ð¾Ñ€Ð¼ Ð·Ð° ÑÐµÐ³Ð¾Ð´Ð½Ñ</h2>
+          <h2>Таблицы Telegram Web форм за сегодня</h2>
           <p id="mainTableTelegramFormSummaryText">${escapeHtml(mainTableTelegramFormContent.summary)}</p>
           <div class="main-table-telegram-form-panel__actions">
             <button
@@ -9888,16 +9888,16 @@ function buildInitialPhotoLightboxState() {
         <div class="layout-grid split">
           <div class="info-stack">
             <div class="panel no-print main-summary-panel">
-              <h2>Ð¡Ð²Ð¾Ð´ÐºÐ° Ð¸ Ð´Ð°Ñ‚Ð°</h2>
+              <h2>Сводка и дата</h2>
               <div class="meta-row">
                 <div class="inline-field static-field">
-                  <span>Ð”Ð°Ñ‚Ð° Ð¸ Ð²Ñ€ÐµÐ¼Ñ</span>
+                  <span>Дата и время</span>
                   <strong id="reportDateField">${escapeHtml(currentDateTime.full)}</strong>
                 </div>
                 <span class="pill ${getSourceClass()}" id="sheetSourcePill">${escapeHtml(sourceLabel)}</span>
               </div>
               <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
-              <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Ð“Ð»Ð°Ð²Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» Ð¼Ð¾Ð¶Ð½Ð¾ Ð¿ÐµÑ‡Ð°Ñ‚Ð°Ñ‚ÑŒ ÑÑ€Ð°Ð·Ñƒ, Ð° PDF ÑÐ¾Ð·Ð´Ð°ÐµÑ‚ÑÑ Ñ‡ÐµÑ€ÐµÐ· ÐºÐ½Ð¾Ð¿ÐºÑƒ ÐŸÐµÑ‡Ð°Ñ‚ÑŒ Ð² Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€Ðµ.")}</p>
+              <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.")}</p>
               <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
               ${renderPendingSyncControls()}
               ${renderShiftTransferControls()}
@@ -9907,58 +9907,58 @@ function buildInitialPhotoLightboxState() {
               </div>
               <div class="freshness-overview">
                 <div class="freshness-stat freshness-stat--fresh">
-                  <span>Ð¡Ð²ÐµÐ¶Ð¸Ðµ</span>
+                  <span>Свежие</span>
                   <strong id="freshCount">${freshnessStats.counts.fresh}</strong>
                 </div>
                 <div class="freshness-stat freshness-stat--warning">
-                  <span>ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ</span>
+                  <span>Проверить</span>
                   <strong id="warningCount">${freshnessStats.counts.warning}</strong>
                 </div>
                 <div class="freshness-stat freshness-stat--stale">
-                  <span>Ð¡Ñ‚Ð°Ñ€Ñ‹Ðµ</span>
+                  <span>Старые</span>
                   <strong id="staleCount">${freshnessStats.counts.stale}</strong>
                 </div>
                 <div class="freshness-stat freshness-stat--missing">
-                  <span>ÐÐµÑ‚ Ð´Ð°Ð½Ð½Ñ‹Ñ…</span>
+                  <span>Нет данных</span>
                   <strong id="missingCount">${freshnessStats.counts.missing}</strong>
                 </div>
               </div>
               <p class="hint" id="freshnessOldestText">${
                 freshnessStats.oldestRow
-                  ? escapeHtml(`Ð¡Ð°Ð¼Ñ‹Ðµ ÑÑ‚Ð°Ñ€Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ: ${freshnessStats.oldestRow.department} â€” ${formatTimestamp(getRowEffectiveUpdatedAt(freshnessStats.oldestRow))} (${formatAge(getRowEffectiveUpdatedAt(freshnessStats.oldestRow))})`)
-                  : "ÐÐµÑ‚ Ð½Ð¸ Ð¾Ð´Ð½Ð¾Ð³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ð¼Ð¸ Ð´Ð°Ð½Ð½Ñ‹Ð¼Ð¸."
+                  ? escapeHtml(`Самые старые данные: ${freshnessStats.oldestRow.department} — ${formatTimestamp(getRowEffectiveUpdatedAt(freshnessStats.oldestRow))} (${formatAge(getRowEffectiveUpdatedAt(freshnessStats.oldestRow))})`)
+                  : "Нет ни одного отделения с отправленными данными."
               }</p>
             </div>
 
             ${renderMainPhotoRoutePanel()}
 
             <section class="panel no-print updates-panel">
-              <h2>ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹</h2>
-              <p>Ð¢Ð¾Ñ‡Ð½Ñ‹Ð¹ ÑÐ¿Ð¸ÑÐ¾Ðº Ð¿Ð¾ ÐºÐ°Ð¶Ð´Ð¾Ð¼Ñƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸ÑŽ: ÐºÐ¾Ð³Ð´Ð° Ð¸Ð¼ÐµÐ½Ð½Ð¾ Ð¿Ñ€Ð¸ÑˆÐ»Ð¸ Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ.</p>
+              <h2>Обновления отделений</h2>
+              <p>Точный список по каждому отделению: когда именно пришли последние данные.</p>
               <div class="updates-list" id="departmentUpdatesList">
                 ${state.snapshot.rows.map((row) => buildDepartmentUpdateItem(row)).join("")}
               </div>
             </section>
             <section class="panel no-print archive-panel main-daily-archive-panel">
-              <h2>Ð•Ð¶ÐµÐ´Ð½ÐµÐ²Ð½Ñ‹Ð¹ Ð°Ñ€Ñ…Ð¸Ð² 10:00</h2>
+              <h2>Ежедневный архив 10:00</h2>
               <p id="archiveSummaryText">${
                 latestArchive
-                  ? escapeHtml(`ÐŸÐ¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¹ ÑÐ½Ð¸Ð¼Ð¾Ðº: ${latestArchive.archiveLabel}, ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½ ${formatTimestamp(latestArchive.capturedAt)}.`)
-                  : "ÐÑ€Ñ…Ð¸Ð²Ð¾Ð² Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚. ÐŸÐµÑ€Ð²Ñ‹Ð¹ ÑÐ½Ð¸Ð¼Ð¾Ðº Ð¿Ð¾ÑÐ²Ð¸Ñ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð¿Ð¾ÑÐ»Ðµ 10:00 Ð¿Ð¾ Ð•Ñ€ÐµÐ²Ð°Ð½Ñƒ."
+                  ? escapeHtml(`Последний снимок: ${latestArchive.archiveLabel}, сохранён ${formatTimestamp(latestArchive.capturedAt)}.`)
+                  : "Архивов пока нет. Первый снимок появится автоматически после 10:00 по Еревану."
               }</p>
-              <p class="hint">Ð¡Ð½Ð¸Ð¼Ð¾Ðº ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ Ð² ÑÑ‚Ð¾Ð¼ Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€Ðµ Ð¾Ð´Ð¸Ð½ Ñ€Ð°Ð· Ð² Ð´ÐµÐ½ÑŒ Ð¿Ð¾ÑÐ»Ðµ 10:00 Ð¿Ð¾ Ð²Ñ€ÐµÐ¼ÐµÐ½Ð¸ Ð•Ñ€ÐµÐ²Ð°Ð½Ð°.</p>
+              <p class="hint">Снимок сохраняется в этом браузере один раз в день после 10:00 по времени Еревана.</p>
               <div class="archive-list" id="archiveList">
                 ${
                   archiveRecords.length
                     ? buildArchivePicker(archiveRecords)
-                    : '<div class="archive-empty">ÐŸÐ¾ÐºÐ° Ð½ÐµÑ‚ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ñ… Ð´Ð°Ñ‚.</div>'
+                    : '<div class="archive-empty">Пока нет сохранённых дат.</div>'
                 }
               </div>
             </section>
             <section class="panel no-print archive-panel department-pdf-archive-panel">
-              <h2>ÐÑ€Ñ…Ð¸Ð² PDF Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹</h2>
+              <h2>Архив PDF отделений</h2>
               <p id="departmentPdfArchiveSummaryText">${escapeHtml(getDepartmentPdfArchiveSummaryText(departmentPdfArchiveRecords))}</p>
-              <p class="hint">ÐŸÐ¾ÑÐ»Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð·Ð´ÐµÑÑŒ Ð¾ÑÑ‚Ð°ÐµÑ‚ÑÑ PDF-ÐºÐ¾Ð¿Ð¸Ñ Ð±Ð»Ð°Ð½ÐºÐ°. ÐœÐ¾Ð¶Ð½Ð¾ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ð¹ Ð±Ð»Ð°Ð½Ðº Ð½Ð° ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¸Ð»Ð¸ Ð¾Ð±Ñ‰Ð¸Ð¹ PDF Ð·Ð° Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½ÑƒÑŽ Ð´Ð°Ñ‚Ñƒ.</p>
+              <p class="hint">После сохранения отделения здесь остается PDF-копия бланка. Можно открыть отдельный бланк на странице отделения или общий PDF за выбранную дату.</p>
               <div class="archive-list" id="departmentPdfArchiveList">
                 ${buildMainDepartmentPdfArchivePicker(departmentPdfArchiveRecords)}
               </div>
@@ -9966,8 +9966,8 @@ function buildInitialPhotoLightboxState() {
           </div>
 
           <aside class="panel no-print main-links-panel">
-            <h2>Ð¡ÑÑ‹Ð»ÐºÐ¸ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹</h2>
-            <p>Ð£ ÐºÐ°Ð¶Ð´Ð¾Ð³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ ÑÐ²Ð¾Ñ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ð°Ñ HTML-ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð°. Ð˜Ð¼ Ð¼Ð¾Ð¶Ð½Ð¾ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÑ‚ÑŒ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ ÑÐ²Ð¾ÑŽ ÑÑÑ‹Ð»ÐºÑƒ.</p>
+            <h2>Ссылки отделений</h2>
+            <p>У каждого отделения своя отдельная HTML-страница. Им можно отправлять только свою ссылку.</p>
             <div class="link-grid">
               ${config.departmentDefinitions.map(buildCopyCard).join("")}
             </div>
@@ -9989,52 +9989,52 @@ function buildInitialPhotoLightboxState() {
         <div class="toolbar no-print">
           <div>
             <h1>OCR feedback</h1>
-            <p>ÐžÑ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ð¹ Ð¶ÑƒÑ€Ð½Ð°Ð» ÑÐ»ÑƒÑ‡Ð°ÐµÐ² Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð²Ð°Ð½Ð¸Ñ: Ñ‡Ñ‚Ð¾ Ð±Ñ‹Ð»Ð¾ Ð¿Ñ€Ð¸Ð½ÑÑ‚Ð¾ Ð±ÐµÐ· Ð¿Ñ€Ð°Ð²Ð¾Ðº Ð¸ Ñ‡Ñ‚Ð¾ Ð¸ÑÐ¿Ñ€Ð°Ð²Ð¸Ð» Ð¾Ð¿ÐµÑ€Ð°Ñ‚Ð¾Ñ€ Ð¿ÐµÑ€ÐµÐ´ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½Ð½Ñ‹Ð¼ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸ÐµÐ¼.</p>
+            <p>Отдельный журнал случаев распознавания: что было принято без правок и что исправил оператор перед подтверждённым сохранением.</p>
           </div>
           <div class="toolbar-actions">
             <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
             ${buildOwnerAuthActions()}
-            <button type="button" id="refreshBtn">ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ</button>
-            <a class="button-link" href="${escapeHtml(mainPath)}">Ðš Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼Ñƒ</a>
+            <button type="button" id="refreshBtn">Обновить</button>
+            <a class="button-link" href="${escapeHtml(mainPath)}">К главному</a>
           </div>
         </div>
 
         <div class="info-stack">
           <section class="panel no-print">
-            <h2>Ð¡Ð²Ð¾Ð´ÐºÐ° OCR feedback</h2>
+            <h2>Сводка OCR feedback</h2>
             <p class="hint${state.feedback.error ? " warning-note" : ""}">${
               escapeHtml(
                 state.feedback.error
                   || (state.feedback.isLoading
-                    ? "Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÑŽ OCR feedback..."
-                    : "Ð—Ð°Ð¿Ð¸ÑÐ¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÑŽÑ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð¿Ð¾ÑÐ»Ðµ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾Ð³Ð¾ Ð¸ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½Ð½Ð¾Ð³Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.")
+                    ? "Загружаю OCR feedback..."
+                    : "Записи сохраняются автоматически после успешного и подтверждённого сохранения данных отделения.")
               )
             }</p>
             <div class="freshness-overview">
               <div class="freshness-stat freshness-stat--fresh">
-                <span>Ð’ÑÐµÐ³Ð¾</span>
+                <span>Всего</span>
                 <strong>${summary.total}</strong>
               </div>
               <div class="freshness-stat freshness-stat--fresh">
-                <span>Ð‘ÐµÐ· Ð¿Ñ€Ð°Ð²Ð¾Ðº</span>
+                <span>Без правок</span>
                 <strong>${summary.accepted}</strong>
               </div>
               <div class="freshness-stat freshness-stat--stale">
-                <span>Ð˜ÑÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¾</span>
+                <span>Исправлено</span>
                 <strong>${summary.corrected}</strong>
               </div>
               <div class="freshness-stat freshness-stat--warning">
-                <span>Ð¤Ð¾Ñ‚Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾</span>
+                <span>Фото сохранено</span>
                 <strong>${summary.withPhotos}</strong>
               </div>
             </div>
           </section>
 
           <section class="panel no-print">
-            <h2>ÐŸÐ¾ÑÐ»ÐµÐ´Ð½Ð¸Ðµ ÑÐ»ÑƒÑ‡Ð°Ð¸</h2>
+            <h2>Последние случаи</h2>
             ${records.length
               ? `<div class="feedback-list">${records.map((record) => buildFeedbackCard(record)).join("")}</div>`
-              : `<div class="archive-empty">${escapeHtml(state.feedback.isLoading ? "Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÑŽ Ð·Ð°Ð¿Ð¸ÑÐ¸..." : "ÐŸÐ¾ÐºÐ° Ð½ÐµÑ‚ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ñ… OCR feedback Ð·Ð°Ð¿Ð¸ÑÐµÐ¹.")}</div>`}
+              : `<div class="archive-empty">${escapeHtml(state.feedback.isLoading ? "Загружаю записи..." : "Пока нет сохранённых OCR feedback записей.")}</div>`}
           </section>
         </div>
       </div>
@@ -10076,19 +10076,19 @@ function buildInitialPhotoLightboxState() {
           const saveBlockedByState = isArchivePreview || hasDirtyMainTableRows || state.mainTableSaveInFlight || lightbox.isReassigning;
           const canSave = !saveBlockedByControls && !saveBlockedByState && !lightbox.isSaving;
           const saveHint = isArchivePreview
-            ? "Ð”Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ OCR Ð²ÐµÑ€Ð½Ð¸Ñ‚ÐµÑÑŒ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ."
+            ? "Для сохранения OCR вернитесь к текущей таблице."
             : (hasDirtyMainTableRows
-              ? "Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¸Ð»Ð¸ ÑÐ½Ð¸Ð¼Ð¸Ñ‚Ðµ Ñ€ÑƒÑ‡Ð½Ñ‹Ðµ Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ."
+              ? "Сначала сохраните или снимите ручные правки в главной таблице."
               : (state.mainTableSaveInFlight
-                ? "Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑƒÐ¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ. ÐŸÐ¾Ð´Ð¾Ð¶Ð´Ð¸Ñ‚Ðµ."
+                ? "Главная таблица уже сохраняется. Подождите."
                 : (saveBlockedByControls
                   ? context.validation.failedChecks.map((item) => item.failureMessage).join(" ")
-                  : "ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒ Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½. OCR Ð¼Ð¾Ð¶Ð½Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð² ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.")));
+                  : "Контроль пройден. OCR можно сохранить в строку отделения.")));
           const reassignMeta = getPhotoLightboxReassignMeta(context, lightbox);
           ocrPreviewHtml = `
             <div class="photo-lightbox-ocr">
               <div class="photo-lightbox-ocr__head">
-                <h3>OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ</h3>
+                <h3>OCR данные</h3>
                 <div class="photo-lightbox-ocr__department-tools">
                   <label class="photo-lightbox-ocr__department">
                     <span>\u041e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435</span>
@@ -10118,7 +10118,7 @@ function buildInitialPhotoLightboxState() {
                   id="photoLightboxSaveBtn"
                   class="${canSave ? "save-ready" : "save-blocked"}"
                   ${(canSave && !lightbox.isSaving && !lightbox.isReassigning) ? "" : "disabled"}
-                >${lightbox.isSaving ? "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ..." : "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ"}</button>
+                >${lightbox.isSaving ? "Сохраняю..." : "Сохранить"}</button>
                 <span id="photoLightboxSaveHint" class="photo-lightbox-save-hint${(!canSave && saveBlockedByControls) || lightbox.statusIsError ? " warning-note" : ""}">${escapeHtml(saveHint)}</span>
               </div>
               ${renderPhotoLightboxDepartmentTable(context.displayContext?.snapshot || state.snapshot, boundRow)}
@@ -10132,7 +10132,7 @@ function buildInitialPhotoLightboxState() {
             class="photo-lightbox-recheck"
             id="photoLightboxRecheck"
             ${(lightbox.isRechecking || lightbox.isSaving || lightbox.isReassigning) ? "disabled" : ""}
-          >${lightbox.isRechecking ? "ÐŸÑ€Ð¾Ð²ÐµÑ€ÑÑŽ..." : "ÐŸÐµÑ€ÐµÐ¿Ñ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ"}</button>
+          >${lightbox.isRechecking ? "Проверяю..." : "Перепроверить"}</button>
         `;
       }
     }
@@ -10145,12 +10145,12 @@ function buildInitialPhotoLightboxState() {
             type="button"
             class="photo-lightbox-rotate"
             id="photoLightboxRotate"
-            aria-label="ÐŸÐ¾Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾"
-            title="ÐŸÐ¾Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾"
+            aria-label="Повернуть фото"
+            title="Повернуть фото"
             ${(lightbox.isRotating || lightbox.isSaving || lightbox.isReassigning) ? "disabled" : ""}
-          >â†»</button>
-          <button type="button" class="photo-lightbox-close" id="photoLightboxClose" aria-label="Ð—Ð°ÐºÑ€Ñ‹Ñ‚ÑŒ Ð¿Ñ€Ð¾ÑÐ¼Ð¾Ñ‚Ñ€">Ã—</button>
-          <img src="${escapeHtml(lightbox.imageDataUrl)}" alt="${escapeHtml(lightbox.alt || "Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°")}">
+          >↻</button>
+          <button type="button" class="photo-lightbox-close" id="photoLightboxClose" aria-label="Закрыть просмотр">×</button>
+          <img src="${escapeHtml(lightbox.imageDataUrl)}" alt="${escapeHtml(lightbox.alt || "Фото бланка")}">
           ${ocrPreviewHtml}
         </div>
       </div>
@@ -10159,34 +10159,34 @@ function buildInitialPhotoLightboxState() {
 
   function renderDepartmentAccessGate(message = "", isError = false) {
     const definition = getCurrentDepartmentDefinition();
-    const departmentName = definition ? definition.department : "ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ";
+    const departmentName = definition ? definition.department : "Отделение";
     const mainPath = appendShareQuery(config.getMainPagePath(basePath));
     const canVerifyAccess = sync.hasRemoteSync();
     const statusText = message || (canVerifyAccess
-      ? "Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ ÐºÐ¾Ð´ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÑ‚Ð¾Ñ‚ HTML-Ð±Ð»Ð°Ð½Ðº."
-      : "Ð—Ð°Ñ‰Ð¸Ñ‰Ñ‘Ð½Ð½Ñ‹Ð¹ Ð²Ñ…Ð¾Ð´ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ñ€Ð¸ Ð²ÐºÐ»ÑŽÑ‡Ñ‘Ð½Ð½Ð¾Ð¹ Ð¾Ð½Ð»Ð°Ð¹Ð½-ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Supabase.");
+      ? "Введите код отделения, чтобы открыть этот HTML-бланк."
+      : "Защищённый вход работает только при включённой онлайн-синхронизации Supabase.");
 
     app.innerHTML = `
       <div class="page page--narrow">
         <div class="panel access-gate-panel">
-          <span class="pill ${canVerifyAccess ? "remote" : "local"}">Ð—Ð°Ñ‰Ð¸Ñ‰Ñ‘Ð½Ð½Ñ‹Ð¹ Ð²Ñ…Ð¾Ð´</span>
+          <span class="pill ${canVerifyAccess ? "remote" : "local"}">Защищённый вход</span>
           <h1>${escapeHtml(departmentName)}</h1>
-          <p>Ð‘Ð»Ð°Ð½Ðº Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ñ‚ÐºÑ€Ð¾ÐµÑ‚ÑÑ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ð¾ÑÐ»Ðµ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ ÐºÐ¾Ð´Ð° Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°.</p>
+          <p>Бланк отделения откроется только после проверки кода доступа.</p>
           <form id="departmentAccessForm" class="setup-form access-gate-form">
             <label class="setup-field">
-              <span>ÐšÐ¾Ð´ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°</span>
+              <span>Код доступа</span>
               <input
                 type="password"
                 id="departmentAccessCode"
                 value="${escapeHtml(getStoredAccessCode())}"
-                aria-label="ÐšÐ¾Ð´ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ"
+                aria-label="Код доступа отделения"
                 autocomplete="current-password"
                 ${canVerifyAccess ? "" : "disabled"}
               >
             </label>
             <div class="setup-actions access-gate-actions">
-              <button type="submit" id="departmentAccessSubmit" ${canVerifyAccess ? "" : "disabled"}>Ð’Ð¾Ð¹Ñ‚Ð¸</button>
-              <a class="button-link access-gate-link" href="${escapeHtml(mainPath)}">Ðš Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼Ñƒ</a>
+              <button type="submit" id="departmentAccessSubmit" ${canVerifyAccess ? "" : "disabled"}>Войти</button>
+              <a class="button-link access-gate-link" href="${escapeHtml(mainPath)}">К главному</a>
             </div>
           </form>
           <p class="hint${isError ? " warning-note" : ""}" id="gateStatusText">${escapeHtml(statusText)}</p>
@@ -10235,10 +10235,10 @@ function buildInitialPhotoLightboxState() {
       && doesDepartmentRowMatchPreviewValues(state.snapshot, row, values, reviewState.lastAppliedKeys)
     );
     const statusText = reviewState.draftMode
-      ? "Ð—Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¿Ð¾Ð´ÑÑ‚Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ"
-      : "ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ Telegram Ñ„Ð¾Ñ€Ð¼Ð° Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½Ð° Ð´Ð»Ñ ÑÐ²ÐµÑ€ÐºÐ¸";
+      ? "Значения подставлены в таблицу отделения"
+      : "Последняя Telegram форма показана для сверки";
     const effectiveStatusText = savedToMain
-      ? "Ð£Ð¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ"
+      ? "Уже сохранено в основную таблицу"
       : statusText;
     const cells = PHOTO_FIELD_DEFINITIONS.map((field) => {
       const displayValue = getTelegramFormReviewValue(values, field.key);
@@ -10250,38 +10250,38 @@ function buildInitialPhotoLightboxState() {
       `;
     }).join("");
     const note = reviewState.isError
-      ? (reviewState.status || "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹.")
-      : (reviewState.status || "ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ ÑÑ‚Ñƒ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ. Ð•ÑÐ»Ð¸ Ð²ÑÑ‘ Ð¿Ñ€Ð°Ð²Ð¸Ð»ÑŒÐ½Ð¾, Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð²Ð½ÐµÑÑ‚Ð¸ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð² Ð¾Ð±Ñ‰ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ.");
+      ? (reviewState.status || "Не удалось загрузить значения Telegram формы.")
+      : (reviewState.status || "Проверьте эту таблицу. Если всё правильно, нажмите Сохранить, чтобы внести данные в общую таблицу.");
 
     const effectiveNote = savedToMain && !reviewState.isError
-      ? "Ð­Ñ‚Ð° Telegram Ñ„Ð¾Ñ€Ð¼Ð° ÑƒÐ¶Ðµ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð·Ð°Ð¿Ð¸ÑÐ°Ð½Ð° Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ. ÐÐ¸Ð¶Ðµ Ð¼Ð¾Ð¶Ð½Ð¾ ÑÐ²ÐµÑ€Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ."
+      ? "Эта Telegram форма уже автоматически записана в основную таблицу. Ниже можно сверить отправленные значения."
       : note;
 
     return `
       <section class="panel no-print telegram-form-review-panel telegram-form-review-panel--${status}">
         <div class="telegram-form-review-head">
           <div>
-            <h2>Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹</h2>
+            <h2>Данные из Telegram формы</h2>
             <p class="hint${reviewState.isError ? " warning-note" : ""}">${escapeHtml(effectiveNote)}</p>
           </div>
           <span class="status-chip status-chip--${status === "processed" ? "fresh" : "stale"}">${escapeHtml(effectiveStatusText)}</span>
         </div>
         <div class="telegram-form-review-meta">
           <span>Feedback: ${escapeHtml(feedbackId)}</span>
-          <span>ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ: ${escapeHtml(row.department)}</span>
-          ${reviewState.lastReportDate ? `<span>Ð”Ð°Ñ‚Ð°: ${escapeHtml(reviewState.lastReportDate)}</span>` : ""}
+          <span>Отделение: ${escapeHtml(row.department)}</span>
+          ${reviewState.lastReportDate ? `<span>Дата: ${escapeHtml(reviewState.lastReportDate)}</span>` : ""}
         </div>
         <div class="telegram-form-review-actions">
           <button
             type="button"
             id="applyTelegramSourceBtn"
             ${canApplyTelegramSource && !reviewState.draftMode ? "" : "disabled"}
-          >Ð’Ð·ÑÑ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹</button>
+          >Взять данные из Telegram формы</button>
           <span>${reviewState.draftMode
-            ? "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ Ð²Ñ‹Ð±Ñ€Ð°Ð½ Ð¸ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹."
-            : "Ð˜ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº Ð¿Ð¾Ð¿Ð°Ð´ÐµÑ‚ Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ð¾ÑÐ»Ðµ Ð²Ð°ÑˆÐµÐ³Ð¾ Ð²Ñ‹Ð±Ð¾Ñ€Ð° Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ."}</span>
+            ? "Сейчас в таблице выбран источник Telegram формы."
+            : "Источник попадет в таблицу только после вашего выбора и сохранения."}</span>
         </div>
-        ${savedToMain ? `<p class="hint">Ð­Ñ‚Ð¸ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ ÑƒÐ¶Ðµ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð·Ð°Ð¿Ð¸ÑÐ°Ð½Ñ‹ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¸Ð· Telegram App.</p>` : ""}
+        ${savedToMain ? `<p class="hint">Эти значения уже автоматически записаны в основную таблицу из Telegram App.</p>` : ""}
         <div class="telegram-form-review-table-wrap">
           <table class="telegram-form-review-table">
             <tbody>
@@ -10366,7 +10366,7 @@ function buildInitialPhotoLightboxState() {
       if (field.computed) {
         const output = cell.querySelector("[data-photo-preview-output]");
         if (output) {
-          output.textContent = getDisplayValue(getPhotoPreviewValue(row, field.key, photoState.recognizedValues)) || "â€”";
+          output.textContent = getDisplayValue(getPhotoPreviewValue(row, field.key, photoState.recognizedValues)) || "—";
         }
         return;
       }
@@ -10625,7 +10625,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     syncPhotoImportPreviewState(row);
-    setPhotoImportStatus("OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ñ‹ Ð²Ñ€ÑƒÑ‡Ð½ÑƒÑŽ. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒ Ð¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Â«Ð’Ð·ÑÑ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Ñ„Ð¾Ñ‚Ð¾Â».", false);
+    setPhotoImportStatus("OCR данные изменены вручную. Проверьте контроль и нажмите «Взять данные из фото».", false);
     refreshPhotoImportPreviewUi(row);
     return sanitized;
   }
@@ -10770,55 +10770,55 @@ function buildInitialPhotoLightboxState() {
 
     const groups = [
       {
-        title: "ÔµÕ‚ÔµÔ¼ Ô·",
+        title: "ԵՂԵԼ Է",
         keys: [
-          { key: "beenTotal", label: "Ô¸Õ†Ô´" },
-          { key: "beenSoldier", label: "Ô¶/Ô¾" },
-          { key: "beenSeries", label: "Õ‡Ô±Õ" }
+          { key: "beenTotal", label: "ԸՆԴ" },
+          { key: "beenSoldier", label: "Զ/Ծ" },
+          { key: "beenSeries", label: "ՇԱՐ" }
         ]
       },
       {
-        title: "Ô¸Õ†Ô´ÕˆÕ’Õ†ÕŽÔµÔ¼ Ô·",
+        title: "ԸՆԴՈՒՆՎԵԼ Է",
         keys: [
-          { key: "admittedTotal", label: "Ô¸Õ†Ô´" },
-          { key: "admittedSoldier", label: "Ô¶/Ô¾" },
-          { key: "admittedSeries", label: "Õ‡Ô±Õ" }
+          { key: "admittedTotal", label: "ԸՆԴ" },
+          { key: "admittedSoldier", label: "Զ/Ծ" },
+          { key: "admittedSeries", label: "ՇԱՐ" }
         ]
       },
       {
-        title: "Ô´/Ô³",
+        title: "Դ/Գ",
         keys: [
-          { key: "dgTotal", label: "Ô¸Õ†Ô´" },
-          { key: "dgSoldier", label: "Ô¶/Ô¾" },
-          { key: "dgSeries", label: "Õ‡Ô±Õ" }
+          { key: "dgTotal", label: "ԸՆԴ" },
+          { key: "dgSoldier", label: "Զ/Ծ" },
+          { key: "dgSeries", label: "ՇԱՐ" }
         ]
       },
       {
-        title: "ÕÕ¥Õ²Õ¡ÖƒÕ¸Õ­",
+        title: "Տեղափոխ",
         keys: [
-          { key: "transferFromDepartment", label: "Ô´Õ¸Ö‚Ö€Õ½" },
-          { key: "transferToDepartment", label: "Õ†Õ¥Ö€Õ½" }
+          { key: "transferFromDepartment", label: "Դուրս" },
+          { key: "transferToDepartment", label: "Ներս" }
         ]
       },
       {
-        title: "Ô±ÕŒÔ¿Ô± Ô·",
+        title: "ԱՌԿԱ Է",
         keys: [
-          { key: "presentTotal", label: "Ô¸Õ¶Õ¤Õ°." },
-          { key: "currentShar", label: "Õ‡Ô±Õ" },
-          { key: "currentSpa", label: "ÕÕŠÔ±" },
-          { key: "currentPaym", label: "ÕŠÔ±Õ…Õ„" },
-          { key: "currentZh", label: "Ô¶/Õ€" },
-          { key: "family", label: "Ô¶/Ô¾ Õ¨Õ¶Õ¿" },
-          { key: "officer", label: "Ô¶/ÕŠ" },
-          { key: "civil", label: "Õ”-Õ«" }
+          { key: "presentTotal", label: "Ընդհ." },
+          { key: "currentShar", label: "ՇԱՐ" },
+          { key: "currentSpa", label: "ՍՊԱ" },
+          { key: "currentPaym", label: "ՊԱՅՄ" },
+          { key: "currentZh", label: "Զ/Հ" },
+          { key: "family", label: "Զ/Ծ ընտ" },
+          { key: "officer", label: "Զ/Պ" },
+          { key: "civil", label: "Ք-ի" }
         ]
       },
       {
-        title: "Ô±Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ¸Ö‚Õ´",
+        title: "Արձակուրդում",
         keys: [
-          { key: "leaveSharq", label: "Õ‡Ô±Õ" },
-          { key: "leaveSpa", label: "ÕÕŠÔ±" },
-          { key: "leavePaym", label: "ÕŠÔ±Õ…Õ„" }
+          { key: "leaveSharq", label: "ՇԱՐ" },
+          { key: "leaveSpa", label: "ՍՊԱ" },
+          { key: "leavePaym", label: "ՊԱՅՄ" }
         ]
       }
     ];
@@ -10841,7 +10841,7 @@ function buildInitialPhotoLightboxState() {
           controlTone ? `photo-import-mini-table__cell--control-${controlTone}` : ""
         ].filter(Boolean).join(" ");
         const inputHtml = fieldMeta?.computed || !editable
-          ? `<span data-photo-preview-output="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(value) || "â€”")}</span>`
+          ? `<span data-photo-preview-output="${escapeHtml(cell.key)}">${escapeHtml(getDisplayValue(value) || "—")}</span>`
           : `<input
               type="number"
               min="0"
@@ -10889,8 +10889,8 @@ function buildInitialPhotoLightboxState() {
     const photoState = state.photoImport || buildInitialPhotoImportState();
     const queueInfoText = photoState.queueMode
       ? (photoState.queueRemainingCount > 0
-        ? `Ð­Ñ‚Ð¾ Ñ„Ð¾Ñ‚Ð¾ Ð¿Ñ€Ð¸ÑˆÐ»Ð¾ Ð¸Ð· Ð¾Ð±Ñ‰ÐµÐ¹ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸. ÐŸÐ¾ÑÐ»Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð¾Ñ‚ÐºÑ€Ð¾ÐµÑ‚ÑÑ ÑÐ»ÐµÐ´ÑƒÑŽÑ‰ÐµÐµ Ñ„Ð¾Ñ‚Ð¾. ÐžÑÑ‚Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾ÑÐ»Ðµ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾: ${photoState.queueRemainingCount}.${photoState.queueNextDepartmentName ? ` Ð¡Ð»ÐµÐ´ÑƒÑŽÑ‰ÐµÐµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ: ${photoState.queueNextDepartmentName}.` : ""}`
-        : "Ð­Ñ‚Ð¾ Ð¿Ð¾ÑÐ»ÐµÐ´Ð½ÐµÐµ Ñ„Ð¾Ñ‚Ð¾ Ð¸Ð· Ð¾Ð±Ñ‰ÐµÐ¹ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸. ÐŸÐ¾ÑÐ»Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ Ð·Ð°Ð²ÐµÑ€ÑˆÐ¸Ñ‚ÑÑ.")
+        ? `Это фото пришло из общей очереди. После сохранения автоматически откроется следующее фото. Осталось после текущего: ${photoState.queueRemainingCount}.${photoState.queueNextDepartmentName ? ` Следующее отделение: ${photoState.queueNextDepartmentName}.` : ""}`
+        : "Это последнее фото из общей очереди. После сохранения очередь завершится.")
       : "";
     const canApplyPhotoSource = Boolean(
       photoState.recognizedValues
@@ -10908,46 +10908,46 @@ function buildInitialPhotoLightboxState() {
 
     return `
       <section class="panel no-print photo-import-panel">
-        <h2>Ð—Ð°Ð³Ñ€ÑƒÐ·ÐºÐ° Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°</h2>
-        <p>Ð—Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð²ÐµÑ€Ñ…Ð½ÐµÐ¹ Ñ‡Ð°ÑÑ‚Ð¸ Ð±Ð»Ð°Ð½ÐºÐ°. ÐÐ° ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ñ„Ð¾Ñ‚Ð¾ Ð²ÑÐµÐ³Ð´Ð° Ð¾Ñ‚Ð½Ð¾ÑÐ¸Ñ‚ÑÑ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¼Ñƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸ÑŽ: Ð¼Ð°Ñ€ÐºÐµÑ€ SR Ð·Ð´ÐµÑÑŒ Ð½Ðµ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÑÐµÑ‚ÑÑ Ð¸ Ð½Ðµ Ð½ÑƒÐ¶ÐµÐ½. Ð—Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¿Ð¾Ð´ÑÑ‚Ð°Ð²ÑÑ‚ÑÑ Ð² ÑÑ‡ÐµÐ¹ÐºÐ¸ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾, Ð¿Ð¾Ñ‚Ð¾Ð¼ Ð²Ñ‹ Ð¸Ñ… Ð¿Ñ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚Ðµ Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¾Ð±Ñ‹Ñ‡Ð½Ð¾Ð¹ ÐºÐ½Ð¾Ð¿ÐºÐ¾Ð¹.</p>
-        <p class="hint">ÐÑƒÐ¼ÐµÑ€Ð°Ñ†Ð¸Ñ ÑÑ‡ÐµÐµÐº Ð´Ð»Ñ OCR: <strong>1-22</strong>, ÑÑ‡Ñ‘Ñ‚ Ð¸Ð´Ñ‘Ñ‚ Ð¾Ñ‚ <strong>1</strong>, Ð½Ðµ Ð¾Ñ‚ 0. Ð¯Ñ‡ÐµÐ¹ÐºÐ° 12 Ñ‡Ð¸Ñ‚Ð°ÐµÑ‚ÑÑ ÐºÐ°Ðº Ñ€Ð°ÑÑ‡Ñ‘Ñ‚Ð½Ð°Ñ ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ°, Ð° 13-22 ÑÑ‚Ð¾ Ð¾Ð±Ñ‹Ñ‡Ð½Ñ‹Ðµ Ð¿ÐµÑ€ÐµÐ¼ÐµÐ½Ð½Ñ‹Ðµ.</p>
+        <h2>Загрузка фото бланка</h2>
+        <p>Загрузите фото верхней части бланка. На странице отделения фото всегда относится к текущему отделению: маркер SR здесь не проверяется и не нужен. Значения подставятся в ячейки локально, потом вы их проверите и сохраните обычной кнопкой.</p>
+        <p class="hint">Нумерация ячеек для OCR: <strong>1-22</strong>, счёт идёт от <strong>1</strong>, не от 0. Ячейка 12 читается как расчётная карточка, а 13-22 это обычные переменные.</p>
         <div class="photo-import-actions">
           <label class="button-link photo-file-label${photoState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="photoImportFile" accept="image/*" capture="environment" ${photoState.isProcessing ? "disabled" : ""}>
-            Ð’Ñ‹Ð±Ñ€Ð°Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾
+            Выбрать фото
           </label>
-          <button type="button" id="photoZoomBtn" ${!photoState.imageDataUrl ? "disabled" : ""}>Ð£Ð²ÐµÐ»Ð¸Ñ‡Ð¸Ñ‚ÑŒ</button>
-          <button type="button" id="photoRotateBtn" ${!photoState.imageDataUrl || photoState.isProcessing ? "disabled" : ""}>ÐŸÐ¾Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ 90Â°</button>
+          <button type="button" id="photoZoomBtn" ${!photoState.imageDataUrl ? "disabled" : ""}>Увеличить</button>
+          <button type="button" id="photoRotateBtn" ${!photoState.imageDataUrl || photoState.isProcessing ? "disabled" : ""}>Повернуть 90°</button>
           <button type="button" id="photoRecognizeBtn" ${!photoState.imageDataUrl || photoState.isProcessing || !canRecognize ? "disabled" : ""}>
-            ${photoState.isProcessing ? "Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°ÑŽ..." : "Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ñ‚ÑŒ"}
+            ${photoState.isProcessing ? "Распознаю..." : "Распознать"}
           </button>
           <button type="button" id="photoRecheckBtn" ${!photoState.imageDataUrl || photoState.isProcessing || !canRecognize ? "disabled" : ""}>
-            ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ Ð·Ð°Ð½Ð¾Ð²Ð¾
+            Проверить заново
           </button>
-          <button type="button" id="photoClearBtn" ${!photoState.imageDataUrl || photoState.isProcessing ? "disabled" : ""}>ÐžÑ‡Ð¸ÑÑ‚Ð¸Ñ‚ÑŒ</button>
+          <button type="button" id="photoClearBtn" ${!photoState.imageDataUrl || photoState.isProcessing ? "disabled" : ""}>Очистить</button>
         </div>
         <div class="photo-import-save-actions">
           <button
             type="button"
             id="applyPhotoSourceBtn"
             ${canApplyPhotoSource && !photoState.draftMode ? "" : "disabled"}
-          >Ð’Ð·ÑÑ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Ñ„Ð¾Ñ‚Ð¾</button>
+          >Взять данные из фото</button>
           <span>${photoState.draftMode
-            ? "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ Ð²Ñ‹Ð±Ñ€Ð°Ð½ Ð¸ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº Ñ„Ð¾Ñ‚Ð¾."
-            : "Ð˜ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº Ð¿Ð¾Ð¿Ð°Ð´ÐµÑ‚ Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ð¾ÑÐ»Ðµ Ð²Ð°ÑˆÐµÐ³Ð¾ Ð²Ñ‹Ð±Ð¾Ñ€Ð° Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ."}</span>
+            ? "Сейчас в таблице выбран источник фото."
+            : "Источник попадет в таблицу только после вашего выбора и сохранения."}</span>
         </div>
         <p class="hint${photoState.isError ? " warning-note" : ""}" id="photoImportStatus">${
           escapeHtml(
             photoState.status
             || (canRecognize
-              ? "Ð›ÑƒÑ‡ÑˆÐµ Ð²ÑÐµÐ³Ð¾ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ„Ð¾Ñ‚Ð¾ ÑÐ²ÐµÑ€Ñ…Ñƒ, Ð±ÐµÐ· ÑÐ¸Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð½Ð°ÐºÐ»Ð¾Ð½Ð° Ð¸ Ñ Ñ‡Ñ‘Ñ‚ÐºÐ¸Ð¼Ð¸ Ñ†Ð¸Ñ„Ñ€Ð°Ð¼Ð¸. ÐÐ° ÑÑ‚Ð¾Ð¹ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ðµ ÑÐ¸ÑÑ‚ÐµÐ¼Ð° Ñ‡Ð¸Ñ‚Ð°ÐµÑ‚ Ñ†Ð¸Ñ„Ñ€Ñ‹ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð´Ð»Ñ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¸ Ð½Ðµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ SR."
-              : "Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð²Ð°Ð½Ð¸Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.")
+              ? "Лучше всего работает фото сверху, без сильного наклона и с чёткими цифрами. На этой странице система читает цифры только для текущего отделения и не использует SR."
+              : "Распознавание фото доступно только в онлайн-режиме владельца.")
           )
         }</p>
         ${queueInfoText ? `<p class="hint"><strong>${escapeHtml(queueInfoText)}</strong></p>` : ""}
         ${previewTable || photoState.lastReportDate || (photoState.notes && photoState.notes.length) ? `
           <div class="photo-import-results">
-            ${photoState.lastReportDate ? `<p class="hint">Ð”Ð°Ñ‚Ð° Ð½Ð° Ñ„Ð¾Ñ‚Ð¾: <strong>${escapeHtml(photoState.lastReportDate)}</strong></p>` : ""}
+            ${photoState.lastReportDate ? `<p class="hint">Дата на фото: <strong>${escapeHtml(photoState.lastReportDate)}</strong></p>` : ""}
             ${previewTable}
             ${photoState.notes && photoState.notes.length ? `
               <div class="photo-import-notes">
@@ -10955,7 +10955,7 @@ function buildInitialPhotoLightboxState() {
               </div>
             ` : ""}
             <p class="hint warning-note" id="photoImportSuspectReason"${photoState.suspectReason ? "" : " hidden"}><strong>${escapeHtml(photoState.suspectReason || "")}</strong></p>
-            ${photoState.draftMode ? `<p class="hint"><strong>Ð”Ð»Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ ÑÐµÐ¹Ñ‡Ð°Ñ Ð²Ñ‹Ð±Ñ€Ð°Ð½Ñ‹ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Ñ„Ð¾Ñ‚Ð¾.</strong> ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ ÑÑ‡ÐµÐ¹ÐºÐ¸ Ð¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ.</p>` : ""}
+            ${photoState.draftMode ? `<p class="hint"><strong>Для таблицы сейчас выбраны данные из фото.</strong> Проверьте ячейки и нажмите Сохранить.</p>` : ""}
           </div>
         ` : ""}
         ${photoState.imageDataUrl ? `
@@ -10963,7 +10963,7 @@ function buildInitialPhotoLightboxState() {
             <div class="photo-import-preview-frame">
               <img
                 src="${escapeHtml(photoState.imageDataUrl)}"
-                alt="Ð—Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½Ð½Ñ‹Ð¹ Ð±Ð»Ð°Ð½Ðº"
+                alt="Загруженный бланк"
                 class="photo-import-preview-image"
                 data-photo-zoom-trigger="department"
               >
@@ -11053,26 +11053,26 @@ function buildInitialPhotoLightboxState() {
     const statusHtml = `<div id="qhCalcStatus" class="qh-calc-status"></div>`;
     const buttonHtml = options.showButton === false ? "" : `
           <div class="qh-calc-actions">
-            <button type="button" id="qhCalcApplyBtn">Õ€Õ¡Õ·Õ¾Õ¥Õ¬ Ö‡ Õ¿Õ¥Õ²Õ¡Õ¤Ö€Õ¥Õ¬</button>
+            <button type="button" id="qhCalcApplyBtn">Հաշվել և տեղադրել</button>
           </div>
     `;
 
     return `
       <div class="${panelClass}">
-        <${titleTag}>Ô¸Õ¶Õ¤Õ¸Ö‚Õ¶Õ¸Ö‚Õ´/Ô´Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¸Ö‚Õ´</${titleTag}>
-        ${isEmbedded ? "" : `<p>Õ„Õ¸Ö‚Õ¿Ö„Õ¡Õ£Ö€Õ¥Ö„ Õ¨Õ¶Õ¤Õ¸Ö‚Õ¶Õ¾Õ¡Õ®, Õ¤Õ¸Ö‚Ö€Õ½Õ£Ö€Õ¾Õ¡Õ®, Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤ Õ£Õ¶Õ¡ÖÕ¸Õ² Ö‡ Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ«Ö Õ¾Õ¥Ö€Õ¡Õ¤Õ¡Ö€Õ±Õ¡Õ® Õ°Õ«Õ¾Õ¡Õ¶Õ¤Õ¶Õ¥Ö€Õ« Ö„Õ¡Õ¶Õ¡Õ¯Õ¨, Ö‡ Õ°Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¶Õ¥Ö€Õ¨ Õ¯Õ¯Õ¡Õ¿Õ¡Ö€Õ¾Õ¥Õ¶ Õ¡Õ¾Õ¿Õ¸Õ´Õ¡Õ¿Ö‰ ÕÕ¥Õ²Õ´Õ¥Ö„ Â«Õ€Õ¡Õ·Õ¾Õ¥Õ¬ Ö‡ Õ¿Õ¥Õ²Õ¡Õ¤Ö€Õ¥Õ¬Â» Õ¯Õ¸Õ³Õ¡Õ¯Õ¨â€¤ Õ¿Õ¾ÕµÕ¡Õ¬Õ¶Õ¥Ö€Õ¨ Õ¯Õ¿Õ¥Õ²Õ¡Õ¤Ö€Õ¾Õ¥Õ¶ Õ¢Õ¡ÕªÕ¡Õ¶Õ´Õ¸Ö‚Õ¶Ö„Õ« Õ½Õ¡Õ¶Õ¤Õ²Õ¡Õ¯Õ¸Ö‚Õ´, Õ¸Ö€Õ«Ö Õ°Õ¥Õ¿Õ¸ Õ½Õ¥Õ²Õ´Õ¥Ö„ Â«ÕŠÕ¡Õ°ÕºÕ¡Õ¶Õ¥Õ¬Â» Õ¯Õ¸Õ³Õ¡Õ¯Õ¨Ö‰</p>`}
+        <${titleTag}>Ընդունում/Դուրսգրում</${titleTag}>
+        ${isEmbedded ? "" : `<p>Մուտքագրեք ընդունված, դուրսգրված, արձակուրդ գնացող և արձակուրդից վերադարձած հիվանդների քանակը, և հաշվարկները կկատարվեն ավտոմատ։ Սեղմեք «Հաշվել և տեղադրել» կոճակը․ տվյալները կտեղադրվեն բաժանմունքի սանդղակում, որից հետո սեղմեք «Պահպանել» կոճակը։</p>`}
         <div class="qh-calc-wrap" id="qhCalcPanel">
           <table class="qh-calc-table">
             <thead>
               <tr>
                 <th></th>
-                <th>Õ‡Ô±Õ</th>
-                <th>ÕÕŠÔ±</th>
-                <th>ÕŠÔ±Õ…Õ„</th>
-                <th>Ô¶/Õ€</th>
-                <th>Ô¶/Ô¾ Õ¨Õ¶Õ¿</th>
-                <th>Ô¶/ÕŠ</th>
-                <th>Õ”-Õ«</th>
+                <th>ՇԱՐ</th>
+                <th>ՍՊԱ</th>
+                <th>ՊԱՅՄ</th>
+                <th>Զ/Հ</th>
+                <th>Զ/Ծ ընտ</th>
+                <th>Զ/Պ</th>
+                <th>Ք-ի</th>
               </tr>
             </thead>
             <tbody>
@@ -11102,8 +11102,8 @@ function buildInitialPhotoLightboxState() {
       app.innerHTML = `
         <div class="page">
           <div class="panel">
-            <h2>ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾</h2>
-            <p>Ð”Ð»Ñ ÑÑ‚Ð¾Ð¹ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾ Ð½ÑƒÐ¶Ð½Ð¾Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ. Ð’ÐµÑ€Ð½Ð¸ÑÑŒ Ð² Ð³Ð»Ð°Ð²Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» Ð¸ Ð¾Ñ‚ÐºÑ€Ð¾Ð¹ ÑÑÑ‹Ð»ÐºÑƒ ÑÐ½Ð¾Ð²Ð°.</p>
+            <h2>Отделение не найдено</h2>
+            <p>Для этой страницы не найдено нужное отделение. Вернись в главный файл и открой ссылку снова.</p>
           </div>
         </div>
       `;
@@ -11116,7 +11116,7 @@ function buildInitialPhotoLightboxState() {
       : null;
     const accessCodeValue = getStoredAccessCode();
     const downloadPdfButtonHtml = blankPdfPath
-      ? `<a class="button-link" href="${escapeHtml(blankPdfPath)}" download target="_blank" rel="noopener">Ð¡ÐºÐ°Ñ‡Ð°Ñ‚ÑŒ PDF</a>`
+      ? `<a class="button-link" href="${escapeHtml(blankPdfPath)}" download target="_blank" rel="noopener">Скачать PDF</a>`
       : "";
 
     app.innerHTML = `
@@ -11128,24 +11128,24 @@ function buildInitialPhotoLightboxState() {
         <div class="toolbar no-print">
           <div>
             <h1>${escapeHtml(row.department)}</h1>
-            <p>Ð­Ñ‚Ð° ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð·Ð°Ð¿Ð¾Ð»Ð½ÑÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¾Ð´Ð½Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐµÑ‚ ÐµÐ³Ð¾ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð² Ð¾Ð±Ñ‰Ð¸Ð¹ SARSH_KKZH.</p>
+            <p>Эта страница заполняет только одно отделение и отправляет его данные в общий SARSH_KKZH.</p>
           </div>
           <div class="toolbar-actions">
             <span class="pill ${getSourceClass()}" id="syncModeLabel">${escapeHtml(sourceLabel)}</span>
             ${buildOwnerAuthActions()}
             ${downloadPdfButtonHtml}
             <div class="zoom-control">
-              <label for="zoomRange">ÐœÐ°ÑÑˆÑ‚Ð°Ð±</label>
+              <label for="zoomRange">Масштаб</label>
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
             <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR feedback</a>
-            <a class="button-link" href="${escapeHtml(getSetupPath())}">ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ°</a>
-            <button type="button" id="saveBtn">Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ</button>
-            <button type="button" id="refreshBtn">ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ</button>
-            <button type="button" id="resetBtn">Ð¡Ð±Ñ€Ð¾ÑÐ¸Ñ‚ÑŒ</button>
-            <button type="button" id="printBtn">ÐŸÐµÑ‡Ð°Ñ‚ÑŒ</button>
-            <a class="button-link" href="${escapeHtml(mainPath)}">Ðš Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼Ñƒ</a>
+            <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
+            <button type="button" id="saveBtn">Сохранить</button>
+            <button type="button" id="refreshBtn">Обновить</button>
+            <button type="button" id="resetBtn">Сбросить</button>
+            <button type="button" id="printBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(mainPath)}">К главному</a>
           </div>
         </div>
 
@@ -11153,7 +11153,7 @@ function buildInitialPhotoLightboxState() {
           <div class="zoom-target">
             <div class="sheet-shell">
               <p class="status-line no-print">
-                <strong>ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ°:</strong>
+                <strong>Последняя отправка:</strong>
                 <span id="lastUpdatedText">${escapeHtml(rowFreshness.timestamp)}</span>
                 <span class="status-chip status-chip--${rowFreshness.level}" id="lastUpdatedBadge">${escapeHtml(rowFreshness.label)}</span>
               </p>
@@ -11166,21 +11166,21 @@ function buildInitialPhotoLightboxState() {
           ${renderPhotoImportPanel(row)}
 
           <div class="panel no-print">
-            <h2>Ð¡Ð¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ</h2>
+            <h2>Синхронизация отделения</h2>
             <div class="meta-row">
               <div class="inline-field static-field">
-                <span>Ð”Ð°Ñ‚Ð° Ð¸ Ð²Ñ€ÐµÐ¼Ñ</span>
+                <span>Дата и время</span>
                 <strong id="reportDateField">${escapeHtml(currentDateTime.full)}</strong>
               </div>
               ${isDepartmentAccessProtected() ? `
                 <label class="inline-field access-code">
-                  <span>ÐšÐ¾Ð´</span>
-                  <input type="password" id="accessCodeField" value="${escapeHtml(accessCodeValue)}" aria-label="ÐšÐ¾Ð´ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ">
+                  <span>Код</span>
+                  <input type="password" id="accessCodeField" value="${escapeHtml(accessCodeValue)}" aria-label="Код отделения">
                 </label>
               ` : ""}
             </div>
             <p id="syncStatusText">${escapeHtml(getSyncDescription())}</p>
-            <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÑŽÑ‚ÑÑ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾. Ð’ Ð¾Ð±Ñ‰Ð¸Ð¹ Ñ„Ð°Ð¹Ð» Ð¾Ð½Ð¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÑÑ‚ÑÑ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ð¾ÑÐ»Ðµ Ð½Ð°Ð¶Ð°Ñ‚Ð¸Ñ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ.")}</p>
+            <p class="hint${state.infoIsError ? " warning-note" : ""}" id="syncInfoText">${escapeHtml(state.info || "Изменения сохраняются локально. В общий файл они отправятся только после нажатия Сохранить.")}</p>
             <p class="hint${state.warning ? " warning-note" : ""}" id="warningText">${escapeHtml(state.warning)}</p>
             ${renderPendingSyncControls()}
             <p class="hint save-rule-note" id="saveRuleText"></p>
@@ -11213,7 +11213,7 @@ function buildInitialPhotoLightboxState() {
         <div class="panel">
           <h2>${escapeHtml(title)}</h2>
           <p>${escapeHtml(message)}</p>
-          <p><a href="${escapeHtml(mainPath)}">Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ Ðº Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼Ñƒ Ñ„Ð°Ð¹Ð»Ñƒ</a></p>
+          <p><a href="${escapeHtml(mainPath)}">Вернуться к главному файлу</a></p>
         </div>
       </div>
     `;
@@ -11222,7 +11222,7 @@ function buildInitialPhotoLightboxState() {
   function renderDepartmentPdfArchiveRecordPage() {
     const record = getDepartmentPdfArchiveRecordByKey(departmentArchiveKeyFromQuery);
     if (!record) {
-      renderArchiveNotFoundPage("ÐÑ€Ñ…Ð¸Ð² PDF Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½", "Ð”Ð»Ñ ÑÑ‚Ð¾Ð³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð°Ñ€Ñ…Ð¸Ð²Ð½Ð°Ñ PDF-ÐºÐ¾Ð¿Ð¸Ñ Ð² Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¼ Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€Ðµ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°.");
+      renderArchiveNotFoundPage("Архив PDF не найден", "Для этого отделения архивная PDF-копия в текущем браузере не найдена.");
       return;
     }
 
@@ -11240,19 +11240,19 @@ function buildInitialPhotoLightboxState() {
         <div class="toolbar no-print">
           <div>
             <h1>PDF ${escapeHtml(record.departmentMarker || record.departmentName)}</h1>
-            <p>${escapeHtml(record.archiveLabel)}. ÐÑ€Ñ…Ð¸Ð²Ð½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ Ð±Ð»Ð°Ð½ÐºÐ° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.</p>
+            <p>${escapeHtml(record.archiveLabel)}. Архивная копия бланка отделения.</p>
           </div>
           <div class="toolbar-actions">
-            <button type="button" id="printBtn">ÐŸÐµÑ‡Ð°Ñ‚ÑŒ</button>
-            <a class="button-link" href="${escapeHtml(appendShareQuery(config.getMainPagePath(basePath)))}">Ðš Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼Ñƒ</a>
+            <button type="button" id="printBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(appendShareQuery(config.getMainPagePath(basePath)))}">К главному</a>
           </div>
         </div>
         <div class="info-stack">
           <div class="panel no-print">
-            <h2>Ð”Ð°Ð½Ð½Ñ‹Ðµ PDF-Ð°Ñ€Ñ…Ð¸Ð²Ð°</h2>
-            <p><strong>ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ:</strong> ${escapeHtml(record.departmentName || "")}</p>
-            <p><strong>Ð”Ð°Ñ‚Ð°:</strong> ${escapeHtml(record.archiveLabel)}</p>
-            <p><strong>Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾:</strong> ${escapeHtml(formatTimestamp(record.capturedAt))}</p>
+            <h2>Данные PDF-архива</h2>
+            <p><strong>Отделение:</strong> ${escapeHtml(record.departmentName || "")}</p>
+            <p><strong>Дата:</strong> ${escapeHtml(record.archiveLabel)}</p>
+            <p><strong>Сохранено:</strong> ${escapeHtml(formatTimestamp(record.capturedAt))}</p>
           </div>
           <div class="zoom-target">
             <div class="sheet-shell">
@@ -11269,7 +11269,7 @@ function buildInitialPhotoLightboxState() {
   function renderDepartmentPdfArchiveDatePage() {
     const records = getDepartmentPdfArchiveRecordsForDate(departmentArchiveDateFromQuery);
     if (!records.length) {
-      renderArchiveNotFoundPage("PDF-Ð°Ñ€Ñ…Ð¸Ð² Ð·Ð° Ð´Ð°Ñ‚Ñƒ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½", "Ð—Ð° ÑÑ‚Ñƒ Ð´Ð°Ñ‚Ñƒ PDF-ÐºÐ¾Ð¿Ð¸Ð¸ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ Ð² Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¼ Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€Ðµ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ñ‹.");
+      renderArchiveNotFoundPage("PDF-архив за дату не найден", "За эту дату PDF-копии отделений в текущем браузере не найдены.");
       return;
     }
 
@@ -11285,19 +11285,19 @@ function buildInitialPhotoLightboxState() {
         </div>
         <div class="toolbar no-print">
           <div>
-            <h1>PDF Ð°Ñ€Ñ…Ð¸Ð² ${escapeHtml(departmentArchiveDateFromQuery)}</h1>
-            <p>ÐžÐ±Ñ‰Ð¸Ð¹ Ñ„Ð°Ð¹Ð» Ð¸Ð· ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð½Ñ‹Ñ… PDF-Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ Ð·Ð° Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½ÑƒÑŽ Ð´Ð°Ñ‚Ñƒ.</p>
+            <h1>PDF архив ${escapeHtml(departmentArchiveDateFromQuery)}</h1>
+            <p>Общий файл из сохраненных PDF-бланков отделений за выбранную дату.</p>
           </div>
           <div class="toolbar-actions">
-            <button type="button" id="printBtn">ÐŸÐµÑ‡Ð°Ñ‚ÑŒ</button>
-            <a class="button-link" href="${escapeHtml(appendShareQuery(config.getMainPagePath(basePath)))}">Ðš Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼Ñƒ</a>
+            <button type="button" id="printBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(appendShareQuery(config.getMainPagePath(basePath)))}">К главному</a>
           </div>
         </div>
         <div class="info-stack">
           <div class="panel no-print">
-            <h2>Ð”Ð°Ð½Ð½Ñ‹Ðµ PDF-Ð°Ñ€Ñ…Ð¸Ð²Ð°</h2>
-            <p><strong>Ð”Ð°Ñ‚Ð°:</strong> ${escapeHtml(departmentArchiveDateFromQuery)}</p>
-            <p><strong>ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹:</strong> ${records.length}</p>
+            <h2>Данные PDF-архива</h2>
+            <p><strong>Дата:</strong> ${escapeHtml(departmentArchiveDateFromQuery)}</p>
+            <p><strong>Отделений:</strong> ${records.length}</p>
           </div>
           <div class="zoom-target">
             <div class="sheet-shell">
@@ -11314,23 +11314,23 @@ function buildInitialPhotoLightboxState() {
   function renderLeaveCalcPanel(row, options = {}) {
     const bodyRows = [
       {
-        label: "ÕˆÖ‚Õ²Õ¡Ö€Õ¯Õ¾Õ¥Õ¬ Õ§ Õ¢Õ¸Ö‚Õªâ€¤ Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤",
+        label: "Ուղարկվել է բուժ․ արձակուրդ",
         cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.sentKey, marker: column.sentMarker, role: "input" }))
       },
       {
-        label: "ÕŽÕ¥Ö€Õ¡Õ¤Õ¡Ö€Õ±Õ¥Õ¬ Õ§ Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ«Ö",
+        label: "Վերադարձել է արձակուրդից",
         cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.returnedKey, marker: column.returnedMarker, role: "input" }))
       },
       {
-        label: "ÔµÕ²Õ¥Õ¬ Õ§ Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤Õ¸Ö‚Õ´",
+        label: "Եղել է արձակուրդում",
         cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.leaveKey, marker: column.baseMarker, role: "linked" }))
       },
       {
-        label: "Õ€Õ¡Õ·Õ¾Õ¡Ö€Õ¯",
+        label: "Հաշվարկ",
         cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.leaveKey, marker: column.leaveOutputMarker, role: "leave-output" }))
       },
       {
-        label: "Ô±Õ¼Õ¯Õ¡ Õ§",
+        label: "Առկա է",
         cells: LEAVE_CALC_COLUMNS.map((column) => ({ key: column.presentKey, marker: column.presentOutputMarker, role: "present-output" }))
       }
     ];
@@ -11394,13 +11394,13 @@ function buildInitialPhotoLightboxState() {
     const titleTag = isEmbedded ? "h3" : "h2";
     const buttonHtml = options.showButton === false ? "" : `
           <div class="qh-calc-actions">
-            <button type="button" id="leaveCalcApplyBtn">Õ€Õ¡Õ·Õ¾Õ¥Õ¬ Ö‡ Õ¿Õ¥Õ²Õ¡Õ¤Ö€Õ¥Õ¬</button>
+            <button type="button" id="leaveCalcApplyBtn">Հաշվել և տեղադրել</button>
           </div>
     `;
 
     return `
       <div class="${panelClass}">
-        <${titleTag}>Ô²Õ¸Ö‚ÕªÕ¡Õ¯Õ¡Õ¶ Õ¡Ö€Õ±Õ¡Õ¯Õ¸Ö‚Ö€Õ¤</${titleTag}>
+        <${titleTag}>Բուժական արձակուրդ</${titleTag}>
         <div class="qh-calc-wrap" id="leaveCalcPanel">
           <table class="qh-calc-table">
             <thead>
@@ -11615,7 +11615,7 @@ function buildInitialPhotoLightboxState() {
 
     const record = getMainTableSavedRecordByKey(savedMainKeyFromQuery);
     if (!record) {
-      renderArchiveNotFoundPage("Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°", "Ð”Ð»Ñ ÑÑ‚Ð¾Ð³Ð¾ ÑÐ½Ð¸Ð¼ÐºÐ° ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ð¾Ð¹ Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Ð² Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¼ Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€Ðµ Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð½ÐµÑ‚.");
+      renderArchiveNotFoundPage("Сохранённая таблица не найдена", "Для этого снимка сохранённой главной таблицы в текущем браузере данных нет.");
       return;
     }
 
@@ -11631,20 +11631,20 @@ function buildInitialPhotoLightboxState() {
         </div>
         <div class="toolbar no-print">
           <div>
-            <h1>Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ${escapeHtml(record.dateLabel)} ${escapeHtml(record.slotLabel)}</h1>
-            <p>Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ð°Ñ Ð²ÐµÑ€ÑÐ¸Ñ Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Ð´Ð»Ñ Ð¿Ñ€Ð¾ÑÐ¼Ð¾Ñ‚Ñ€Ð° ÑÑ‚Ð°Ñ€Ñ‹Ñ… Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð¸ Ð¿ÐµÑ‡Ð°Ñ‚Ð¸.</p>
+            <h1>Сохранённая таблица ${escapeHtml(record.dateLabel)} ${escapeHtml(record.slotLabel)}</h1>
+            <p>Сохранённая версия главной таблицы для просмотра старых данных и печати.</p>
           </div>
           <div class="toolbar-actions">
-            <button type="button" id="printBtn">ÐŸÐµÑ‡Ð°Ñ‚ÑŒ</button>
-            <a class="button-link" href="${escapeHtml(appendShareQuery(config.getMainPagePath(basePath)))}">Ðš Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼Ñƒ</a>
+            <button type="button" id="printBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(appendShareQuery(config.getMainPagePath(basePath)))}">К главному</a>
           </div>
         </div>
         <div class="info-stack">
           <div class="panel no-print">
-            <h2>Ð”Ð°Ð½Ð½Ñ‹Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹</h2>
-            <p><strong>ÐžÐºÐ½Ð¾:</strong> ${escapeHtml(record.dateLabel)} ${escapeHtml(record.slotLabel)}</p>
-            <p><strong>Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾:</strong> ${escapeHtml(formatTimestamp(record.savedAt))}</p>
-            <p><strong>Ð”Ð°Ñ‚Ð° Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ð°:</strong> ${escapeHtml(record.reportDate)}</p>
+            <h2>Данные сохранённой таблицы</h2>
+            <p><strong>Окно:</strong> ${escapeHtml(record.dateLabel)} ${escapeHtml(record.slotLabel)}</p>
+            <p><strong>Сохранено:</strong> ${escapeHtml(formatTimestamp(record.savedAt))}</p>
+            <p><strong>Дата документа:</strong> ${escapeHtml(record.reportDate)}</p>
           </div>
           <div class="zoom-target">
             <div class="sheet-shell">
@@ -11678,9 +11678,9 @@ function buildInitialPhotoLightboxState() {
       app.innerHTML = `
         <div class="page">
           <div class="panel">
-            <h2>ÐÑ€Ñ…Ð¸Ð² Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½</h2>
-            <p>Ð”Ð»Ñ ÑÑ‚Ð¾Ð¹ Ð´Ð°Ñ‚Ñ‹ Ð°Ñ€Ñ…Ð¸Ð²Ð½Ñ‹Ð¹ ÑÐ½Ð¸Ð¼Ð¾Ðº Ð² Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¼ Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€Ðµ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½. ÐžÑ‚ÐºÑ€Ð¾Ð¹ Ð³Ð»Ð°Ð²Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð», Ð´Ð¾Ð¶Ð´Ð¸ÑÑŒ Ð¿Ð¾ÑÐ²Ð»ÐµÐ½Ð¸Ñ Ð´Ð°Ñ‚Ñ‹ Ð² Ð°Ñ€Ñ…Ð¸Ð²Ðµ Ð¸ Ð¿Ð¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹ ÑÐ½Ð¾Ð²Ð°.</p>
-            <p><a href="${escapeHtml(config.getMainPagePath(basePath))}">Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ Ðº Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼Ñƒ Ñ„Ð°Ð¹Ð»Ñƒ</a></p>
+            <h2>Архив не найден</h2>
+            <p>Для этой даты архивный снимок в текущем браузере не найден. Открой главный файл, дождись появления даты в архиве и попробуй снова.</p>
+            <p><a href="${escapeHtml(config.getMainPagePath(basePath))}">Вернуться к главному файлу</a></p>
           </div>
         </div>
       `;
@@ -11699,21 +11699,21 @@ function buildInitialPhotoLightboxState() {
         </div>
         <div class="toolbar no-print">
           <div>
-            <h1>ÐÑ€Ñ…Ð¸Ð² ${escapeHtml(record.archiveLabel)}</h1>
-            <p>ÐÑ€Ñ…Ð¸Ð²Ð½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ Ð³Ð»Ð°Ð²Ð½Ð¾Ð³Ð¾ Ñ„Ð°Ð¹Ð»Ð° Ð´Ð»Ñ Ð¿ÐµÑ‡Ð°Ñ‚Ð¸ Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð² PDF.</p>
+            <h1>Архив ${escapeHtml(record.archiveLabel)}</h1>
+            <p>Архивная копия главного файла для печати и сохранения в PDF.</p>
           </div>
           <div class="toolbar-actions">
-            <button type="button" id="printBtn">ÐŸÐµÑ‡Ð°Ñ‚ÑŒ</button>
-            <a class="button-link" href="${escapeHtml(config.getMainPagePath(basePath))}">Ðš Ð³Ð»Ð°Ð²Ð½Ð¾Ð¼Ñƒ</a>
+            <button type="button" id="printBtn">Печать</button>
+            <a class="button-link" href="${escapeHtml(config.getMainPagePath(basePath))}">К главному</a>
           </div>
         </div>
 
         <div class="info-stack">
           <div class="panel no-print">
-            <h2>Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð°Ñ€Ñ…Ð¸Ð²Ð°</h2>
-            <p><strong>ÐÑ€Ñ…Ð¸Ð²Ð½Ð°Ñ Ð´Ð°Ñ‚Ð°:</strong> ${escapeHtml(record.archiveLabel)}</p>
-            <p><strong>Ð¡Ð½Ð¸Ð¼Ð¾Ðº ÑÐ¾Ð·Ð´Ð°Ð½:</strong> ${escapeHtml(formatTimestamp(record.capturedAt))}</p>
-            <p><strong>Ð”Ð°Ñ‚Ð° Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ð°:</strong> ${escapeHtml(record.reportDate)}</p>
+            <h2>Данные архива</h2>
+            <p><strong>Архивная дата:</strong> ${escapeHtml(record.archiveLabel)}</p>
+            <p><strong>Снимок создан:</strong> ${escapeHtml(formatTimestamp(record.capturedAt))}</p>
+            <p><strong>Дата документа:</strong> ${escapeHtml(record.reportDate)}</p>
           </div>
 
           <div class="zoom-target">
@@ -11978,10 +11978,10 @@ function buildInitialPhotoLightboxState() {
     }
 
     if (constraint.blocked) {
-      return `ÐŸÐ¾ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸ ${constraint.column.label} Ð½ÐµÑ‚ Ð½Ð°Ð»Ð¸Ñ‡Ð¸Ñ Ð² Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¸. ÐŸÐµÑ€ÐµÐ²Ð¾Ð´ Ð¸Ð· Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½.`;
+      return `По категории ${constraint.column.label} нет наличия в отделении. Перевод из отделения заблокирован.`;
     }
 
-    return `ÐŸÐ¾ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸ ${constraint.column.label} Ð¼Ð¾Ð¶Ð½Ð¾ Ð¿ÐµÑ€ÐµÐ²ÐµÑÑ‚Ð¸ Ð¸Ð· Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð½Ðµ Ð±Ð¾Ð»ÑŒÑˆÐµ ${constraint.limit}.`;
+    return `По категории ${constraint.column.label} можно перевести из отделения не больше ${constraint.limit}.`;
   }
 
   function calcTransferRemainingValue(row, type, snapshot = state.snapshot) {
@@ -12042,7 +12042,7 @@ function buildInitialPhotoLightboxState() {
     if (statusEl) {
       const invalidColumns = getTransferCalcInvalidColumns(row, snapshot);
       if (invalidColumns.length) {
-        statusEl.textContent = `Õ“Õ¸Õ­Õ¡Õ¶ÖÕ¸Ö‚Õ´Õ¶Õ¥Ö€Õ« Õ°Õ¡Õ·Õ¾Õ¡Ö€Õ¯Õ¨ Õ¹Õ« Õ¯Õ¡Ö€Õ¸Õ² Õ¯Õ«Ö€Õ¡Õ¼Õ¾Õ¥Õ¬â€¤ ${invalidColumns.map((column) => column.label).join(", ")} Õ½ÕµÕ¸Ö‚Õ¶Õ¡Õ¯Õ¶Õ¥Ö€Õ¸Ö‚Õ´ Õ¯Õ½Õ¿Õ¡ÖÕ¾Õ« Õ¢Õ¡ÖÕ¡Õ½Õ¡Õ¯Õ¡Õ¶ Õ¡Ö€ÕªÕ¥Ö„Ö‰`;
+        statusEl.textContent = `Փոխանցումների հաշվարկը չի կարող կիրառվել․ ${invalidColumns.map((column) => column.label).join(", ")} սյունակներում կստացվի բացասական արժեք։`;
         statusEl.className = "qh-calc-status qh-calc-status--invalid";
       } else {
         statusEl.textContent = "";
@@ -12081,8 +12081,8 @@ function buildInitialPhotoLightboxState() {
     }
     if (syncInfoText) {
       syncInfoText.textContent = state.info || (mode === "department"
-        ? "Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÑŽÑ‚ÑÑ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾. Ð’ Ð¾Ð±Ñ‰Ð¸Ð¹ Ñ„Ð°Ð¹Ð» Ð¾Ð½Ð¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÑÑ‚ÑÑ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ð¾ÑÐ»Ðµ Ð½Ð°Ð¶Ð°Ñ‚Ð¸Ñ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ."
-        : "Ð“Ð»Ð°Ð²Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» Ð¼Ð¾Ð¶Ð½Ð¾ Ð¿ÐµÑ‡Ð°Ñ‚Ð°Ñ‚ÑŒ ÑÑ€Ð°Ð·Ñƒ, Ð° PDF ÑÐ¾Ð·Ð´Ð°ÐµÑ‚ÑÑ Ñ‡ÐµÑ€ÐµÐ· ÐºÐ½Ð¾Ð¿ÐºÑƒ ÐŸÐµÑ‡Ð°Ñ‚ÑŒ Ð² Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€Ðµ.");
+        ? "Изменения сохраняются локально. В общий файл они отправятся только после нажатия Сохранить."
+        : "Главный файл можно печатать сразу, а PDF создается через кнопку Печать в браузере.");
       syncInfoText.className = `hint${state.infoIsError ? " warning-note" : ""}`;
     }
     if (warningText) {
@@ -12123,7 +12123,7 @@ function buildInitialPhotoLightboxState() {
         const mainDisplayContext = getMainTableDisplaySnapshotContext();
         const stats = buildFreshnessStats(mainDisplayContext.rows);
         const newestUpdatedAt = stats.newestRow ? getRowEffectiveUpdatedAt(stats.newestRow) : "";
-        lastUpdatedText.textContent = newestUpdatedAt ? formatTimestamp(newestUpdatedAt) : "ÐµÑ‰Ðµ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐ»Ð¾ÑÑŒ";
+        lastUpdatedText.textContent = newestUpdatedAt ? formatTimestamp(newestUpdatedAt) : "еще не отправлялось";
         if (lastUpdatedBadge) {
           const meta = getFreshnessMeta(newestUpdatedAt, Boolean(stats.newestRow));
           lastUpdatedBadge.textContent = meta.label;
@@ -12181,8 +12181,8 @@ function buildInitialPhotoLightboxState() {
       }
       if (oldestText) {
         oldestText.textContent = stats.oldestRow
-          ? `Ð¡Ð°Ð¼Ñ‹Ðµ ÑÑ‚Ð°Ñ€Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ: ${stats.oldestRow.department} â€” ${formatTimestamp(getRowEffectiveUpdatedAt(stats.oldestRow))} (${formatAge(getRowEffectiveUpdatedAt(stats.oldestRow))})`
-          : "ÐÐµÑ‚ Ð½Ð¸ Ð¾Ð´Ð½Ð¾Ð³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ð¼Ð¸ Ð´Ð°Ð½Ð½Ñ‹Ð¼Ð¸.";
+          ? `Самые старые данные: ${stats.oldestRow.department} — ${formatTimestamp(getRowEffectiveUpdatedAt(stats.oldestRow))} (${formatAge(getRowEffectiveUpdatedAt(stats.oldestRow))})`
+          : "Нет ни одного отделения с отправленными данными.";
       }
       if (overallUpdateBanner) {
         overallUpdateBanner.className = `update-health-banner update-health-banner--${overallUpdateStatus.level}`;
@@ -12210,8 +12210,8 @@ function buildInitialPhotoLightboxState() {
       syncArchivePickerUi();
       if (savedTablesSummaryText) {
         const nextSavedTablesSummary = savedTableRecords.length
-          ? `Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ñ… Ñ‚Ð°Ð±Ð»Ð¸Ñ†: ${savedTableRecords.length}. ${state.activeMainTableSavedPreviewKey ? "ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½" : "Ð’Ñ‹Ð±Ñ€Ð°Ð½"} ÑÐ½Ð¸Ð¼Ð¾Ðº: ${buildMainTableSavedSelectionText(selectedSavedRecord)}.`
-          : "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ñ… Ñ‚Ð°Ð±Ð»Ð¸Ñ† Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚. ÐŸÐ¾ÑÐ»Ðµ Ñ€ÑƒÑ‡Ð½Ð¾Ð³Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð·Ð´ÐµÑÑŒ Ð¿Ð¾ÑÐ²ÑÑ‚ÑÑ Ð´Ð²Ðµ Ñ€Ð°Ð±Ð¾Ñ‡Ð¸Ðµ Ð²ÐµÑ€ÑÐ¸Ð¸ Ð·Ð° ÑÑƒÑ‚ÐºÐ¸.";
+          ? `Сохранённых таблиц: ${savedTableRecords.length}. ${state.activeMainTableSavedPreviewKey ? "Показан" : "Выбран"} снимок: ${buildMainTableSavedSelectionText(selectedSavedRecord)}.`
+          : "Сохранённых таблиц пока нет. После ручного сохранения здесь появятся две рабочие версии за сутки.";
         if (savedTablesSummaryText.textContent !== nextSavedTablesSummary) {
           savedTablesSummaryText.textContent = nextSavedTablesSummary;
         }
@@ -12294,11 +12294,11 @@ function buildInitialPhotoLightboxState() {
           const openFeedbackId = getDepartmentOpenFeedbackId(row);
           if (openFeedbackId) {
             feedbackLinkEl.setAttribute("href", appendQueryParams(config.getDepartmentPagePath(basePath, row.id), { tgFeedback: openFeedbackId }));
-            feedbackLinkEl.textContent = "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ð¾Ðµ";
+            feedbackLinkEl.textContent = "Открыть отправленное";
             feedbackLinkEl.setAttribute("data-open-mode", "feedback");
           } else {
             feedbackLinkEl.setAttribute("href", appendShareQuery(config.getDepartmentPagePath(basePath, row.id)));
-            feedbackLinkEl.textContent = "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ";
+            feedbackLinkEl.textContent = "Открыть отделение";
             feedbackLinkEl.setAttribute("data-open-mode", "department");
           }
         }
@@ -12423,11 +12423,11 @@ function buildInitialPhotoLightboxState() {
     saveBtn.disabled = !validation.isValid;
     saveBtn.setAttribute("aria-disabled", String(!validation.isValid));
     saveBtn.title = validation.isValid
-      ? "Ð¤Ð¾Ñ€Ð¼ÑƒÐ»Ð° ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÐµÑ‚, Ð¼Ð¾Ð¶Ð½Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÑ‚ÑŒ."
-      : "Ð˜ÑÐ¿Ñ€Ð°Ð²ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ: ÐºÐ½Ð¾Ð¿ÐºÐ° ÑÑ‚Ð°Ð½ÐµÑ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¹, ÐºÐ¾Ð³Ð´Ð° ÑÑƒÐ¼Ð¼Ð° 13-22 ÑÐ¾Ð²Ð¿Ð°Ð´ÐµÑ‚ Ñ Ñ„Ð¾Ñ€Ð¼ÑƒÐ»Ð¾Ð¹.";
+      ? "Формула совпадает, можно сохранять."
+      : "Исправь данные: кнопка станет активной, когда сумма 13-22 совпадет с формулой.";
     saveBtn.title = validation.isValid
-      ? "ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ñ‹Ðµ ÑÑƒÐ¼Ð¼Ñ‹ ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÑŽÑ‚, Ð¼Ð¾Ð¶Ð½Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÑ‚ÑŒ."
-      : "Ð˜ÑÐ¿Ñ€Ð°Ð²ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ: ÐºÐ½Ð¾Ð¿ÐºÐ° ÑÑ‚Ð°Ð½ÐµÑ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¹, ÐºÐ¾Ð³Ð´Ð° ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ñ‹Ðµ ÑÑƒÐ¼Ð¼Ñ‹ ÑÐ¾Ð²Ð¿Ð°Ð´ÑƒÑ‚ Ñ Ñ„Ð¾Ñ€Ð¼ÑƒÐ»Ð°Ð¼Ð¸.";
+      ? "Контрольные суммы совпадают, можно сохранять."
+      : "Исправь данные: кнопка станет активной, когда контрольные суммы совпадут с формулами.";
     saveBtn.classList.add(validation.isValid ? "save-ready" : "save-blocked");
 
     if (ruleText) {
@@ -12454,7 +12454,7 @@ function buildInitialPhotoLightboxState() {
     saveBtn.disabled = !canSave;
     saveBtn.setAttribute("aria-disabled", String(!canSave));
     saveBtn.title = state.mainTableSaveInFlight
-      ? "Ð˜Ð´Ñ‘Ñ‚ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹."
+      ? "Идёт сохранение главной таблицы."
       : validation.message;
     if (canSave) {
       saveBtn.classList.add("save-ready");
@@ -12464,7 +12464,7 @@ function buildInitialPhotoLightboxState() {
 
     if (ruleText) {
       ruleText.textContent = state.mainTableSaveInFlight
-        ? "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ Ð³Ð»Ð°Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ..."
+        ? "Сохраняю главную таблицу..."
         : validation.message;
       const toneClass = canSave
         ? "save-rule-note--valid"
@@ -12554,12 +12554,12 @@ function buildInitialPhotoLightboxState() {
 
     const countText = Number.isFinite(photoState.structureCellCount)
       ? `${photoState.structureCellCount}/22`
-      : "Ð¼ÐµÐ½ÑŒÑˆÐµ 22/22";
+      : "меньше 22/22";
     const missingText = Array.isArray(photoState.structureMissingCells) && photoState.structureMissingCells.length
-      ? ` ÐÐµ Ð½Ð°Ð¹Ð´ÐµÐ½Ñ‹ Ð¸Ð»Ð¸ Ð½Ðµ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ñ‹ Ð¿Ð¾Ð·Ð¸Ñ†Ð¸Ð¸: ${photoState.structureMissingCells.join(", ")}.`
+      ? ` Не найдены или не подтверждены позиции: ${photoState.structureMissingCells.join(", ")}.`
       : "";
     const reasonText = photoState.structureReason ? ` ${photoState.structureReason}` : "";
-    return `Ð¡Ñ‚Ñ€ÑƒÐºÑ‚ÑƒÑ€Ð° Ð±Ð»Ð°Ð½ÐºÐ° Ð½Ðµ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð°: ÑÐ¸ÑÑ‚ÐµÐ¼Ð° ÑƒÐ²Ð¸Ð´ÐµÐ»Ð° Ñ‚Ð¾Ð»ÑŒÐºÐ¾ ${countText} ÑÑ‡ÐµÐµÐº Ð²ÐµÑ€Ñ…Ð½ÐµÐ¹ ÑÑ‚Ñ€Ð¾ÐºÐ¸. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð¸ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð¸Ñ‚Ðµ Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð²Ð°Ð½Ð¸Ðµ.${missingText}${reasonText}`;
+    return `Структура бланка не подтверждена: система увидела только ${countText} ячеек верхней строки. Проверьте фото и повторите распознавание.${missingText}${reasonText}`;
   }
 
   async function handlePhotoImportSelection(file) {
@@ -12580,7 +12580,7 @@ function buildInitialPhotoLightboxState() {
     state.photoImport.queueMode = false;
     state.photoImport.queueRemainingCount = 0;
     state.photoImport.queueNextDepartmentName = "";
-    setPhotoImportStatus("ÐŸÐ¾Ð´Ð³Ð¾Ñ‚Ð°Ð²Ð»Ð¸Ð²Ð°ÑŽ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð²Ð°Ð½Ð¸Ñ...", false);
+    setPhotoImportStatus("Подготавливаю фото для распознавания...", false);
     renderPage();
 
     try {
@@ -12589,19 +12589,19 @@ function buildInitialPhotoLightboxState() {
       state.photoImport.isProcessing = false;
       const canRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
       const orientationNote = preparedPhoto.rotatedToLandscape
-        ? " Ð¤Ð¾Ñ‚Ð¾ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð²Ñ‹Ñ€Ð¾Ð²Ð½ÐµÐ½Ð¾: Ð½Ð°Ð´Ð¿Ð¸ÑÑŒ SR Ð¿ÐµÑ€ÐµÐ¼ÐµÑ‰ÐµÐ½Ð° Ð²Ð¿Ñ€Ð°Ð²Ð¾ Ð²Ð²ÐµÑ€Ñ…."
+        ? " Фото автоматически выровнено: надпись SR перемещена вправо вверх."
         : "";
       setPhotoImportStatus(
         canRecognize
-          ? `Ð¤Ð¾Ñ‚Ð¾ Ð³Ð¾Ñ‚Ð¾Ð²Ð¾: ${file.name || "image"}.${orientationNote} ÐŸÑ€Ð¸ Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾ÑÑ‚Ð¸ Ð¿Ð¾Ð²ÐµÑ€Ð½Ð¸Ñ‚Ðµ Ñ„Ð¾Ñ‚Ð¾, Ð·Ð°Ñ‚ÐµÐ¼ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ "Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ñ‚ÑŒ".`
-          : `Ð¤Ð¾Ñ‚Ð¾ Ð³Ð¾Ñ‚Ð¾Ð²Ð¾: ${file.name || "image"}.${orientationNote} Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð²Ð°Ð½Ð¸Ðµ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.`,
+          ? `Фото готово: ${file.name || "image"}.${orientationNote} При необходимости поверните фото, затем нажмите "Распознать".`
+          : `Фото готово: ${file.name || "image"}.${orientationNote} Распознавание доступно только в онлайн-режиме владельца.`,
         !canRecognize
       );
       renderPage();
     } catch (error) {
       state.photoImport = buildInitialPhotoImportState();
       setPhotoImportStatus(
-        error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾.",
+        error instanceof Error ? error.message : "Не удалось подготовить фото.",
         true
       );
       renderPage();
@@ -12614,7 +12614,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     state.photoImport.isProcessing = true;
-    setPhotoImportStatus("ÐŸÐ¾Ð²Ð¾Ñ€Ð°Ñ‡Ð¸Ð²Ð°ÑŽ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ð±Ð¾Ð»ÐµÐµ ÑƒÐ´Ð¾Ð±Ð½Ð¾Ð¹ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸...", false);
+    setPhotoImportStatus("Поворачиваю фото для более удобной проверки...", false);
     renderPage();
 
     try {
@@ -12628,12 +12628,12 @@ function buildInitialPhotoLightboxState() {
       state.photoImport.suspectReason = "";
       state.photoImport.draftMode = false;
       state.photoImport.isProcessing = false;
-      setPhotoImportStatus("Ð¤Ð¾Ñ‚Ð¾ Ð²Ñ€ÑƒÑ‡Ð½ÑƒÑŽ Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÑ‚Ð¾ Ð½Ð° 90Â°. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð¾Ñ€Ð¸ÐµÐ½Ñ‚Ð°Ñ†Ð¸ÑŽ Ð¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Â«Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ñ‚ÑŒÂ».", false);
+      setPhotoImportStatus("Фото вручную повернуто на 90°. Проверьте ориентацию и нажмите «Распознать».", false);
       renderPage();
     } catch (error) {
       state.photoImport.isProcessing = false;
       setPhotoImportStatus(
-        error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾.",
+        error instanceof Error ? error.message : "Не удалось повернуть фото.",
         true
       );
       renderPage();
@@ -12647,26 +12647,26 @@ function buildInitialPhotoLightboxState() {
     }
 
     if (!sync.hasRemoteSync() || typeof sync.recognizeDepartmentPhoto !== "function") {
-      setInfo("Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð²Ð°Ð½Ð¸Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.", true);
+      setInfo("Распознавание фото доступно только в онлайн-режиме владельца.", true);
       return;
     }
 
     if (!state.photoImport.imageDataUrl) {
-      setPhotoImportStatus("Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð²Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°.", true);
+      setPhotoImportStatus("Сначала выберите фото бланка.", true);
       renderPage();
       return;
     }
 
     state.photoImport.isProcessing = true;
-    setPhotoImportStatus("Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°ÑŽ Ñ†Ð¸Ñ„Ñ€Ñ‹ Ð½Ð° Ð±Ð»Ð°Ð½ÐºÐµ Ð´Ð»Ñ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ. ÐœÐ°Ñ€ÐºÐµÑ€ SR Ð·Ð´ÐµÑÑŒ Ð¸Ð³Ð½Ð¾Ñ€Ð¸Ñ€ÑƒÐµÑ‚ÑÑ.", false);
+    setPhotoImportStatus("Распознаю цифры на бланке для текущего отделения. Маркер SR здесь игнорируется.", false);
     setPhotoImportStatus(
       state.photoImport.queueRemainingCount > 0
-        ? `Ð¤Ð¾Ñ‚Ð¾ Ð¿ÐµÑ€ÐµÐ½ÐµÑÐµÐ½Ð¾ Ñ Ð³Ð»Ð°Ð²Ð½Ð¾Ð³Ð¾ Ñ„Ð°Ð¹Ð»Ð°. Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°ÑŽ ÑÑ‚Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ. ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¾Ðµ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¸Ðµ ÑÐ»ÐµÐ´ÑƒÑŽÑ‰ÐµÐ³Ð¾ Ñ„Ð¾Ñ‚Ð¾ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¾, Ð² Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸ Ð¾ÑÑ‚Ð°Ð»Ð¾ÑÑŒ: ${state.photoImport.queueRemainingCount}.`
-        : "Ð¤Ð¾Ñ‚Ð¾ Ð¿ÐµÑ€ÐµÐ½ÐµÑÐµÐ½Ð¾ Ñ Ð³Ð»Ð°Ð²Ð½Ð¾Ð³Ð¾ Ñ„Ð°Ð¹Ð»Ð°. Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°ÑŽ ÑÑ‚Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ. Ð­Ñ‚Ð¾ Ð¿Ð¾ÑÐ»ÐµÐ´Ð½ÐµÐµ Ñ„Ð¾Ñ‚Ð¾ Ð¸Ð· Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸.",
+        ? `Фото перенесено с главного файла. Распознаю это отделение. Автоматическое открытие следующего фото отключено, в очереди осталось: ${state.photoImport.queueRemainingCount}.`
+        : "Фото перенесено с главного файла. Распознаю это отделение. Это последнее фото из очереди.",
       false
     );
     if (!state.photoImport.queueMode) {
-      setPhotoImportStatus("Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°ÑŽ Ñ†Ð¸Ñ„Ñ€Ñ‹ Ð½Ð° Ð±Ð»Ð°Ð½ÐºÐµ Ð´Ð»Ñ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ. ÐœÐ°Ñ€ÐºÐµÑ€ SR Ð·Ð´ÐµÑÑŒ Ð¸Ð³Ð½Ð¾Ñ€Ð¸Ñ€ÑƒÐµÑ‚ÑÑ.", false);
+      setPhotoImportStatus("Распознаю цифры на бланке для текущего отделения. Маркер SR здесь игнорируется.", false);
     }
     renderPage();
 
@@ -12695,27 +12695,27 @@ function buildInitialPhotoLightboxState() {
       }
 
       if (!appliedCount) {
-        setPhotoImportStatus("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑƒÐ²ÐµÑ€ÐµÐ½Ð½Ð¾ Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ñ‚ÑŒ Ñ†Ð¸Ñ„Ñ€Ñ‹. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ Ð´Ñ€ÑƒÐ³Ð¾Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð¸Ð»Ð¸ Ð²Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð²Ñ€ÑƒÑ‡Ð½ÑƒÑŽ.", true);
+        setPhotoImportStatus("Не удалось уверенно распознать цифры. Попробуйте другое фото или введите значения вручную.", true);
         renderPage();
         return;
       }
 
       setPhotoImportStatus(
         state.photoImport.suspectReason
-          ? `Ð—Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¿Ð¾Ð´ÑÑ‚Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾, Ð½Ð¾ Ñ„Ð¾Ñ€Ð¼ÑƒÐ»Ð° Ð½Ðµ ÑÐ¾ÑˆÐ»Ð°ÑÑŒ. ${state.photoImport.suspectReason}`
-          : "Ð—Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¿Ð¾Ð´ÑÑ‚Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ ÑÑ‡ÐµÐ¹ÐºÐ¸ Ð¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ.",
+          ? `Значения подставлены локально, но формула не сошлась. ${state.photoImport.suspectReason}`
+          : "Значения подставлены локально. Проверьте ячейки и нажмите Сохранить.",
         false
       );
       if (state.photoImport.suspectReason) {
-        setPhotoImportStatus(`Ð—Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¿Ð¾Ð´ÑÑ‚Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾, Ð½Ð¾ ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ñ‹Ðµ ÑÑƒÐ¼Ð¼Ñ‹ Ð½Ðµ ÑÐ¾ÑˆÐ»Ð¸ÑÑŒ. ${state.photoImport.suspectReason}`, false);
+        setPhotoImportStatus(`Значения подставлены локально, но контрольные суммы не сошлись. ${state.photoImport.suspectReason}`, false);
       }
       renderPage();
       refreshTableData();
-      setInfo("Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð½Ð½Ñ‹Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¿Ð¾Ð´ÑÑ‚Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾. ÐŸÐ¾ÑÐ»Ðµ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ.", false);
+      setInfo("Распознанные значения подставлены локально. После проверки нажмите Сохранить.", false);
     } catch (error) {
       state.photoImport.isProcessing = false;
       setPhotoImportStatus(
-        error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°.",
+        error instanceof Error ? error.message : "Не удалось распознать фото бланка.",
         true
       );
       renderPage();
@@ -12733,7 +12733,7 @@ function buildInitialPhotoLightboxState() {
     );
     state.photoImport = buildInitialPhotoImportState();
     if (hadPhoto) {
-      state.photoImport.status = "Ð”Ð°Ð½Ð½Ñ‹Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹. Ð¤Ð¾Ñ‚Ð¾ Ð¾Ñ‡Ð¸Ñ‰ÐµÐ½Ð¾, ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° Ð³Ð¾Ñ‚Ð¾Ð²Ð° Ðº Ð½Ð¾Ð²Ð¾Ð¹ Ð·Ð°Ð³Ñ€ÑƒÐ·ÐºÐµ Ð±Ð»Ð°Ð½ÐºÐ°.";
+      state.photoImport.status = "Данные сохранены. Фото очищено, страница готова к новой загрузке бланка.";
       state.photoImport.isError = false;
     }
   }
@@ -12752,7 +12752,7 @@ function buildInitialPhotoLightboxState() {
       next.lastReportDate = state.photoImport.lastReportDate || "";
       next.notes = Array.isArray(state.photoImport.notes) ? [...state.photoImport.notes] : [];
       next.cellReviews = Array.isArray(state.photoImport.cellReviews) ? [...state.photoImport.cellReviews] : [];
-      next.status = "Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð½Ð½Ñ‹Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¾ÑÑ‚Ð°ÑŽÑ‚ÑÑ Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð¸Ñ… Ð¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ.";
+      next.status = "Распознанные значения остаются в таблице локально. Проверьте их и нажмите Сохранить.";
     }
     state.photoImport = next;
     renderPage();
@@ -12838,10 +12838,10 @@ function buildInitialPhotoLightboxState() {
     resetDepartmentRowValuesFromLoaded(reviewState.lastAppliedKeys || []);
     reviewState.draftMode = false;
     reviewState.workflowStatus = "processed";
-    reviewState.status = "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚Ð° Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ð°Ñ Telegram Ñ„Ð¾Ñ€Ð¼Ð°. Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð¸ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ ÐºÐ½Ð¾Ð¿ÐºÐ¾Ð¹ Ð½Ð¸Ð¶Ðµ.";
+    reviewState.status = "Открыта отправленная Telegram форма. Выберите источник обновления кнопкой ниже.";
     reviewState.isError = false;
     state.telegramFormReview = reviewState;
-    setInfo("ÐžÑ‚ÐºÑ€Ñ‹Ñ‚Ð° Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ð°Ñ Telegram Ñ„Ð¾Ñ€Ð¼Ð°. Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ, Ð±Ñ€Ð°Ñ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Ñ„Ð¾Ñ‚Ð¾ Ð¸Ð»Ð¸ Ð¸Ð· Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹.", false);
+    setInfo("Открыта отправленная Telegram форма. Выберите, брать данные из фото или из Telegram формы.", false);
     renderPage();
   }
 
@@ -12851,7 +12851,7 @@ function buildInitialPhotoLightboxState() {
     }
     state.photoImport.draftMode = false;
     state.photoImport.workflowStatus = "processed";
-    state.photoImport.status = "Ð¤Ð¾Ñ‚Ð¾ Ð¾ÑÑ‚Ð°Ð²Ð»ÐµÐ½Ð¾ Ð´Ð»Ñ ÑÐ²ÐµÑ€ÐºÐ¸. Ð§Ñ‚Ð¾Ð±Ñ‹ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¿Ð¾ Ð½ÐµÐ¼Ñƒ, Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Â«Ð’Ð·ÑÑ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Ñ„Ð¾Ñ‚Ð¾Â»." ;
+    state.photoImport.status = "Фото оставлено для сверки. Чтобы обновить таблицу по нему, нажмите «Взять данные из фото»." ;
     state.photoImport.isError = false;
   }
 
@@ -12861,7 +12861,7 @@ function buildInitialPhotoLightboxState() {
     }
     state.telegramFormReview.draftMode = false;
     state.telegramFormReview.workflowStatus = "processed";
-    state.telegramFormReview.status = "Telegram Ñ„Ð¾Ñ€Ð¼Ð° Ð¾ÑÑ‚Ð°Ð²Ð»ÐµÐ½Ð° Ð´Ð»Ñ ÑÐ²ÐµÑ€ÐºÐ¸. Ð§Ñ‚Ð¾Ð±Ñ‹ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¿Ð¾ Ð½ÐµÐ¹, Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Â«Ð’Ð·ÑÑ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¸Ð· Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹Â».";
+    state.telegramFormReview.status = "Telegram форма оставлена для сверки. Чтобы обновить таблицу по ней, нажмите «Взять данные из Telegram формы».";
     state.telegramFormReview.isError = false;
   }
 
@@ -12975,13 +12975,13 @@ function buildInitialPhotoLightboxState() {
       const title = department
         ? `${department.marker || item.detectedDepartmentId} - ${department.department}`
         : ({
-          queued: "Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸",
-          preparing: "ÐŸÐ¾Ð´Ð³Ð¾Ñ‚Ð°Ð²Ð»Ð¸Ð²Ð°ÐµÑ‚ÑÑ",
-          ready: "Ð“Ð¾Ñ‚Ð¾Ð²Ð¾ Ðº Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐµ",
-          detecting: "ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»ÑÐµÑ‚ÑÑ",
-          detected: "ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¾",
-          failed: "ÐÐµ Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð½Ð¾"
-        }[item.stage] || "ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ");
+          queued: "В очереди",
+          preparing: "Подготавливается",
+          ready: "Готово к отправке",
+          detecting: "Определяется",
+          detected: "Определено",
+          failed: "Не распознано"
+        }[item.stage] || "Ожидание");
 
       return `
         <div class="photo-import-result-item">
@@ -13033,7 +13033,7 @@ function buildInitialPhotoLightboxState() {
     if (!(await ensureMainPhotoSaveDirectoryPermission(selectedDirectoryHandle))) {
       return {
         handle: selectedDirectoryHandle,
-        name: selectedDirectoryHandle.name || "Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½Ð°Ñ Ð¿Ð°Ð¿ÐºÐ°",
+        name: selectedDirectoryHandle.name || "выбранная папка",
         needsPermission: true
       };
     }
@@ -13041,7 +13041,7 @@ function buildInitialPhotoLightboxState() {
     if (typeof selectedDirectoryHandle.getDirectoryHandle !== "function") {
       return {
         handle: selectedDirectoryHandle,
-        name: selectedDirectoryHandle.name || "Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½Ð°Ñ Ð¿Ð°Ð¿ÐºÐ°"
+        name: selectedDirectoryHandle.name || "выбранная папка"
       };
     }
 
@@ -13054,7 +13054,7 @@ function buildInitialPhotoLightboxState() {
 
   async function chooseMainPhotoSaveDirectory() {
     if (!canUseMainPhotoSaveDirectory()) {
-      setMainPhotoRouteStatus("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ Ð² Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½ÑƒÑŽ Ð¿Ð°Ð¿ÐºÑƒ. Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹Ñ‚Ðµ Chrome Ð¸Ð»Ð¸ Edge.", true);
+      setMainPhotoRouteStatus("Браузер не поддерживает сохранение в выбранную папку. Используйте Chrome или Edge.", true);
       renderPage();
       return false;
     }
@@ -13078,18 +13078,18 @@ function buildInitialPhotoLightboxState() {
         : "MFPictures";
       setMainPhotoRouteStatus(
         hasPermission
-          ? `ÐŸÐ°Ð¿ÐºÐ° Ð´Ð»Ñ ÐºÐ¾Ð¿Ð¸Ð¹ Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð°: ${state.mainPhotoSaveDirectoryName}. ÐŸÐ¾ÑÐ»Ðµ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ñ„Ð¾Ñ‚Ð¾ Ð±ÑƒÐ´ÐµÑ‚ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾ Ñ‚ÑƒÐ´Ð°.`
-          : "ÐŸÐ°Ð¿ÐºÐ° Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð°, Ð½Ð¾ Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð½Ðµ Ð´Ð°Ð» Ð¿Ñ€Ð°Ð²Ð¾ Ð·Ð°Ð¿Ð¸ÑÐ¸. Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð¿Ð°Ð¿ÐºÑƒ ÐµÑ‰Ñ‘ Ñ€Ð°Ð· Ð¸ Ñ€Ð°Ð·Ñ€ÐµÑˆÐ¸Ñ‚Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ.",
+          ? `Папка для копий выбрана: ${state.mainPhotoSaveDirectoryName}. После определения отделения фото будет сохранено туда.`
+          : "Папка выбрана, но браузер не дал право записи. Выберите папку ещё раз и разрешите сохранение.",
         !hasPermission
       );
       renderPage();
       return hasPermission;
     } catch (error) {
       if (error && error.name === "AbortError") {
-        setMainPhotoRouteStatus("ÐŸÐ°Ð¿ÐºÐ° MFPictures Ð½Ðµ Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð°. Ð¤Ð¾Ñ‚Ð¾ Ð¾Ð±Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÑŽÑ‚ÑÑ, Ð½Ð¾ ÐºÐ¾Ð¿Ð¸Ð¸ Ð½Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÑ‚ÑÑ Ð½Ð° Ð´Ð¸ÑÐº.", true);
+        setMainPhotoRouteStatus("Папка MFPictures не выбрана. Фото обработаются, но копии не сохранятся на диск.", true);
       } else {
         setMainPhotoRouteStatus(
-          error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð²Ñ‹Ð±Ñ€Ð°Ñ‚ÑŒ Ð¿Ð°Ð¿ÐºÑƒ Ð´Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ñ„Ð¾Ñ‚Ð¾.",
+          error instanceof Error ? error.message : "Не удалось выбрать папку для сохранения фото.",
           true
         );
       }
@@ -13125,7 +13125,7 @@ function buildInitialPhotoLightboxState() {
   function dataUrlToBlob(dataUrl) {
     const [header, base64Payload] = String(dataUrl || "").split(",");
     if (!header || !base64Payload) {
-      throw new Error("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ.");
+      throw new Error("Не удалось подготовить фото для сохранения.");
     }
 
     const mimeMatch = header.match(/^data:([^;]+);base64$/i);
@@ -13164,12 +13164,12 @@ function buildInitialPhotoLightboxState() {
       return false;
     }
     if (typeof sync.queueDepartmentPhoto !== "function") {
-      throw new Error("ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð° Ð² Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¼ Ñ€ÐµÐ¶Ð¸Ð¼Ðµ.");
+      throw new Error("Очередь фото отделений недоступна в текущем режиме.");
     }
 
     const department = config.getDepartmentById(item.departmentId);
     const notes = [
-      "Ð¤Ð¾Ñ‚Ð¾ Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½Ð¾ Ñ Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¿Ð¾ÑÐ»Ðµ Ð°Ð²Ñ‚Ð¾Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.",
+      "Фото загружено с главной страницы после автоопределения отделения.",
       ...(Array.isArray(item.notes) ? item.notes : [])
     ];
     const result = await sync.queueDepartmentPhoto(
@@ -13181,7 +13181,7 @@ function buildInitialPhotoLightboxState() {
     applyLoadedSnapshot(result);
 
     if (department) {
-      setInfo(`ÐÐ¾Ð²Ñ‹Ð¹ Ð±Ð»Ð°Ð½Ðº Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½ Ð² Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ: ${department.department}.`, false);
+      setInfo(`Новый бланк добавлен в очередь отделения: ${department.department}.`, false);
     }
 
     return true;
@@ -13228,10 +13228,10 @@ function buildInitialPhotoLightboxState() {
     const selectionNotes = [];
 
     if (isFolderSelection && folderName) {
-      selectionNotes.push(`ÐŸÐ°Ð¿ÐºÐ° Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð°: ${folderName}.`);
+      selectionNotes.push(`Папка проверена: ${folderName}.`);
     }
     if (skippedFilesCount > 0) {
-      selectionNotes.push(`ÐŸÑ€Ð¾Ð¿ÑƒÑ‰ÐµÐ½Ð¾ Ñ„Ð°Ð¹Ð»Ð¾Ð² Ð±ÐµÐ· Ð¿Ð¾Ð´Ñ…Ð¾Ð´ÑÑ‰ÐµÐ³Ð¾ Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ: ${skippedFilesCount}.`);
+      selectionNotes.push(`Пропущено файлов без подходящего изображения: ${skippedFilesCount}.`);
     }
 
     if (!selectedFiles.length) {
@@ -13239,8 +13239,8 @@ function buildInitialPhotoLightboxState() {
       state.mainPhotoRoute.notes = selectionNotes;
       setMainPhotoRouteStatus(
         isFolderSelection
-          ? "Ð’ Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½Ð¾Ð¹ Ð¿Ð°Ð¿ÐºÐµ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾ Ð¿Ð¾Ð´Ñ…Ð¾Ð´ÑÑ‰Ð¸Ñ… Ñ„Ð¾Ñ‚Ð¾Ð³Ñ€Ð°Ñ„Ð¸Ð¹ Ð±Ð»Ð°Ð½ÐºÐ¾Ð²."
-          : "ÐÐµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾ Ð¿Ð¾Ð´Ñ…Ð¾Ð´ÑÑ‰Ð¸Ñ… Ñ„Ð°Ð¹Ð»Ð¾Ð² Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ð¹.",
+          ? "В выбранной папке не найдено подходящих фотографий бланков."
+          : "Не найдено подходящих файлов изображений.",
         true
       );
       renderPage();
@@ -13256,10 +13256,10 @@ function buildInitialPhotoLightboxState() {
       state.mainPhotoRoute.batchItems = selectedFiles.map((item, index) => buildMainPhotoRouteBatchItem(item, index));
       state.mainPhotoRoute.batchTotalCount = selectedFiles.length;
       state.mainPhotoRoute.notes = selectionNotes;
-      setMainPhotoRouteStatus(`ÐŸÐ¾Ð´Ð³Ð¾Ñ‚Ð°Ð²Ð»Ð¸Ð²Ð°ÑŽ ${selectedFiles.length} Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ð¿Ð°ÐºÐµÑ‚Ð½Ð¾Ð¹ Ð¾Ð±Ñ€Ð°Ð±Ð¾Ñ‚ÐºÐ¸...`, false);
+      setMainPhotoRouteStatus(`Подготавливаю ${selectedFiles.length} фото для пакетной обработки...`, false);
       renderPage();
       if (isFolderSelection) {
-        setMainPhotoRouteStatus(`ÐŸÐ°Ð¿ÐºÐ° Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð°: Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾ ${selectedFiles.length} Ð¿Ð¾Ð´Ñ…Ð¾Ð´ÑÑ‰Ð¸Ñ… Ñ„Ð¾Ñ‚Ð¾. ÐŸÐ¾Ð´Ð³Ð¾Ñ‚Ð°Ð²Ð»Ð¸Ð²Ð°ÑŽ Ð¸Ñ… Ðº Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐµ...`, false);
+        setMainPhotoRouteStatus(`Папка проверена: найдено ${selectedFiles.length} подходящих фото. Подготавливаю их к отправке...`, false);
         renderPage();
       }
 
@@ -13272,7 +13272,7 @@ function buildInitialPhotoLightboxState() {
             batchItem.stage = "preparing";
           }
           setMainPhotoRouteStatus(
-            `ÐŸÐ¾Ð´Ð³Ð¾Ñ‚Ð°Ð²Ð»Ð¸Ð²Ð°ÑŽ Ñ„Ð¾Ñ‚Ð¾ ${index + 1} Ð¸Ð· ${selectedFiles.length}: ${currentFile.name || "image"}`,
+            `Подготавливаю фото ${index + 1} из ${selectedFiles.length}: ${currentFile.name || "image"}`,
             false
           );
           renderPage();
@@ -13297,7 +13297,7 @@ function buildInitialPhotoLightboxState() {
         const canAutoDetect = sync.hasRemoteSync() && typeof sync.detectDepartmentPhoto === "function";
         if (canAutoDetect) {
           setMainPhotoRouteStatus(
-            `Ð¤Ð¾Ñ‚Ð¾ Ð³Ð¾Ñ‚Ð¾Ð²Ñ‹. ÐŸÐ¾ÑÐ»ÐµÐ´Ð¾Ð²Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÑŽ ${preparedItems.length} ÑÐ½Ð¸Ð¼ÐºÐ¾Ð² Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€...`,
+            `Фото готовы. Последовательно отправляю ${preparedItems.length} снимков на сервер...`,
             false
           );
           renderPage();
@@ -13305,13 +13305,13 @@ function buildInitialPhotoLightboxState() {
           return;
         }
 
-        setMainPhotoRouteStatus("ÐŸÐ°ÐºÐµÑ‚Ð½Ð°Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ° Ñ„Ð¾Ñ‚Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð° Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.", true);
+        setMainPhotoRouteStatus("Пакетная отправка фото доступна только в онлайн-режиме владельца.", true);
         renderPage();
         return;
       } catch (error) {
         state.mainPhotoRoute = buildInitialMainPhotoRouteState();
         setMainPhotoRouteStatus(
-          error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.",
+          error instanceof Error ? error.message : "Не удалось подготовить фото для определения отделения.",
           true
         );
         renderPage();
@@ -13327,7 +13327,7 @@ function buildInitialPhotoLightboxState() {
     state.mainPhotoRoute.isProcessing = true;
     state.mainPhotoRoute.imageName = file.name || "";
     state.mainPhotoRoute.notes = selectionNotes;
-    setMainPhotoRouteStatus("ÐŸÐ¾Ð´Ð³Ð¾Ñ‚Ð°Ð²Ð»Ð¸Ð²Ð°ÑŽ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ...", false);
+    setMainPhotoRouteStatus("Подготавливаю фото для определения отделения...", false);
     renderPage();
 
     try {
@@ -13336,21 +13336,21 @@ function buildInitialPhotoLightboxState() {
       state.mainPhotoRoute.isProcessing = false;
       const canAutoDetect = sync.hasRemoteSync() && typeof sync.detectDepartmentPhoto === "function";
       const orientationNote = preparedPhoto.rotatedToLandscape
-        ? " Ð¤Ð¾Ñ‚Ð¾ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð²Ñ‹Ñ€Ð¾Ð²Ð½ÐµÐ½Ð¾: Ð½Ð°Ð´Ð¿Ð¸ÑÑŒ SR Ð¿ÐµÑ€ÐµÐ¼ÐµÑ‰ÐµÐ½Ð° Ð²Ð¿Ñ€Ð°Ð²Ð¾ Ð²Ð²ÐµÑ€Ñ…."
+        ? " Фото автоматически выровнено: надпись SR перемещена вправо вверх."
         : "";
       if (canAutoDetect) {
-        setMainPhotoRouteStatus(`Ð¤Ð¾Ñ‚Ð¾ Ð³Ð¾Ñ‚Ð¾Ð²Ð¾: ${file.name || "image"}.${orientationNote} ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÑÑŽ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ...`, false);
+        setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Автоматически определяю отделение...`, false);
         renderPage();
         await handleMainPhotoRouteDetection();
         return;
       }
 
-      setMainPhotoRouteStatus(`Ð¤Ð¾Ñ‚Ð¾ Ð³Ð¾Ñ‚Ð¾Ð²Ð¾: ${file.name || "image"}.${orientationNote} ÐÐ°Ð¶Ð¼Ð¸Ñ‚Ðµ "ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ".`, false);
+      setMainPhotoRouteStatus(`Фото готово: ${file.name || "image"}.${orientationNote} Нажмите "Определить".`, false);
       renderPage();
     } catch (error) {
       state.mainPhotoRoute = buildInitialMainPhotoRouteState();
       setMainPhotoRouteStatus(
-        error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.",
+        error instanceof Error ? error.message : "Не удалось подготовить фото для определения отделения.",
         true
       );
       renderPage();
@@ -13372,7 +13372,7 @@ function buildInitialPhotoLightboxState() {
       ...buildInitialPhotoLightboxState(),
       open: true,
       imageDataUrl,
-      alt: alt || "Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°",
+      alt: alt || "Фото бланка",
       sourceKind: typeof sourceKind === "string" ? sourceKind : "",
       sourceId: sourceId == null ? "" : String(sourceId),
       isRotating: false,
@@ -13483,7 +13483,7 @@ function buildInitialPhotoLightboxState() {
         isRotating: false
       };
       renderPage();
-      setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾.", true);
+      setInfo(error instanceof Error ? error.message : "Не удалось повернуть фото.", true);
     }
   }
 
@@ -13617,7 +13617,7 @@ function buildInitialPhotoLightboxState() {
     if (!sync.hasRemoteSync() || typeof sync.saveDepartmentFromMain !== "function") {
       state.photoLightbox = {
         ...lightbox,
-        status: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ OCR Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.",
+        status: "Сохранение OCR доступно только в онлайн-режиме владельца.",
         statusIsError: true
       };
       renderPage();
@@ -13627,7 +13627,7 @@ function buildInitialPhotoLightboxState() {
     if (state.activeMainTableSavedPreviewKey) {
       state.photoLightbox = {
         ...lightbox,
-        status: "Ð’ÐµÑ€Ð½Ð¸Ñ‚ÐµÑÑŒ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ OCR Ð² Ð³Ð»Ð°Ð²Ð½ÑƒÑŽ ÑÑ‚Ñ€Ð¾ÐºÑƒ.",
+        status: "Вернитесь к текущей таблице, чтобы сохранить OCR в главную строку.",
         statusIsError: true
       };
       renderPage();
@@ -13637,7 +13637,7 @@ function buildInitialPhotoLightboxState() {
     if (getMainTableDirtyRows().length) {
       state.photoLightbox = {
         ...lightbox,
-        status: "Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¸Ð»Ð¸ ÑÐ½Ð¸Ð¼Ð¸Ñ‚Ðµ Ñ€ÑƒÑ‡Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ.",
+        status: "Сначала сохраните или снимите ручные изменения в главной таблице.",
         statusIsError: true
       };
       renderPage();
@@ -13647,7 +13647,7 @@ function buildInitialPhotoLightboxState() {
     if (state.mainTableSaveInFlight) {
       state.photoLightbox = {
         ...lightbox,
-        status: "Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑƒÐ¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ. ÐŸÐ¾Ð´Ð¾Ð¶Ð´Ð¸Ñ‚Ðµ.",
+        status: "Главная таблица уже сохраняется. Подождите.",
         statusIsError: true
       };
       renderPage();
@@ -13658,7 +13658,7 @@ function buildInitialPhotoLightboxState() {
     if (!context?.record || !context.boundRow) {
       state.photoLightbox = {
         ...lightbox,
-        status: "Ð£ ÑÑ‚Ð¾Ð³Ð¾ Ñ„Ð¾Ñ‚Ð¾ Ð½ÐµÑ‚ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð¹ Ð¿Ñ€Ð¸Ð²ÑÐ·ÐºÐ¸ Ðº ÑÑ‚Ñ€Ð¾ÐºÐµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.",
+        status: "У этого фото нет корректной привязки к строке отделения.",
         statusIsError: true
       };
       renderPage();
@@ -13668,7 +13668,7 @@ function buildInitialPhotoLightboxState() {
     if (!context.validation.applicable || !context.validation.isValid) {
       state.photoLightbox = {
         ...lightbox,
-        status: context.validation.failedChecks.map((item) => item.failureMessage).join(" ") || "ÐšÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒÐ½Ñ‹Ðµ ÑÑƒÐ¼Ð¼Ñ‹ OCR Ð½Ðµ ÑÐ¾ÑˆÐ»Ð¸ÑÑŒ.",
+        status: context.validation.failedChecks.map((item) => item.failureMessage).join(" ") || "Контрольные суммы OCR не сошлись.",
         statusIsError: true
       };
       renderPage();
@@ -13678,7 +13678,7 @@ function buildInitialPhotoLightboxState() {
     state.photoLightbox = {
       ...lightbox,
       isSaving: true,
-      status: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð² ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ...",
+      status: "Сохраняю OCR данные в строку отделения...",
       statusIsError: false
     };
     renderPage();
@@ -13695,7 +13695,7 @@ function buildInitialPhotoLightboxState() {
       const draftRow = deepCopy(saveContext.boundRow);
       const appliedKeys = applyPreviewValuesToDepartmentRow(draftRow, saveContext.previewValues, saveContext.recognizedKeys);
       if (!appliedKeys.length) {
-        throw new Error("Ð’ OCR Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ Ð½ÐµÑ‚ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ð¹ Ð´Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ.");
+        throw new Error("В OCR таблице нет значений для сохранения.");
       }
 
       const expectedValues = config.normalizeRowValues(draftRow.values);
@@ -13714,16 +13714,16 @@ function buildInitialPhotoLightboxState() {
       state.photoLightbox = {
         ...state.photoLightbox,
         isSaving: false,
-        status: `OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹. ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾: ${formatTimestamp(verification.savedRow.updatedAt)}.`,
+        status: `OCR данные сохранены. Обновлено: ${formatTimestamp(verification.savedRow.updatedAt)}.`,
         statusIsError: false
       };
-      setInfo(`OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð´Ð»Ñ ${draftRow.department} ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ.`, false);
+      setInfo(`OCR данные для ${draftRow.department} сохранены в основную таблицу.`, false);
       renderPage();
     } catch (error) {
       state.photoLightbox = {
         ...state.photoLightbox,
         isSaving: false,
-        status: error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ OCR Ð´Ð°Ð½Ð½Ñ‹Ðµ.",
+        status: error instanceof Error ? error.message : "Не удалось сохранить OCR данные.",
         statusIsError: true
       };
       renderPage();
@@ -13746,29 +13746,29 @@ function buildInitialPhotoLightboxState() {
     const departmentName = department ? department.department : departmentIdToDelete;
 
     if (!departmentIdToDelete || !feedbackId) {
-      setInfo("Ð£ ÑÑ‚Ð¾Ð³Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð½ÐµÑ‚ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ñ… Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð´Ð»Ñ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ.", false);
+      setInfo("У этого отделения нет отправленных данных для удаления.", false);
       return;
     }
 
     if (typeof sync.deleteDepartmentFeedback !== "function") {
-      setInfo("Ð£Ð´Ð°Ð»ÐµÐ½Ð¸Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ñ… Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð¿Ð¾ÐºÐ° Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾. ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚Ðµ Ñ„Ð°Ð¹Ð»Ñ‹ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.", true);
+      setInfo("Удаление отправленных данных пока недоступно. Обновите файлы синхронизации.", true);
       return;
     }
 
-    const confirmed = window.confirm(`Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ ${departmentName}? ÐžÑÐ½Ð¾Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð½Ðµ Ð¸Ð·Ð¼ÐµÐ½Ð¸Ñ‚ÑÑ.`);
+    const confirmed = window.confirm(`Удалить отправленные данные отделения ${departmentName}? Основная таблица не изменится.`);
     if (!confirmed) {
       return;
     }
 
     button.disabled = true;
-    setInfo(`Ð£Ð´Ð°Ð»ÑÑŽ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ: ${departmentName}...`, false);
+    setInfo(`Удаляю отправленные данные: ${departmentName}...`, false);
     try {
       const result = await sync.deleteDepartmentFeedback(departmentIdToDelete, feedbackId);
       applyLoadedSnapshot(result);
-      setInfo(`ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ ÑƒÐ´Ð°Ð»ÐµÐ½Ñ‹: ${departmentName}.`, false);
+      setInfo(`Отправленные данные удалены: ${departmentName}.`, false);
       renderPage();
     } catch (error) {
-      setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑƒÐ´Ð°Ð»Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ.", true);
+      setInfo(error instanceof Error ? error.message : "Не удалось удалить отправленные данные.", true);
       button.disabled = false;
     }
   }
@@ -13833,22 +13833,22 @@ function buildInitialPhotoLightboxState() {
     const departmentName = department?.department || record?.departmentName || departmentIdToDelete || `feedback ${feedbackId}`;
 
     if (!Number.isFinite(feedbackId)) {
-      setInfo("Ð£ ÑÑ‚Ð¾Ð³Ð¾ Ñ„Ð¾Ñ‚Ð¾ Ð½ÐµÑ‚ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð¹ Ð¿Ñ€Ð¸Ð²ÑÐ·ÐºÐ¸ Ðº Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸ÑŽ Ð´Ð»Ñ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ.", true);
+      setInfo("У этого фото нет корректной привязки к отделению для удаления.", true);
       return;
     }
 
     if (typeof sync.deleteDepartmentFeedback !== "function") {
-      setInfo("Ð£Ð´Ð°Ð»ÐµÐ½Ð¸Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð¿Ð¾ÐºÐ° Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾. ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚Ðµ Ñ„Ð°Ð¹Ð»Ñ‹ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.", true);
+      setInfo("Удаление фото пока недоступно. Обновите файлы синхронизации.", true);
       return;
     }
 
-    const confirmed = window.confirm(`Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ ${departmentName} Ñ ÑÐµÑ€Ð²ÐµÑ€Ð°?`);
+    const confirmed = window.confirm(`Удалить фото бланка отделения ${departmentName} с сервера?`);
     if (!confirmed) {
       return;
     }
 
     button.disabled = true;
-    setInfo(`Ð£Ð´Ð°Ð»ÑÑŽ Ñ„Ð¾Ñ‚Ð¾: ${departmentName}...`, false);
+    setInfo(`Удаляю фото: ${departmentName}...`, false);
     try {
       const result = await sync.deleteDepartmentFeedback(departmentIdToDelete || "", feedbackId);
       removeMainTablePhotoGalleryRecord(feedbackId);
@@ -13856,10 +13856,10 @@ function buildInitialPhotoLightboxState() {
         closePhotoLightbox();
       }
       applyLoadedSnapshot(result);
-      setInfo(`Ð¤Ð¾Ñ‚Ð¾ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¾: ${departmentName}.`, false);
+      setInfo(`Фото удалено: ${departmentName}.`, false);
       renderPage();
     } catch (error) {
-      setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑƒÐ´Ð°Ð»Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°.", true);
+      setInfo(error instanceof Error ? error.message : "Не удалось удалить фото бланка.", true);
       button.disabled = false;
     }
   }
@@ -13870,19 +13870,19 @@ function buildInitialPhotoLightboxState() {
     const items = Array.isArray(bulkDeleteMeta.items) ? [...bulkDeleteMeta.items] : [];
 
     if (!items.length) {
-      setInfo("Ð”Ð»Ñ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Ð½ÐµÑ‚ Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½Ð½Ñ‹Ñ… Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ.", false);
+      setInfo("Для текущей таблицы нет загруженных фото для удаления.", false);
       return;
     }
     if (bulkDeleteMeta.isDeletingAll) {
       return;
     }
     if (typeof sync.deleteDepartmentFeedback !== "function" || !sync.hasRemoteSync?.()) {
-      setInfo("ÐœÐ°ÑÑÐ¾Ð²Ð¾Ðµ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.", true);
+      setInfo("Массовое удаление фото доступно только в онлайн-режиме владельца.", true);
       return;
     }
 
     const confirmed = window.confirm(
-      `Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ñ ÑÐµÑ€Ð²ÐµÑ€Ð° Ð²ÑÐµ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ð¸Ð· Ð±Ð»Ð¾ÐºÐ° Â«Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹Â»? Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð±ÑƒÐ´ÐµÑ‚ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¾: ${items.length}.`
+      `Удалить с сервера все фото бланков из блока «Фото бланков текущей таблицы»? Сейчас будет удалено: ${items.length}.`
     );
     if (!confirmed) {
       return;
@@ -13900,7 +13900,7 @@ function buildInitialPhotoLightboxState() {
       for (let index = 0; index < items.length; index += 1) {
         const item = items[index];
         const departmentName = item.departmentName || item.departmentId || item.rowId || `feedback ${item.feedbackId}`;
-        setInfo(`Ð£Ð´Ð°Ð»ÑÑŽ Ñ„Ð¾Ñ‚Ð¾ ${index + 1} Ð¸Ð· ${items.length}: ${departmentName}...`, false);
+        setInfo(`Удаляю фото ${index + 1} из ${items.length}: ${departmentName}...`, false);
         try {
           const result = await sync.deleteDepartmentFeedback(item.departmentId || item.rowId || "", item.feedbackId);
           lastResult = result;
@@ -13929,14 +13929,14 @@ function buildInitialPhotoLightboxState() {
           .slice(0, 3)
           .map(({ item, error }) => {
             const departmentName = item.departmentName || item.departmentId || item.rowId || `feedback ${item.feedbackId}`;
-            const reason = error instanceof Error && error.message ? error.message : "Ð¾ÑˆÐ¸Ð±ÐºÐ° ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ";
+            const reason = error instanceof Error && error.message ? error.message : "ошибка удаления";
             return `${departmentName} (${reason})`;
           })
           .join("; ");
-        const extraFailures = failedItems.length > 3 ? ` Ð•Ñ‰Ñ‘ Ð¾ÑˆÐ¸Ð±Ð¾Ðº: ${failedItems.length - 3}.` : "";
-        setInfo(`Ð£Ð´Ð°Ð»ÐµÐ½Ð¾ Ñ„Ð¾Ñ‚Ð¾: ${deletedCount} Ð¸Ð· ${items.length}. ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑƒÐ´Ð°Ð»Ð¸Ñ‚ÑŒ: ${failureSummary}.${extraFailures}`, true);
+        const extraFailures = failedItems.length > 3 ? ` Ещё ошибок: ${failedItems.length - 3}.` : "";
+        setInfo(`Удалено фото: ${deletedCount} из ${items.length}. Не удалось удалить: ${failureSummary}.${extraFailures}`, true);
       } else {
-        setInfo(`Ð’ÑÐµ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ ÑƒÐ´Ð°Ð»ÐµÐ½Ñ‹: ${deletedCount}.`, false);
+        setInfo(`Все фото бланков текущей таблицы удалены: ${deletedCount}.`, false);
       }
     } finally {
       state.mainTablePhotoGallery.isDeletingAll = false;
@@ -13957,13 +13957,13 @@ function buildInitialPhotoLightboxState() {
     }
 
     if (typeof sync.reassignOcrFeedbackDepartment !== "function") {
-      setInfo("ÐŸÐµÑ€ÐµÐ½Ð°Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð¿Ð¾ÐºÐ° Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾. ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚Ðµ Ñ„Ð°Ð¹Ð»Ñ‹ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.", true);
+      setInfo("Переназначение фото пока недоступно. Обновите файлы синхронизации.", true);
       select.value = currentDepartmentId;
       return;
     }
 
     const confirmed = window.confirm(
-      `ÐŸÐµÑ€ÐµÐ½ÐµÑÑ‚Ð¸ Ñ„Ð¾Ñ‚Ð¾ Ð¸Ð· "${currentDepartment?.department || currentDepartmentId}" Ð² "${nextDepartment?.department || nextDepartmentId}"?`
+      `Перенести фото из "${currentDepartment?.department || currentDepartmentId}" в "${nextDepartment?.department || nextDepartmentId}"?`
     );
     if (!confirmed) {
       select.value = currentDepartmentId;
@@ -13971,15 +13971,15 @@ function buildInitialPhotoLightboxState() {
     }
 
     select.disabled = true;
-    setInfo(`ÐŸÐµÑ€ÐµÐ½Ð°Ð·Ð½Ð°Ñ‡Ð°ÑŽ Ñ„Ð¾Ñ‚Ð¾ Ð² Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ ${nextDepartment?.department || nextDepartmentId}...`, false);
+    setInfo(`Переназначаю фото в отделение ${nextDepartment?.department || nextDepartmentId}...`, false);
     try {
       const result = await sync.reassignOcrFeedbackDepartment(feedbackId, nextDepartmentId);
       upsertMainTablePhotoGalleryRecord(result?.record);
       applyLoadedSnapshot(result);
-      setInfo(`Ð¤Ð¾Ñ‚Ð¾ Ð¿ÐµÑ€ÐµÐ½ÐµÑÐµÐ½Ð¾ Ð² Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ ${nextDepartment?.department || nextDepartmentId}.`, false);
+      setInfo(`Фото перенесено в отделение ${nextDepartment?.department || nextDepartmentId}.`, false);
       renderPage();
     } catch (error) {
-      setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¸Ð·Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð´Ð»Ñ Ñ„Ð¾Ñ‚Ð¾.", true);
+      setInfo(error instanceof Error ? error.message : "Не удалось изменить отделение для фото.", true);
       select.value = currentDepartmentId;
       select.disabled = false;
     }
@@ -14000,36 +14000,36 @@ function buildInitialPhotoLightboxState() {
     }
 
     if (!sync.hasRemoteSync() || typeof sync.saveDepartmentFromMain !== "function") {
-      setInfo("ÐžÐ±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ðµ Ð¿Ð¾ Telegram Web Ñ„Ð¾Ñ€Ð¼Ðµ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.", true);
+      setInfo("Обновление по Telegram Web форме доступно только в онлайн-режиме владельца.", true);
       return;
     }
     if (state.activeMainTableSavedPreviewKey) {
-      setInfo("Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð²ÐµÑ€Ð½Ð¸Ñ‚ÐµÑÑŒ Ðº Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ, Ð¿Ð¾Ñ‚Ð¾Ð¼ Ð¾Ð±Ð½Ð¾Ð²Ð»ÑÐ¹Ñ‚Ðµ ÐµÑ‘ Ð¿Ð¾ Telegram Web Ñ„Ð¾Ñ€Ð¼Ðµ.", true);
+      setInfo("Сначала вернитесь к текущей таблице, потом обновляйте её по Telegram Web форме.", true);
       return;
     }
     if (getMainTableDirtyRows().length) {
-      setInfo("Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¸Ð»Ð¸ Ð¾Ñ‚Ð¼ÐµÐ½Ð¸Ñ‚Ðµ Ñ€ÑƒÑ‡Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ.", true);
+      setInfo("Сначала сохраните или отмените ручные изменения в главной таблице.", true);
       return;
     }
     if (state.mainTableSaveInFlight) {
-      setInfo("Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑƒÐ¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ. ÐŸÐ¾Ð´Ð¾Ð¶Ð´Ð¸Ñ‚Ðµ Ð¿Ð°Ñ€Ñƒ ÑÐµÐºÑƒÐ½Ð´.", true);
+      setInfo("Главная таблица уже сохраняется. Подождите пару секунд.", true);
       return;
     }
 
     const record = getMainTableTelegramFormRecordById(feedbackId);
     if (!record) {
-      setInfo("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð½Ð°Ð¹Ñ‚Ð¸ Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½ÑƒÑŽ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñƒ.", true);
+      setInfo("Не удалось найти выбранную Telegram Web форму.", true);
       return;
     }
 
     const liveRow = getDepartmentRow(state.snapshot, record.departmentId);
     if (!liveRow) {
-      setInfo("Ð£ ÑÑ‚Ð¾Ð¹ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð½ÐµÑ‚ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð¹ Ð¿Ñ€Ð¸Ð²ÑÐ·ÐºÐ¸ Ðº ÑÑ‚Ñ€Ð¾ÐºÐµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.", true);
+      setInfo("У этой Telegram Web формы нет корректной привязки к строке отделения.", true);
       return;
     }
 
     button.disabled = true;
-    setInfo(`ÐžÐ±Ð½Ð¾Ð²Ð»ÑÑŽ Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¿Ð¾ Telegram Web Ñ„Ð¾Ñ€Ð¼Ðµ: ${liveRow.department}...`, false);
+    setInfo(`Обновляю основную таблицу по Telegram Web форме: ${liveRow.department}...`, false);
 
     try {
       const draftRow = deepCopy(liveRow);
@@ -14039,7 +14039,7 @@ function buildInitialPhotoLightboxState() {
         : Object.keys(previewValues);
       const appliedKeys = applyTelegramFormValuesToDepartmentRow(draftRow, previewValues, recognizedKeys);
       if (!appliedKeys.length) {
-        throw new Error("Ð’ ÑÑ‚Ð¾Ð¹ Telegram Web Ñ„Ð¾Ñ€Ð¼Ðµ Ð½ÐµÑ‚ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ð¹ Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð² Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ.");
+        throw new Error("В этой Telegram Web форме нет значений для записи в основную таблицу.");
       }
 
       const expectedValues = config.normalizeRowValues(draftRow.values);
@@ -14059,10 +14059,10 @@ function buildInitialPhotoLightboxState() {
 
       applyLoadedSnapshot(result);
       state.mainTableTelegramForms.lastLoadedAt = 0;
-      setInfo(`ÐžÑÐ½Ð¾Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð° Ð¿Ð¾ Telegram Web Ñ„Ð¾Ñ€Ð¼Ðµ: ${draftRow.department}.`, false);
+      setInfo(`Основная таблица обновлена по Telegram Web форме: ${draftRow.department}.`, false);
       renderPage();
     } catch (error) {
-      setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð¾ÑÐ½Ð¾Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¿Ð¾ Telegram Web Ñ„Ð¾Ñ€Ð¼Ðµ.", true);
+      setInfo(error instanceof Error ? error.message : "Не удалось обновить основную таблицу по Telegram Web форме.", true);
       button.disabled = false;
     }
   }
@@ -14075,29 +14075,29 @@ function buildInitialPhotoLightboxState() {
     const departmentName = department?.department || record?.departmentName || departmentId || `feedback ${feedbackId}`;
 
     if (!Number.isFinite(feedbackId) || !departmentId) {
-      setInfo("Ð£ ÑÑ‚Ð¾Ð¹ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð½ÐµÑ‚ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾Ð¹ Ð¿Ñ€Ð¸Ð²ÑÐ·ÐºÐ¸ Ðº Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸ÑŽ Ð´Ð»Ñ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ.", true);
+      setInfo("У этой Telegram Web формы нет корректной привязки к отделению для удаления.", true);
       return;
     }
     if (typeof sync.deleteDepartmentFeedback !== "function") {
-      setInfo("Ð£Ð´Ð°Ð»ÐµÐ½Ð¸Ðµ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð¿Ð¾ÐºÐ° Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾. ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚Ðµ Ñ„Ð°Ð¹Ð»Ñ‹ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.", true);
+      setInfo("Удаление Telegram Web формы пока недоступно. Обновите файлы синхронизации.", true);
       return;
     }
 
-    const confirmed = window.confirm(`Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ ${departmentName}?`);
+    const confirmed = window.confirm(`Удалить Telegram Web форму отделения ${departmentName}?`);
     if (!confirmed) {
       return;
     }
 
     button.disabled = true;
-    setInfo(`Ð£Ð´Ð°Ð»ÑÑŽ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñƒ: ${departmentName}...`, false);
+    setInfo(`Удаляю Telegram Web форму: ${departmentName}...`, false);
     try {
       const result = await sync.deleteDepartmentFeedback(departmentId, feedbackId);
       removeMainTableTelegramFormRecord(feedbackId);
       applyLoadedSnapshot(result);
-      setInfo(`Telegram Web Ñ„Ð¾Ñ€Ð¼Ð° ÑƒÐ´Ð°Ð»ÐµÐ½Ð°: ${departmentName}.`, false);
+      setInfo(`Telegram Web форма удалена: ${departmentName}.`, false);
       renderPage();
     } catch (error) {
-      setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑƒÐ´Ð°Ð»Ð¸Ñ‚ÑŒ Telegram Web Ñ„Ð¾Ñ€Ð¼Ñƒ.", true);
+      setInfo(error instanceof Error ? error.message : "Не удалось удалить Telegram Web форму.", true);
       button.disabled = false;
     }
   }
@@ -14110,44 +14110,44 @@ function buildInitialPhotoLightboxState() {
       : null;
     const batchPreviewItems = buildMainPhotoRouteBatchSummary(routeState);
     const saveDirectoryLabel = state.mainPhotoSaveDirectoryName
-      ? `Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑ‚ÑŒ: ${state.mainPhotoSaveDirectoryName}`
-      : "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑ‚ÑŒ: MFPictures";
+      ? `Сохранять: ${state.mainPhotoSaveDirectoryName}`
+      : "Сохранять: MFPictures";
 
     return `
       <section class="panel no-print photo-import-panel">
-        <h2>Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ° Ð² Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ</h2>
-        <p>Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð²Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð¿Ð°Ð¿ÐºÑƒ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ, ÐµÑÐ»Ð¸ Ð½ÑƒÐ¶Ð½Ñ‹ ÐºÐ¾Ð¿Ð¸Ð¸ Ð½Ð° Ð´Ð¸ÑÐº. ÐŸÐ¾Ñ‚Ð¾Ð¼ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°: ÑÐ¸ÑÑ‚ÐµÐ¼Ð° Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¸ Ð¾Ñ‚Ð¼ÐµÑ‚Ð¸Ñ‚ ÐµÐ³Ð¾ ÐºÑ€Ð°ÑÐ½Ð¾Ð¹ ÐºÐ½Ð¾Ð¿ÐºÐ¾Ð¹, ÐºÐ°Ðº Ð¿Ð¾ÑÐ»Ðµ Telegram.</p>
+        <h2>Фото бланка в отделение</h2>
+        <p>Сначала выберите папку сохранения, если нужны копии на диск. Потом загрузите фото бланка: система определит отделение и отметит его красной кнопкой, как после Telegram.</p>
         <div class="photo-import-save-actions">
           <button type="button" id="mainPhotoRouteSaveFolderBtn" ${!canUseMainPhotoSaveDirectory() || routeState.isProcessing ? "disabled" : ""}>
             ${escapeHtml(saveDirectoryLabel)}
           </button>
-          <span>Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Pictures Ð¸Ð»Ð¸ MFPictures Ð¾Ð´Ð¸Ð½ Ñ€Ð°Ð· Ð¿ÐµÑ€ÐµÐ´ Ð·Ð°Ð³Ñ€ÑƒÐ·ÐºÐ¾Ð¹.</span>
+          <span>Выберите Pictures или MFPictures один раз перед загрузкой.</span>
         </div>
         <div class="photo-import-actions">
           <label class="button-link photo-file-label${routeState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="mainPhotoRouteFile" accept="image/*" capture="environment" multiple ${routeState.isProcessing ? "disabled" : ""}>
-            Ð’Ñ‹Ð±Ñ€Ð°Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾
+            Выбрать фото
           </label>
           <label class="button-link photo-file-label${routeState.isProcessing ? " is-disabled" : ""}">
             <input type="file" id="mainPhotoRouteFolder" accept="image/*" webkitdirectory directory multiple ${routeState.isProcessing ? "disabled" : ""}>
-            ÐŸÐ°Ð¿ÐºÐ° Ñ„Ð¾Ñ‚Ð¾
+            Папка фото
           </label>
-          <button type="button" id="mainPhotoRouteZoomBtn" ${!routeState.imageDataUrl ? "disabled" : ""}>Ð£Ð²ÐµÐ»Ð¸Ñ‡Ð¸Ñ‚ÑŒ</button>
-          <button type="button" id="mainPhotoRouteRotateBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>ÐŸÐ¾Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ 90Â°</button>
+          <button type="button" id="mainPhotoRouteZoomBtn" ${!routeState.imageDataUrl ? "disabled" : ""}>Увеличить</button>
+          <button type="button" id="mainPhotoRouteRotateBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>Повернуть 90°</button>
           <button type="button" id="mainPhotoRouteDetectBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
-            ${routeState.isProcessing ? "ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»ÑÑŽ..." : "ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ"}
+            ${routeState.isProcessing ? "Определяю..." : "Определить"}
           </button>
           <button type="button" id="mainPhotoRouteRecheckBtn" ${!routeState.imageDataUrl || routeState.isProcessing || !canDetect ? "disabled" : ""}>
-            ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ Ð·Ð°Ð½Ð¾Ð²Ð¾
+            Проверить заново
           </button>
-          <button type="button" id="mainPhotoRouteClearBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>ÐžÑ‡Ð¸ÑÑ‚Ð¸Ñ‚ÑŒ</button>
+          <button type="button" id="mainPhotoRouteClearBtn" ${!routeState.imageDataUrl || routeState.isProcessing ? "disabled" : ""}>Очистить</button>
         </div>
         <p class="hint${routeState.isError ? " warning-note" : ""}" id="mainPhotoRouteStatus">${
           escapeHtml(
             routeState.status
             || (canDetect
-              ? "Ð›ÑƒÑ‡ÑˆÐµ Ð²ÑÐµÐ³Ð¾ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ„Ð¾Ñ‚Ð¾ Ð²ÑÐµÐ³Ð¾ Ð±Ð»Ð°Ð½ÐºÐ° Ñ Ð²Ð¸Ð´Ð¸Ð¼Ñ‹Ð¼ Ð¼Ð°Ñ€ÐºÐµÑ€Ð¾Ð¼ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¸ Ñ‡ÐµÑ‚ÐºÐ¾Ð¹ ÑˆÐ°Ð¿ÐºÐ¾Ð¹."
-              : "ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.")
+              ? "Лучше всего работает фото всего бланка с видимым маркером отделения и четкой шапкой."
+              : "Определение отделения доступно только в онлайн-режиме владельца.")
           )
         }</p>
         ${detectedDepartment || batchPreviewItems || (routeState.notes && routeState.notes.length) ? `
@@ -14155,12 +14155,12 @@ function buildInitialPhotoLightboxState() {
             ${detectedDepartment ? `
               <div class="photo-import-result-grid">
                 <div class="photo-import-result-item">
-                  <span>ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»Ñ‘Ð½Ð½Ð¾Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ</span>
+                  <span>Определённое отделение</span>
                   <strong>${escapeHtml(detectedDepartment.department)}</strong>
                 </div>
                 ${detectedDepartment.marker ? `
                   <div class="photo-import-result-item">
-                    <span>ÐœÐ°Ñ€ÐºÐµÑ€</span>
+                    <span>Маркер</span>
                     <strong>${escapeHtml(detectedDepartment.marker)}</strong>
                   </div>
                 ` : ""}
@@ -14178,7 +14178,7 @@ function buildInitialPhotoLightboxState() {
           <div class="photo-import-preview">
             <img
               src="${escapeHtml(routeState.imageDataUrl)}"
-              alt="Ð¤Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ"
+              alt="Фото для определения отделения"
               class="photo-import-preview-image"
               data-photo-zoom-trigger="main"
             >
@@ -14195,7 +14195,7 @@ function buildInitialPhotoLightboxState() {
 
     if (preparedItems.length > 1) {
       if (!sync.hasRemoteSync() || typeof sync.detectDepartmentPhoto !== "function") {
-        setMainPhotoRouteStatus("ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.", true);
+        setMainPhotoRouteStatus("Определение отделения доступно только в онлайн-режиме владельца.", true);
         renderPage();
         return;
       }
@@ -14216,7 +14216,7 @@ function buildInitialPhotoLightboxState() {
         notes: [],
         stage: "ready"
       }));
-      setMainPhotoRouteStatus(`ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»ÑÑŽ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¿Ð¾ ${preparedItems.length} Ñ„Ð¾Ñ‚Ð¾...`, false);
+      setMainPhotoRouteStatus(`Определяю отделения по ${preparedItems.length} фото...`, false);
       renderPage();
 
       try {
@@ -14231,7 +14231,7 @@ function buildInitialPhotoLightboxState() {
             batchItem.stage = "detecting";
           }
           setMainPhotoRouteStatus(
-            `ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÑÑŽ Ñ„Ð¾Ñ‚Ð¾ ${index + 1} Ð¸Ð· ${preparedItems.length}: ${preparedItem.imageName || "image"}`,
+            `Отправляю фото ${index + 1} из ${preparedItems.length}: ${preparedItem.imageName || "image"}`,
             false
           );
           renderPage();
@@ -14255,7 +14255,7 @@ function buildInitialPhotoLightboxState() {
           if (department) {
             void playDepartmentDetectedSound();
             setMainPhotoRouteStatus(
-              `ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾: ${department.department}. Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ Ñ„Ð¾Ñ‚Ð¾ ÐºÐ°Ðº Ð½Ð¾Ð²Ñ‹Ð¹ Ð±Ð»Ð°Ð½Ðº...`,
+              `Отделение найдено: ${department.department}. Сохраняю фото как новый бланк...`,
               false
             );
             renderPage();
@@ -14278,7 +14278,7 @@ function buildInitialPhotoLightboxState() {
               }
             } catch (saveError) {
               batchNotes.push(
-                `${preparedItem.imageName || `Ð¤Ð¾Ñ‚Ð¾ ${index + 1}`}: Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¾, Ð½Ð¾ ÐºÐ¾Ð¿Ð¸Ñ Ð½Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ð»Ð°ÑÑŒ (${saveError instanceof Error ? saveError.message : "Ð¾ÑˆÐ¸Ð±ÐºÐ° Ð·Ð°Ð¿Ð¸ÑÐ¸"}).`
+                `${preparedItem.imageName || `Фото ${index + 1}`}: отделение определено, но копия не сохранилась (${saveError instanceof Error ? saveError.message : "ошибка записи"}).`
               );
             }
             recognizedQueue.push({
@@ -14287,7 +14287,7 @@ function buildInitialPhotoLightboxState() {
             state.mainPhotoRoute.batchDetectedCount += 1;
           } else {
             state.mainPhotoRoute.batchFailedCount += 1;
-            batchNotes.push(`${preparedItem.imageName || `Ð¤Ð¾Ñ‚Ð¾ ${index + 1}`}: Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð½Ðµ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ð»Ð¾ÑÑŒ ÑƒÐ²ÐµÑ€ÐµÐ½Ð½Ð¾.`);
+            batchNotes.push(`${preparedItem.imageName || `Фото ${index + 1}`}: отделение не определилось уверенно.`);
           }
         }
 
@@ -14298,7 +14298,7 @@ function buildInitialPhotoLightboxState() {
 
         if (!recognizedQueue.length) {
           setMainPhotoRouteStatus(
-            "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑƒÐ²ÐµÑ€ÐµÐ½Ð½Ð¾ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¿Ð¾ Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½Ñ‹Ð¼ Ñ„Ð¾Ñ‚Ð¾. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ Ð±Ð¾Ð»ÐµÐµ Ñ‡Ñ‘Ñ‚ÐºÐ¸Ðµ ÑÐ½Ð¸Ð¼ÐºÐ¸ Ñ Ð²Ð¸Ð´Ð¸Ð¼Ñ‹Ð¼ SR Ð¸ ÑˆÐ°Ð¿ÐºÐ¾Ð¹.",
+            "Не удалось уверенно определить отделения по выбранным фото. Попробуйте более чёткие снимки с видимым SR и шапкой.",
             true
           );
           renderPage();
@@ -14306,10 +14306,10 @@ function buildInitialPhotoLightboxState() {
         }
 
         const saveStatusText = state.mainPhotoSaveDirectoryHandle
-          ? ` Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾ ÐºÐ¾Ð¿Ð¸Ð¹ Ð² ${state.mainPhotoSaveDirectoryName || "Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½ÑƒÑŽ Ð¿Ð°Ð¿ÐºÑƒ"}: ${savedCopyCount}.`
-          : " ÐšÐ¾Ð¿Ð¸Ð¸ Ð½Ð° Ð´Ð¸ÑÐº Ð½Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹: ÑÐ½Ð°Ñ‡Ð°Ð»Ð° Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Â«Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑ‚ÑŒ: MFPicturesÂ» Ð¸ Ð²Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Pictures Ð¸Ð»Ð¸ MFPictures.";
+          ? ` Сохранено копий в ${state.mainPhotoSaveDirectoryName || "выбранную папку"}: ${savedCopyCount}.`
+          : " Копии на диск не сохранены: сначала нажмите «Сохранять: MFPictures» и выберите Pictures или MFPictures.";
         setMainPhotoRouteStatus(
-          `ÐŸÐ°ÐºÐµÑ‚ Ð³Ð¾Ñ‚Ð¾Ð²: Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð½Ð¾ ${recognizedQueue.length} Ð¸Ð· ${preparedItems.length}. ÐšÐ½Ð¾Ð¿ÐºÐ¸ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ Ñ Ð½Ð¾Ð²Ñ‹Ð¼Ð¸ Ð±Ð»Ð°Ð½ÐºÐ°Ð¼Ð¸ Ð¿Ð¾Ð´ÑÐ²ÐµÑ‡ÐµÐ½Ñ‹ ÐºÑ€Ð°ÑÐ½Ñ‹Ð¼, ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð½Ðµ Ð¾Ñ‚ÐºÑ€Ñ‹Ð²Ð°Ð»Ð¸ÑÑŒ.${saveStatusText}`,
+          `Пакет готов: распознано ${recognizedQueue.length} из ${preparedItems.length}. Кнопки отделений с новыми бланками подсвечены красным, страницы не открывались.${saveStatusText}`,
           false
         );
         renderPage();
@@ -14317,7 +14317,7 @@ function buildInitialPhotoLightboxState() {
       } catch (error) {
         state.mainPhotoRoute.isProcessing = false;
         setMainPhotoRouteStatus(
-          error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¿Ð¾ Ñ„Ð¾Ñ‚Ð¾.",
+          error instanceof Error ? error.message : "Не удалось определить отделение по фото.",
           true
         );
         renderPage();
@@ -14325,13 +14325,13 @@ function buildInitialPhotoLightboxState() {
       }
     }
     if (!state.mainPhotoRoute.imageDataUrl) {
-      setMainPhotoRouteStatus("Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð²Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ñ„Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ°.", true);
+      setMainPhotoRouteStatus("Сначала выберите фото бланка.", true);
       renderPage();
       return;
     }
 
     if (!sync.hasRemoteSync() || typeof sync.detectDepartmentPhoto !== "function") {
-      setMainPhotoRouteStatus("ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.", true);
+      setMainPhotoRouteStatus("Определение отделения доступно только в онлайн-режиме владельца.", true);
       renderPage();
       return;
     }
@@ -14340,7 +14340,7 @@ function buildInitialPhotoLightboxState() {
     state.mainPhotoRoute.notes = [];
     state.mainPhotoRoute.detectedDepartmentId = "";
     state.mainPhotoRoute.detectedBy = "";
-    setMainPhotoRouteStatus("ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»ÑÑŽ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¿Ð¾ Ð¼Ð°Ñ€ÐºÐµÑ€Ñƒ Ð¸ ÑˆÐ°Ð¿ÐºÐµ Ð±Ð»Ð°Ð½ÐºÐ°...", false);
+    setMainPhotoRouteStatus("Определяю отделение по маркеру и шапке бланка...", false);
     renderPage();
 
     try {
@@ -14357,14 +14357,14 @@ function buildInitialPhotoLightboxState() {
       state.mainPhotoRoute.notes = notes;
 
       if (!detectedDepartmentId) {
-        setMainPhotoRouteStatus("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑƒÐ²ÐµÑ€ÐµÐ½Ð½Ð¾ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ Ñ„Ð¾Ñ‚Ð¾ Ñ Ð±Ð¾Ð»ÐµÐµ Ñ‡Ñ‘Ñ‚ÐºÐ¸Ð¼ Ð¼Ð°Ñ€ÐºÐµÑ€Ð¾Ð¼ Ð¸ ÑˆÐ°Ð¿ÐºÐ¾Ð¹.", true);
+        setMainPhotoRouteStatus("Не удалось уверенно определить отделение. Попробуйте фото с более чётким маркером и шапкой.", true);
         renderPage();
         return;
       }
 
       const department = config.getDepartmentById(detectedDepartmentId);
       if (!department) {
-        setMainPhotoRouteStatus("ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ð»Ð¾ÑÑŒ Ð½ÐµÐ¸Ð·Ð²ÐµÑÑ‚Ð½Ð¾Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÐµÑ‰Ñ‘ Ñ€Ð°Ð·.", true);
+        setMainPhotoRouteStatus("Определилось неизвестное отделение. Попробуйте ещё раз.", true);
         renderPage();
         return;
       }
@@ -14381,26 +14381,26 @@ function buildInitialPhotoLightboxState() {
       await queueMainPhotoRouteDepartmentPhoto(queuedItem);
 
       let saveStatusText = state.mainPhotoSaveDirectoryHandle
-        ? " ÐšÐ¾Ð¿Ð¸Ñ Ð½Ð° Ð´Ð¸ÑÐº Ð½Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð°: Ð½ÐµÑ‚ Ñ€Ð°Ð·Ñ€ÐµÑˆÐµÐ½Ð¸Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸."
-        : " ÐšÐ¾Ð¿Ð¸Ñ Ð½Ð° Ð´Ð¸ÑÐº Ð½Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð°: ÑÐ½Ð°Ñ‡Ð°Ð»Ð° Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Â«Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑ‚ÑŒ: MFPicturesÂ» Ð¸ Ð²Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Pictures Ð¸Ð»Ð¸ MFPictures.";
+        ? " Копия на диск не сохранена: нет разрешения записи."
+        : " Копия на диск не сохранена: сначала нажмите «Сохранять: MFPictures» и выберите Pictures или MFPictures.";
       try {
         const saveResult = await saveMainPhotoRouteCopy(queuedItem, 1);
         if (saveResult.ok) {
-          saveStatusText = ` ÐšÐ¾Ð¿Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð°: ${saveResult.fileName}.`;
+          saveStatusText = ` Копия сохранена: ${saveResult.fileName}.`;
         }
       } catch (saveError) {
-        saveStatusText = ` ÐšÐ¾Ð¿Ð¸Ñ Ð½Ð° Ð´Ð¸ÑÐº Ð½Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð°: ${saveError instanceof Error ? saveError.message : "Ð¾ÑˆÐ¸Ð±ÐºÐ° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ"}.`;
+        saveStatusText = ` Копия на диск не сохранена: ${saveError instanceof Error ? saveError.message : "ошибка сохранения"}.`;
       }
 
       setMainPhotoRouteStatus(
-        `ÐžÐ¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¾ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ: ${department.department}. Ð¤Ð¾Ñ‚Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾ ÐºÐ°Ðº Ð½Ð¾Ð²Ñ‹Ð¹ Ð±Ð»Ð°Ð½Ðº, ÐºÐ½Ð¾Ð¿ÐºÐ° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¿Ð¾Ð´ÑÐ²ÐµÑ‡ÐµÐ½Ð° ÐºÑ€Ð°ÑÐ½Ñ‹Ð¼.${saveStatusText}`,
+        `Определено отделение: ${department.department}. Фото сохранено как новый бланк, кнопка отделения подсвечена красным.${saveStatusText}`,
         false
       );
       renderPage();
     } catch (error) {
       state.mainPhotoRoute.isProcessing = false;
       setMainPhotoRouteStatus(
-        error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¿Ð¾ Ñ„Ð¾Ñ‚Ð¾.",
+        error instanceof Error ? error.message : "Не удалось определить отделение по фото.",
         true
       );
       renderPage();
@@ -14431,8 +14431,8 @@ function buildInitialPhotoLightboxState() {
     const canRecognize = sync.hasRemoteSync() && typeof sync.recognizeDepartmentPhoto === "function";
     setPhotoImportStatus(
       canRecognize
-        ? "Ð¤Ð¾Ñ‚Ð¾ Ð¿ÐµÑ€ÐµÐ½ÐµÑÐµÐ½Ð¾ Ð½Ð° ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ. ÐŸÐ¾Ð²ÐµÑ€Ð½Ð¸Ñ‚Ðµ ÐµÐ³Ð¾ Ð¿Ñ€Ð¸ Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾ÑÑ‚Ð¸, Ð·Ð°Ñ‚ÐµÐ¼ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ \"Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ñ‚ÑŒ\"."
-        : "Ð¤Ð¾Ñ‚Ð¾ Ð¿ÐµÑ€ÐµÐ½ÐµÑÐµÐ½Ð¾ Ð½Ð° ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ. Ð”Ð»Ñ Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð²Ð°Ð½Ð¸Ñ Ð½ÑƒÐ¶ÐµÐ½ Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.",
+        ? "Фото перенесено на страницу отделения. Поверните его при необходимости, затем нажмите \"Распознать\"."
+        : "Фото перенесено на страницу отделения. Для распознавания нужен онлайн-режим владельца.",
       !canRecognize
     );
     renderPage();
@@ -14472,7 +14472,7 @@ function buildInitialPhotoLightboxState() {
       state.photoImport.recognizedValues = buildPhotoPreviewValuesFromRecord(record);
       state.photoImport.notes = normalizeOcrNotes(record.notes);
       state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
-      state.photoImport.status = "Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ° Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½Ð¾ Ð¸Ð· Telegram. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¸ Ð¿Ñ€Ð¸ Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾ÑÑ‚Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ.";
+      state.photoImport.status = "Фото бланка загружено из Telegram. Проверьте значения и при необходимости сохраните.";
       state.photoImport.isError = false;
       renderPage();
     } catch (_error) {
@@ -14521,8 +14521,8 @@ function buildInitialPhotoLightboxState() {
       state.photoImport.notes = normalizeOcrNotes(recordNotes);
       state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
       state.photoImport.status = preparedPhoto.rotatedToLandscape
-        ? "Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ° Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½Ð¾ Ð¸Ð· Telegram Ð¸ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð²Ñ‹Ñ€Ð¾Ð²Ð½ÐµÐ½Ð¾: SR ÑÐ²ÐµÑ€Ñ…Ñƒ ÑÐ¿Ñ€Ð°Ð²Ð°. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¸ Ð¿Ñ€Ð¸ Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾ÑÑ‚Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ."
-        : "Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ° Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½Ð¾ Ð¸Ð· Telegram. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¸ Ð¿Ñ€Ð¸ Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾ÑÑ‚Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ.";
+        ? "Фото бланка загружено из Telegram и автоматически выровнено: SR сверху справа. Проверьте значения и при необходимости сохраните."
+        : "Фото бланка загружено из Telegram. Проверьте значения и при необходимости сохраните.";
       state.photoImport.isError = false;
       void playPhotoReceivedSound();
       renderPage();
@@ -14561,8 +14561,8 @@ function buildInitialPhotoLightboxState() {
         state.photoImport.notes = normalizeOcrNotes(recordNotes);
         state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
         state.photoImport.status = preparedPhoto.rotatedToLandscape
-          ? "Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ° Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½Ð¾ Ð¸Ð· Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð·ÐµÑ€ÐºÐ°Ð»Ð° Ð¸ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð²Ñ‹Ñ€Ð¾Ð²Ð½ÐµÐ½Ð¾: SR ÑÐ²ÐµÑ€Ñ…Ñƒ ÑÐ¿Ñ€Ð°Ð²Ð°. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¸ Ð¿Ñ€Ð¸ Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾ÑÑ‚Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ."
-          : "Ð¤Ð¾Ñ‚Ð¾ Ð±Ð»Ð°Ð½ÐºÐ° Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½Ð¾ Ð¸Ð· Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð·ÐµÑ€ÐºÐ°Ð»Ð°. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¸ Ð¿Ñ€Ð¸ Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾ÑÑ‚Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ.";
+          ? "Фото бланка загружено из локального зеркала и автоматически выровнено: SR сверху справа. Проверьте значения и при необходимости сохраните."
+          : "Фото бланка загружено из локального зеркала. Проверьте значения и при необходимости сохраните.";
         state.photoImport.isError = false;
         renderPage();
       } catch (_mirrorError) {
@@ -14614,7 +14614,7 @@ function buildInitialPhotoLightboxState() {
           feedbackId: candidateId
         });
         if (applyToDepartment && state.telegramFormReview.draftMode) {
-          setInfo("ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð½Ð°Ñ Telegram Ñ„Ð¾Ñ€Ð¼Ð° Ð¿Ð¾Ð´ÑÑ‚Ð°Ð²Ð»ÐµÐ½Ð° Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ. ÐŸÐ¾ÑÐ»Ðµ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ.", false);
+          setInfo("Отправленная Telegram форма подставлена в таблицу отделения. После проверки нажмите Сохранить.", false);
         }
         renderPage();
         return;
@@ -14624,8 +14624,8 @@ function buildInitialPhotoLightboxState() {
           state.telegramFormReview.feedbackId = String(candidateId);
           state.telegramFormReview.workflowStatus = "pending";
           state.telegramFormReview.status = error instanceof Error
-            ? `ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹: ${error.message}`
-            : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹.";
+            ? `Не удалось загрузить данные Telegram формы: ${error.message}`
+            : "Не удалось загрузить данные Telegram формы.";
           state.telegramFormReview.isError = true;
           renderPage();
           return;
@@ -14694,10 +14694,10 @@ function buildInitialPhotoLightboxState() {
       state.photoImport.notes = normalizeOcrNotes(recordNotes);
       state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
       state.photoImport.status = workflowStatus === "pending"
-        ? "ÐÐ¾Ð²Ñ‹Ð¹ Ð±Ð»Ð°Ð½Ðº Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¿Ð¾ÑÐ»Ðµ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð¾Ðº."
-        : "ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½ Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¹ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ð¹ Ð±Ð»Ð°Ð½Ðº Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.";
+        ? "Новый бланк загружен. Проверьте значения и сохраните данные после корректировок."
+        : "Показан последний сохранённый бланк отделения.";
       if (preparedPhoto.rotatedToLandscape) {
-        state.photoImport.status = `Ð¤Ð¾Ñ‚Ð¾ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð²Ñ‹Ñ€Ð¾Ð²Ð½ÐµÐ½Ð¾: SR ÑÐ²ÐµÑ€Ñ…Ñƒ ÑÐ¿Ñ€Ð°Ð²Ð°. ${state.photoImport.status}`;
+        state.photoImport.status = `Фото автоматически выровнено: SR сверху справа. ${state.photoImport.status}`;
       }
       state.photoImport.isError = false;
       if (workflowStatus === "pending") {
@@ -14742,10 +14742,10 @@ function buildInitialPhotoLightboxState() {
         state.photoImport.notes = normalizeOcrNotes(recordNotes);
         state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
         state.photoImport.status = workflowStatus === "pending"
-          ? "ÐÐ¾Ð²Ñ‹Ð¹ Ð±Ð»Ð°Ð½Ðº Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½ Ð¸Ð· Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð·ÐµÑ€ÐºÐ°Ð»Ð°. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¿Ð¾ÑÐ»Ðµ ÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð¾Ðº."
-          : "ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½ Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¹ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ð¹ Ð±Ð»Ð°Ð½Ðº Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¸Ð· Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð·ÐµÑ€ÐºÐ°Ð»Ð°.";
+          ? "Новый бланк загружен из локального зеркала. Проверьте значения и сохраните данные после корректировок."
+          : "Показан последний сохранённый бланк отделения из локального зеркала.";
         if (preparedPhoto.rotatedToLandscape) {
-          state.photoImport.status = `Ð¤Ð¾Ñ‚Ð¾ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð²Ñ‹Ñ€Ð¾Ð²Ð½ÐµÐ½Ð¾: SR ÑÐ²ÐµÑ€Ñ…Ñƒ ÑÐ¿Ñ€Ð°Ð²Ð°. ${state.photoImport.status}`;
+          state.photoImport.status = `Фото автоматически выровнено: SR сверху справа. ${state.photoImport.status}`;
         }
         state.photoImport.isError = false;
         renderPage();
@@ -14789,9 +14789,9 @@ function buildInitialPhotoLightboxState() {
       <h1>${escapeHtml(PRINT_REPORT_TITLE)}</h1>
     </div>
     <div class="archive-print-meta">
-      <p><strong>ÐÑ€Ñ…Ð¸Ð²Ð½Ð°Ñ Ð´Ð°Ñ‚Ð°:</strong> ${escapeHtml(record.archiveLabel)}</p>
-      <p><strong>Ð¡Ð½Ð¸Ð¼Ð¾Ðº ÑÐ¾Ð·Ð´Ð°Ð½:</strong> ${escapeHtml(formatTimestamp(record.capturedAt))}</p>
-      <p><strong>Ð”Ð°Ñ‚Ð° Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ð°:</strong> ${escapeHtml(record.reportDate)}</p>
+      <p><strong>Архивная дата:</strong> ${escapeHtml(record.archiveLabel)}</p>
+      <p><strong>Снимок создан:</strong> ${escapeHtml(formatTimestamp(record.capturedAt))}</p>
+      <p><strong>Дата документа:</strong> ${escapeHtml(record.reportDate)}</p>
     </div>
     <div class="sheet-shell">
       <div class="table-wrap">
@@ -14813,7 +14813,7 @@ function buildInitialPhotoLightboxState() {
   function printArchiveRecord(archiveKey) {
     const record = ensureArchiveRecordsLoaded().find((item) => item.archiveKey === archiveKey);
     if (!record) {
-      setInfo("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð½Ð°Ð¹Ñ‚Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ð¹ Ð°Ñ€Ñ…Ð¸Ð².", true);
+      setInfo("Не удалось найти сохранённый архив.", true);
       return;
     }
 
@@ -14826,18 +14826,18 @@ function buildInitialPhotoLightboxState() {
       window.setTimeout(() => {
         URL.revokeObjectURL(blobUrl);
       }, 60000);
-      setInfo(`ÐÑ€Ñ…Ð¸Ð² ${record.archiveLabel} Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ Ð´Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð² PDF.`, false);
+      setInfo(`Архив ${record.archiveLabel} открыт для сохранения в PDF.`, false);
       return;
     }
     if (!printWindow) {
-      setInfo("Ð‘Ñ€Ð°ÑƒÐ·ÐµÑ€ Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð» Ð¾ÐºÐ½Ð¾ Ð¿ÐµÑ‡Ð°Ñ‚Ð¸ Ð°Ñ€Ñ…Ð¸Ð²Ð°.", true);
+      setInfo("Браузер заблокировал окно печати архива.", true);
       return;
     }
 
     printWindow.document.open();
     printWindow.document.write(buildArchivePrintHtml(record));
     printWindow.document.close();
-    setInfo(`ÐÑ€Ñ…Ð¸Ð² ${record.archiveLabel} Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ Ð´Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð² PDF.`, false);
+    setInfo(`Архив ${record.archiveLabel} открыт для сохранения в PDF.`, false);
   }
 
   function setInfo(message, isError) {
@@ -14851,8 +14851,8 @@ function buildInitialPhotoLightboxState() {
     renderPage();
     setInfo(
       state.mainTableUnlocked
-        ? "Ð ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ Ð²ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¾."
-        : "Ð ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹ ÑÐ½Ð¾Ð²Ð° Ð·Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½Ð¾.",
+        ? "Редактирование главной таблицы включено."
+        : "Редактирование главной таблицы снова заблокировано.",
       false
     );
   }
@@ -14963,11 +14963,11 @@ function buildInitialPhotoLightboxState() {
         const fallback = await loadDesktopMirrorSnapshotResult();
         const fallbackMessage = error instanceof Error && error.message
           ? error.message
-          : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ñ ÑÐµÑ€Ð²ÐµÑ€Ð°.";
+          : "Не удалось загрузить данные с сервера.";
         result = {
           ...fallback,
           source: "desktop-mirror",
-          warning: `ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½Ð° Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ Ð´Ð°Ð½Ð½Ñ‹Ñ…: ${fallbackMessage}`
+          warning: `Показана локальная копия данных: ${fallbackMessage}`
         };
       }
     } else {
@@ -14989,7 +14989,7 @@ function buildInitialPhotoLightboxState() {
     event.preventDefault();
 
     if (!sync.hasRemoteSync()) {
-      setGateStatusText("Ð—Ð°Ñ‰Ð¸Ñ‰Ñ‘Ð½Ð½Ñ‹Ð¹ Ð²Ñ…Ð¾Ð´ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ñ€Ð¸ Ð²ÐºÐ»ÑŽÑ‡Ñ‘Ð½Ð½Ð¾Ð¹ Ð¾Ð½Ð»Ð°Ð¹Ð½-ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Supabase.", true);
+      setGateStatusText("Защищённый вход работает только при включённой онлайн-синхронизации Supabase.", true);
       return;
     }
 
@@ -15000,7 +15000,7 @@ function buildInitialPhotoLightboxState() {
     if (submitButton instanceof HTMLButtonElement) {
       submitButton.disabled = true;
     }
-    setGateStatusText("ÐŸÑ€Ð¾Ð²ÐµÑ€ÑÑŽ ÐºÐ¾Ð´ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°...", false);
+    setGateStatusText("Проверяю код доступа...", false);
 
     try {
       await sync.verifyDepartmentAccess(departmentId, accessCode);
@@ -15020,7 +15020,7 @@ function buildInitialPhotoLightboxState() {
     } catch (error) {
       clearCurrentDepartmentUnlock();
       setGateStatusText(
-        error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ñ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ ÐºÐ¾Ð´ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°.",
+        error instanceof Error ? error.message : "Не удалось проверить код доступа.",
         true
       );
       if (submitButton instanceof HTMLButtonElement) {
@@ -15035,7 +15035,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     state.mainPhotoRoute.isProcessing = true;
-    setMainPhotoRouteStatus("ÐŸÐ¾Ð²Ð¾Ñ€Ð°Ñ‡Ð¸Ð²Ð°ÑŽ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð¾Ñ€Ð¸ÐµÐ½Ñ‚Ð°Ñ†Ð¸Ð¸...", false);
+    setMainPhotoRouteStatus("Поворачиваю фото для проверки ориентации...", false);
     renderPage();
 
     try {
@@ -15043,12 +15043,12 @@ function buildInitialPhotoLightboxState() {
       state.mainPhotoRoute.detectedDepartmentId = "";
       state.mainPhotoRoute.detectedDepartmentName = "";
       state.mainPhotoRoute.isProcessing = false;
-      setMainPhotoRouteStatus("Ð¤Ð¾Ñ‚Ð¾ Ð²Ñ€ÑƒÑ‡Ð½ÑƒÑŽ Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÑ‚Ð¾ Ð½Ð° 90Â°. Ð•ÑÐ»Ð¸ Ð¾Ñ€Ð¸ÐµÐ½Ñ‚Ð°Ñ†Ð¸Ñ Ð¿Ñ€Ð°Ð²Ð¸Ð»ÑŒÐ½Ð°Ñ, Ð·Ð°Ð¿ÑƒÑÐºÐ°Ð¹Ñ‚Ðµ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.", false);
+      setMainPhotoRouteStatus("Фото вручную повернуто на 90°. Если ориентация правильная, запускайте определение отделения.", false);
       renderPage();
     } catch (error) {
       state.mainPhotoRoute.isProcessing = false;
       setMainPhotoRouteStatus(
-        error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾.",
+        error instanceof Error ? error.message : "Не удалось повернуть фото.",
         true
       );
       renderPage();
@@ -15123,7 +15123,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     if (isDepartmentAccessProtected() && !getAccessCode()) {
-      setInfo("Ð”Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð½ÑƒÐ¶ÐµÐ½ ÐºÐ¾Ð´ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.", true);
+      setInfo("Для сохранения нужен код отделения.", true);
       return;
     }
 
@@ -15142,7 +15142,7 @@ function buildInitialPhotoLightboxState() {
     const previousStats = buildFreshnessStats(previousRows);
     const previousOverall = getOverallUpdateStatus(previousStats, previousRows.length);
     const saveId = ++state.saveSequence;
-    setInfo(manual ? "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ..." : "ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÑÑŽ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð² Ð¾Ð±Ñ‰Ð¸Ð¹ Ñ„Ð°Ð¹Ð»...", false);
+    setInfo(manual ? "Сохраняю данные отделения..." : "Отправляю изменения в общий файл...", false);
 
     try {
       let lastError = null;
@@ -15191,14 +15191,14 @@ function buildInitialPhotoLightboxState() {
             if (state.photoImport.feedbackId) {
               state.photoImport.workflowStatus = "processed";
               if (state.photoImport.imageDataUrl) {
-                state.photoImport.status = "ÐŸÐ¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¹ Ð±Ð»Ð°Ð½Ðº ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½ Ð²Ð¼ÐµÑÑ‚Ðµ Ñ Ð´Ð°Ð½Ð½Ñ‹Ð¼Ð¸ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.";
+                state.photoImport.status = "Последний бланк сохранён вместе с данными отделения.";
                 state.photoImport.isError = false;
               }
             }
             if (state.telegramFormReview && state.telegramFormReview.feedbackId && state.telegramFormReview.draftMode) {
               state.telegramFormReview.draftMode = false;
               state.telegramFormReview.workflowStatus = "processed";
-              state.telegramFormReview.status = "Telegram Ñ„Ð¾Ñ€Ð¼Ð° Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð° Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð° Ð² Ð¾Ð±Ñ‰ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ.";
+              state.telegramFormReview.status = "Telegram форма проверена и сохранена в общую таблицу.";
               state.telegramFormReview.isError = false;
             }
 
@@ -15208,7 +15208,7 @@ function buildInitialPhotoLightboxState() {
               } catch (feedbackError) {
                 feedbackWarning = feedbackError instanceof Error
                   ? feedbackError.message
-                  : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ OCR feedback.";
+                  : "Не удалось сохранить OCR feedback.";
               }
             }
 
@@ -15218,12 +15218,12 @@ function buildInitialPhotoLightboxState() {
               await playUpdateSound();
             }
 
-            setInfo(manual ? "Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹. ÐŸÑ€Ð¾Ð²ÐµÑ€ÐºÐ° Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½Ð°." : "Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð¸ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ° Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½Ð°.", false);
+            setInfo(manual ? "Данные отделения сохранены. Проверка записи пройдена." : "Изменения отправлены и проверка записи пройдена.", false);
             if (result.source === "pending-sync") {
               setInfo(
                 manual
-                  ? "Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð² Ð¾Ñ„Ð»Ð°Ð¹Ð½-Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ."
-                  : "Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð¸ Ð¶Ð´ÑƒÑ‚ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.",
+                  ? "Данные отделения сохранены локально и добавлены в офлайн-очередь."
+                  : "Изменения отделения сохранены и ждут синхронизации.",
                 false
               );
             }
@@ -15231,7 +15231,7 @@ function buildInitialPhotoLightboxState() {
             resetPhotoImportAfterSuccessfulSave();
             renderPage();
             if (manual && wasPhotoQueueMode) {
-              setInfo("Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹, Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ° Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½Ð°. ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¾Ðµ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚Ð¸Ðµ ÑÐ»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ñ… ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ† Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¾.", false);
+              setInfo("Данные отделения сохранены, проверка записи пройдена. Автоматическое открытие следующих страниц отключено.", false);
             }
             return;
           }
@@ -15242,7 +15242,7 @@ function buildInitialPhotoLightboxState() {
 
         if (attempt < SAVE_VERIFICATION_ATTEMPTS) {
           setInfo(
-            `ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸Ðµ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð½Ðµ Ð¿Ñ€Ð¾ÑˆÐ»Ð¾. ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€ÑÑŽ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ (${attempt + 1}/${SAVE_VERIFICATION_ATTEMPTS})...`,
+            `Подтверждение записи не прошло. Повторяю сохранение (${attempt + 1}/${SAVE_VERIFICATION_ATTEMPTS})...`,
             false
           );
           await wait(SAVE_VERIFICATION_DELAY_MS);
@@ -15250,20 +15250,20 @@ function buildInitialPhotoLightboxState() {
       }
 
       const failureMessage = lastError
-        ? `ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¿Ð¾ÑÐ»Ðµ ${SAVE_VERIFICATION_ATTEMPTS} Ð¿Ð¾Ð¿Ñ‹Ñ‚Ð¾Ðº: ${lastError instanceof Error ? lastError.message : "Ð¾ÑˆÐ¸Ð±ÐºÐ° ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸"}.`
-        : `ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð¿Ð¾ÑÐ»Ðµ ${SAVE_VERIFICATION_ATTEMPTS} Ð¿Ð¾Ð¿Ñ‹Ñ‚Ð¾Ðº: ${lastVerificationReason || "ÑÐµÑ€Ð²ÐµÑ€ Ð²ÐµÑ€Ð½ÑƒÐ» Ð½ÐµÐ¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½Ð½Ñ‹Ð¹ Ñ€ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚"}.`;
+        ? `Не удалось сохранить данные отделения после ${SAVE_VERIFICATION_ATTEMPTS} попыток: ${lastError instanceof Error ? lastError.message : "ошибка синхронизации"}.`
+        : `Не удалось подтвердить сохранение данных после ${SAVE_VERIFICATION_ATTEMPTS} попыток: ${lastVerificationReason || "сервер вернул неподтверждённый результат"}.`;
 
       setPendingMainSaveNotice(`${row.department}: ${failureMessage}`, true);
       setInfo(failureMessage, true);
       refreshTableData();
     } catch (error) {
-      setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ.", true);
+      setInfo(error instanceof Error ? error.message : "Не удалось сохранить данные отделения.", true);
     }
   }
 
   async function persistReportDate() {
     syncCurrentReportDate();
-    setInfo("Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ Ð´Ð°Ñ‚Ñƒ Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ð°...", false);
+    setInfo("Сохраняю дату документа...", false);
     try {
       const result = await sync.saveReportDate(state.snapshot.reportDate);
       state.snapshot = deepCopy(result.snapshot);
@@ -15275,13 +15275,13 @@ function buildInitialPhotoLightboxState() {
       }
       setInfo(
         result.source === "pending-sync"
-          ? "Ð”Ð°Ñ‚Ð° Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð° Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð° Ð² Ð¾Ñ„Ð»Ð°Ð¹Ð½-Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ."
-          : "Ð”Ð°Ñ‚Ð° Ð´Ð¾ÐºÑƒÐ¼ÐµÐ½Ñ‚Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð°.",
+          ? "Дата документа сохранена локально и добавлена в офлайн-очередь."
+          : "Дата документа сохранена.",
         false
       );
       refreshTableData();
     } catch (error) {
-      setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð´Ð°Ñ‚Ñƒ.", true);
+      setInfo(error instanceof Error ? error.message : "Не удалось сохранить дату.", true);
     }
   }
 
@@ -15292,16 +15292,16 @@ function buildInitialPhotoLightboxState() {
       return;
     }
     if (hasPhotoImportDraft()) {
-      setInfo("Ð Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð½Ð½Ñ‹Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¿Ð¾ÐºÐ° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð¸Ñ… Ð¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ.", false);
+      setInfo("Распознанные значения пока сохранены только локально. Проверьте их и нажмите Сохранить.", false);
       return;
     }
-    setInfo("Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾. ÐÐ°Ð¶Ð¼Ð¸ Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð´Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸.", false);
+    setInfo("Изменения сохранены локально. Нажми Сохранить для отправки.", false);
   }
 
   async function persistMainTableChanges() {
     const validation = getMainTableValidationState();
     if (!validation.dirtyRows.length) {
-      setInfo("Ð’ Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ðµ Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚ Ð½Ð¾Ð²Ñ‹Ñ… Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ Ð´Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ.", false);
+      setInfo("В главной таблице пока нет новых изменений для сохранения.", false);
       refreshMainTableSaveState();
       return;
     }
@@ -15318,7 +15318,7 @@ function buildInitialPhotoLightboxState() {
     refreshMainTableSaveState();
     const saveId = ++state.mainTableSaveSequence;
     syncCurrentReportDate();
-    setInfo(`Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ Ð³Ð»Ð°Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ: ÑÑ‚Ñ€Ð¾Ðº ${validation.dirtyRows.length}...`, false);
+    setInfo(`Сохраняю главную таблицу: строк ${validation.dirtyRows.length}...`, false);
 
     try {
       let lastResult = null;
@@ -15346,11 +15346,11 @@ function buildInitialPhotoLightboxState() {
       setInfo(
         lastResult.source === "pending-sync"
           ? savedRecord
-            ? `Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð° Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð° Ð² Ð¾Ñ„Ð»Ð°Ð¹Ð½-Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ. Ð¡Ð½Ð¸Ð¼Ð¾Ðº: ${savedRecord.dateLabel} ${savedRecord.slotLabel}.`
-            : "Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð° Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð° Ð² Ð¾Ñ„Ð»Ð°Ð¹Ð½-Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ."
+            ? `Главная таблица сохранена локально и добавлена в офлайн-очередь. Снимок: ${savedRecord.dateLabel} ${savedRecord.slotLabel}.`
+            : "Главная таблица сохранена локально и добавлена в офлайн-очередь."
           : savedRecord
-            ? `Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð°. Ð¡Ð½Ð¸Ð¼Ð¾Ðº: ${savedRecord.dateLabel} ${savedRecord.slotLabel}.`
-            : "Ð“Ð»Ð°Ð²Ð½Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð°.",
+            ? `Главная таблица сохранена. Снимок: ${savedRecord.dateLabel} ${savedRecord.slotLabel}.`
+            : "Главная таблица сохранена.",
         false
       );
       refreshTableData();
@@ -15358,7 +15358,7 @@ function buildInitialPhotoLightboxState() {
       if (saveId !== state.mainTableSaveSequence) {
         return;
       }
-      setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð³Ð»Ð°Ð²Ð½ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ.", true);
+      setInfo(error instanceof Error ? error.message : "Не удалось сохранить главную таблицу.", true);
     } finally {
       if (saveId === state.mainTableSaveSequence) {
         state.mainTableSaveInFlight = false;
@@ -15408,7 +15408,7 @@ function buildInitialPhotoLightboxState() {
     clearBackgroundPendingSyncSchedule();
     if (!statusBefore.hasPending) {
       if (!silent) {
-        setInfo("ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+        setInfo("Очередь синхронизации пуста.", false);
       }
       refreshTableData();
       return {
@@ -15418,7 +15418,7 @@ function buildInitialPhotoLightboxState() {
       };
     }
     if (!sync.hasRemoteSync()) {
-      const message = "Ð”Ð»Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ñ… Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ Ð²ÐºÐ»ÑŽÑ‡Ð¸Ñ‚Ðµ Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼.";
+      const message = "Для отправки накопленных изменений включите онлайн-режим.";
       if (!silent) {
         setInfo(message, true);
       }
@@ -15431,7 +15431,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     if (!silent) {
-      setInfo(`Ð¡Ð¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€ÑƒÑŽ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ: ${statusBefore.count}...`, false);
+      setInfo(`Синхронизирую накопленные изменения: ${statusBefore.count}...`, false);
     }
     refreshTableData();
 
@@ -15456,7 +15456,7 @@ function buildInitialPhotoLightboxState() {
         }
 
         if (!silent) {
-          setInfo(syncedCount > 0 ? `ÐÐ°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€: ${syncedCount}.` : "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+          setInfo(syncedCount > 0 ? `Накопленные изменения отправлены на сервер: ${syncedCount}.` : "Очередь синхронизации пуста.", false);
         }
         renderPage();
       } else {
@@ -15469,7 +15469,7 @@ function buildInitialPhotoLightboxState() {
         restorePendingMainSaveNotice();
         refreshTableData();
         if (!silent) {
-          setInfo(syncedCount > 0 ? `ÐÐ°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€: ${syncedCount}.` : "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°.", false);
+          setInfo(syncedCount > 0 ? `Накопленные изменения отправлены на сервер: ${syncedCount}.` : "Очередь синхронизации пуста.", false);
         }
       }
       return {
@@ -15486,7 +15486,7 @@ function buildInitialPhotoLightboxState() {
       } catch (_reloadError) {
       }
 
-      const message = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ.";
+      const message = error instanceof Error ? error.message : "Не удалось синхронизировать накопленные изменения.";
       state.pendingSyncAutoRetryAfter = Date.now() + AUTO_PENDING_SYNC_RETRY_MS;
       if (!silent) {
         setInfo(message, true);
@@ -15513,16 +15513,16 @@ function buildInitialPhotoLightboxState() {
   }
 
   async function refreshFromSource() {
-    if (blockPhotoImportDraftAction("Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ñ€Ð°ÑÐ¿Ð¾Ð·Ð½Ð°Ð½Ð½Ñ‹Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ, Ð¿Ð¾Ñ‚Ð¾Ð¼ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ñ ÑÐµÑ€Ð²ÐµÑ€Ð°.")) {
+    if (blockPhotoImportDraftAction("Сначала сохраните распознанные значения, потом обновите данные с сервера.")) {
       return;
     }
     if (mode === "main" && hasMainTablePendingLocalChanges()) {
-      setInfo("Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹, Ð¿Ð¾Ñ‚Ð¾Ð¼ Ð¾Ð±Ð½Ð¾Ð²Ð»ÑÐ¹Ñ‚Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ñ ÑÐµÑ€Ð²ÐµÑ€Ð°.", true);
+      setInfo("Сначала сохраните изменения главной таблицы, потом обновляйте данные с сервера.", true);
       return;
     }
 
     syncCurrentReportDate();
-    setInfo("ÐžÐ±Ð½Ð¾Ð²Ð»ÑÑŽ Ð´Ð°Ð½Ð½Ñ‹Ðµ...", false);
+    setInfo("Обновляю данные...", false);
     const result = await sync.loadSnapshot();
     applyLoadedSnapshot(result);
     state.photoImport = buildInitialPhotoImportState();
@@ -15535,7 +15535,7 @@ function buildInitialPhotoLightboxState() {
     if (restorePendingMainSaveNotice()) {
       refreshTableData();
     } else {
-      setInfo("Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ñ‹.", false);
+      setInfo("Данные обновлены.", false);
     }
     renderPage();
     if (mode === "department") {
@@ -15608,18 +15608,18 @@ function buildInitialPhotoLightboxState() {
           button.disabled = true;
         }
 
-        setInfo("ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÑÑŽ Report.pdf Ð¸ MAINFLOW.pdf Ð² Telegram...", false);
+        setInfo("Отправляю Report.pdf и MAINFLOW.pdf в Telegram...", false);
         try {
           if (typeof sync.sendMainPdfsToTelegram !== "function") {
-            throw new Error("ÐžÑ‚Ð¿Ñ€Ð°Ð²ÐºÐ° PDF Ð² Telegram Ð¿Ð¾ÐºÐ° Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð°.");
+            throw new Error("Отправка PDF в Telegram пока недоступна.");
           }
           const result = await sync.sendMainPdfsToTelegram();
           const sent = result && result.result && typeof result.result.sent === "number"
             ? result.result.sent
             : 0;
-          setInfo(`PDF Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð² Telegram: Report.pdf Ð¸ MAINFLOW.pdf. ÐŸÐ¾Ð»ÑƒÑ‡Ð°Ñ‚ÐµÐ»ÐµÐ¹: ${sent}.`, false);
+          setInfo(`PDF отправлены в Telegram: Report.pdf и MAINFLOW.pdf. Получателей: ${sent}.`, false);
         } catch (error) {
-          setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ PDF Ð² Telegram.", true);
+          setInfo(error instanceof Error ? error.message : "Не удалось отправить PDF в Telegram.", true);
         } finally {
           if (button) {
             button.disabled = false;
@@ -15632,25 +15632,25 @@ function buildInitialPhotoLightboxState() {
       shiftFormButton.addEventListener("click", async () => {
         const button = shiftFormButton instanceof HTMLButtonElement ? shiftFormButton : null;
         const mode = shiftFormButton.getAttribute("data-send-shift-form") || "night";
-        const label = mode === "day" ? "Ð´Ð½ÐµÐ²Ð½Ð¾Ð¹ ÑÐ¼ÐµÐ½Ñ‹"
-          : mode === "discharge" ? "ÑƒÑ‚Ñ€ÐµÐ½Ð½ÐµÐ¹ Ð²Ñ‹Ð¿Ð¸ÑÐºÐ¸"
-            : "Ð½Ð¾Ñ‡Ð½Ð¾Ð¹ ÑÐ¼ÐµÐ½Ñ‹";
+        const label = mode === "day" ? "дневной смены"
+          : mode === "discharge" ? "утренней выписки"
+            : "ночной смены";
         if (button) {
           button.disabled = true;
         }
 
-        setInfo(`ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð»ÑÑŽ Telegram Ñ„Ð¾Ñ€Ð¼Ñƒ ${label}...`, false);
+        setInfo(`Отправляю Telegram форму ${label}...`, false);
         try {
           if (typeof sync.sendShiftFormToTelegram !== "function") {
-            throw new Error("ÐžÑ‚Ð¿Ñ€Ð°Ð²ÐºÐ° Telegram Ñ„Ð¾Ñ€Ð¼Ñ‹ Ð¿Ð¾ÐºÐ° Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð°.");
+            throw new Error("Отправка Telegram формы пока недоступна.");
           }
           const result = await sync.sendShiftFormToTelegram(mode);
           const sent = result && result.result && typeof result.result.sent === "number"
             ? result.result.sent
             : 0;
-          setInfo(`Telegram Ñ„Ð¾Ñ€Ð¼Ð° ${label} Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð°. ÐŸÐ¾Ð»ÑƒÑ‡Ð°Ñ‚ÐµÐ»ÐµÐ¹: ${sent}.`, false);
+          setInfo(`Telegram форма ${label} отправлена. Получателей: ${sent}.`, false);
         } catch (error) {
-          setInfo(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Telegram Ñ„Ð¾Ñ€Ð¼Ñƒ.", true);
+          setInfo(error instanceof Error ? error.message : "Не удалось отправить Telegram форму.", true);
         } finally {
           if (button) {
             button.disabled = false;
@@ -15678,8 +15678,8 @@ function buildInitialPhotoLightboxState() {
         try {
           await refreshFromSource();
         } catch (error) {
-          state.warning = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ.";
-          setInfo("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ.", true);
+          state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
+          setInfo("Не удалось обновить данные.", true);
         }
       });
     }
@@ -15718,9 +15718,9 @@ function buildInitialPhotoLightboxState() {
         const absoluteLink = new URL(relativeLink, window.location.href).toString();
         try {
           await navigator.clipboard.writeText(absoluteLink);
-          setInfo(`Ð¡ÑÑ‹Ð»ÐºÐ° ÑÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð°: ${relativeLink}`, false);
+          setInfo(`Ссылка скопирована: ${relativeLink}`, false);
         } catch (error) {
-          window.prompt("Ð¡ÐºÐ¾Ð¿Ð¸Ñ€ÑƒÐ¹Ñ‚Ðµ ÑÑÑ‹Ð»ÐºÑƒ Ð²Ñ€ÑƒÑ‡Ð½ÑƒÑŽ", absoluteLink);
+          window.prompt("Скопируйте ссылку вручную", absoluteLink);
         }
       });
     });
@@ -15787,7 +15787,7 @@ function buildInitialPhotoLightboxState() {
     const mainPhotoRouteZoomBtn = document.getElementById("mainPhotoRouteZoomBtn");
     if (mainPhotoRouteZoomBtn) {
       mainPhotoRouteZoomBtn.addEventListener("click", () => {
-        openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Ð¤Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ", "main-route");
+        openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Фото для определения отделения", "main-route");
       });
     }
 
@@ -15883,7 +15883,7 @@ function buildInitialPhotoLightboxState() {
       image.addEventListener("click", () => {
         const kind = image.getAttribute("data-photo-zoom-trigger");
         if (kind === "main") {
-          openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Ð¤Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ", "main-route");
+          openPhotoLightbox(state.mainPhotoRoute?.imageDataUrl || "", "Фото для определения отделения", "main-route");
           return;
         }
         openPhotoLightbox(state.photoImport?.imageDataUrl || "", "Photo", "photo-import", state.photoImport?.feedbackId || "");
@@ -16384,7 +16384,7 @@ function buildInitialPhotoLightboxState() {
           await maybeAutoRecognizeLoadedTelegramPhoto();
         }
       } catch (error) {
-        state.warning = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð´Ð°Ð½Ð½Ñ‹Ðµ.";
+        state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
         refreshTableData();
       }
     }, sync.runtime.refreshIntervalMs);
@@ -16446,7 +16446,7 @@ function buildInitialPhotoLightboxState() {
         await maybeAutoRecognizeLoadedTelegramPhoto();
       }
     } catch (error) {
-      state.warning = error instanceof Error ? error.message : "ÃÂÃÂµ Ã‘Æ’ÃÂ´ÃÂ°ÃÂ»ÃÂ¾Ã‘ÂÃ‘Å’ ÃÂ¾ÃÂ±ÃÂ½ÃÂ¾ÃÂ²ÃÂ¸Ã‘â€šÃ‘Å’ ÃÂ´ÃÂ°ÃÂ½ÃÂ½Ã‘â€¹ÃÂµ.";
+      state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
       refreshTableData();
     }
   }
@@ -16487,7 +16487,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     syncCurrentReportDate();
-    setInfo("Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÑŽ Ð´Ð°Ð½Ð½Ñ‹Ðµ...", false);
+    setInfo("Загружаю данные...", false);
     renderPage();
     await loadWorkingSnapshot();
     if (mode === "feedback") {
@@ -16564,52 +16564,52 @@ function buildInitialPhotoLightboxState() {
     status.className = `qh-calc-status${invalidColumns.length ? " qh-calc-status--bad" : ""}`;
     status.innerHTML = invalidColumns.length
       ? invalidColumns.map((column) => (
-        `<div>${escapeHtml(`${column.label}: Õ¹Õ« Õ¯Õ¡Ö€Õ¸Õ² Õ¬Õ«Õ¶Õ¥Õ¬ Õ¢Õ¡ÖÕ¡Õ½Õ¡Õ¯Õ¡Õ¶ Õ¡Ö€ÕªÕ¥Ö„`)}</div>`
+        `<div>${escapeHtml(`${column.label}: չի կարող լինել բացասական արժեք`)}</div>`
       )).join("")
       : "";
   }
 
   function getSyncDescription() {
     if (state.source === "remote") {
-      return "Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ð±ÑŠÐµÐ´Ð¸Ð½ÑÑŽÑ‚ÑÑ Ð¼ÐµÐ¶Ð´Ñƒ ÐºÐ¾Ð¼Ð¿ÑŒÑŽÑ‚ÐµÑ€Ð°Ð¼Ð¸ Ñ‡ÐµÑ€ÐµÐ· Ð¸Ð½Ñ‚ÐµÑ€Ð½ÐµÑ‚.";
+      return "Данные объединяются между компьютерами через интернет.";
     }
     if (state.source === "pending-sync") {
-      return "Ð§Ð°ÑÑ‚ÑŒ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹ ÐµÑ‰Ñ‘ Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð° Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€. ÐžÐ½Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¸ Ð¶Ð´ÑƒÑ‚ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.";
+      return "Часть изменений ещё не отправлена на сервер. Они сохранены локально и ждут синхронизации.";
     }
     if (state.source === "local-cache") {
-      return "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¹ ÐºÑÑˆ. Ð¡ÐµÑ€Ð²ÐµÑ€ Ð²Ñ€ÐµÐ¼ÐµÐ½Ð½Ð¾ Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿ÐµÐ½.";
+      return "Сейчас показан локальный кэш. Сервер временно недоступен.";
     }
-    return "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð²ÐºÐ»ÑŽÑ‡Ñ‘Ð½ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¹ Ñ€ÐµÐ¶Ð¸Ð¼. ÐœÐµÐ¶Ð´Ñƒ Ñ€Ð°Ð·Ð½Ñ‹Ð¼Ð¸ ÐºÐ¾Ð¼Ð¿ÑŒÑŽÑ‚ÐµÑ€Ð°Ð¼Ð¸ Ð´Ð°Ð½Ð½Ñ‹Ðµ ÐµÑ‰Ñ‘ Ð½Ðµ Ð¾Ð±ÑŠÐµÐ´Ð¸Ð½ÑÑŽÑ‚ÑÑ.";
+    return "Сейчас включён локальный режим. Между разными компьютерами данные ещё не объединяются.";
   }
 
   function getPendingSyncButtonLabel(status = getPendingSyncStatus()) {
     if (status.isSyncing) {
-      return status.count > 0 ? `Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð». (${status.count})...` : "Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð»....";
+      return status.count > 0 ? `Синхр. накопл. (${status.count})...` : "Синхр. накопл....";
     }
-    return status.count > 0 ? `Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð». (${status.count})` : "Ð¡Ð¸Ð½Ñ…Ñ€. Ð½Ð°ÐºÐ¾Ð¿Ð».";
+    return status.count > 0 ? `Синхр. накопл. (${status.count})` : "Синхр. накопл.";
   }
 
   function getPendingSyncSummaryText(status = getPendingSyncStatus()) {
     if (status.hasPending) {
       if (!sync.hasRemoteSync()) {
-        return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼, Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð¶Ð´ÑƒÑ‚ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸.`;
+        return `В очереди: ${status.count}. Сейчас оффлайн-режим, поэтому изменения ждут отправки.`;
       }
-      return `Ð’ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸: ${status.count}. ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑÑ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð² Ñ„Ð¾Ð½Ðµ, Ð° ÐºÐ½Ð¾Ð¿ÐºÐ° Ð¾ÑÑ‚Ð°Ñ‘Ñ‚ÑÑ Ð´Ð»Ñ Ñ€ÑƒÑ‡Ð½Ð¾Ð¹ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸.`;
+      return `В очереди: ${status.count}. Очередь отправится автоматически в фоне, а кнопка остаётся для ручной синхронизации.`;
     }
     if (status.lastSyncedAt) {
-      return `ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ Ð¿ÑƒÑÑ‚Ð°. ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ ÑƒÑÐ¿ÐµÑˆÐ½Ð°Ñ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ñ: ${formatTimestamp(status.lastSyncedAt)}.`;
+      return `Очередь пуста. Последняя успешная синхронизация: ${formatTimestamp(status.lastSyncedAt)}.`;
     }
     return sync.hasRemoteSync()
-      ? "ÐžÑ‡ÐµÑ€ÐµÐ´ÑŒ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð¿ÑƒÑÑ‚Ð°. Ð¤Ð¾Ð½Ð¾Ð²Ð°Ñ Ð°Ð²Ñ‚Ð¾ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ñ Ð²ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°."
-      : "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ„Ñ„Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼. ÐÐ¾Ð²Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ Ð±ÑƒÐ´ÑƒÑ‚ Ð½Ð°ÐºÐ°Ð¿Ð»Ð¸Ð²Ð°Ñ‚ÑŒÑÑ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾.";
+      ? "Очередь синхронизации пуста. Фоновая автосинхронизация включена."
+      : "Сейчас оффлайн-режим. Новые изменения будут накапливаться локально.";
   }
 
   function getPendingSyncErrorText(status = getPendingSyncStatus()) {
     if (status.lastError) {
-      return `ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ Ð¾ÑˆÐ¸Ð±ÐºÐ° ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸: ${status.lastError}`;
+      return `Последняя ошибка синхронизации: ${status.lastError}`;
     }
     if (status.hasPending && !sync.hasRemoteSync()) {
-      return "Ð§Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð½Ð°ÐºÐ¾Ð¿Ð»ÐµÐ½Ð½Ñ‹Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ, Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÐµÑÑŒ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼.";
+      return "Чтобы отправить накопленные изменения, переключитесь в онлайн-режим.";
     }
     return "";
   }
@@ -16620,7 +16620,7 @@ function buildInitialPhotoLightboxState() {
     return `
       <div class="pending-sync-panel">
         <div class="pending-sync-panel__copy">
-          <strong>ÐžÑ„Ñ„Ð»Ð°Ð¹Ð½-Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ</strong>
+          <strong>Оффлайн-очередь</strong>
           <p id="pendingSyncSummaryText">${escapeHtml(getPendingSyncSummaryText(status))}</p>
           <p class="hint${errorText ? " warning-note" : ""}" id="pendingSyncErrorText">${escapeHtml(errorText)}</p>
         </div>
@@ -16676,7 +16676,7 @@ function buildInitialPhotoLightboxState() {
 
     const invalidColumns = getTransferCalcInvalidColumns(row, snapshot);
     if (invalidColumns.length) {
-      statusEl.textContent = `Ð Ð°ÑÑ‡Ñ‘Ñ‚ Ð¿ÐµÑ€ÐµÐ²Ð¾Ð´Ð¾Ð² Ð½Ðµ Ð¼Ð¾Ð¶ÐµÑ‚ Ð±Ñ‹Ñ‚ÑŒ Ð¿Ñ€Ð¸Ð¼ÐµÐ½Ñ‘Ð½: Ð¿Ð¾ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸ÑÐ¼ ${invalidColumns.map((column) => column.label).join(", ")} Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÑ‚ÑÑ Ð¾Ñ‚Ñ€Ð¸Ñ†Ð°Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ð¹ Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ðº.`;
+      statusEl.textContent = `Расчёт переводов не может быть применён: по категориям ${invalidColumns.map((column) => column.label).join(", ")} получается отрицательный остаток.`;
       statusEl.className = "qh-calc-status qh-calc-status--invalid";
       return;
     }
@@ -16783,8 +16783,8 @@ function buildInitialPhotoLightboxState() {
     app.innerHTML = `
       <div class="page">
         <div class="panel">
-          <h2>ÐžÑˆÐ¸Ð±ÐºÐ° Ð·Ð°Ð³Ñ€ÑƒÐ·ÐºÐ¸</h2>
-          <p>${escapeHtml(error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÐ¸ÑÑ‚ÐµÐ¼Ñƒ SARSH_KKZH.")}</p>
+          <h2>Ошибка загрузки</h2>
+          <p>${escapeHtml(error instanceof Error ? error.message : "Не удалось открыть систему SARSH_KKZH.")}</p>
         </div>
       </div>
     `;
