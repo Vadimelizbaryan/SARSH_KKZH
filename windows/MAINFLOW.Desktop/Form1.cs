@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http;
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -10,6 +11,7 @@ namespace MAINFLOW.Desktop;
 
 public partial class Form1 : Form
 {
+    private const int SwRestore = 9;
     private const string DefaultRelativePage = "index.html";
     private const string RemoteSupabaseUrl = "https://ywecvlapdlaojpvijaqy.supabase.co";
     private const string RemoteSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZWN2bGFwZGxhb2pwdmlqYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNTAzMjgsImV4cCI6MjA5MzYyNjMyOH0._HEPdPB2bBTo_N-1Qo8jLau5g5oYGgvoGnBWPxDupL4";
@@ -22,6 +24,8 @@ public partial class Form1 : Form
     private const int InitialVisibleUpdateDelayMs = 90 * 1000;
     private const int InitialBackgroundUpdateDelayMs = 15 * 1000;
     private const int VisibleAutoUpdateGraceDelayMs = 10 * 1000;
+    private const int DataMirrorSyncIntervalMs = 5 * 60 * 1000;
+    private const int InitialDataMirrorSyncDelayMs = 30 * 1000;
 
     private readonly bool _startInBackground;
     private readonly string _webRootPath;
@@ -30,6 +34,7 @@ public partial class Form1 : Form
     private readonly string _stateFilePath;
     private readonly string _localPackageManifestPath;
     private readonly string _updateCacheDir;
+    private readonly DesktopDataMirrorService _dataMirrorService;
     private readonly HttpClient _releaseHttpClient = new()
     {
         Timeout = TimeSpan.FromMinutes(20)
@@ -55,6 +60,7 @@ public partial class Form1 : Form
     private readonly ToolStripMenuItem _trayMenuAutoStart;
     private readonly ToolStripMenuItem _trayMenuExit;
     private readonly System.Windows.Forms.Timer _autoUpdateTimer;
+    private readonly System.Windows.Forms.Timer _dataMirrorTimer;
 
     private DesktopShellState _shellState;
     private bool _suppressModeEvents;
@@ -64,6 +70,7 @@ public partial class Form1 : Form
     private bool _backgroundLaunchHandled;
     private bool _updateCheckInProgress;
     private bool _updateInstallInProgress;
+    private bool _dataMirrorSyncInProgress;
     private string _currentRelativePage = DefaultRelativePage;
     private string _pendingUpdateToken = string.Empty;
     private string _lastAnnouncedUpdateToken = string.Empty;
@@ -85,6 +92,7 @@ public partial class Form1 : Form
         _stateFilePath = Path.Combine(_appDataRoot, "desktop-state.json");
         _localPackageManifestPath = Path.Combine(_webRootPath, "package-manifest.json");
         _updateCacheDir = Path.Combine(_appDataRoot, "updates");
+        _dataMirrorService = new DesktopDataMirrorService(Path.Combine(_appDataRoot, "DataMirror"));
 
         Directory.CreateDirectory(_appDataRoot);
         Directory.CreateDirectory(_webViewUserDataPath);
@@ -175,6 +183,11 @@ public partial class Form1 : Form
             Interval = AutoUpdateIntervalMs
         };
         _autoUpdateTimer.Tick += async (_, _) => await CheckForDesktopUpdatesAsync();
+        _dataMirrorTimer = new System.Windows.Forms.Timer(components)
+        {
+            Interval = DataMirrorSyncIntervalMs
+        };
+        _dataMirrorTimer.Tick += async (_, _) => await RunDataMirrorSyncAsync();
 
         toolStripComboBoxMode.Items.Clear();
         toolStripComboBoxMode.Items.AddRange(["Оффлайн", "Онлайн"]);
@@ -198,6 +211,7 @@ public partial class Form1 : Form
         Disposed += (_, _) =>
         {
             _autoUpdateTimer.Dispose();
+            _dataMirrorTimer.Dispose();
             _releaseHttpClient.Dispose();
         };
         Shown += async (_, _) =>
@@ -205,7 +219,9 @@ public partial class Form1 : Form
             await InitializeWebViewAsync();
             HandleInitialBackgroundLaunch();
             _autoUpdateTimer.Start();
+            _dataMirrorTimer.Start();
             FireAndForgetAutoUpdateCheck(_startInBackground ? InitialBackgroundUpdateDelayMs : InitialVisibleUpdateDelayMs);
+            FireAndForgetDataMirrorSync(_startInBackground ? 10_000 : InitialDataMirrorSyncDelayMs);
         };
         FormClosing += HandleFormClosing;
     }
@@ -234,6 +250,30 @@ public partial class Form1 : Form
         });
     }
 
+    private void FireAndForgetDataMirrorSync(int delayMs)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (delayMs > 0)
+                {
+                    await Task.Delay(delayMs);
+                }
+
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                BeginInvoke(async () => await RunDataMirrorSyncAsync());
+            }
+            catch
+            {
+            }
+        });
+    }
+
     private async Task InitializeWebViewAsync()
     {
         if (_webViewReady)
@@ -244,6 +284,11 @@ public partial class Form1 : Form
         try
         {
             await webView.EnsureCoreWebView2Async();
+            webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                "mirror.mainflow.local",
+                _dataMirrorService.MirrorRoot,
+                CoreWebView2HostResourceAccessKind.Allow
+            );
             webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
             webView.CoreWebView2.Settings.IsStatusBarEnabled = true;
@@ -270,6 +315,7 @@ public partial class Form1 : Form
                 CaptureCurrentRelativePageFromWebView();
                 UpdateCurrentPageStatus();
                 SaveShellState();
+                FireAndForgetDataMirrorSync(2000);
             };
             _webViewReady = true;
             NavigateToRelativePage(_currentRelativePage, saveState: false);
@@ -319,6 +365,7 @@ public partial class Form1 : Form
         if (requestedMode == DesktopMode.Online)
         {
             FireAndForgetAutoUpdateCheck(2000);
+            FireAndForgetDataMirrorSync(2000);
         }
     }
 
@@ -359,6 +406,7 @@ public partial class Form1 : Form
 
             if (result.Ok)
             {
+                FireAndForgetDataMirrorSync(2000);
                 MessageBox.Show(
                     this,
                     result.SyncedCount > 0
@@ -395,6 +443,32 @@ public partial class Form1 : Form
         {
             toolStripButtonSyncQueue.Enabled = true;
             _trayMenuSync.Enabled = true;
+        }
+    }
+
+    private async Task RunDataMirrorSyncAsync()
+    {
+        if (_dataMirrorSyncInProgress || !_webViewReady || webView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        if (_shellState.Mode != DesktopMode.Online || !HasInternetAvailable())
+        {
+            return;
+        }
+
+        _dataMirrorSyncInProgress = true;
+        try
+        {
+            await _dataMirrorService.SyncAsync(webView.CoreWebView2);
+        }
+        catch
+        {
+        }
+        finally
+        {
+            _dataMirrorSyncInProgress = false;
         }
     }
 
@@ -951,10 +1025,62 @@ public partial class Form1 : Form
 
     private void RestoreFromTray()
     {
-        Show();
-        ShowInTaskbar = true;
-        WindowState = FormWindowState.Normal;
+        if (InvokeRequired)
+        {
+            BeginInvoke(RestoreFromTray);
+            return;
+        }
+
+        SuspendLayout();
+        try
+        {
+            ShowInTaskbar = true;
+            Visible = true;
+            Show();
+            if (WindowState == FormWindowState.Minimized)
+            {
+                WindowState = FormWindowState.Normal;
+            }
+
+            EnsureWindowVisibleOnScreen();
+        }
+        finally
+        {
+            ResumeLayout();
+        }
+
+        if (IsHandleCreated)
+        {
+            ShowWindow(Handle, SwRestore);
+            SetForegroundWindow(Handle);
+        }
+
+        BringToFront();
+        TopMost = true;
+        TopMost = false;
         Activate();
+        Focus();
+    }
+
+    private void EnsureWindowVisibleOnScreen()
+    {
+        var bounds = RestoreBounds.Width > 0 && RestoreBounds.Height > 0
+            ? RestoreBounds
+            : Bounds;
+        var visibleOnAnyScreen = Screen.AllScreens.Any(screen => screen.WorkingArea.IntersectsWith(bounds));
+        if (visibleOnAnyScreen)
+        {
+            return;
+        }
+
+        var area = Screen.PrimaryScreen?.WorkingArea ?? Screen.FromControl(this).WorkingArea;
+        var width = Math.Min(Math.Max(bounds.Width, 1100), area.Width);
+        var height = Math.Min(Math.Max(bounds.Height, 700), area.Height);
+        var x = area.Left + Math.Max(0, (area.Width - width) / 2);
+        var y = area.Top + Math.Max(0, (area.Height - height) / 2);
+
+        StartPosition = FormStartPosition.Manual;
+        Bounds = new Rectangle(x, y, width, height);
     }
 
     private void ExitApplication()
@@ -1209,6 +1335,14 @@ public partial class Form1 : Form
     private sealed record PendingSyncCommandResult(bool Ok, int SyncedCount, int RemainingCount, string Error);
     private sealed record PendingSyncStatusResult(bool HasPending, int Count, bool IsSyncing);
     private sealed record DesktopUpdateBlockersResult(bool HasBlockingWork, bool HasBlockingUiWork, bool HasPendingSync, int PendingCount, bool IsSyncing);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
 
     private sealed class DesktopPackageManifest
     {
