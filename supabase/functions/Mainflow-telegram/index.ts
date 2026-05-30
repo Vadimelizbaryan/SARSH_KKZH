@@ -4453,6 +4453,42 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
   };
 }
 
+async function loadMainArchiveSnapshotByDateKey(
+  supabase: ReturnType<typeof createClient>,
+  dateKey: string
+) {
+  const normalizedDateKey = normalizeTelegramFormArchiveDateKey(dateKey);
+  if (!normalizedDateKey) {
+    return null;
+  }
+
+  const { data, error } = await (supabase as any)
+    .from("sharsh_main_archives")
+    .select("archive_key, report_date, snapshot")
+    .eq("archive_key", normalizedDateKey)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const snapshot = data && typeof data.snapshot === "object" && data.snapshot
+    ? data.snapshot as Record<string, unknown>
+    : null;
+  if (!snapshot || !Array.isArray(snapshot.rows)) {
+    return null;
+  }
+
+  return {
+    ...snapshot,
+    reportDate: typeof data.report_date === "string" && data.report_date.trim()
+      ? data.report_date.trim()
+      : (typeof snapshot.reportDate === "string" && snapshot.reportDate.trim()
+        ? snapshot.reportDate.trim()
+        : DEFAULT_DATE)
+  };
+}
+
 async function saveNightShiftDraft(
   supabase: ReturnType<typeof createClient>,
   rows: unknown,
@@ -12081,11 +12117,14 @@ Deno.serve(async (request) => {
       try {
         const currentUrl = new URL(request.url);
         const supabase = createSupabaseAdmin();
-        const snapshot = await loadSnapshot(supabase);
-        const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
+        const liveSnapshot = await loadSnapshot(supabase);
+        const liveReportDate = liveSnapshot.reportDate || getYerevanReportDateText();
         const requestedDate = (currentUrl.searchParams.get("date") || "").trim();
-        const dateKey = normalizeTelegramFormArchiveDateKey(requestedDate || snapshotReportDate) || getYerevanDateKey();
-        const pdfBytes = await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey);
+        const dateKey = normalizeTelegramFormArchiveDateKey(requestedDate || liveReportDate) || getYerevanDateKey();
+        const archiveSnapshot = await loadMainArchiveSnapshotByDateKey(supabase, dateKey);
+        const effectiveSnapshot = archiveSnapshot || liveSnapshot;
+        const effectiveReportDate = effectiveSnapshot.reportDate || liveReportDate;
+        const pdfBytes = await buildMainArchivePdfBytes(supabase, effectiveSnapshot, effectiveReportDate, dateKey);
         return buildPdfBytesResponse(
           pdfBytes,
           buildMainArchivePdfFileName(dateKey)
