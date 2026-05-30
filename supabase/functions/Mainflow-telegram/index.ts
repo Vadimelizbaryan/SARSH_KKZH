@@ -4479,13 +4479,61 @@ async function loadMainArchiveSnapshotByDateKey(
     return null;
   }
 
+  const rowMap = new Map<string, Record<string, unknown>>();
+  for (const row of snapshot.rows as Array<Record<string, unknown>>) {
+    const rowId = typeof row?.id === "string" && row.id.trim()
+      ? row.id.trim()
+      : (typeof row?.department_id === "string" ? row.department_id.trim() : "");
+    if (!rowId) {
+      continue;
+    }
+    rowMap.set(rowId, row);
+  }
+
+  const normalizedRows = Object.entries(DEPARTMENTS).map(([id, meta]) => {
+    const saved = rowMap.get(id);
+    return {
+      id,
+      marker: typeof saved?.marker === "string" && saved.marker.trim()
+        ? saved.marker.trim()
+        : meta.marker,
+      department: typeof saved?.department === "string" && saved.department.trim()
+        ? saved.department.trim()
+        : meta.department,
+      group: meta.group,
+      values: sanitizeValues(saved?.values as Record<string, unknown> | undefined),
+      updatedAt: typeof saved?.updatedAt === "string" && saved.updatedAt.trim()
+        ? saved.updatedAt
+        : (typeof saved?.updated_at === "string" && saved.updated_at.trim()
+          ? saved.updated_at
+          : null),
+      photoWorkflowStatus: typeof saved?.photoWorkflowStatus === "string" && saved.photoWorkflowStatus.trim()
+        ? saved.photoWorkflowStatus
+        : (typeof saved?.photo_workflow_status === "string" && saved.photo_workflow_status.trim()
+          ? saved.photo_workflow_status
+          : "idle"),
+      photoFeedbackId: typeof saved?.photoFeedbackId === "number"
+        ? saved.photoFeedbackId
+        : (typeof saved?.photo_feedback_id === "number" ? saved.photo_feedback_id : null),
+      photoFeedbackUpdatedAt: typeof saved?.photoFeedbackUpdatedAt === "string" && saved.photoFeedbackUpdatedAt.trim()
+        ? saved.photoFeedbackUpdatedAt
+        : (typeof saved?.photo_feedback_updated_at === "string" && saved.photo_feedback_updated_at.trim()
+          ? saved.photo_feedback_updated_at
+          : null),
+      photoName: typeof saved?.photoName === "string" && saved.photoName.trim()
+        ? saved.photoName
+        : (typeof saved?.photo_name === "string" ? saved.photo_name : "")
+    };
+  });
+
   return {
     ...snapshot,
     reportDate: typeof data.report_date === "string" && data.report_date.trim()
       ? data.report_date.trim()
       : (typeof snapshot.reportDate === "string" && snapshot.reportDate.trim()
         ? snapshot.reportDate.trim()
-        : DEFAULT_DATE)
+        : DEFAULT_DATE),
+    rows: syncQhCalculatedSnapshotRows(normalizedRows)
   };
 }
 
