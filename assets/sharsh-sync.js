@@ -386,7 +386,11 @@
         source: "remote"
       };
     } catch (error) {
-      if (requiresOwnerAuth()) {
+      const statusCode = error && typeof error === "object" && "statusCode" in error
+        ? Number(error.statusCode)
+        : 0;
+      const isOwnerAuthError = requiresOwnerAuth() && statusCode === 403;
+      if (isOwnerAuthError) {
         throw error;
       }
       const snapshot = loadLocalSnapshot();
