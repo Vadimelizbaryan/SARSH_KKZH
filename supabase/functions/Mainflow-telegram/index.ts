@@ -41,6 +41,7 @@ const TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT = "Դուրսգրում";
 const TELEGRAM_APPLY_NIGHT_SHIFT_CALLBACK = "apply_night_shift_to_main";
 const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
 const REPORT_PDF_FILE_NAME = "Report.pdf";
+const MAIN_ARCHIVE_PDF_FILE_NAME = "Main_archive.pdf";
 const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarmenian/NotoSansArmenian%5Bwdth,wght%5D.ttf";
 const YEREVAN_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
 const FIREBASE_PUSH_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
