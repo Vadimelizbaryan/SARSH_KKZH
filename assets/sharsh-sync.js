@@ -339,7 +339,6 @@
   }
 
   async function loadRemoteSnapshot() {
-    ensureOwnerAuth();
     const response = await fetch(getSyncEndpoint(), {
       method: "GET",
       headers: getAuthHeaders()
