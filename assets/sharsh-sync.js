@@ -2443,6 +2443,20 @@
     return url.toString();
   }
 
+  function buildMainArchivePdfUrl(reportDate) {
+    const normalizedDate = String(reportDate || "").trim();
+    if (!hasRemoteSync()) {
+      return "";
+    }
+
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "main-archive-pdf");
+    if (normalizedDate) {
+      url.searchParams.set("date", normalizedDate);
+    }
+    return url.toString();
+  }
+
   function getSourceLabel(source) {
     if (source === "remote") {
       return "Առցանց սինխր.";
@@ -2498,6 +2512,7 @@
     loadTelegramPhotoFeedback,
     buildTelegramFormPdfUrl,
     buildTelegramFormArchiveDatePdfUrl,
+    buildMainArchivePdfUrl,
     listOcrFeedback,
     listAndroidMainformFeedback,
     verifyDepartmentAccess,
