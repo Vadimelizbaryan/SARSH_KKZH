@@ -8495,7 +8495,7 @@ function buildMainArchivePhotoSourceLabel(imageName: string, notes: unknown) {
   ) {
     return "Telegram Web App";
   }
-  return "Фото бланка";
+  return "Բլանկի լուսանկար";
 }
 
 async function listMainArchivePhotoRecordsForDate(
@@ -8628,13 +8628,13 @@ async function addMainArchivePhotoPage(
   const margin = 32;
   const headerLines = [
     `${record.departmentName} (${DEPARTMENTS[record.departmentId].marker})`,
-    `Источник: ${record.sourceLabel}`,
-    `Время отправки: ${Number.isFinite(Date.parse(record.createdAt || "")) ? getYerevanHyDateTimeText(new Date(record.createdAt)) : (record.createdAt || "не указано")}`,
-    record.reportDate ? `Дата отчёта: ${record.reportDate}` : "",
-    record.photoReportDate ? `Дата фото: ${record.photoReportDate}` : ""
+    `Աղբյուր՝ ${record.sourceLabel}`,
+    `Ուղարկման ժամը՝ ${Number.isFinite(Date.parse(record.createdAt || "")) ? getYerevanHyDateTimeText(new Date(record.createdAt)) : (record.createdAt || "նշված չէ")}`,
+    record.reportDate ? `Հաշվետվության ամսաթիվը՝ ${record.reportDate}` : "",
+    record.photoReportDate ? `Լուսանկարի ամսաթիվը՝ ${record.photoReportDate}` : ""
   ].filter(Boolean);
 
-  drawPdfText(page, "Фото бланка", margin, pageHeight - 34, {
+  drawPdfText(page, "Բլանկի լուսանկար", margin, pageHeight - 34, {
     font: fonts.bold,
     size: 18
   });
@@ -8673,11 +8673,11 @@ async function buildMainArchivePdfBytes(
   addMainArchiveSectionPage(
     output,
     fonts,
-    "Архивный комплект MAINFLOW",
+    "MAINFLOW արխիվային փաթեթ",
     [
-      `Дата архива: ${normalizedDateLabel}`,
-      `Дата сводки: ${reportDate}`,
-      "Ниже объединены Report.pdf, MAINFLOW.pdf, All_departments_current_<дата>.pdf и все связанные фото бланков."
+      `Արխիվի ամսաթիվը՝ ${normalizedDateLabel}`,
+      `Ամփոփագրի ամսաթիվը՝ ${reportDate}`,
+      "Ստորև միավորված են Report.pdf, MAINFLOW.pdf, All_departments_current_<date>.pdf և բոլոր կապված բլանկների լուսանկարները։"
     ]
   );
 
@@ -8689,10 +8689,10 @@ async function buildMainArchivePdfBytes(
     addMainArchiveSectionPage(
       output,
       fonts,
-      "Фото бланков за дату",
+      "Օրվա բլանկների լուսանկարներ",
       [
-        `Связанных фото: ${archivePhotoRecords.length}.`,
-        "Каждое фото добавлено на отдельную страницу с подписью отделения и времени отправки."
+        `Կապված լուսանկարներ՝ ${archivePhotoRecords.length}։`,
+        "Յուրաքանչյուր լուսանկար ավելացվել է առանձին էջում՝ բաժանմունքի և ուղարկման ժամանակի նշումով։"
       ]
     );
     for (const record of archivePhotoRecords) {
