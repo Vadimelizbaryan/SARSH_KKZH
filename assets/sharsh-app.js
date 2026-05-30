@@ -4703,6 +4703,33 @@ function buildInitialPhotoLightboxState() {
     return `Выбран архив ${record.archiveLabel}. Дата документа: ${record.reportDate}. Сохранён: ${formatTimestamp(record.capturedAt)}.`;
   }
 
+  function getArchiveDateKey(record) {
+    if (!record || typeof record !== "object") {
+      return "";
+    }
+    const archiveKey = typeof record.archiveKey === "string" ? record.archiveKey.trim() : "";
+    if (/^\d{4}-\d{2}-\d{2}/.test(archiveKey)) {
+      return archiveKey.slice(0, 10);
+    }
+    const reportDate = typeof record.reportDate === "string" ? record.reportDate.trim() : "";
+    if (reportDate) {
+      const normalized = normalizeTelegramFormArchiveDateKey(reportDate);
+      if (normalized) {
+        return normalized;
+      }
+    }
+    const archiveLabel = typeof record.archiveLabel === "string" ? record.archiveLabel.trim() : "";
+    return normalizeTelegramFormArchiveDateKey(archiveLabel) || "";
+  }
+
+  function getMainArchiveSelectionText(record) {
+    if (!record) {
+      return "Выбери дату, чтобы открыть общий архивный PDF.";
+    }
+    const dateKey = getArchiveDateKey(record);
+    return `Выбран архив ${record.archiveLabel}. Дата комплекта: ${dateKey || record.reportDate}. Сохранён: ${formatTimestamp(record.capturedAt)}.`;
+  }
+
   function buildArchiveOptions(records, selectedArchiveKey) {
     return records.map((record) => `
       <option value="${escapeHtml(record.archiveKey)}"${record.archiveKey === selectedArchiveKey ? " selected" : ""}>
@@ -4726,9 +4753,9 @@ function buildInitialPhotoLightboxState() {
               ${buildArchiveOptions(records, selectedRecord.archiveKey)}
             </select>
           </label>
-          <a class="archive-open-link" id="archivePdfLink" href="${escapeHtml(getArchivePrintPath(selectedRecord.archiveKey))}" target="_blank" rel="noopener">PDF</a>
+          <a class="archive-open-link" id="archivePdfLink" href="${escapeHtml(typeof sync.buildMainArchivePdfUrl === "function" ? sync.buildMainArchivePdfUrl(getArchiveDateKey(selectedRecord) || selectedRecord.reportDate || "") : "")}" target="_blank" rel="noopener">PDF архив</a>
         </div>
-        <div class="archive-selected-meta" id="archiveSelectedMeta">${escapeHtml(getArchiveSelectionText(selectedRecord))}</div>
+        <div class="archive-selected-meta" id="archiveSelectedMeta">${escapeHtml(getMainArchiveSelectionText(selectedRecord))}</div>
       </div>
     `;
   }
@@ -4745,7 +4772,9 @@ function buildInitialPhotoLightboxState() {
     }
     if (link) {
       if (selectedRecord) {
-        link.href = getArchivePrintPath(selectedRecord.archiveKey);
+        link.href = typeof sync.buildMainArchivePdfUrl === "function"
+          ? sync.buildMainArchivePdfUrl(getArchiveDateKey(selectedRecord) || selectedRecord.reportDate || "")
+          : "#";
         link.removeAttribute("aria-disabled");
       } else {
         link.removeAttribute("href");
@@ -4753,7 +4782,50 @@ function buildInitialPhotoLightboxState() {
       }
     }
     if (meta) {
-      meta.textContent = getArchiveSelectionText(selectedRecord);
+      meta.textContent = getMainArchiveSelectionText(selectedRecord);
+    }
+  }
+
+  function normalizeMainArchivePanels() {
+    if (mode !== "main") {
+      return;
+    }
+
+    const dailyPanel = document.querySelector(".main-daily-archive-panel");
+    if (dailyPanel instanceof HTMLElement) {
+      const heading = dailyPanel.querySelector("h2");
+      if (heading) {
+        heading.textContent = "PDF архив";
+      }
+
+      const summary = document.getElementById("archiveSummaryText");
+      const records = ensureArchiveRecordsLoaded();
+      const latestArchive = records[0] || null;
+      if (summary) {
+        summary.textContent = latestArchive
+          ? `Архивных комплектов: ${records.length}. Последний комплект: ${latestArchive.archiveLabel}, сохранён ${formatTimestamp(latestArchive.capturedAt)}.`
+          : "Архивных комплектов пока нет. Первый комплект появится автоматически после сохранения дневного снимка.";
+      }
+
+      const hint = dailyPanel.querySelector(".hint");
+      if (hint) {
+        hint.textContent = "В один PDF объединяются Report.pdf, MAINFLOW.pdf, All_departments_current_<дата>.pdf и все связанные фото бланков за выбранную дату.";
+      }
+
+      const archiveButton = document.getElementById("archivePdfLink");
+      if (archiveButton) {
+        archiveButton.textContent = "PDF архив";
+      }
+
+      const archiveMeta = document.getElementById("archiveSelectedMeta");
+      if (archiveMeta) {
+        archiveMeta.textContent = getMainArchiveSelectionText(getSelectedArchiveRecord(records));
+      }
+    }
+
+    const departmentArchivePanel = document.querySelector(".department-pdf-archive-panel");
+    if (departmentArchivePanel instanceof HTMLElement) {
+      departmentArchivePanel.remove();
     }
   }
 
@@ -11748,6 +11820,7 @@ function buildInitialPhotoLightboxState() {
       renderMainPage();
     }
 
+    normalizeMainArchivePanels();
     document.title = getAppDocumentTitle();
     enhanceMainPageCollapsiblePanels();
     attachCommonEvents();
@@ -11757,6 +11830,7 @@ function buildInitialPhotoLightboxState() {
       return;
     }
     refreshTableData();
+    normalizeMainArchivePanels();
   }
 
   function refreshComputedCells() {
