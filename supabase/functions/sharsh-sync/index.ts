@@ -1723,7 +1723,8 @@ async function authorizeOwner(request: Request, supabase: ReturnType<typeof crea
 
 function isPublicPostType(type: string) {
   return type === "list_ocr_feedback"
-    || type === "list_telegram_form_feedback";
+    || type === "list_telegram_form_feedback"
+    || type === "get_runtime_preferences";
 }
 
 function buildDepartmentFeedbackSourceMap(feedbackRows: Array<Record<string, unknown>>) {

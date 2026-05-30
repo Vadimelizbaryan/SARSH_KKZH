@@ -339,7 +339,6 @@
   }
 
   async function loadRemoteSnapshot() {
-    ensureOwnerAuth();
     const response = await fetch(getSyncEndpoint(), {
       method: "GET",
       headers: getAuthHeaders()
@@ -1964,7 +1963,6 @@
       return [];
     }
 
-    ensureOwnerAuth();
     const feedbackIds = Array.isArray(feedbackIdsOrOptions) ? feedbackIdsOrOptions : [];
     const options = (
       feedbackIdsOrOptions
@@ -2008,7 +2006,6 @@
       return [];
     }
 
-    ensureOwnerAuth();
     const response = await fetch(getSyncEndpoint(), {
       method: "POST",
       headers: getAuthHeaders(),
@@ -2019,6 +2016,7 @@
     });
 
     const payload = await response.json().catch(() => null);
+    if (!response.ok) { return { autoRotateImages: Boolean(runtime.autoRotateImages) }; }
     if (!response.ok) {
       if (await handleOwnerAuthFailure(response)) {
         throw new Error("Сессия владельца недействительна. Войдите снова.");
@@ -2067,7 +2065,6 @@
       };
     }
 
-    ensureOwnerAuth();
     const response = await fetch(getSyncEndpoint(), {
       method: "POST",
       headers: getAuthHeaders(),

@@ -2016,6 +2016,7 @@
     });
 
     const payload = await response.json().catch(() => null);
+    if (!response.ok) { return { autoRotateImages: Boolean(runtime.autoRotateImages) }; }
     if (!response.ok) {
       if (await handleOwnerAuthFailure(response)) {
         throw new Error("Сессия владельца недействительна. Войдите снова.");
@@ -2064,7 +2065,6 @@
       };
     }
 
-    ensureOwnerAuth();
     const response = await fetch(getSyncEndpoint(), {
       method: "POST",
       headers: getAuthHeaders(),
