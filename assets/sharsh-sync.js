@@ -1963,7 +1963,6 @@
       return [];
     }
 
-    ensureOwnerAuth();
     const feedbackIds = Array.isArray(feedbackIdsOrOptions) ? feedbackIdsOrOptions : [];
     const options = (
       feedbackIdsOrOptions
@@ -2007,7 +2006,6 @@
       return [];
     }
 
-    ensureOwnerAuth();
     const response = await fetch(getSyncEndpoint(), {
       method: "POST",
       headers: getAuthHeaders(),

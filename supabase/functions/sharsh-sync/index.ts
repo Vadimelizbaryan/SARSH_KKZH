@@ -1721,6 +1721,11 @@ async function authorizeOwner(request: Request, supabase: ReturnType<typeof crea
   return null;
 }
 
+function isPublicPostType(type: string) {
+  return type === "list_ocr_feedback"
+    || type === "list_telegram_form_feedback";
+}
+
 function buildDepartmentFeedbackSourceMap(feedbackRows: Array<Record<string, unknown>>) {
   const feedbackMap = new Map<string, {
     hasTelegramFormFeedback: boolean;
@@ -2670,11 +2675,6 @@ Deno.serve(async (request) => {
 
   try {
     const supabase = createSupabaseAdmin();
-    const authError = await authorizeOwner(request, supabase);
-    if (authError) {
-      return jsonResponse({ error: authError }, 403);
-    }
-
     if (request.method === "GET") {
       return jsonResponse(await loadSnapshot(supabase));
     }
@@ -2685,6 +2685,12 @@ Deno.serve(async (request) => {
 
     const payload = await request.json();
     const type = typeof payload?.type === "string" ? payload.type : "";
+    if (!isPublicPostType(type)) {
+      const authError = await authorizeOwner(request, supabase);
+      if (authError) {
+        return jsonResponse({ error: authError }, 403);
+      }
+    }
 
     if (type === "save_report_date") {
       const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()
