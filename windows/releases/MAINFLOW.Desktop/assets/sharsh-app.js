@@ -16069,31 +16069,7 @@ function buildInitialPhotoLightboxState() {
       });
     }
 
-    const archiveSelect = document.getElementById("archiveSelect");
-    if (archiveSelect) {
-      archiveSelect.addEventListener("change", () => {
-        state.selectedArchiveKey = archiveSelect.value || "";
-        syncArchivePickerUi();
-      });
-    }
-
     attachMainTableSavedNavigatorEvents();
-
-    const departmentPdfArchiveSelect = document.getElementById("departmentPdfArchiveSelect");
-    if (departmentPdfArchiveSelect) {
-      departmentPdfArchiveSelect.addEventListener("change", () => {
-        state.selectedDepartmentPdfArchiveKey = departmentPdfArchiveSelect.value || "";
-        syncDepartmentPdfArchivePickerUi();
-      });
-    }
-
-    const departmentPdfArchiveDateSelect = document.getElementById("departmentPdfArchiveDateSelect");
-    if (departmentPdfArchiveDateSelect) {
-      departmentPdfArchiveDateSelect.addEventListener("change", () => {
-        state.selectedDepartmentPdfArchiveDate = departmentPdfArchiveDateSelect.value || "";
-        syncMainDepartmentPdfArchivePickerUi();
-      });
-    }
 
     if (!app.dataset.archiveDownloadBound) {
       app.addEventListener("click", (event) => {
@@ -16115,6 +16091,33 @@ function buildInitialPhotoLightboxState() {
         printArchiveRecord(archiveKey);
       });
       app.dataset.archiveDownloadBound = "1";
+    }
+
+    if (!app.dataset.archiveChangeBound) {
+      app.addEventListener("change", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLSelectElement)) {
+          return;
+        }
+
+        if (target.id === "archiveSelect") {
+          state.selectedArchiveKey = target.value || "";
+          syncArchivePickerUi();
+          return;
+        }
+
+        if (target.id === "departmentPdfArchiveSelect") {
+          state.selectedDepartmentPdfArchiveKey = target.value || "";
+          syncDepartmentPdfArchivePickerUi();
+          return;
+        }
+
+        if (target.id === "departmentPdfArchiveDateSelect") {
+          state.selectedDepartmentPdfArchiveDate = target.value || "";
+          syncMainDepartmentPdfArchivePickerUi();
+        }
+      });
+      app.dataset.archiveChangeBound = "1";
     }
 
     if (!window.__sharshPhotoDraftGuardBound) {
