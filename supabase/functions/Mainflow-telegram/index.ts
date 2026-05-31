@@ -3,6 +3,8 @@ import JSZip from "npm:jszip@3.10.1";
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
 import { Jimp } from "npm:jimp";
+import { DOMParser as HtmlDomParser } from "npm:linkedom@0.18.12";
+import { DOMParser as XmlDomParser, XMLSerializer } from "npm:@xmldom/xmldom@0.8.10";
 import { Buffer } from "node:buffer";
 
 // deploy-touch: 2026-05-10
@@ -52,6 +54,8 @@ const SONO_BASE_DOCX_TEMPLATE_PATH = "/program-table-blank.docx";
 const SONO_EXPECTED_FILE_NAMES = new Set(["sono.docx", "sono.doc"]);
 const SONO_OLE_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1] as const;
 const WORD_XML_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const DOM_ELEMENT_NODE = 1;
+const DOM_TEXT_NODE = 3;
 const SONO_CLINICS = [
   {
     id: "evamed",
@@ -7457,7 +7461,7 @@ async function buildSonoConclusionDocxBytes(
 
 function removeWordRunPropertyNode(runProperties: Element, localName: string) {
   Array.from(runProperties.childNodes).forEach((node) => {
-    if (node.nodeType === Node.ELEMENT_NODE && (node as Element).localName === localName) {
+    if (node.nodeType === DOM_ELEMENT_NODE && (node as Element).localName === localName) {
       runProperties.removeChild(node);
     }
   });
@@ -7474,7 +7478,7 @@ function upsertWordRunPropertySize(doc: XMLDocument, runProperties: Element, siz
   const normalizedSize = Math.max(16, Math.trunc(size));
   const setSize = (localName: "sz" | "szCs") => {
     let sizeNode = Array.from(runProperties.childNodes).find((node) => (
-      node.nodeType === Node.ELEMENT_NODE && (node as Element).localName === localName
+      node.nodeType === DOM_ELEMENT_NODE && (node as Element).localName === localName
     )) as Element | undefined;
     if (!sizeNode) {
       sizeNode = doc.createElementNS(WORD_XML_NAMESPACE, `w:${localName}`);
@@ -7606,7 +7610,7 @@ function buildSonoTemplateDocumentXml(
     reportDate?: string;
   } = {}
 ) {
-  const parser = new DOMParser();
+  const parser = new XmlDomParser();
   const document = parser.parseFromString(templateXml, "application/xml");
   if (!document || document.getElementsByTagName("parsererror").length) {
     throw new Error("Не удалось прочитать XML шаблона Sono-клиники.");
@@ -7754,7 +7758,7 @@ function collectWordParagraphText(paragraph: Element) {
   const chunks: string[] = [];
 
   const walk = (node: Node) => {
-    if (node.nodeType === Node.ELEMENT_NODE) {
+    if (node.nodeType === DOM_ELEMENT_NODE) {
       const element = node as Element;
       if (element.localName === "t") {
         chunks.push(element.textContent || "");
@@ -7783,7 +7787,7 @@ function replaceWordParagraphText(doc: XMLDocument, paragraph: Element, nextText
     ? firstRun.getElementsByTagNameNS(WORD_XML_NAMESPACE, "rPr")[0] || null
     : null;
   const preservedParagraphProperties = Array.from(paragraph.childNodes).filter((node) => (
-    node.nodeType === Node.ELEMENT_NODE && (node as Element).localName === "pPr"
+    node.nodeType === DOM_ELEMENT_NODE && (node as Element).localName === "pPr"
   ));
 
   Array.from(paragraph.childNodes).forEach((node) => {
@@ -7824,7 +7828,7 @@ function replaceWordParagraphText(doc: XMLDocument, paragraph: Element, nextText
 }
 
 async function translateWordXmlContent(xml: string) {
-  const parser = new DOMParser();
+  const parser = new XmlDomParser();
   const document = parser.parseFromString(xml, "application/xml");
   if (!document || document.getElementsByTagName("parsererror").length) {
     throw new Error("Не удалось прочитать XML-содержимое Word-документа.");
@@ -7926,49 +7930,56 @@ function looksLikeHtmlDocument(value: string) {
   return /<(html|body|p|div|table|span|meta|head)\b/i.test(value);
 }
 
+function collectTranslatableHtmlTextNodes(root: Node | null) {
+  const textNodes: Array<{ node: Node; value: string }> = [];
+
+  const walk = (node: Node | null) => {
+    if (!node) {
+      return;
+    }
+
+    if (node.nodeType === DOM_TEXT_NODE) {
+      const textValue = node.nodeValue || "";
+      const parent = node.parentNode as Element | null;
+      const tagName = parent?.tagName ? parent.tagName.toLowerCase() : "";
+      if (tagName !== "script" && tagName !== "style" && hasRussianCyrillicText(textValue)) {
+        textNodes.push({ node, value: textValue });
+      }
+      return;
+    }
+
+    Array.from(node.childNodes || []).forEach((child) => walk(child as Node));
+  };
+
+  walk(root);
+  return textNodes;
+}
+
 async function translateSonoHtmlDocumentBytes(bytes: Uint8Array) {
   const decoded = decodeSonoTextBytes(bytes);
   if (!decoded || !looksLikeHtmlDocument(decoded)) {
     throw new Error("Не удалось распознать HTML-содержимое Word .doc.");
   }
 
-  const parser = new DOMParser();
+  const parser = new HtmlDomParser();
   const document = parser.parseFromString(decoded, "text/html");
   if (!document || !document.documentElement) {
     throw new Error("Не удалось прочитать HTML-содержимое документа.");
   }
 
-  const textNodes: Text[] = [];
-  const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const textValue = node.nodeValue || "";
-      const parent = node.parentNode as Element | null;
-      if (!parent) {
-        return NodeFilter.FILTER_REJECT;
-      }
-      const tagName = parent.tagName ? parent.tagName.toLowerCase() : "";
-      if (tagName === "script" || tagName === "style") {
-        return NodeFilter.FILTER_REJECT;
-      }
-      return hasRussianCyrillicText(textValue)
-        ? NodeFilter.FILTER_ACCEPT
-        : NodeFilter.FILTER_SKIP;
-    }
-  });
-
-  while (walker.nextNode()) {
-    textNodes.push(walker.currentNode as Text);
-  }
+  const textNodes = collectTranslatableHtmlTextNodes(
+    (document.body || document.documentElement) as unknown as Node
+  );
 
   if (!textNodes.length) {
     throw new Error("В документе не найден русский текст для перевода.");
   }
 
   const translatedTexts = await translateRussianTextsToArmenian(
-    textNodes.map((node) => node.nodeValue || "")
+    textNodes.map((entry) => entry.value)
   );
-  textNodes.forEach((node, index) => {
-    node.nodeValue = translatedTexts[index];
+  textNodes.forEach((entry, index) => {
+    entry.node.nodeValue = translatedTexts[index];
   });
 
   let html = `<!doctype html>\n${document.documentElement.outerHTML}`;
