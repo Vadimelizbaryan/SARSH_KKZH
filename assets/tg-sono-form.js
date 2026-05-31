@@ -4,6 +4,8 @@
     ? window.Telegram.WebApp
     : null;
   const root = document.getElementById("tg-sono-root");
+  const SONO_SETUP_URL =
+    "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/Sono.exe";
   let telegramViewportListenerAttached = false;
 
   function escapeHtml(value) {
@@ -110,6 +112,24 @@
       URL.revokeObjectURL(blobUrl);
     }, 1500);
     return true;
+  }
+
+  function openExternalUrl(url) {
+    const href = String(url || "").trim();
+    if (!href) {
+      return;
+    }
+
+    if (telegram && typeof telegram.openLink === "function") {
+      try {
+        telegram.openLink(href);
+        return;
+      } catch (_error) {
+        // Fall through to a regular browser open.
+      }
+    }
+
+    window.open(href, "_blank", "noopener");
   }
 
   function renderError(message) {
@@ -221,6 +241,14 @@
             <span>Готовый файл можно сразу печатать. Если у вас уже есть Word-файл, отправьте боту <strong>Sono.docx</strong> или <strong>Sono.doc</strong>.</span>
           </div>
 
+          <div class="tg-sono-setup">
+            <div class="tg-sono-setup-copy">
+              <strong>Нужна отдельная программа для Windows?</strong>
+              <span>Из этой формы можно сразу открыть и скачать установщик <strong>SONO.exe</strong> на рабочий компьютер.</span>
+            </div>
+            <button class="tg-sono-download tg-sono-download--setup" type="button" data-setup-download>Скачать SONO.exe</button>
+          </div>
+
           <div class="tg-sono-actions">
             <button class="tg-sono-submit" type="submit" data-submit>Перевести и получить Word</button>
             <button class="tg-sono-download" type="button" data-download hidden>Скачать Word сразу</button>
@@ -233,8 +261,15 @@
     const form = root.querySelector("[data-form]");
     const submit = root.querySelector("[data-submit]");
     const download = root.querySelector("[data-download]");
+    const setupDownload = root.querySelector("[data-setup-download]");
     const message = root.querySelector("[data-message]");
     let lastDownload = null;
+
+    if (setupDownload) {
+      setupDownload.addEventListener("click", function () {
+        openExternalUrl(SONO_SETUP_URL);
+      });
+    }
 
     download.addEventListener("click", function () {
       if (!lastDownload) {

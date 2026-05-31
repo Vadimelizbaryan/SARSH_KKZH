@@ -116,7 +116,8 @@ textarea {
 .tg-sono-note,
 .tg-sono-section,
 .tg-sono-field,
-.tg-sono-footnote {
+.tg-sono-footnote,
+.tg-sono-setup {
   border: 1px solid var(--sono-line);
   border-radius: 18px;
   background: var(--sono-panel);
@@ -289,6 +290,36 @@ textarea {
     #ffffff;
 }
 
+.tg-sono-setup {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(34, 103, 153, 0.08),
+      rgba(255, 255, 255, 0.96)
+    ),
+    #ffffff;
+}
+
+.tg-sono-setup-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.tg-sono-setup-copy strong {
+  font-size: 13px;
+}
+
+.tg-sono-setup-copy span {
+  color: var(--sono-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .tg-sono-actions {
   display: grid;
   gap: 10px;
@@ -306,6 +337,9 @@ textarea {
 }
 
 .tg-sono-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 44px;
   border: 1px solid rgba(31, 122, 90, 0.22);
   border-radius: 16px;
@@ -314,6 +348,12 @@ textarea {
   font-size: 15px;
   font-weight: 900;
   cursor: pointer;
+  padding: 10px 14px;
+  text-decoration: none;
+}
+
+.tg-sono-download--setup {
+  width: 100%;
 }
 
 .tg-sono-submit:disabled {
@@ -365,5 +405,16 @@ textarea {
 
   .tg-sono-form > .tg-sono-field:last-of-type textarea {
     min-height: clamp(300px, 52vh, 540px);
+  }
+}
+
+@media (min-width: 721px) {
+  .tg-sono-setup {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .tg-sono-download--setup {
+    width: auto;
+    min-width: 220px;
   }
 }
