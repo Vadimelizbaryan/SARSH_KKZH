@@ -32,6 +32,7 @@ public partial class Form1 : Form
     private const int InitialDataMirrorSyncDelayMs = 30 * 1000;
 
     private readonly bool _startInBackground;
+    private readonly EventWaitHandle? _restoreRequestEvent;
     private readonly string _webRootPath;
     private readonly string _appDataRoot;
     private readonly string _webViewUserDataPath;
@@ -69,6 +70,7 @@ public partial class Form1 : Form
     private readonly ToolStripMenuItem _trayMenuExit;
     private readonly System.Windows.Forms.Timer _autoUpdateTimer;
     private readonly System.Windows.Forms.Timer _dataMirrorTimer;
+    private RegisteredWaitHandle? _restoreRequestRegistration;
 
     private DesktopShellState _shellState;
     private bool _suppressModeEvents;
@@ -83,9 +85,10 @@ public partial class Form1 : Form
     private string _pendingUpdateToken = string.Empty;
     private string _lastAnnouncedUpdateToken = string.Empty;
 
-    public Form1(bool startInBackground = false)
+    public Form1(bool startInBackground = false, EventWaitHandle? restoreRequestEvent = null)
     {
         _startInBackground = startInBackground;
+        _restoreRequestEvent = restoreRequestEvent;
         InitializeComponent();
 
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
@@ -251,10 +254,13 @@ public partial class Form1 : Form
         Resize += (_, _) => HandleResizeToTray();
         Disposed += (_, _) =>
         {
+            _restoreRequestRegistration?.Unregister(null);
+            _restoreRequestEvent?.Dispose();
             _autoUpdateTimer.Dispose();
             _dataMirrorTimer.Dispose();
             _releaseHttpClient.Dispose();
         };
+        RegisterRestoreRequestHandler();
         Shown += async (_, _) =>
         {
             await InitializeWebViewAsync();
@@ -265,6 +271,36 @@ public partial class Form1 : Form
             FireAndForgetDataMirrorSync(_startInBackground ? 10_000 : InitialDataMirrorSyncDelayMs);
         };
         FormClosing += HandleFormClosing;
+    }
+
+    private void RegisterRestoreRequestHandler()
+    {
+        if (_restoreRequestEvent is null)
+        {
+            return;
+        }
+
+        _restoreRequestRegistration = ThreadPool.RegisterWaitForSingleObject(
+            _restoreRequestEvent,
+            static (state, _) =>
+            {
+                if (state is not Form1 form || form.IsDisposed)
+                {
+                    return;
+                }
+
+                try
+                {
+                    form.RestoreFromTray();
+                }
+                catch
+                {
+                }
+            },
+            this,
+            Timeout.Infinite,
+            executeOnlyOnce: false
+        );
     }
 
     private void FireAndForgetAutoUpdateCheck(int delayMs)

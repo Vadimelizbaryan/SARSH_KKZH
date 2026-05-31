@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-05-31T22:09:03.6288932Z",
+    "generatedAtUtc":  "2026-05-31T22:15:52.7683642Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -338,13 +338,13 @@
                   },
                   {
                       "path":  "Mainflow.dll",
-                      "size":  131584,
-                      "sha256":  "B4675602C8A9B75E86D723F5608589BB8E58B0A0791B4F77F32DAF4B630AE841"
+                      "size":  133120,
+                      "sha256":  "7A2074D942C39CC0FA66CA410252B38E08DE3C3884265A2EBD62EFDE7C194F38"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "86825C69314DB65854EE90E69BD24330CBC22AE8933D54761D8CB88BC7FE70D0"
+                      "sha256":  "E6DBC4F3D03C1BE9F88EA81E7B451C411A5F7E6D70BB21094D885623B9874E9B"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",
