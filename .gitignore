@@ -10,3 +10,30 @@ tools/PdfMergeTool/bin/
 tools/PdfMergeTool/obj/
 android/**/bin/
 android/**/obj/
+windows/**/bin/
+windows/**/obj/
+windows/.tmp/
+*.pdb
+
+# Local temp files
+.tmp-*.patch
+tmp_*
+
+# Local secrets
+google-services.json
+*-firebase-adminsdk-*.json
+
+# Local desktop release artifacts
+windows/releases/SONO.Desktop/
+windows/releases/Sono.exe
+
+# Generated release-only duplicates
+windows/releases/MAINFLOW.Desktop/android-intake.html
+windows/releases/MAINFLOW.Desktop/sono-desktop.html
+windows/releases/MAINFLOW.Desktop/tg-sono-form.html
+windows/releases/MAINFLOW.Desktop/assets/android-intake.css
+windows/releases/MAINFLOW.Desktop/assets/android-intake.js
+windows/releases/MAINFLOW.Desktop/assets/sono-desktop.js
+windows/releases/MAINFLOW.Desktop/assets/tg-sono-form.css
+windows/releases/MAINFLOW.Desktop/assets/tg-sono-form.js
+windows/releases/MAINFLOW.Desktop/assets/templates/sono/

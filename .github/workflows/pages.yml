@@ -52,6 +52,8 @@ jobs:
           cp qr-sheet.html _site/
           cp qr-sheet.pdf _site/
           cp -R assets _site/
+          mkdir -p _site/windows
+          cp -R windows/releases _site/windows/
           mkdir -p _site/android
           cp -R android/releases _site/android/
           cp -R bgej6lyx _site/

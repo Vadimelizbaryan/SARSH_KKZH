@@ -1,7 +1,6 @@
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
 using Android.Content.PM;
 using Android.App;
 using Android.Content;
@@ -11,9 +10,7 @@ using Android.Provider;
 using Android.Views;
 using Android.Webkit;
 using Android.Widget;
-using AndroidX.Core.App;
 using AndroidX.Core.Content;
-using Java.Interop;
 
 namespace MAINFORM;
 
@@ -24,10 +21,6 @@ public class MainActivity : Activity
         "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-form-url";
     private const string AndroidPhotoCheckUrl =
         "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-photo-check";
-    private const string AndroidDeviceNotificationsUrl =
-        "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-device-notifications";
-    private const string AndroidDeviceNotificationsAckUrl =
-        "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-device-notifications-ack";
     private const string AndroidReleaseManifestUrl =
         "https://vadimelizbaryan.github.io/SARSH_KKZH/android/releases/latest.json";
     private const string PreferenceName = "mainform_preferences";
@@ -36,12 +29,9 @@ public class MainActivity : Activity
     private const int FileChooserRequestCode = 1101;
     private const int NativePhotoRequestCode = 1102;
     private const int CameraPermissionRequestCode = 1103;
-    private const int NotificationPermissionRequestCode = 1104;
     private const int PhotoMaxDimension = 1600;
     private const int PhotoQuality = 86;
     private const string AndroidIntakeHubDepartmentId = "admission_hub";
-    private const string NotificationChannelId = "mainform_ocr_results";
-    private const int NotificationPollIntervalMs = 120000;
 
     private static readonly HttpClient BootstrapHttpClient = new()
     {
@@ -52,7 +42,7 @@ public class MainActivity : Activity
 
     private static readonly DepartmentOption[] Departments =
     [
-        new("Ընդունարան", "admission_hub", AndroidIntakeHubDepartmentId),
+        new("\u0538\u0576\u0564\u0578\u0582\u0576\u0561\u0580\u0561\u0576", "admission_hub", AndroidIntakeHubDepartmentId),
         new("Վիրաբուժական", "te9625wg", "r4"),
         new("Դ/Ծ վ/բ բաժանմունք", "1ei6dnv2", "r5"),
         new("Քիթ-կոկորդ բ-ք", "du9wa6oq", "r6"),
@@ -87,11 +77,7 @@ public class MainActivity : Activity
     private bool _updatePromptShown;
     private bool _pageReady;
     private DepartmentOption? _selectedDepartment;
-    private string _pendingAdmissionHubCaptureDepartmentId = string.Empty;
     private AndroidPhotoRuntimeState _photoState = AndroidPhotoRuntimeState.Empty;
-    private Timer? _notificationPollTimer;
-    private int _notificationPollInFlight;
-    private int _nextNotificationId = 3000;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -113,10 +99,6 @@ public class MainActivity : Activity
         var exitButton = FindViewById<Button>(Resource.Id.buttonExit);
 
         ConfigureWebView();
-        EnsureNotificationChannel();
-        MaybeRequestNotificationPermission();
-        StartNotificationPolling();
-        _ = MainformPushSupport.InitializeAndRegisterAsync(this, _selectedDepartment?.DepartmentId);
 
         if (selectDepartmentButton is not null)
         {
@@ -172,20 +154,6 @@ public class MainActivity : Activity
         _ = CheckForAppUpdateAsync();
     }
 
-    protected override void OnResume()
-    {
-        base.OnResume();
-        _ = PollNotificationQueueAsync();
-        _ = MainformPushSupport.InitializeAndRegisterAsync(this, _selectedDepartment?.DepartmentId);
-    }
-
-    protected override void OnDestroy()
-    {
-        _notificationPollTimer?.Dispose();
-        _notificationPollTimer = null;
-        base.OnDestroy();
-    }
-
     public override void OnBackPressed()
     {
         if (_webView?.CanGoBack() == true)
@@ -236,15 +204,6 @@ public class MainActivity : Activity
         _pendingCameraUri = null;
         if (selectedUri is not null)
         {
-            if (IsAdmissionHubDepartment(_selectedDepartment) &&
-                !string.IsNullOrWhiteSpace(_pendingAdmissionHubCaptureDepartmentId))
-            {
-                var targetDepartmentId = _pendingAdmissionHubCaptureDepartmentId;
-                _pendingAdmissionHubCaptureDepartmentId = string.Empty;
-                await ProcessAdmissionHubPhotoAsync(selectedUri, targetDepartmentId);
-                return;
-            }
-
             await ProcessNativePhotoAsync(selectedUri);
         }
     }
@@ -252,11 +211,6 @@ public class MainActivity : Activity
     public override void OnRequestPermissionsResult(int requestCode, string[]? permissions, Permission[]? grantResults)
     {
         base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        if (requestCode == NotificationPermissionRequestCode)
-        {
-            return;
-        }
 
         if (requestCode != CameraPermissionRequestCode)
         {
@@ -302,7 +256,6 @@ public class MainActivity : Activity
             CookieManager.Instance.SetAcceptThirdPartyCookies(_webView, true);
         }
 
-        _webView.AddJavascriptInterface(new MainflowAndroidBridge(this), "MainflowAndroidBridge");
         _webView.SetWebViewClient(new MainFormWebViewClient(this));
         _webView.SetWebChromeClient(new MainFormWebChromeClient(this));
     }
@@ -380,7 +333,6 @@ public class MainActivity : Activity
     {
         _selectedDepartment = option;
         SaveSelectedDepartment(option.Slug);
-        _ = MainformPushSupport.InitializeAndRegisterAsync(this, option.DepartmentId);
         if (clearPhoto)
         {
             ClearSelectedPhoto(showToast: false);
@@ -517,27 +469,6 @@ public class MainActivity : Activity
             .Show();
     }
 
-    internal void StartAdmissionHubCameraCapture(string departmentId)
-    {
-        if (!IsAdmissionHubDepartment(_selectedDepartment))
-        {
-            Toast.MakeText(this, Resource.String.select_department_first, ToastLength.Short)?.Show();
-            return;
-        }
-
-        _pendingAdmissionHubCaptureDepartmentId = string.IsNullOrWhiteSpace(departmentId)
-            ? string.Empty
-            : departmentId.Trim();
-
-        if (string.IsNullOrWhiteSpace(_pendingAdmissionHubCaptureDepartmentId))
-        {
-            Toast.MakeText(this, Resource.String.photo_processing_failed, ToastLength.Short)?.Show();
-            return;
-        }
-
-        StartCameraCapture();
-    }
-
     private void StartGalleryPicker()
     {
         try
@@ -624,39 +555,6 @@ public class MainActivity : Activity
                     : error.Message;
                 SetPhotoStatus(message, "#B92D20");
                 ApplyAndroidRuntimeStateToWebView();
-            });
-        }
-    }
-
-    private async Task ProcessAdmissionHubPhotoAsync(Android.Net.Uri sourceUri, string targetDepartmentId)
-    {
-        try
-        {
-            var preparedPhoto = await PreparePhotoPayloadAsync(sourceUri, targetDepartmentId);
-            var payload = new
-            {
-                departmentId = targetDepartmentId,
-                photo = new
-                {
-                    imageDataUrl = preparedPhoto.ImageDataUrl,
-                    imageName = preparedPhoto.ImageName,
-                    createdAt = DateTime.UtcNow.ToString("O"),
-                    reportDate = string.Empty
-                }
-            };
-            ApplyAdmissionHubPhotoToWebView(payload);
-        }
-        catch (Exception error)
-        {
-            RunOnUiThread(() =>
-            {
-                Toast.MakeText(
-                    this,
-                    string.IsNullOrWhiteSpace(error.Message)
-                        ? GetString(Resource.String.photo_processing_failed)
-                        : error.Message,
-                    ToastLength.Long
-                )?.Show();
             });
         }
     }
@@ -1035,191 +933,6 @@ public class MainActivity : Activity
         return string.IsNullOrWhiteSpace(device) ? "Android MAINFORM" : device;
     }
 
-    private void EnsureNotificationChannel()
-    {
-        if (Build.VERSION.SdkInt < BuildVersionCodes.O)
-        {
-            return;
-        }
-
-        var channel = new NotificationChannel(
-            NotificationChannelId,
-            "MAINFORM OCR",
-            NotificationImportance.High)
-        {
-            Description = "OCR results for department photos"
-        };
-
-        var manager = (NotificationManager?)GetSystemService(NotificationService);
-        manager?.CreateNotificationChannel(channel);
-    }
-
-    private void MaybeRequestNotificationPermission()
-    {
-        if (Build.VERSION.SdkInt < BuildVersionCodes.Tiramisu)
-        {
-            return;
-        }
-
-        if (CheckSelfPermission("android.permission.POST_NOTIFICATIONS") == Permission.Granted)
-        {
-            return;
-        }
-
-        RequestPermissions(["android.permission.POST_NOTIFICATIONS"], NotificationPermissionRequestCode);
-    }
-
-    private void StartNotificationPolling()
-    {
-        _notificationPollTimer?.Dispose();
-        _notificationPollTimer = new Timer(async _ =>
-        {
-            try
-            {
-                await PollNotificationQueueAsync();
-            }
-            catch
-            {
-                // Ignore transient polling errors.
-            }
-        }, null, NotificationPollIntervalMs, NotificationPollIntervalMs);
-    }
-
-    private string? GetNotificationDepartmentId()
-    {
-        if (_selectedDepartment is null || IsAdmissionHubDepartment(_selectedDepartment))
-        {
-            return null;
-        }
-
-        return _selectedDepartment.DepartmentId;
-    }
-
-    private async Task PollNotificationQueueAsync()
-    {
-        if (Interlocked.Exchange(ref _notificationPollInFlight, 1) == 1)
-        {
-            return;
-        }
-
-        try
-        {
-            var departmentId = GetNotificationDepartmentId();
-            if (string.IsNullOrWhiteSpace(departmentId))
-            {
-                return;
-            }
-
-            var requestUrl =
-                $"{AndroidDeviceNotificationsUrl}&deviceId={Uri.EscapeDataString(GetOrCreateDeviceId())}" +
-                $"&deviceName={Uri.EscapeDataString(BuildDeviceName())}" +
-                $"&departmentId={Uri.EscapeDataString(departmentId)}";
-            using var response = await BootstrapHttpClient.GetAsync(requestUrl);
-            var responseText = await response.Content.ReadAsStringAsync();
-            if (!response.IsSuccessStatusCode)
-            {
-                return;
-            }
-
-            using var json = JsonDocument.Parse(responseText);
-            var root = json.RootElement;
-            if (!root.TryGetProperty("ok", out var okElement) || okElement.ValueKind != JsonValueKind.True)
-            {
-                return;
-            }
-
-            if (!root.TryGetProperty("notifications", out var notificationsElement) ||
-                notificationsElement.ValueKind != JsonValueKind.Array)
-            {
-                return;
-            }
-
-            var deliveredIds = new List<string>();
-            foreach (var item in notificationsElement.EnumerateArray())
-            {
-                var notification = AndroidServerNotification.TryParse(item);
-                if (notification is null)
-                {
-                    continue;
-                }
-
-                if (ShowAndroidNotification(notification))
-                {
-                    deliveredIds.Add(notification.Id);
-                }
-            }
-
-            if (deliveredIds.Count > 0)
-            {
-                await AcknowledgeAndroidNotificationsAsync(departmentId, deliveredIds);
-            }
-        }
-        finally
-        {
-            Interlocked.Exchange(ref _notificationPollInFlight, 0);
-        }
-    }
-
-    private async Task AcknowledgeAndroidNotificationsAsync(string departmentId, List<string> notificationIds)
-    {
-        var requestBody = JsonSerializer.Serialize(new
-        {
-            deviceId = GetOrCreateDeviceId(),
-            deviceName = BuildDeviceName(),
-            departmentId,
-            notificationIds
-        }, JsonOptions);
-
-        using var response = await BootstrapHttpClient.PostAsync(
-            AndroidDeviceNotificationsAckUrl,
-            new StringContent(requestBody, Encoding.UTF8, "application/json")
-        );
-        _ = response;
-    }
-
-    private bool ShowAndroidNotification(AndroidServerNotification notification)
-    {
-        var manager = NotificationManagerCompat.From(this);
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu &&
-            CheckSelfPermission("android.permission.POST_NOTIFICATIONS") != Permission.Granted)
-        {
-            return false;
-        }
-
-        var launchIntent = PackageManager?.GetLaunchIntentForPackage(PackageName);
-        PendingIntent? pendingIntent = null;
-        if (launchIntent is not null)
-        {
-            launchIntent.AddFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
-            pendingIntent = PendingIntent.GetActivity(
-                this,
-                0,
-                launchIntent,
-                PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable
-            );
-        }
-
-        var builder = new NotificationCompat.Builder(this, NotificationChannelId)
-            .SetSmallIcon(Android.Resource.Drawable.IcDialogInfo)
-            .SetContentTitle(notification.Title)
-            .SetContentText(notification.Message)
-            .SetStyle(new NotificationCompat.BigTextStyle().BigText(notification.Message))
-            .SetPriority(notification.Level == "warning"
-                ? NotificationCompat.PriorityHigh
-                : NotificationCompat.PriorityDefault)
-            .SetAutoCancel(true)
-            .SetWhen(notification.CreatedAtUtcMs > 0 ? notification.CreatedAtUtcMs : Java.Lang.JavaSystem.CurrentTimeMillis());
-
-        if (pendingIntent is not null)
-        {
-            builder.SetContentIntent(pendingIntent);
-        }
-
-        manager.Notify(Interlocked.Increment(ref _nextNotificationId), builder.Build());
-        RunOnUiThread(() => Toast.MakeText(this, notification.Message, ToastLength.Long)?.Show());
-        return true;
-    }
-
     private static string? TryGetBootstrapMessage(string? responseText)
     {
         if (string.IsNullOrWhiteSpace(responseText))
@@ -1319,30 +1032,6 @@ public class MainActivity : Activity
         try
         {
             _webView.EvaluateJavascript(script, null);
-        }
-        catch
-        {
-            // Ignore transient WebView timing errors.
-        }
-    }
-
-    private void ApplyAdmissionHubPhotoToWebView(object payload)
-    {
-        if (_webView is null || !_pageReady)
-        {
-            return;
-        }
-
-        var json = JsonSerializer.Serialize(payload, JsonOptions);
-        var script =
-            "(function(){" +
-            $"const payload={json};" +
-            "if(window.MAINFORM_ANDROID_INTAKE_HUB&&typeof window.MAINFORM_ANDROID_INTAKE_HUB.receiveCapturedPhoto==='function'){window.MAINFORM_ANDROID_INTAKE_HUB.receiveCapturedPhoto(payload);}" +
-            "window.dispatchEvent(new CustomEvent('mainform-android-intake-photo',{detail:payload}));" +
-            "})();";
-        try
-        {
-            RunOnUiThread(() => _webView.EvaluateJavascript(script, null));
         }
         catch
         {
@@ -1458,18 +1147,6 @@ public class MainActivity : Activity
         }
     }
 
-    private sealed class MainflowAndroidBridge(MainActivity activity) : Java.Lang.Object
-    {
-        [JavascriptInterface]
-        [Export("captureAdmissionHubPhoto")]
-        public void CaptureAdmissionHubPhoto(string? departmentId)
-        {
-            activity.RunOnUiThread(() =>
-                activity.StartAdmissionHubCameraCapture(departmentId ?? string.Empty)
-            );
-        }
-    }
-
     private sealed record DepartmentOption(string Name, string Slug, string DepartmentId);
 
     private sealed record PreparedPhotoPayload(string ImageName, string ImageDataUrl);
@@ -1481,52 +1158,6 @@ public class MainActivity : Activity
         string DetectedDepartmentId,
         string Message
     );
-
-    private sealed record AndroidServerNotification(
-        string Id,
-        string Title,
-        string Message,
-        string Level,
-        long CreatedAtUtcMs
-    )
-    {
-        public static AndroidServerNotification? TryParse(JsonElement element)
-        {
-            if (element.ValueKind != JsonValueKind.Object)
-            {
-                return null;
-            }
-
-            var id = element.TryGetProperty("id", out var idElement) && idElement.ValueKind == JsonValueKind.String
-                ? idElement.GetString()?.Trim()
-                : null;
-            var title = element.TryGetProperty("title", out var titleElement) && titleElement.ValueKind == JsonValueKind.String
-                ? titleElement.GetString()?.Trim()
-                : null;
-            var message = element.TryGetProperty("message", out var messageElement) && messageElement.ValueKind == JsonValueKind.String
-                ? messageElement.GetString()?.Trim()
-                : null;
-            var level = element.TryGetProperty("level", out var levelElement) && levelElement.ValueKind == JsonValueKind.String
-                ? levelElement.GetString()?.Trim()
-                : "success";
-            var createdAtText = element.TryGetProperty("createdAt", out var createdAtElement) && createdAtElement.ValueKind == JsonValueKind.String
-                ? createdAtElement.GetString()?.Trim()
-                : null;
-
-            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(message))
-            {
-                return null;
-            }
-
-            var createdAtUtcMs = 0L;
-            if (DateTimeOffset.TryParse(createdAtText, out var createdAt))
-            {
-                createdAtUtcMs = createdAt.ToUnixTimeMilliseconds();
-            }
-
-            return new AndroidServerNotification(id, title, message, string.IsNullOrWhiteSpace(level) ? "success" : level, createdAtUtcMs);
-        }
-    }
 
     private sealed record AndroidPhotoRuntimeState(
         bool Exists,

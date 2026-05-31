@@ -21,6 +21,7 @@ internal sealed class InstallerForm : Form
     private const string ReleaseBaseUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/MAINFLOW.Desktop/";
     private const string ManifestFileName = "package-manifest.json";
     private const string InstallFolderName = "MAINFLOW Desktop";
+    private const string PreferredInstallBasePath = @"D:\SHARSH AI Apps";
     private const string DesktopShortcutName = "MAINFLOW Desktop.lnk";
     private const string InstalledExecutableName = "Mainflow.exe";
     private const string InstalledProcessName = "Mainflow";
@@ -108,11 +109,7 @@ internal sealed class InstallerForm : Form
 
     private async Task RunInstallAsync()
     {
-        var installDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Programs",
-            InstallFolderName
-        );
+        var installDir = ResolveInstallDirectory();
         var executablePath = Path.Combine(installDir, InstalledExecutableName);
 
         try
@@ -338,6 +335,28 @@ internal sealed class InstallerForm : Form
         }
 
         return destinationPath;
+    }
+
+    private static string ResolveInstallDirectory()
+    {
+        try
+        {
+            if (Directory.Exists(@"D:\"))
+            {
+                var preferredPath = Path.Combine(PreferredInstallBasePath, InstallFolderName);
+                Directory.CreateDirectory(preferredPath);
+                return preferredPath;
+            }
+        }
+        catch
+        {
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Programs",
+            InstallFolderName
+        );
     }
 
     private static bool FileMatchesManifest(string destinationPath, DesktopPackageFile expected, DesktopPackageFile? existingManifestEntry)
