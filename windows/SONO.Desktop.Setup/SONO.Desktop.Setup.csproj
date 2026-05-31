@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>SonoSetup</AssemblyName>
+    <RootNamespace>SONO.Desktop.Setup</RootNamespace>
+    <SatelliteResourceLanguages>ru</SatelliteResourceLanguages>
+    <LangVersion>latest</LangVersion>
+    <ApplicationIcon>..\Resources\SonoMedical.ico</ApplicationIcon>
+  </PropertyGroup>
+
+</Project>

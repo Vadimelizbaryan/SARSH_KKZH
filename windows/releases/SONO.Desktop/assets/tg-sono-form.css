@@ -1,0 +1,369 @@
+:root {
+  color-scheme: light;
+  --sono-ink: #17231f;
+  --sono-muted: #64756d;
+  --sono-line: rgba(37, 66, 57, 0.14);
+  --sono-paper: rgba(255, 255, 255, 0.9);
+  --sono-panel: #fffdf8;
+  --sono-accent: #1f7a5a;
+  --sono-accent-soft: rgba(31, 122, 90, 0.1);
+  --sono-warning: #a55224;
+  --sono-danger: #b63b32;
+  --sono-shadow: 0 22px 60px rgba(42, 57, 49, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: var(--sono-vh, 100dvh);
+  font-family: "Trebuchet MS", "Segoe UI", Verdana, sans-serif;
+  color: var(--sono-ink);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(250, 206, 128, 0.45),
+      transparent 28%
+    ),
+    radial-gradient(
+    circle at bottom right,
+    rgba(112, 186, 156, 0.28),
+    transparent 26%
+  ),
+    linear-gradient(135deg, #f8eed9 0%, #fffdf8 50%, #ebf6ef 100%);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.tg-sono-root {
+  width: 100%;
+  min-height: var(--sono-vh, 100dvh);
+  margin: 0;
+  padding:
+    calc(env(safe-area-inset-top) + 8px)
+    calc(env(safe-area-inset-right) + 8px)
+    calc(env(safe-area-inset-bottom) + 8px)
+    calc(env(safe-area-inset-left) + 8px);
+}
+
+.tg-sono-card {
+  min-height: calc(var(--sono-vh, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px);
+  background: var(--sono-paper);
+  border: 1px solid var(--sono-line);
+  border-radius: 24px;
+  box-shadow: var(--sono-shadow);
+  padding: 14px;
+  backdrop-filter: blur(10px);
+}
+
+.tg-sono-card--loading {
+  min-height: 240px;
+  display: grid;
+  align-content: center;
+}
+
+.tg-sono-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.tg-sono-kicker {
+  margin: 0 0 4px;
+  color: var(--sono-accent);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.tg-sono-title {
+  margin: 0;
+  font-size: clamp(22px, 4.2vw, 34px);
+  line-height: 1.02;
+}
+
+.tg-sono-badge {
+  margin: 0;
+  border: 1px solid rgba(31, 122, 90, 0.18);
+  border-radius: 999px;
+  background: var(--sono-accent-soft);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tg-sono-muted {
+  margin: 0;
+  color: var(--sono-muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.tg-sono-note,
+.tg-sono-section,
+.tg-sono-field,
+.tg-sono-footnote {
+  border: 1px solid var(--sono-line);
+  border-radius: 18px;
+  background: var(--sono-panel);
+}
+
+.tg-sono-note {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+}
+
+.tg-sono-note strong {
+  color: var(--sono-accent);
+  font-size: 13px;
+}
+
+.tg-sono-note span,
+.tg-sono-footnote span {
+  color: var(--sono-muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tg-sono-form {
+  display: grid;
+  gap: 10px;
+}
+
+.tg-sono-section {
+  padding: 10px 12px;
+}
+
+.tg-sono-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tg-sono-section-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.tg-sono-section-head span {
+  color: var(--sono-muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tg-sono-clinic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tg-sono-clinic-option {
+  display: block;
+  cursor: pointer;
+}
+
+.tg-sono-clinic-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tg-sono-clinic-card {
+  display: grid;
+  gap: 3px;
+  min-height: 72px;
+  padding: 11px 12px;
+  border: 1px solid rgba(37, 66, 57, 0.12);
+  border-radius: 16px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(249, 225, 169, 0.25),
+      rgba(255, 255, 255, 0.96)
+    ),
+    #ffffff;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.tg-sono-clinic-card strong {
+  font-size: 15px;
+}
+
+.tg-sono-clinic-card small {
+  color: var(--sono-muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.tg-sono-clinic-option input:checked + .tg-sono-clinic-card {
+  border-color: rgba(31, 122, 90, 0.44);
+  box-shadow: 0 12px 24px rgba(31, 122, 90, 0.12);
+  transform: translateY(-1px);
+}
+
+.tg-sono-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tg-sono-field {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.tg-sono-field span {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--sono-muted);
+}
+
+.tg-sono-field input,
+.tg-sono-field textarea {
+  width: 100%;
+  border: 1px solid rgba(37, 66, 57, 0.16);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--sono-ink);
+  padding: 10px 12px;
+}
+
+.tg-sono-field input {
+  min-height: 42px;
+  font-weight: 800;
+}
+
+.tg-sono-field textarea {
+  min-height: 240px;
+  resize: vertical;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.tg-sono-form > .tg-sono-field:last-of-type textarea {
+  min-height: clamp(340px, 46vh, 620px);
+  line-height: 1.55;
+}
+
+.tg-sono-field input:focus,
+.tg-sono-field textarea:focus {
+  outline: 3px solid rgba(31, 122, 90, 0.16);
+  border-color: rgba(31, 122, 90, 0.45);
+}
+
+.tg-sono-footnote {
+  padding: 10px 12px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(105, 164, 138, 0.08),
+      rgba(255, 255, 255, 0.96)
+    ),
+    #ffffff;
+}
+
+.tg-sono-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.tg-sono-submit {
+  min-height: 48px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1f7a5a 0%, #205c8d 100%);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-sono-download {
+  min-height: 44px;
+  border: 1px solid rgba(31, 122, 90, 0.22);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--sono-ink);
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-sono-submit:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.tg-sono-message {
+  margin: 0;
+  min-height: 22px;
+  color: var(--sono-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tg-sono-message--success {
+  color: var(--sono-accent);
+}
+
+.tg-sono-message--error {
+  color: var(--sono-danger);
+}
+
+@media (max-width: 720px) {
+  body {
+    background: var(--sono-panel);
+  }
+
+  .tg-sono-root {
+    padding: 0;
+  }
+
+  .tg-sono-card {
+    min-height: var(--sono-vh, 100dvh);
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    padding: 10px;
+  }
+
+  .tg-sono-clinic-grid,
+  .tg-sono-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tg-sono-title {
+    font-size: clamp(20px, 7vw, 28px);
+  }
+
+  .tg-sono-form > .tg-sono-field:last-of-type textarea {
+    min-height: clamp(300px, 52vh, 540px);
+  }
+}

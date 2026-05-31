@@ -11491,25 +11491,53 @@ async function handleSonoDesktopSubmit(request: Request) {
       }, 403);
     }
 
-    const prepared = await prepareSonoFormDocument(
-      payload,
-      accessState.record?.deviceName || deviceName
+    const clinicId = normalizeSonoClinicId(payload?.clinicId);
+    const patientName = sanitizeSonoTextField(payload?.patientName, 180);
+    const studyNameRu = sanitizeSonoTextField(payload?.studyName, 220);
+    const conclusionRu = sanitizeSonoTextField(payload?.conclusionText, 20000);
+    const reportDate = normalizeSonoReportDate(payload?.reportDate, getYerevanDateKey());
+
+    if (!conclusionRu) {
+      return jsonResponse({ ok: false, error: "Введите русское заключение для перевода." }, 400);
+    }
+    if (!hasRussianCyrillicText(conclusionRu) && !hasRussianCyrillicText(studyNameRu)) {
+      return jsonResponse({ ok: false, error: "В тексте не найден русский фрагмент для перевода." }, 400);
+    }
+
+    const [studyNameHy, conclusionHy] = await translateRussianTextsToArmenian([
+      studyNameRu,
+      conclusionRu
+    ]);
+    const fileName = buildSonoFormOutputFileName(clinicId, reportDate, patientName);
+    const translatedDocxBytes = await buildSonoConclusionDocxBytes(
+      clinicId,
+      conclusionHy,
+      {
+        patientName,
+        studyNameHy,
+        reportDate
+      }
     );
+    const caption = [
+      "Готово. Перевод УЗИ-заключения подготовлен на армянском.",
+      patientName ? `Пациент: ${patientName}` : null,
+      `Дата документа: ${formatSonoReportDateForDocument(reportDate)}`,
+      `Источник: ${accessState.record?.deviceName || deviceName}`
+    ].filter(Boolean).join("\n");
 
     return jsonResponse({
       ok: true,
-      fileName: prepared.fileName,
-      message: prepared.caption,
+      fileName,
+      message: caption,
       mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      fileBase64: Buffer.from(prepared.translatedDocxBytes).toString("base64"),
+      fileBase64: Buffer.from(translatedDocxBytes).toString("base64"),
       telegramDelivered: false
     });
   } catch (error) {
-    const message = sanitizePublicErrorMessage(error);
     return jsonResponse({
       ok: false,
-      error: message
-    }, isSonoFormValidationErrorMessage(message) ? 400 : 500);
+      error: sanitizePublicErrorMessage(error)
+    }, 500);
   }
 }
 
