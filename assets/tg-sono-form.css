@@ -289,6 +289,17 @@ textarea {
   cursor: pointer;
 }
 
+.tg-sono-download {
+  min-height: 46px;
+  border: 1px solid rgba(31, 122, 90, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--sono-ink);
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
 .tg-sono-submit:disabled {
   cursor: wait;
   opacity: 0.72;

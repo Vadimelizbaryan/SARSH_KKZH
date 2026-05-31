@@ -33,6 +33,43 @@
       : "";
   }
 
+  function decodeBase64ToBytes(base64) {
+    const normalized = String(base64 || "").trim();
+    if (!normalized) {
+      return new Uint8Array();
+    }
+
+    const binary = atob(normalized);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
+  }
+
+  function triggerBrowserDownload(fileName, mimeType, fileBase64) {
+    const bytes = decodeBase64ToBytes(fileBase64);
+    if (!bytes.length) {
+      return false;
+    }
+
+    const blob = new Blob([bytes], {
+      type: mimeType ||
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = fileName || "Sono.docx";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () {
+      URL.revokeObjectURL(blobUrl);
+    }, 1500);
+    return true;
+  }
+
   function renderError(message) {
     root.innerHTML = `
       <section class="tg-sono-card">
@@ -144,6 +181,7 @@
 
           <div class="tg-sono-actions">
             <button class="tg-sono-submit" type="submit" data-submit>Перевести и получить Word</button>
+            <button class="tg-sono-download" type="button" data-download hidden>Скачать Word сразу</button>
             <p class="tg-sono-message" data-message>Форма готова к отправке.</p>
           </div>
         </form>
@@ -152,7 +190,20 @@
 
     const form = root.querySelector("[data-form]");
     const submit = root.querySelector("[data-submit]");
+    const download = root.querySelector("[data-download]");
     const message = root.querySelector("[data-message]");
+    let lastDownload = null;
+
+    download.addEventListener("click", function () {
+      if (!lastDownload) {
+        return;
+      }
+      triggerBrowserDownload(
+        lastDownload.fileName,
+        lastDownload.mimeType,
+        lastDownload.fileBase64,
+      );
+    });
 
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -182,6 +233,8 @@
 
       submit.disabled = true;
       submit.textContent = "Перевожу...";
+      download.hidden = true;
+      lastDownload = null;
       message.className = "tg-sono-message";
       message.textContent = "Проверяю текст и отправляю его на перевод...";
 
@@ -202,8 +255,36 @@
           );
         }
 
+        const hasDirectDownload = result.fileName && result.fileBase64;
+        const telegramDelivered = result.telegramDelivered !== false;
+        if (hasDirectDownload) {
+          lastDownload = {
+            fileName: result.fileName,
+            mimeType: result.mimeType,
+            fileBase64: result.fileBase64,
+          };
+          download.hidden = false;
+        }
+
         message.className = "tg-sono-message tg-sono-message--success";
-        message.textContent = "Готово. Бот уже отправил Word-файл в этот чат.";
+        if (hasDirectDownload) {
+          const downloaded = triggerBrowserDownload(
+            result.fileName,
+            result.mimeType,
+            result.fileBase64,
+          );
+          if (!telegramDelivered) {
+            message.textContent = downloaded
+              ? "Готово. Telegram не прислал файл в чат, но Word уже скачан в браузер."
+              : "Готово. Telegram не прислал файл в чат. Нажмите «Скачать Word сразу».";
+          } else {
+            message.textContent = downloaded
+              ? "Готово. Бот отправил файл в чат, и Word уже скачивается в браузер."
+              : "Готово. Бот отправил файл в чат. Если Telegram Web не скачивает его, нажмите «Скачать Word сразу».";
+          }
+        } else {
+          message.textContent = "Готово. Бот уже отправил Word-файл в этот чат.";
+        }
         submit.textContent = "Готово";
 
         if (telegram) {

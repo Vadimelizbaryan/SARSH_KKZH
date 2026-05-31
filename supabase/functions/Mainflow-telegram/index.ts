@@ -11032,18 +11032,30 @@ async function handleTelegramSonoFormSubmit(request: Request) {
       userName ? `Источник: ${userName}` : null
     ].filter(Boolean).join("\n");
 
-    await sendTelegramDocument(
-      verifiedUser.userId,
-      fileName,
-      translatedDocxBytes,
-      caption,
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    );
+    let telegramDelivered = true;
+    let telegramDeliveryError = "";
+    try {
+      await sendTelegramDocument(
+        verifiedUser.userId,
+        fileName,
+        translatedDocxBytes,
+        caption,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      );
+    } catch (error) {
+      telegramDelivered = false;
+      telegramDeliveryError = sanitizePublicErrorMessage(error);
+      console.error("Sono Telegram document delivery failed:", telegramDeliveryError);
+    }
 
     return jsonResponse({
       ok: true,
       fileName,
-      message: caption
+      message: caption,
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      fileBase64: Buffer.from(translatedDocxBytes).toString("base64"),
+      telegramDelivered,
+      telegramDeliveryError: telegramDelivered ? null : telegramDeliveryError
     });
   } catch (error) {
     return jsonResponse({
