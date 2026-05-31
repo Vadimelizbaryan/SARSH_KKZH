@@ -68,6 +68,17 @@ const SONO_CLINICS = [
     addressHy: "",
     footerHy: "",
     templatePath: "/assets/templates/sono/evamed.docx"
+  },
+  {
+    id: "diamed",
+    labelRu: "DIAMED",
+    docLabel: "DIAMED",
+    hintRu: "Реальный бланк DIAMED",
+    accentColor: "000000",
+    headerAlign: "left",
+    addressHy: "",
+    footerHy: "",
+    templatePath: "/assets/templates/sono/diamed.docx"
   }
 ] as const;
 type SonoClinicId = typeof SONO_CLINICS[number]["id"];
@@ -7439,7 +7450,7 @@ async function buildSonoConclusionDocxBytes(
   if (templatePath !== SONO_BASE_DOCX_TEMPLATE_PATH) {
     const documentFile = zip.file("word/document.xml");
     if (!documentFile) {
-      throw new Error("В шаблоне клиники EVAmed не найден word/document.xml.");
+      throw new Error(`В шаблоне клиники ${clinic.docLabel} не найден word/document.xml.`);
     }
     const templateXml = await documentFile.async("string");
     zip.file(
@@ -7604,6 +7615,18 @@ function insertWordNodeBefore(referenceNode: Node, nextNode: Node) {
   parentNode.insertBefore(nextNode, referenceNode);
 }
 
+function isSonoTemplateTitleText(text: string) {
+  const normalized = String(text || "").trim().toLowerCase();
+  return normalized.includes("ուլտրաձայնային հետազոտություն")
+    || normalized.includes("ультразвуков")
+    || normalized.includes("узи");
+}
+
+function isSonoTemplateDoctorText(text: string) {
+  const normalized = String(text || "").trim().toLowerCase();
+  return normalized.includes("բժիշկ") || normalized.includes("врач");
+}
+
 function buildSonoTemplateDocumentXml(
   templateXml: string,
   translatedConclusion: string,
@@ -7625,21 +7648,62 @@ function buildSonoTemplateDocumentXml(
   }
 
   const paragraphs = Array.from(body.getElementsByTagNameNS(WORD_XML_NAMESPACE, "p"));
+  const paragraphInfos = paragraphs.map((paragraph, index) => ({
+    index,
+    paragraph,
+    text: collectWordParagraphText(paragraph)
+  }));
+  const nonEmptyParagraphInfos = paragraphInfos.filter((item) => item.text.trim());
+  const countBlankParagraphsBefore = (index: number) => {
+    let count = 0;
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      if (paragraphInfos[cursor].text.trim()) {
+        break;
+      }
+      count += 1;
+    }
+    return count;
+  };
   const titleParagraph = paragraphs.find((paragraph) => (
     collectWordParagraphText(paragraph).includes("Ուլտրաձայնային հետազոտություն")
   )) || null;
   const doctorParagraph = paragraphs.find((paragraph) => collectWordParagraphText(paragraph).includes("Բժիշկ"))
     || null;
-  const anchorParagraph = titleParagraph
-    || doctorParagraph
+  const structuralDoctorParagraph = paragraphInfos
+    .filter((item) => item.text.trim())
+    .map((item) => ({
+      ...item,
+      blankBefore: countBlankParagraphsBefore(item.index)
+    }))
+    .filter((item) => item.blankBefore >= 2)
+    .sort((left, right) => (right.blankBefore - left.blankBefore) || (left.index - right.index))[0]
+    ?.paragraph || null;
+  const fallbackDoctorParagraph = structuralDoctorParagraph
+    || (nonEmptyParagraphInfos.length ? nonEmptyParagraphInfos[nonEmptyParagraphInfos.length - 1].paragraph : null);
+  const resolvedDoctorParagraph = paragraphInfos.find((item) =>
+    isSonoTemplateDoctorText(item.text)
+  )?.paragraph || doctorParagraph || fallbackDoctorParagraph;
+  const resolvedDoctorParagraphIndex = resolvedDoctorParagraph ? paragraphs.indexOf(resolvedDoctorParagraph) : -1;
+  const structuralTitleParagraph = resolvedDoctorParagraphIndex > 0
+    ? paragraphInfos
+      .slice(0, resolvedDoctorParagraphIndex)
+      .reverse()
+      .find((item) => item.text.trim())
+      ?.paragraph || null
+    : null;
+  const resolvedTitleParagraph = paragraphInfos.find((item) =>
+    isSonoTemplateTitleText(item.text)
+  )?.paragraph || titleParagraph || structuralTitleParagraph;
+  const anchorParagraph = resolvedTitleParagraph
+    || resolvedDoctorParagraph
     || [...paragraphs].reverse().find((paragraph) => collectWordParagraphText(paragraph).trim())
     || null;
   if (!anchorParagraph) {
     throw new Error("В шаблоне Sono-клиники не найдена точка вставки текста.");
   }
 
-  const titleParagraphIndex = titleParagraph ? paragraphs.indexOf(titleParagraph) : -1;
-  const doctorParagraphIndex = doctorParagraph ? paragraphs.indexOf(doctorParagraph) : -1;
+  const titleParagraphIndex = resolvedTitleParagraph ? paragraphs.indexOf(resolvedTitleParagraph) : -1;
+  const doctorParagraphIndex = resolvedDoctorParagraph ? paragraphs.indexOf(resolvedDoctorParagraph) : -1;
   const blankParagraphSlots = titleParagraphIndex >= 0 &&
       doctorParagraphIndex > titleParagraphIndex
     ? paragraphs
@@ -7698,16 +7762,16 @@ function buildSonoTemplateDocumentXml(
     });
   });
 
-  if (blankParagraphSlots.length && doctorParagraph) {
+  if (blankParagraphSlots.length && resolvedDoctorParagraph) {
     const remainingSlots = [...blankParagraphSlots];
     paragraphsToInsert.forEach((paragraph) => {
-      const node = createWordParagraphNodeForSonoTemplate(document, paragraph.text, doctorParagraph, paragraph);
+      const node = createWordParagraphNodeForSonoTemplate(document, paragraph.text, resolvedDoctorParagraph, paragraph);
       const slot = remainingSlots.shift();
       if (slot && slot.parentNode) {
         slot.parentNode.replaceChild(node, slot);
         return;
       }
-      insertWordNodeBefore(doctorParagraph, node);
+      insertWordNodeBefore(resolvedDoctorParagraph, node);
     });
 
     remainingSlots.forEach((slot) => {
@@ -7715,17 +7779,22 @@ function buildSonoTemplateDocumentXml(
         slot.parentNode.removeChild(slot);
       }
     });
-  } else if (titleParagraph) {
-    let cursor: Node = titleParagraph;
+  } else if (resolvedTitleParagraph) {
+    let cursor: Node = resolvedTitleParagraph;
     paragraphsToInsert.forEach((paragraph) => {
-      const node = createWordParagraphNodeForSonoTemplate(document, paragraph.text, doctorParagraph || titleParagraph, paragraph);
+      const node = createWordParagraphNodeForSonoTemplate(
+        document,
+        paragraph.text,
+        resolvedDoctorParagraph || resolvedTitleParagraph,
+        paragraph
+      );
       insertWordNodeAfter(cursor, node);
       cursor = node;
     });
-  } else if (doctorParagraph) {
+  } else if (resolvedDoctorParagraph) {
     paragraphsToInsert.forEach((paragraph) => {
-      const node = createWordParagraphNodeForSonoTemplate(document, paragraph.text, doctorParagraph, paragraph);
-      insertWordNodeBefore(doctorParagraph, node);
+      const node = createWordParagraphNodeForSonoTemplate(document, paragraph.text, resolvedDoctorParagraph, paragraph);
+      insertWordNodeBefore(resolvedDoctorParagraph, node);
     });
   } else {
     let cursor: Node = anchorParagraph;
