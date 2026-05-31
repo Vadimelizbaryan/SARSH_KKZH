@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+﻿import { createClient } from "npm:@supabase/supabase-js@2";
 import JSZip from "npm:jszip@3.10.1";
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
@@ -46,6 +46,28 @@ const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/ma
 const YEREVAN_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
 const FIREBASE_PUSH_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
 const FIREBASE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+const SONO_TRANSLATION_MODEL = (Deno.env.get("OPENAI_TRANSLATION_MODEL") || "gpt-5.4").trim();
+const SONO_FORM_UI_VERSION = "20260531sono2";
+const SONO_BASE_DOCX_TEMPLATE_PATH = "/program-table-blank.docx";
+const SONO_EXPECTED_FILE_NAMES = new Set(["sono.docx", "sono.doc"]);
+const SONO_OLE_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1] as const;
+const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarmenian/NotoSansArmenian%5Bwdth,wght%5D.ttf";
+const YEREVAN_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
+const WORD_XML_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const SONO_CLINICS = [
+  {
+    id: "evamed",
+    labelRu: "EVAmed",
+    docLabel: "EVAmed",
+    hintRu: "Реальный бланк EVAmed",
+    accentColor: "000000",
+    headerAlign: "left",
+    addressHy: "",
+    footerHy: "",
+    templatePath: "/assets/templates/sono/evamed.docx"
+  }
+] as const;
+type SonoClinicId = typeof SONO_CLINICS[number]["id"];
 const TELEGRAM_DAILY_REMINDERS = {
   midday: {
     label: "12:00",
@@ -1349,12 +1371,26 @@ function getTelegramCivilReferralsFormUrl() {
   return `${getPublicSiteBaseUrl()}/tg-civil-referrals.html`;
 }
 
+function getTelegramSonoFormUrl() {
+  const params = new URLSearchParams();
+  params.set("ui", SONO_FORM_UI_VERSION);
+  return `${getPublicSiteBaseUrl()}/tg-sono-form.html?${params.toString()}`;
+}
+
 function getOcrTemplateBlankImageUrl() {
   return `${getPublicSiteBaseUrl()}${OCR_TEMPLATE_BLANK_IMAGE_PATH}`;
 }
 
 function getDepartmentSheetTemplateUrl() {
   return `${getPublicSiteBaseUrl()}${DEPARTMENT_SHEET_TEMPLATE_PATH}`;
+}
+
+function getSonoBaseDocxTemplateUrl() {
+  return `${getPublicSiteBaseUrl()}${SONO_BASE_DOCX_TEMPLATE_PATH}`;
+}
+
+function getSonoDocxTemplateUrl(templatePath: string) {
+  return `${getPublicSiteBaseUrl()}${templatePath}`;
 }
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -1688,6 +1724,98 @@ function extractOpenAiOutputText(payload: Record<string, unknown>) {
   }
 
   return "";
+}
+
+function buildSonoTranslationSchema(batchLength: number) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      items: {
+        type: "array",
+        minItems: batchLength,
+        maxItems: batchLength,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            index: { type: "integer" },
+            translation: { type: "string" }
+          },
+          required: ["index", "translation"]
+        }
+      }
+    },
+    required: ["items"]
+  };
+}
+
+async function translateRussianTextsToArmenian(texts: string[]) {
+  const source = texts.map((item) => String(item ?? ""));
+  const pending = source
+    .map((text, index) => ({ index, text }))
+    .filter((item) => hasRussianCyrillicText(item.text) && item.text.trim());
+
+  if (!pending.length) {
+    return source;
+  }
+
+  const translated = [...source];
+  const batches: Array<typeof pending> = [];
+  let currentBatch: typeof pending = [];
+  let currentChars = 0;
+
+  for (const item of pending) {
+    const nextChars = currentChars + item.text.length;
+    if (currentBatch.length && (currentBatch.length >= 24 || nextChars > 14000)) {
+      batches.push(currentBatch);
+      currentBatch = [];
+      currentChars = 0;
+    }
+    currentBatch.push(item);
+    currentChars += item.text.length;
+  }
+  if (currentBatch.length) {
+    batches.push(currentBatch);
+  }
+
+  for (const batch of batches) {
+    const prompt = [
+      "Translate each Russian medical ultrasound text item into Armenian.",
+      "Preserve the item indexes exactly.",
+      "Preserve measurements, dates, numbering, abbreviations, punctuation, and line breaks when medically meaningful.",
+      "Do not add explanations or comments.",
+      "If a fragment is already not Russian, keep it as close to the original as possible.",
+      "",
+      JSON.stringify({ items: batch }, null, 2)
+    ].join("\n");
+
+    const payload = await requestOpenAiStructuredJson(
+      SONO_TRANSLATION_MODEL,
+      prompt,
+      "sono_translation_batch",
+      buildSonoTranslationSchema(batch.length)
+    );
+
+    const items = Array.isArray(payload.items) ? payload.items as Array<Record<string, unknown>> : [];
+    const byIndex = new Map<number, string>();
+    items.forEach((item) => {
+      const index = Number(item.index);
+      const translation = typeof item.translation === "string" ? item.translation : "";
+      if (Number.isFinite(index)) {
+        byIndex.set(index, translation);
+      }
+    });
+
+    batch.forEach((item) => {
+      const nextText = byIndex.get(item.index);
+      if (typeof nextText === "string" && nextText.trim()) {
+        translated[item.index] = nextText.replace(/\r\n/g, "\n").trim();
+      }
+    });
+  }
+
+  return translated;
 }
 
 function buildPhotoRecognitionSchema() {
@@ -6981,6 +7109,816 @@ async function fetchDepartmentSheetTemplateBytes() {
   return new Uint8Array(await response.arrayBuffer());
 }
 
+const sonoDocxTemplateBytesPromises = new Map<string, Promise<Uint8Array>>();
+
+async function fetchSonoDocxTemplateBytes(templatePath: string) {
+  const normalizedPath = String(templatePath || "").trim() || SONO_BASE_DOCX_TEMPLATE_PATH;
+  const cached = sonoDocxTemplateBytesPromises.get(normalizedPath);
+  if (cached) {
+    return new Uint8Array(await (await cached).slice(0));
+  }
+
+  const pending = (async () => {
+    const url = normalizedPath === SONO_BASE_DOCX_TEMPLATE_PATH
+      ? getSonoBaseDocxTemplateUrl()
+      : getSonoDocxTemplateUrl(normalizedPath);
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/octet-stream,*/*"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Не удалось загрузить Word-шаблон Sono (${response.status}) из ${url}.`);
+    }
+
+    return new Uint8Array(await response.arrayBuffer());
+  })();
+
+  sonoDocxTemplateBytesPromises.set(normalizedPath, pending);
+  return new Uint8Array(await (await pending).slice(0));
+}
+
+function escapeWordXmlText(value: string) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function escapeHtmlText(value: string) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildWordRunPropertiesXml(options: {
+  bold?: boolean;
+  size?: number;
+  color?: string;
+} = {}) {
+  const size = Number.isFinite(options.size) ? Math.max(16, Math.trunc(options.size as number)) : 24;
+  const color = String(options.color || "1F2A24").replace(/[^0-9A-Fa-f]/g, "").slice(0, 6) || "1F2A24";
+  return [
+    "<w:rPr>",
+    '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>',
+    options.bold ? "<w:b/><w:bCs/>" : "",
+    `<w:color w:val="${color}"/>`,
+    `<w:sz w:val="${size}"/>`,
+    `<w:szCs w:val="${size}"/>`,
+    "</w:rPr>"
+  ].join("");
+}
+
+function buildWordTextXml(value: string) {
+  const safeText = String(value ?? "").replace(/\t/g, "    ");
+  const lines = safeText.split("\n");
+  const parts: string[] = [];
+
+  lines.forEach((line, index) => {
+    if (index > 0) {
+      parts.push("<w:br/>");
+    }
+    const normalized = line.length ? line : " ";
+    const preserveSpace = /^\s|\s$/.test(normalized);
+    parts.push(`<w:t${preserveSpace ? ' xml:space="preserve"' : ""}>${escapeWordXmlText(normalized)}</w:t>`);
+  });
+
+  return parts.join("");
+}
+
+function buildWordParagraphXml(
+  value: string,
+  options: {
+    bold?: boolean;
+    size?: number;
+    color?: string;
+    align?: "left" | "center" | "right";
+    spacingBefore?: number;
+    spacingAfter?: number;
+    borderBottomColor?: string;
+    borderBottomSize?: number;
+  } = {}
+) {
+  const alignMap = {
+    left: "left",
+    center: "center",
+    right: "right"
+  } as const;
+  const align = alignMap[options.align || "left"] || "left";
+  const spacingBefore = Number.isFinite(options.spacingBefore) ? Math.max(0, Math.trunc(options.spacingBefore as number)) : 0;
+  const spacingAfter = Number.isFinite(options.spacingAfter) ? Math.max(0, Math.trunc(options.spacingAfter as number)) : 120;
+  const borderBottomColor = options.borderBottomColor
+    ? String(options.borderBottomColor).replace(/[^0-9A-Fa-f]/g, "").slice(0, 6) || "auto"
+    : "";
+  const borderBottomSize = Number.isFinite(options.borderBottomSize) ? Math.max(4, Math.trunc(options.borderBottomSize as number)) : 10;
+
+  return [
+    "<w:p>",
+    "<w:pPr>",
+    `<w:jc w:val="${align}"/>`,
+    `<w:spacing w:before="${spacingBefore}" w:after="${spacingAfter}" w:line="320" w:lineRule="auto"/>`,
+    borderBottomColor
+      ? `<w:pBdr><w:bottom w:val="single" w:sz="${borderBottomSize}" w:space="6" w:color="${borderBottomColor}"/></w:pBdr>`
+      : "",
+    "</w:pPr>",
+    "<w:r>",
+    buildWordRunPropertiesXml(options),
+    buildWordTextXml(value),
+    "</w:r>",
+    "</w:p>"
+  ].join("");
+}
+
+function buildSonoConclusionDocxDocumentXml(
+  clinicId: SonoClinicId,
+  translatedConclusion: string,
+  options: {
+    patientName?: string;
+    studyNameHy?: string;
+    reportDate?: string;
+    headerLabel?: string;
+    addressHy?: string;
+    footerHy?: string;
+  } = {}
+) {
+  const clinic = getSonoClinicById(clinicId);
+  const headerLabel = sanitizeSonoTextField(options.headerLabel || clinic.docLabel, 120);
+  const addressHy = sanitizeSonoTextField(options.addressHy || clinic.addressHy, 220);
+  const footerHy = sanitizeSonoTextField(options.footerHy || clinic.footerHy, 220);
+  const patientName = sanitizeSonoTextField(options.patientName || "", 180);
+  const studyNameHy = sanitizeSonoTextField(options.studyNameHy || "", 220);
+  const reportDate = formatSonoReportDateForDocument(options.reportDate || getYerevanDateKey());
+  const paragraphs = splitSonoTextIntoParagraphs(translatedConclusion);
+  const align = clinic.headerAlign === "center" ? "center" : "left";
+
+  const bodyParagraphs = paragraphs.length
+    ? paragraphs.map((paragraph) => buildWordParagraphXml(paragraph, { size: 24, spacingAfter: 120 })).join("")
+    : buildWordParagraphXml("Թարգմանված տեքստը դատարկ է։", { size: 24, spacingAfter: 120 });
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"',
+    ' xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"',
+    ' xmlns:o="urn:schemas-microsoft-com:office:office"',
+    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"',
+    ' xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"',
+    ' xmlns:v="urn:schemas-microsoft-com:vml"',
+    ' xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"',
+    ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"',
+    ' xmlns:w10="urn:schemas-microsoft-com:office:word"',
+    ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"',
+    ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"',
+    ' xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"',
+    ' xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk"',
+    ' xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml"',
+    ' xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"',
+    ' mc:Ignorable="w14 wp14">',
+    "<w:body>",
+    buildWordParagraphXml(headerLabel, {
+      bold: true,
+      size: 30,
+      color: clinic.accentColor,
+      align,
+      spacingAfter: 70
+    }),
+    buildWordParagraphXml("Ուլտրաձայնային հետազոտության եզրակացություն", {
+      bold: true,
+      size: 28,
+      color: clinic.accentColor,
+      align,
+      spacingAfter: 120,
+      borderBottomColor: clinic.accentColor,
+      borderBottomSize: 10
+    }),
+    addressHy ? buildWordParagraphXml(addressHy, {
+      size: 20,
+      color: "5C6A64",
+      align,
+      spacingAfter: 160
+    }) : "",
+    patientName ? buildWordParagraphXml(`Պացիենտ: ${patientName}`, {
+      bold: true,
+      size: 22,
+      spacingAfter: 60
+    }) : "",
+    buildWordParagraphXml(`Ամսաթիվ: ${reportDate}`, {
+      bold: true,
+      size: 22,
+      spacingAfter: studyNameHy ? 60 : 140
+    }),
+    studyNameHy ? buildWordParagraphXml(`Ուսումնասիրություն: ${studyNameHy}`, {
+      bold: true,
+      size: 22,
+      spacingAfter: 160
+    }) : "",
+    buildWordParagraphXml("Եզրակացություն", {
+      bold: true,
+      size: 24,
+      color: clinic.accentColor,
+      spacingAfter: 90
+    }),
+    bodyParagraphs,
+    footerHy ? buildWordParagraphXml(footerHy, {
+      size: 18,
+      color: "66726D",
+      spacingBefore: 220,
+      spacingAfter: 0
+    }) : "",
+    '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="907" w:bottom="1134" w:left="907" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>',
+    "</w:body>",
+    "</w:document>"
+  ].join("");
+}
+
+function buildSonoFormOutputFileName(clinicId: SonoClinicId, reportDate: string, patientName = "") {
+  const clinic = getSonoClinicById(clinicId);
+  const datePart = sanitizeSheetFileNamePart(formatSonoReportDateForDocument(reportDate).replaceAll(".", "-")) || "date";
+  const patientPart = sanitizeSheetFileNamePart(patientName) || "patient";
+  const clinicPart = sanitizeSheetFileNamePart(clinic.docLabel) || "clinic";
+  return `Sono_${clinicPart}_${patientPart}_${datePart}.docx`;
+}
+
+function buildSonoTranslatedFileName(fileName: string, extensionOverride?: string) {
+  const rawName = String(fileName || "Sono").trim() || "Sono";
+  const withoutExtension = rawName.replace(/\.[^.]+$/, "") || "Sono";
+  const extensionMatch = rawName.match(/(\.[^.]+)$/);
+  const extension = extensionOverride || (extensionMatch ? extensionMatch[1].toLowerCase() : ".docx");
+  return `${sanitizeSheetFileNamePart(withoutExtension) || "Sono"}_hy${extension}`;
+}
+
+async function buildSonoConclusionDocxBytes(
+  clinicId: SonoClinicId,
+  translatedConclusion: string,
+  options: {
+    patientName?: string;
+    studyNameHy?: string;
+    reportDate?: string;
+    headerLabel?: string;
+    addressHy?: string;
+    footerHy?: string;
+  } = {}
+) {
+  const clinic = getSonoClinicById(clinicId);
+  const templatePath = typeof clinic.templatePath === "string" && clinic.templatePath.trim()
+    ? clinic.templatePath.trim()
+    : SONO_BASE_DOCX_TEMPLATE_PATH;
+  const templateBytes = await fetchSonoDocxTemplateBytes(templatePath);
+  const zip = await JSZip.loadAsync(templateBytes);
+  if (templatePath !== SONO_BASE_DOCX_TEMPLATE_PATH) {
+    const documentFile = zip.file("word/document.xml");
+    if (!documentFile) {
+      throw new Error("В шаблоне клиники EVAmed не найден word/document.xml.");
+    }
+    const templateXml = await documentFile.async("string");
+    zip.file(
+      "word/document.xml",
+      buildSonoTemplateDocumentXml(templateXml, translatedConclusion, options)
+    );
+    return await zip.generateAsync({
+      type: "uint8array",
+      compression: "DEFLATE"
+    });
+  }
+
+  zip.file(
+    "word/document.xml",
+    buildSonoConclusionDocxDocumentXml(clinicId, translatedConclusion, options)
+  );
+  return await zip.generateAsync({
+    type: "uint8array",
+    compression: "DEFLATE"
+  });
+}
+
+function removeWordRunPropertyNode(runProperties: Element, localName: string) {
+  Array.from(runProperties.childNodes).forEach((node) => {
+    if (node.nodeType === Node.ELEMENT_NODE && (node as Element).localName === localName) {
+      runProperties.removeChild(node);
+    }
+  });
+}
+
+function upsertWordRunPropertyFlag(doc: XMLDocument, runProperties: Element, localName: string, enabled: boolean) {
+  removeWordRunPropertyNode(runProperties, localName);
+  if (enabled) {
+    runProperties.appendChild(doc.createElementNS(WORD_XML_NAMESPACE, `w:${localName}`));
+  }
+}
+
+function upsertWordRunPropertySize(doc: XMLDocument, runProperties: Element, size: number) {
+  const normalizedSize = Math.max(16, Math.trunc(size));
+  const setSize = (localName: "sz" | "szCs") => {
+    let sizeNode = Array.from(runProperties.childNodes).find((node) => (
+      node.nodeType === Node.ELEMENT_NODE && (node as Element).localName === localName
+    )) as Element | undefined;
+    if (!sizeNode) {
+      sizeNode = doc.createElementNS(WORD_XML_NAMESPACE, `w:${localName}`);
+      runProperties.appendChild(sizeNode);
+    }
+    sizeNode.setAttributeNS(WORD_XML_NAMESPACE, "w:val", String(normalizedSize));
+  };
+
+  setSize("sz");
+  setSize("szCs");
+}
+
+function cloneWordRunPropertiesForSonoTemplate(
+  doc: XMLDocument,
+  referenceParagraph: Element | null,
+  options: {
+    bold?: boolean;
+    size?: number;
+  } = {}
+) {
+  const referenceRunProperties = referenceParagraph
+    ? referenceParagraph.getElementsByTagNameNS(WORD_XML_NAMESPACE, "rPr")[0] || null
+    : null;
+  const runProperties = (
+    referenceRunProperties
+      ? referenceRunProperties.cloneNode(true)
+      : buildDefaultWordRunPropertiesNode(doc)
+  ) as Element;
+
+  if (typeof options.bold === "boolean") {
+    upsertWordRunPropertyFlag(doc, runProperties, "b", options.bold);
+    upsertWordRunPropertyFlag(doc, runProperties, "bCs", options.bold);
+  }
+  if (Number.isFinite(options.size)) {
+    upsertWordRunPropertySize(doc, runProperties, options.size as number);
+  }
+
+  return runProperties;
+}
+
+function createWordParagraphNodeForSonoTemplate(
+  doc: XMLDocument,
+  text: string,
+  referenceParagraph: Element | null,
+  options: {
+    bold?: boolean;
+    size?: number;
+    align?: "left" | "center" | "right";
+    spacingBefore?: number;
+    spacingAfter?: number;
+  } = {}
+) {
+  const paragraph = doc.createElementNS(WORD_XML_NAMESPACE, "w:p");
+  const paragraphProperties = doc.createElementNS(WORD_XML_NAMESPACE, "w:pPr");
+  const spacingNode = doc.createElementNS(WORD_XML_NAMESPACE, "w:spacing");
+  spacingNode.setAttributeNS(
+    WORD_XML_NAMESPACE,
+    "w:before",
+    String(Math.max(0, Math.trunc(options.spacingBefore || 0)))
+  );
+  spacingNode.setAttributeNS(
+    WORD_XML_NAMESPACE,
+    "w:after",
+    String(Math.max(0, Math.trunc(options.spacingAfter || 120)))
+  );
+  spacingNode.setAttributeNS(WORD_XML_NAMESPACE, "w:line", "300");
+  spacingNode.setAttributeNS(WORD_XML_NAMESPACE, "w:lineRule", "auto");
+  paragraphProperties.appendChild(spacingNode);
+
+  if (options.align) {
+    const justificationNode = doc.createElementNS(WORD_XML_NAMESPACE, "w:jc");
+    justificationNode.setAttributeNS(WORD_XML_NAMESPACE, "w:val", options.align);
+    paragraphProperties.appendChild(justificationNode);
+  }
+
+  paragraph.appendChild(paragraphProperties);
+
+  const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+  lines.forEach((line, index) => {
+    const run = doc.createElementNS(WORD_XML_NAMESPACE, "w:r");
+    run.appendChild(cloneWordRunPropertiesForSonoTemplate(doc, referenceParagraph, options));
+
+    const textNode = doc.createElementNS(WORD_XML_NAMESPACE, "w:t");
+    const safeLine = line.length ? line : " ";
+    if (/^\s|\s$/.test(safeLine)) {
+      textNode.setAttribute("xml:space", "preserve");
+    }
+    textNode.textContent = safeLine;
+    run.appendChild(textNode);
+    paragraph.appendChild(run);
+
+    if (index < lines.length - 1) {
+      const breakRun = doc.createElementNS(WORD_XML_NAMESPACE, "w:r");
+      breakRun.appendChild(cloneWordRunPropertiesForSonoTemplate(doc, referenceParagraph, options));
+      breakRun.appendChild(doc.createElementNS(WORD_XML_NAMESPACE, "w:br"));
+      paragraph.appendChild(breakRun);
+    }
+  });
+
+  return paragraph;
+}
+
+function insertWordNodeAfter(referenceNode: Node, nextNode: Node) {
+  const parentNode = referenceNode.parentNode;
+  if (!parentNode) {
+    throw new Error("Word XML insertion failed because the reference node has no parent.");
+  }
+  if (referenceNode.nextSibling) {
+    parentNode.insertBefore(nextNode, referenceNode.nextSibling);
+    return;
+  }
+  parentNode.appendChild(nextNode);
+}
+
+function insertWordNodeBefore(referenceNode: Node, nextNode: Node) {
+  const parentNode = referenceNode.parentNode;
+  if (!parentNode) {
+    throw new Error("Word XML insertion failed because the reference node has no parent.");
+  }
+  parentNode.insertBefore(nextNode, referenceNode);
+}
+
+function buildSonoTemplateDocumentXml(
+  templateXml: string,
+  translatedConclusion: string,
+  options: {
+    patientName?: string;
+    studyNameHy?: string;
+    reportDate?: string;
+  } = {}
+) {
+  const parser = new DOMParser();
+  const document = parser.parseFromString(templateXml, "application/xml");
+  if (!document || document.getElementsByTagName("parsererror").length) {
+    throw new Error("Не удалось прочитать XML шаблона Sono-клиники.");
+  }
+
+  const body = document.getElementsByTagNameNS(WORD_XML_NAMESPACE, "body")[0] || null;
+  if (!body) {
+    throw new Error("В шаблоне Sono-клиники не найден Word body.");
+  }
+
+  const paragraphs = Array.from(body.getElementsByTagNameNS(WORD_XML_NAMESPACE, "p"));
+  const titleParagraph = paragraphs.find((paragraph) => (
+    collectWordParagraphText(paragraph).includes("Ուլտրաձայնային հետազոտություն")
+  )) || null;
+  const doctorParagraph = paragraphs.find((paragraph) => collectWordParagraphText(paragraph).includes("Բժիշկ"))
+    || null;
+  const anchorParagraph = titleParagraph
+    || doctorParagraph
+    || [...paragraphs].reverse().find((paragraph) => collectWordParagraphText(paragraph).trim())
+    || null;
+  if (!anchorParagraph) {
+    throw new Error("В шаблоне Sono-клиники не найдена точка вставки текста.");
+  }
+
+  const titleParagraphIndex = titleParagraph ? paragraphs.indexOf(titleParagraph) : -1;
+  const doctorParagraphIndex = doctorParagraph ? paragraphs.indexOf(doctorParagraph) : -1;
+  const blankParagraphSlots = titleParagraphIndex >= 0 &&
+      doctorParagraphIndex > titleParagraphIndex
+    ? paragraphs
+      .slice(titleParagraphIndex + 1, doctorParagraphIndex)
+      .filter((paragraph) => !collectWordParagraphText(paragraph).trim())
+    : [];
+
+  const patientName = sanitizeSonoTextField(options.patientName || "", 180);
+  const studyNameHy = sanitizeSonoTextField(options.studyNameHy || "", 220);
+  const reportDate = formatSonoReportDateForDocument(options.reportDate || getYerevanDateKey());
+  const contentParagraphs = splitSonoTextIntoParagraphs(translatedConclusion);
+  if (!contentParagraphs.length) {
+    contentParagraphs.push("Թարգմանված տեքստը դատարկ է։");
+  }
+
+  const paragraphsToInsert: Array<{
+    text: string;
+    bold?: boolean;
+    size?: number;
+    spacingBefore?: number;
+    spacingAfter?: number;
+  }> = [];
+
+  if (patientName) {
+    paragraphsToInsert.push({
+      text: `Պացիենտ՝ ${patientName}`,
+      bold: true,
+      size: 22,
+      spacingBefore: 180,
+      spacingAfter: 30
+    });
+  }
+
+  paragraphsToInsert.push({
+    text: `Ամսաթիվ՝ ${reportDate}`,
+    bold: true,
+    size: 22,
+    spacingBefore: patientName ? 0 : 180,
+    spacingAfter: studyNameHy ? 30 : 100
+  });
+
+  if (studyNameHy) {
+    paragraphsToInsert.push({
+      text: `Հետազոտություն՝ ${studyNameHy}`,
+      bold: true,
+      size: 22,
+      spacingAfter: 120
+    });
+  }
+
+  contentParagraphs.forEach((paragraph, index) => {
+    paragraphsToInsert.push({
+      text: paragraph,
+      size: 22,
+      spacingAfter: index === contentParagraphs.length - 1 ? 80 : 90
+    });
+  });
+
+  if (blankParagraphSlots.length && doctorParagraph) {
+    const remainingSlots = [...blankParagraphSlots];
+    paragraphsToInsert.forEach((paragraph) => {
+      const node = createWordParagraphNodeForSonoTemplate(document, paragraph.text, doctorParagraph, paragraph);
+      const slot = remainingSlots.shift();
+      if (slot && slot.parentNode) {
+        slot.parentNode.replaceChild(node, slot);
+        return;
+      }
+      insertWordNodeBefore(doctorParagraph, node);
+    });
+
+    remainingSlots.forEach((slot) => {
+      if (slot.parentNode) {
+        slot.parentNode.removeChild(slot);
+      }
+    });
+  } else if (titleParagraph) {
+    let cursor: Node = titleParagraph;
+    paragraphsToInsert.forEach((paragraph) => {
+      const node = createWordParagraphNodeForSonoTemplate(document, paragraph.text, doctorParagraph || titleParagraph, paragraph);
+      insertWordNodeAfter(cursor, node);
+      cursor = node;
+    });
+  } else if (doctorParagraph) {
+    paragraphsToInsert.forEach((paragraph) => {
+      const node = createWordParagraphNodeForSonoTemplate(document, paragraph.text, doctorParagraph, paragraph);
+      insertWordNodeBefore(doctorParagraph, node);
+    });
+  } else {
+    let cursor: Node = anchorParagraph;
+    paragraphsToInsert.forEach((paragraph) => {
+      const node = createWordParagraphNodeForSonoTemplate(document, paragraph.text, anchorParagraph, paragraph);
+      insertWordNodeAfter(cursor, node);
+      cursor = node;
+    });
+  }
+
+  return new XMLSerializer().serializeToString(document);
+}
+
+function buildDefaultWordRunPropertiesNode(doc: XMLDocument) {
+  const runProperties = doc.createElementNS(WORD_XML_NAMESPACE, "w:rPr");
+  const fonts = doc.createElementNS(WORD_XML_NAMESPACE, "w:rFonts");
+  fonts.setAttributeNS(WORD_XML_NAMESPACE, "w:ascii", "Arial");
+  fonts.setAttributeNS(WORD_XML_NAMESPACE, "w:hAnsi", "Arial");
+  fonts.setAttributeNS(WORD_XML_NAMESPACE, "w:cs", "Arial");
+  runProperties.appendChild(fonts);
+
+  const size = doc.createElementNS(WORD_XML_NAMESPACE, "w:sz");
+  size.setAttributeNS(WORD_XML_NAMESPACE, "w:val", "24");
+  runProperties.appendChild(size);
+
+  const sizeCs = doc.createElementNS(WORD_XML_NAMESPACE, "w:szCs");
+  sizeCs.setAttributeNS(WORD_XML_NAMESPACE, "w:val", "24");
+  runProperties.appendChild(sizeCs);
+  return runProperties;
+}
+
+function collectWordParagraphText(paragraph: Element) {
+  const chunks: string[] = [];
+
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as Element;
+      if (element.localName === "t") {
+        chunks.push(element.textContent || "");
+        return;
+      }
+      if (element.localName === "tab") {
+        chunks.push("\t");
+        return;
+      }
+      if (element.localName === "br" || element.localName === "cr") {
+        chunks.push("\n");
+        return;
+      }
+    }
+
+    Array.from(node.childNodes).forEach(walk);
+  };
+
+  Array.from(paragraph.childNodes).forEach(walk);
+  return chunks.join("");
+}
+
+function replaceWordParagraphText(doc: XMLDocument, paragraph: Element, nextText: string) {
+  const firstRun = paragraph.getElementsByTagNameNS(WORD_XML_NAMESPACE, "r")[0] || null;
+  const firstRunProperties = firstRun
+    ? firstRun.getElementsByTagNameNS(WORD_XML_NAMESPACE, "rPr")[0] || null
+    : null;
+  const preservedParagraphProperties = Array.from(paragraph.childNodes).filter((node) => (
+    node.nodeType === Node.ELEMENT_NODE && (node as Element).localName === "pPr"
+  ));
+
+  Array.from(paragraph.childNodes).forEach((node) => {
+    paragraph.removeChild(node);
+  });
+  preservedParagraphProperties.forEach((node) => paragraph.appendChild(node));
+
+  const normalizedText = String(nextText || "").replace(/\r\n/g, "\n").replace(/\t/g, "    ");
+  const lines = normalizedText.split("\n");
+  lines.forEach((line, index) => {
+    const run = doc.createElementNS(WORD_XML_NAMESPACE, "w:r");
+    run.appendChild(
+      firstRunProperties
+        ? firstRunProperties.cloneNode(true)
+        : buildDefaultWordRunPropertiesNode(doc)
+    );
+
+    const text = doc.createElementNS(WORD_XML_NAMESPACE, "w:t");
+    const safeLine = line.length ? line : " ";
+    if (/^\s|\s$/.test(safeLine)) {
+      text.setAttribute("xml:space", "preserve");
+    }
+    text.textContent = safeLine;
+    run.appendChild(text);
+    paragraph.appendChild(run);
+
+    if (index < lines.length - 1) {
+      const breakRun = doc.createElementNS(WORD_XML_NAMESPACE, "w:r");
+      breakRun.appendChild(
+        firstRunProperties
+          ? firstRunProperties.cloneNode(true)
+          : buildDefaultWordRunPropertiesNode(doc)
+      );
+      breakRun.appendChild(doc.createElementNS(WORD_XML_NAMESPACE, "w:br"));
+      paragraph.appendChild(breakRun);
+    }
+  });
+}
+
+async function translateWordXmlContent(xml: string) {
+  const parser = new DOMParser();
+  const document = parser.parseFromString(xml, "application/xml");
+  if (!document || document.getElementsByTagName("parsererror").length) {
+    throw new Error("Не удалось прочитать XML-содержимое Word-документа.");
+  }
+
+  const paragraphs = Array.from(document.getElementsByTagNameNS(WORD_XML_NAMESPACE, "p"));
+  if (!paragraphs.length) {
+    return { xml, translatedParagraphs: 0 };
+  }
+
+  const paragraphTexts = paragraphs.map((paragraph) => collectWordParagraphText(paragraph));
+  const translatedParagraphs = await translateRussianTextsToArmenian(paragraphTexts);
+  let translatedCount = 0;
+
+  paragraphs.forEach((paragraph, index) => {
+    if (!hasRussianCyrillicText(paragraphTexts[index])) {
+      return;
+    }
+    replaceWordParagraphText(document, paragraph, translatedParagraphs[index]);
+    translatedCount += 1;
+  });
+
+  if (!translatedCount) {
+    return { xml, translatedParagraphs: 0 };
+  }
+
+  return {
+    xml: new XMLSerializer().serializeToString(document),
+    translatedParagraphs: translatedCount
+  };
+}
+
+async function translateSonoDocxBytes(bytes: Uint8Array) {
+  const zip = await JSZip.loadAsync(bytes);
+  const wordXmlFiles = Object.values(zip.files)
+    .filter((file) => !file.dir)
+    .filter((file) => /^word\/(?:document|header\d+|footer\d+|footnotes|endnotes)\.xml$/i.test(file.name));
+
+  let translatedParagraphs = 0;
+  for (const file of wordXmlFiles) {
+    const xml = await file.async("string");
+    const translated = await translateWordXmlContent(xml);
+    if (translated.translatedParagraphs > 0) {
+      zip.file(file.name, translated.xml);
+      translatedParagraphs += translated.translatedParagraphs;
+    }
+  }
+
+  if (!translatedParagraphs) {
+    throw new Error("В документе не найден русский текст для перевода.");
+  }
+
+  return {
+    bytes: await zip.generateAsync({
+      type: "uint8array",
+      compression: "DEFLATE"
+    }),
+    translatedParagraphs
+  };
+}
+
+function isOleCompoundWordDocument(bytes: Uint8Array) {
+  if (bytes.length < SONO_OLE_SIGNATURE.length) {
+    return false;
+  }
+  return SONO_OLE_SIGNATURE.every((value, index) => bytes[index] === value);
+}
+
+function scoreDecodedSonoText(value: string) {
+  const replacementPenalty = (value.match(/\uFFFD/g) || []).length * 40;
+  const cyrillicScore = (value.match(/[А-Яа-яЁё]/g) || []).length * 8;
+  const htmlScore = /<(html|body|p|div|table|span|meta|head)\b/i.test(value) ? 120 : 0;
+  const printableScore = (value.match(/[A-Za-z0-9<>{}[\]()=;:.,'"\/\\ \r\n\t-]/g) || []).length;
+  return cyrillicScore + htmlScore + printableScore - replacementPenalty;
+}
+
+function decodeSonoTextBytes(bytes: Uint8Array) {
+  const encodings = ["utf-8", "windows-1251", "utf-16le"];
+  let best = "";
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (const encoding of encodings) {
+    try {
+      const decoded = new TextDecoder(encoding as string).decode(bytes);
+      const score = scoreDecodedSonoText(decoded);
+      if (score > bestScore) {
+        best = decoded;
+        bestScore = score;
+      }
+    } catch (_error) {
+      // Ignore unsupported encoding candidates.
+    }
+  }
+
+  return best;
+}
+
+function looksLikeHtmlDocument(value: string) {
+  return /<(html|body|p|div|table|span|meta|head)\b/i.test(value);
+}
+
+async function translateSonoHtmlDocumentBytes(bytes: Uint8Array) {
+  const decoded = decodeSonoTextBytes(bytes);
+  if (!decoded || !looksLikeHtmlDocument(decoded)) {
+    throw new Error("Не удалось распознать HTML-содержимое Word .doc.");
+  }
+
+  const parser = new DOMParser();
+  const document = parser.parseFromString(decoded, "text/html");
+  if (!document || !document.documentElement) {
+    throw new Error("Не удалось прочитать HTML-содержимое документа.");
+  }
+
+  const textNodes: Text[] = [];
+  const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const textValue = node.nodeValue || "";
+      const parent = node.parentNode as Element | null;
+      if (!parent) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      const tagName = parent.tagName ? parent.tagName.toLowerCase() : "";
+      if (tagName === "script" || tagName === "style") {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return hasRussianCyrillicText(textValue)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_SKIP;
+    }
+  });
+
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode as Text);
+  }
+
+  if (!textNodes.length) {
+    throw new Error("В документе не найден русский текст для перевода.");
+  }
+
+  const translatedTexts = await translateRussianTextsToArmenian(
+    textNodes.map((node) => node.nodeValue || "")
+  );
+  textNodes.forEach((node, index) => {
+    node.nodeValue = translatedTexts[index];
+  });
+
+  let html = `<!doctype html>\n${document.documentElement.outerHTML}`;
+  if (!/charset=/i.test(html)) {
+    html = html.replace(/<head([^>]*)>/i, '<head$1><meta charset="utf-8">');
+  }
+  return new TextEncoder().encode(html);
+}
+
 function setXmlAttribute(tag: string, name: string, value: string) {
   const attributePattern = new RegExp(`\\s${name}="[^"]*"`);
   if (attributePattern.test(tag)) {
@@ -8028,6 +8966,87 @@ function normalizeText(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizeSonoFileName(fileName: string) {
+  return String(fileName || "").trim().toLowerCase();
+}
+
+function isExpectedSonoFileName(fileName: string) {
+  return SONO_EXPECTED_FILE_NAMES.has(normalizeSonoFileName(fileName));
+}
+
+function normalizeSonoClinicId(value: unknown): SonoClinicId {
+  const raw = String(value || "").trim();
+  const matched = SONO_CLINICS.find((item) => item.id === raw);
+  return matched ? matched.id : SONO_CLINICS[0].id;
+}
+
+function getSonoClinicById(clinicId: SonoClinicId) {
+  return SONO_CLINICS.find((item) => item.id === clinicId) || SONO_CLINICS[0];
+}
+
+function sanitizeSonoTextField(value: unknown, maxLength = 4000) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function hasRussianCyrillicText(value: string) {
+  return /[А-Яа-яЁё]/.test(String(value || ""));
+}
+
+function normalizeSonoReportDate(value: unknown, fallback = getYerevanDateKey()) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return fallback;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const match = raw.match(/^(\d{1,2})[./,](\d{1,2})[./,](\d{2,4})$/);
+  if (!match) {
+    return fallback;
+  }
+
+  const day = match[1].padStart(2, "0");
+  const month = match[2].padStart(2, "0");
+  const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+  return `${year}-${month}-${day}`;
+}
+
+function formatSonoReportDateForDocument(value: string) {
+  const normalized = normalizeSonoReportDate(value);
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return getYerevanReportDateText();
+  }
+  return `${match[3]}.${match[2]}.${match[1]}`;
+}
+
+function splitSonoTextIntoParagraphs(value: string) {
+  const normalized = sanitizeSonoTextField(value, 20000);
+  if (!normalized) {
+    return [];
+  }
+
+  return normalized
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .flatMap((paragraph) => {
+      const lines = paragraph
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      return lines.length ? lines : [paragraph];
+    });
+}
+
 function detectDepartmentFromHint(text: string): DepartmentId | null {
   const normalized = normalizeText(text);
   if (!normalized) {
@@ -8902,6 +9921,19 @@ function buildTelegramCivilReferralsReplyMarkup(formUrl: string) {
   };
 }
 
+function buildTelegramSonoFormReplyMarkup(formUrl: string) {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "Открыть форму перевода УЗИ",
+          web_app: { url: formUrl }
+        }
+      ]
+    ]
+  };
+}
+
 async function sendWorkingSheetForDepartment(
   supabase: ReturnType<typeof createClient>,
   chatId: number,
@@ -9073,6 +10105,21 @@ async function sendTelegramCivilReferralsForm(chatId: number | string) {
       "Սա հասանելի է միայն ադմինիստրատորին, որպեսզի անձնական տվյալները պատահաբար չբացվեն։"
     ].join("\n"),
     buildTelegramCivilReferralsReplyMarkup(formUrl)
+  );
+}
+
+async function sendTelegramSonoForm(chatId: number | string) {
+  const formUrl = getTelegramSonoFormUrl();
+  await sendTelegramMessageWithReplyMarkup(
+    chatId,
+    [
+      "Форма перевода УЗИ готова.",
+      "Откройте форму кнопкой ниже, выберите бланк клиники и вставьте русское заключение.",
+      "Бот переведёт текст на армянский и вернёт готовый Word-файл в этот чат.",
+      "",
+      "Если отправите готовый файл с именем Sono.docx или Sono.doc, бот попробует перевести именно его."
+    ].join("\n"),
+    buildTelegramSonoFormReplyMarkup(formUrl)
   );
 }
 
@@ -9847,6 +10894,86 @@ async function handleTelegramQhFormSubmit(request: Request) {
       feedbackId,
       validation,
       message: messageText
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      error: sanitizePublicErrorMessage(error)
+    }, 500);
+  }
+}
+
+async function handleTelegramSonoFormSubmit(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const verifiedUser = await verifyTelegramWebAppInitData(String(payload?.initData || ""));
+    if (!verifiedUser) {
+      return jsonResponse({ ok: false, error: "Telegram Web App authorization failed." }, 403);
+    }
+
+    const supabase = createSupabaseAdmin();
+    if (!await isTelegramUserAllowedByRuntimeState(supabase, verifiedUser.userId)) {
+      return jsonResponse({
+        ok: false,
+        error: "Бот сейчас не принимает рабочие переводы от этого пользователя. Обратитесь к администратору."
+      }, 403);
+    }
+    if (!verifiedUser.userId) {
+      return jsonResponse({ ok: false, error: "Не удалось определить Telegram user id." }, 400);
+    }
+
+    const clinicId = normalizeSonoClinicId(payload?.clinicId);
+    const patientName = sanitizeSonoTextField(payload?.patientName, 180);
+    const studyNameRu = sanitizeSonoTextField(payload?.studyName, 220);
+    const conclusionRu = sanitizeSonoTextField(payload?.conclusionText, 20000);
+    const reportDate = normalizeSonoReportDate(payload?.reportDate, getYerevanDateKey());
+
+    if (!conclusionRu) {
+      return jsonResponse({ ok: false, error: "Введите русское заключение для перевода." }, 400);
+    }
+    if (!hasRussianCyrillicText(conclusionRu) && !hasRussianCyrillicText(studyNameRu)) {
+      return jsonResponse({ ok: false, error: "В тексте не найден русский фрагмент для перевода." }, 400);
+    }
+
+    const [studyNameHy, conclusionHy] = await translateRussianTextsToArmenian([
+      studyNameRu,
+      conclusionRu
+    ]);
+    const fileName = buildSonoFormOutputFileName(clinicId, reportDate, patientName);
+    const translatedDocxBytes = await buildSonoConclusionDocxBytes(
+      clinicId,
+      conclusionHy,
+      {
+        patientName,
+        studyNameHy,
+        reportDate
+      }
+    );
+
+    const userName = [
+      verifiedUser.firstName,
+      verifiedUser.lastName,
+      verifiedUser.username ? `@${verifiedUser.username}` : ""
+    ].filter(Boolean).join(" ");
+    const caption = [
+      "Готово. Перевод УЗИ-заключения подготовлен на армянском.",
+      patientName ? `Пациент: ${patientName}` : null,
+      `Дата документа: ${formatSonoReportDateForDocument(reportDate)}`,
+      userName ? `Источник: ${userName}` : null
+    ].filter(Boolean).join("\n");
+
+    await sendTelegramDocument(
+      verifiedUser.userId,
+      fileName,
+      translatedDocxBytes,
+      caption,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
+
+    return jsonResponse({
+      ok: true,
+      fileName,
+      message: caption
     });
   } catch (error) {
     return jsonResponse({
@@ -10754,6 +11881,29 @@ function extractSheetDocument(message: Record<string, unknown>) {
   };
 }
 
+function extractSonoDocument(message: Record<string, unknown>) {
+  const document = message.document as {
+    file_id?: unknown;
+    file_name?: unknown;
+    mime_type?: unknown;
+  } | undefined;
+  if (!document || typeof document.file_id !== "string") {
+    return null;
+  }
+
+  const fileName = typeof document.file_name === "string" ? document.file_name : "";
+  const mimeType = typeof document.mime_type === "string" ? document.mime_type : "";
+  if (!isExpectedSonoFileName(fileName)) {
+    return null;
+  }
+
+  return {
+    fileId: document.file_id,
+    fileName: fileName || "Sono.docx",
+    mimeType
+  };
+}
+
 function isAllowedChat(chatId: number | null) {
   if (chatId === null) {
     return false;
@@ -11352,6 +12502,31 @@ async function handleTelegramCommand(
     return;
   }
 
+  if (command === "/sono") {
+    if (message && isTelegramGroupMessage(message) && String(accessChatId) !== String(chatId)) {
+      const person = getTelegramPersonFromMessage(message, accessChatId);
+      const firstName = getTelegramColleagueFirstName(person);
+      try {
+        await sendTelegramSonoForm(accessChatId);
+        await sendTelegramMessage(
+          chatId,
+          `${firstName}, форму перевода УЗИ я отправил в ваш личный чат с ботом.`
+        );
+      } catch (error) {
+        await sendTelegramMessage(
+          chatId,
+          [
+            `${firstName}, я вижу запрос на форму УЗИ, но не могу отправить её в личный чат.`,
+            "Откройте бота в личном чате, отправьте /start и потом повторите /sono."
+          ].join("\n")
+        );
+      }
+      return;
+    }
+    await sendTelegramSonoForm(chatId);
+    return;
+  }
+
   if (command === "/night" || command === "/night_shift") {
     if (message && isTelegramGroupMessage(message) && String(accessChatId) !== String(chatId)) {
       const person = getTelegramPersonFromMessage(message, accessChatId);
@@ -11838,6 +13013,86 @@ async function handleTelegramSheetDocument(
   );
 }
 
+async function handleTelegramSonoDocument(
+  chatId: number,
+  sonoDocument: { fileId: string; fileName: string; mimeType: string }
+) {
+  await sendTelegramMessage(
+    chatId,
+    "Файл Sono получен. Начинаю перевод с русского на армянский и подготовлю Word-документ."
+  );
+
+  try {
+    const downloaded = await downloadTelegramFileBytes(sonoDocument.fileId);
+    const sourceBytes = downloaded.bytes;
+    const sourceFileName = sonoDocument.fileName || downloaded.fileName || "Sono.docx";
+    const normalizedFileName = normalizeSonoFileName(sourceFileName);
+
+    if (normalizedFileName.endsWith(".docx")) {
+      const translated = await translateSonoDocxBytes(sourceBytes);
+      await sendTelegramDocument(
+        chatId,
+        buildSonoTranslatedFileName(sourceFileName, ".docx"),
+        translated.bytes,
+        [
+          "Готово. Файл переведён на армянский.",
+          `Переведено абзацев: ${translated.translatedParagraphs}.`,
+          "Если хотите перевести новый текст с выбором бланка клиники, откройте команду /sono."
+        ].join("\n"),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      );
+      return;
+    }
+
+    if (isOleCompoundWordDocument(sourceBytes)) {
+      throw new Error("Старый бинарный Word .doc не удалось безопасно обработать на сервере. Сохраните документ как .docx и отправьте ещё раз.");
+    }
+
+    const decodedText = decodeSonoTextBytes(sourceBytes);
+    if (looksLikeHtmlDocument(decodedText)) {
+      const translatedHtmlBytes = await translateSonoHtmlDocumentBytes(sourceBytes);
+      await sendTelegramDocument(
+        chatId,
+        buildSonoTranslatedFileName(sourceFileName, ".doc"),
+        translatedHtmlBytes,
+        "Готово. HTML-совместимый Word .doc переведён на армянский.",
+        "application/msword;charset=utf-8"
+      );
+      return;
+    }
+
+    const normalizedText = sanitizeSonoTextField(decodedText, 20000);
+    if (!hasRussianCyrillicText(normalizedText)) {
+      throw new Error("В файле не найден русский текст для перевода.");
+    }
+
+    const [translatedText] = await translateRussianTextsToArmenian([normalizedText]);
+    const translatedDocxBytes = await buildSonoConclusionDocxBytes(
+      SONO_CLINICS[0].id,
+      translatedText,
+      {
+        reportDate: getYerevanDateKey(),
+        headerLabel: "Sono",
+        addressHy: "Թարգմանված ներմուծված փաստաթուղթ",
+        footerHy: "Փաստաթուղթը վերագեներացվել է ուղարկված ֆայլից"
+      }
+    );
+
+    await sendTelegramDocument(
+      chatId,
+      buildSonoTranslatedFileName(sourceFileName, ".docx"),
+      translatedDocxBytes,
+      "Готово. Текст переведён на армянский и собран в новый Word .docx.",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
+  } catch (error) {
+    await sendTelegramMessage(
+      chatId,
+      `Не удалось перевести Sono-файл: ${sanitizePublicErrorMessage(error)}`
+    );
+  }
+}
+
 async function processTelegramUpdate(update: Record<string, unknown>) {
   const callbackQuery = update.callback_query as Record<string, unknown> | undefined;
   if (callbackQuery && typeof callbackQuery === "object") {
@@ -11898,6 +13153,12 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
 
   if (text.startsWith("/")) {
     await handleTelegramCommand(supabase, safeChatId, text, message, accessChatId);
+    return;
+  }
+
+  const sonoDocument = extractSonoDocument(message);
+  if (sonoDocument) {
+    await handleTelegramSonoDocument(safeChatId, sonoDocument);
     return;
   }
 
@@ -12060,6 +13321,18 @@ Deno.serve(async (request) => {
           error: error instanceof Error ? error.message : String(error)
         }, 500);
       }
+    }
+
+    if (action === "sono-config") {
+      return jsonResponse({
+        ok: true,
+        clinics: SONO_CLINICS.map((clinic) => ({
+          id: clinic.id,
+          label: clinic.labelRu,
+          hint: clinic.hintRu
+        })),
+        defaultReportDate: getYerevanDateKey()
+      });
     }
 
     if (action === "night-duty-reminder") {
@@ -12402,6 +13675,9 @@ Deno.serve(async (request) => {
   }
 
   const postUrl = new URL(request.url);
+  if (postUrl.searchParams.get("action") === "sono-form-submit") {
+    return await handleTelegramSonoFormSubmit(request);
+  }
   if (postUrl.searchParams.get("action") === "web-form-submit") {
     return await handleTelegramWebFormSubmit(request);
   }

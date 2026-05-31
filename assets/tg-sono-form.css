@@ -1,0 +1,335 @@
+:root {
+  color-scheme: light;
+  --sono-ink: #17231f;
+  --sono-muted: #64756d;
+  --sono-line: rgba(37, 66, 57, 0.14);
+  --sono-paper: rgba(255, 255, 255, 0.9);
+  --sono-panel: #fffdf8;
+  --sono-accent: #1f7a5a;
+  --sono-accent-soft: rgba(31, 122, 90, 0.1);
+  --sono-warning: #a55224;
+  --sono-danger: #b63b32;
+  --sono-shadow: 0 22px 60px rgba(42, 57, 49, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Trebuchet MS", "Segoe UI", Verdana, sans-serif;
+  color: var(--sono-ink);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(250, 206, 128, 0.45),
+      transparent 28%
+    ),
+    radial-gradient(
+    circle at bottom right,
+    rgba(112, 186, 156, 0.28),
+    transparent 26%
+  ),
+    linear-gradient(135deg, #f8eed9 0%, #fffdf8 50%, #ebf6ef 100%);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.tg-sono-root {
+  width: min(940px, 100%);
+  margin: 0 auto;
+  padding: 14px;
+}
+
+.tg-sono-card {
+  background: var(--sono-paper);
+  border: 1px solid var(--sono-line);
+  border-radius: 28px;
+  box-shadow: var(--sono-shadow);
+  padding: 18px;
+  backdrop-filter: blur(10px);
+}
+
+.tg-sono-card--loading {
+  min-height: 240px;
+  display: grid;
+  align-content: center;
+}
+
+.tg-sono-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tg-sono-kicker {
+  margin: 0 0 6px;
+  color: var(--sono-accent);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.tg-sono-title {
+  margin: 0;
+  font-size: clamp(24px, 5vw, 38px);
+  line-height: 1.04;
+}
+
+.tg-sono-badge {
+  margin: 0;
+  border: 1px solid rgba(31, 122, 90, 0.18);
+  border-radius: 999px;
+  background: var(--sono-accent-soft);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tg-sono-muted {
+  margin: 0;
+  color: var(--sono-muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.tg-sono-note,
+.tg-sono-section,
+.tg-sono-field,
+.tg-sono-footnote {
+  border: 1px solid var(--sono-line);
+  border-radius: 22px;
+  background: var(--sono-panel);
+}
+
+.tg-sono-note {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.tg-sono-note strong {
+  color: var(--sono-accent);
+  font-size: 14px;
+}
+
+.tg-sono-note span,
+.tg-sono-footnote span {
+  color: var(--sono-muted);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.tg-sono-form {
+  display: grid;
+  gap: 12px;
+}
+
+.tg-sono-section {
+  padding: 14px;
+}
+
+.tg-sono-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tg-sono-section-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.tg-sono-section-head span {
+  color: var(--sono-muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tg-sono-clinic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tg-sono-clinic-option {
+  display: block;
+  cursor: pointer;
+}
+
+.tg-sono-clinic-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tg-sono-clinic-card {
+  display: grid;
+  gap: 4px;
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid rgba(37, 66, 57, 0.12);
+  border-radius: 18px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(249, 225, 169, 0.25),
+      rgba(255, 255, 255, 0.96)
+    ),
+    #ffffff;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.tg-sono-clinic-card strong {
+  font-size: 16px;
+}
+
+.tg-sono-clinic-card small {
+  color: var(--sono-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tg-sono-clinic-option input:checked + .tg-sono-clinic-card {
+  border-color: rgba(31, 122, 90, 0.44);
+  box-shadow: 0 12px 24px rgba(31, 122, 90, 0.12);
+  transform: translateY(-1px);
+}
+
+.tg-sono-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tg-sono-field {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.tg-sono-field span {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--sono-muted);
+}
+
+.tg-sono-field input,
+.tg-sono-field textarea {
+  width: 100%;
+  border: 1px solid rgba(37, 66, 57, 0.16);
+  border-radius: 16px;
+  background: #ffffff;
+  color: var(--sono-ink);
+  padding: 12px 14px;
+}
+
+.tg-sono-field input {
+  min-height: 46px;
+  font-weight: 800;
+}
+
+.tg-sono-field textarea {
+  min-height: 250px;
+  resize: vertical;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.tg-sono-field input:focus,
+.tg-sono-field textarea:focus {
+  outline: 3px solid rgba(31, 122, 90, 0.16);
+  border-color: rgba(31, 122, 90, 0.45);
+}
+
+.tg-sono-footnote {
+  padding: 14px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(105, 164, 138, 0.08),
+      rgba(255, 255, 255, 0.96)
+    ),
+    #ffffff;
+}
+
+.tg-sono-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.tg-sono-submit {
+  min-height: 50px;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #1f7a5a 0%, #205c8d 100%);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tg-sono-submit:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.tg-sono-message {
+  margin: 0;
+  min-height: 22px;
+  color: var(--sono-muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.tg-sono-message--success {
+  color: var(--sono-accent);
+}
+
+.tg-sono-message--error {
+  color: var(--sono-danger);
+}
+
+@media (max-width: 720px) {
+  .tg-sono-root {
+    padding: 8px;
+  }
+
+  .tg-sono-card {
+    border-radius: 22px;
+    padding: 12px;
+  }
+
+  .tg-sono-clinic-grid,
+  .tg-sono-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tg-sono-title {
+    font-size: clamp(22px, 8vw, 30px);
+  }
+
+  .tg-sono-field textarea {
+    min-height: 220px;
+  }
+}
