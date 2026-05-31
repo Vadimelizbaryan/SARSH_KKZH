@@ -51,8 +51,6 @@ const SONO_FORM_UI_VERSION = "20260531sono2";
 const SONO_BASE_DOCX_TEMPLATE_PATH = "/program-table-blank.docx";
 const SONO_EXPECTED_FILE_NAMES = new Set(["sono.docx", "sono.doc"]);
 const SONO_OLE_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1] as const;
-const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarmenian/NotoSansArmenian%5Bwdth,wght%5D.ttf";
-const YEREVAN_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
 const WORD_XML_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const SONO_CLINICS = [
   {
@@ -1724,6 +1722,67 @@ function extractOpenAiOutputText(payload: Record<string, unknown>) {
   }
 
   return "";
+}
+
+async function requestOpenAiStructuredJson(
+  model: string,
+  prompt: string,
+  schemaName: string,
+  schema: Record<string, unknown>
+) {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured on the server.");
+  }
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: prompt
+            }
+          ]
+        }
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: schemaName,
+          strict: true,
+          schema
+        }
+      }
+    })
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload || typeof payload !== "object") {
+    const message = payload && typeof payload === "object" && typeof (payload as { error?: { message?: string } }).error?.message === "string"
+      ? (payload as { error: { message: string } }).error.message
+      : `OpenAI structured request failed (${response.status}).`;
+    throw new Error(message);
+  }
+
+  const outputText = extractOpenAiOutputText(payload as Record<string, unknown>);
+  if (!outputText) {
+    throw new Error("OpenAI returned an empty structured response.");
+  }
+
+  try {
+    return JSON.parse(outputText) as Record<string, unknown>;
+  } catch (_error) {
+    throw new Error("OpenAI returned invalid structured JSON.");
+  }
 }
 
 function buildSonoTranslationSchema(batchLength: number) {
