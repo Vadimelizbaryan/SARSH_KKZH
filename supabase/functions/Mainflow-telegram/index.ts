@@ -40,6 +40,7 @@ const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է մի
 const TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT = "Գիշերային ընդունում";
 const TELEGRAM_DAY_SHIFT_BUTTON_TEXT = "Ընդունում";
 const TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT = "Դուրսգրում";
+const TELEGRAM_SONO_BUTTON_TEXT = "Sono УЗИ";
 const TELEGRAM_APPLY_NIGHT_SHIFT_CALLBACK = "apply_night_shift_to_main";
 const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
 const REPORT_PDF_FILE_NAME = "Report.pdf";
@@ -3057,10 +3058,12 @@ function buildWorkplaceLocationReplyMarkup(gpsEnabled = false) {
   const keyboard = gpsEnabled
     ? [
       [{ text: "Ես աշխատանքի եմ", request_location: true }],
-      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
+      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }],
+      [{ text: TELEGRAM_SONO_BUTTON_TEXT }]
     ]
     : [
-      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }]
+      [{ text: TELEGRAM_DAY_SHIFT_BUTTON_TEXT }, { text: TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT }],
+      [{ text: TELEGRAM_SONO_BUTTON_TEXT }]
     ];
   return {
     keyboard,
@@ -9186,6 +9189,11 @@ function isTelegramDischargeShiftButtonRequest(text: string) {
   return normalized === TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT || normalized === "Ցերեկային դուրսգրում";
 }
 
+function isTelegramSonoButtonRequest(text: string) {
+  const normalized = text.trim();
+  return normalized === TELEGRAM_SONO_BUTTON_TEXT || normalized === "Sono" || normalized === "УЗИ перевод";
+}
+
 function buildColleagueStartText(firstName = "") {
   const greeting = firstName
     ? `Բարև, ${firstName}։ Սա Mainflow բոտն է բաժանմունքների տվյալները ուղարկելու համար։`
@@ -9198,7 +9206,7 @@ function buildColleagueStartText(firstName = "") {
     "1. Ուղարկեք բաժանմունքի կոդը, օրինակ՝ SR-7։",
     "2. Բոտը կուղարկի ընթացիկ PDF-ը և Telegram ձևը բացելու կոճակը։",
     "3. Լրացրեք ձևը և ուղարկեք բլանկի լուսանկարը։",
-    `Ընտրեք «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» կամ «${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}» կոճակը։`,
+    `Ընտրեք «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}», «${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}» կամ «${TELEGRAM_SONO_BUTTON_TEXT}» կոճակը։`,
     "",
     "SR-? հրամանը ցույց կտա բաժանմունքների ցանկը։",
     "",
@@ -9231,6 +9239,7 @@ function buildAdminHelpText() {
     "/form SR-7 — ընթացիկ տվյալների PDF + Telegram ձևի կոճակ։",
     `«${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» — բացել ընդունման Telegram ձևը։`,
     `«${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}» — բացել դուրսգրման Telegram ձևը։`,
+    `«${TELEGRAM_SONO_BUTTON_TEXT}» — открыть форму перевода УЗИ одним нажатием.`,
     "/night — հին համատեղելի հրաման է, որը պահպանված է միայն համատեղելիության համար։",
     "/civil — բացել Քաղ. ԲԿ բազայի Telegram ձևը։",
     "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը։",
@@ -9270,6 +9279,7 @@ function buildHelpText() {
     "/form SR-4 — ստանալ ընթացիկ տվյալների PDF-ը և բացել Telegram Web App ձևը",
     `«${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» — բացել ընդունման Telegram Web App ձևը`,
     `«${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}» — բացել դուրսգրման Telegram Web App ձևը`,
+    `«${TELEGRAM_SONO_BUTTON_TEXT}» — открыть форму перевода УЗИ кнопкой с клавиатуры`,
     "/night — հին համատեղելի հրաման է, որը պահպանված է միայն համատեղելիության համար",
     "/civil — բացել Քաղ. ԲԿ բազայի Telegram Web App ձևը",
     "/geo — ուղարկել աշխատանքի վայրի geolocation կոճակը",
@@ -12337,7 +12347,7 @@ async function handleTelegramCommand(
       [
         "GPS սցենարը անջատված է։",
         "Հին ներկայության նշումները մաքրված են։",
-        `Բոտը հիմա կթողնի «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}» և «${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}» կոճակները։`
+        `Բոտը հիմա կթողնի «${TELEGRAM_DAY_SHIFT_BUTTON_TEXT}», «${TELEGRAM_DISCHARGE_SHIFT_BUTTON_TEXT}» և «${TELEGRAM_SONO_BUTTON_TEXT}» կոճակները։`
       ].join("\n"),
       buildWorkplaceLocationReplyMarkup(false)
     );
@@ -12773,6 +12783,11 @@ async function processTelegramGroupCommand(
 
   if (isTelegramDischargeShiftButtonRequest(text)) {
     await handleTelegramCommand(supabase, accessChatId, "/discharge", message, accessChatId);
+    return;
+  }
+
+  if (isTelegramSonoButtonRequest(text)) {
+    await handleTelegramCommand(supabase, accessChatId, "/sono", message, accessChatId);
     return;
   }
 
@@ -13262,6 +13277,11 @@ async function processTelegramUpdate(update: Record<string, unknown>) {
 
   if (isTelegramDischargeShiftButtonRequest(text)) {
     await handleTelegramCommand(supabase, safeChatId, "/discharge", message, accessChatId);
+    return;
+  }
+
+  if (isTelegramSonoButtonRequest(text)) {
+    await handleTelegramCommand(supabase, safeChatId, "/sono", message, accessChatId);
     return;
   }
 
