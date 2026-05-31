@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-05-31T22:15:52.7683642Z",
+    "generatedAtUtc":  "2026-05-31T22:29:05.8684666Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -68,8 +68,8 @@
                   },
                   {
                       "path":  "assets/sharsh-setup.js",
-                      "size":  11944,
-                      "sha256":  "CE20BE8149A58659830A20E2F3A561B50DC6DBB9B8CEDF0271F1D505BE9AE316"
+                      "size":  11751,
+                      "sha256":  "356B7C01191849940820B1466F0A8D99FD5E383C3207BA91330193A33EE6F042"
                   },
                   {
                       "path":  "assets/sharsh-sync.js",
@@ -339,12 +339,12 @@
                   {
                       "path":  "Mainflow.dll",
                       "size":  133120,
-                      "sha256":  "7A2074D942C39CC0FA66CA410252B38E08DE3C3884265A2EBD62EFDE7C194F38"
+                      "sha256":  "52DA108BA8D325C786DCFD356E7BF3E23FF4E99D16FDAF55E7E1E5B1EAA8A47F"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "E6DBC4F3D03C1BE9F88EA81E7B451C411A5F7E6D70BB21094D885623B9874E9B"
+                      "sha256":  "6B29A6C3CFDCD459576208CD1092A9D3E1BED5B05CEF40E0588E9FE63A594687"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",
@@ -778,8 +778,8 @@
                   },
                   {
                       "path":  "setup.html",
-                      "size":  8091,
-                      "sha256":  "913A76CF8939666DADA3586503229075151EE0EB4BCE21BC863663E9481CA032"
+                      "size":  5983,
+                      "sha256":  "51844E48A1C8171B53F27E335D2AE75583FCFE9E6C9C24D52D4005583D6FCCF4"
                   },
                   {
                       "path":  "sono-desktop.html",

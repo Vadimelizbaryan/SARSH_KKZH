@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   const config = window.SHARSH_CONFIG;
   const runtime = window.SHARSH_RUNTIME_CONFIG || {};
   const runtimeMeta = window.SHARSH_RUNTIME_CONFIG_META || {};
@@ -30,7 +30,7 @@
 
   function escapeHtml(text) {
     return String(text)
-      .replaceAll("&", "&")
+      .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
@@ -316,8 +316,8 @@
         } catch (error) {
           setStatus(
             error instanceof Error
-              ? `Настройки в браузере сохранены, но сервер не принял переключатель автоповорота: ${error.message}`
-              : "Настройки в браузере сохранены, но сервер не принял переключатель автоповорота.",
+              ? `Settings were saved in the browser, but the server rejected the auto-rotate toggle: ${error.message}`
+              : "Settings were saved in the browser, but the server rejected the auto-rotate toggle.",
             true
           );
           return;

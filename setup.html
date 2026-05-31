@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
@@ -7,37 +7,37 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ° ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸ | SARSH_KKZH</title>
+  <title>Настройка синхронизации | SARSH_KKZH</title>
   <link rel="stylesheet" href="assets/sharsh.css?v=20260527desktopnotify1">
   <script defer src="assets/sharsh-runtime-config.js?v=20260525setupfix1"></script>
-  <script defer src="assets/sharsh-auth.js?v=20260530encodingfix3"></script>
-  <script defer src="assets/sharsh-config.js?v=20260530configfix1"></script>
-  <script defer src="assets/sharsh-sync.js?v=20260530publicreadfix3"></script>
-  <script defer src="assets/sharsh-setup.js?v=20260525setupfix1"></script>
+  <script defer src="assets/sharsh-auth.js?v=20260514a"></script>
+  <script defer src="assets/sharsh-config.js?v=20260513h"></script>
+  <script defer src="assets/sharsh-sync.js?v=20260527desktopnotify1"></script>
+  <script defer src="assets/sharsh-setup.js?v=20260601setuptext1"></script>
 </head>
 <body>
   <div class="page">
     <div class="toolbar">
       <div>
-        <h1>ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ° ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸Ð¸</h1>
-        <p>Ð’ÐºÐ»ÑŽÑ‡Ð¸Ñ‚Ðµ Ð¸Ð½Ñ‚ÐµÑ€Ð½ÐµÑ‚-ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸ÑŽ Ð´Ð»Ñ Ð²ÑÐµÑ… Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ Ð¸ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚Ðµ Ñ€Ð°Ð±Ð¾Ñ‡Ð¸Ðµ ÑÑÑ‹Ð»ÐºÐ¸, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ðµ Ð±ÑƒÐ´ÑƒÑ‚ Ð¾Ñ‚ÐºÑ€Ñ‹Ð²Ð°Ñ‚ÑŒÑÑ Ð½Ð° Ð´Ñ€ÑƒÐ³Ð¸Ñ… ÐºÐ¾Ð¼Ð¿ÑŒÑŽÑ‚ÐµÑ€Ð°Ñ… Ð¸ ÑƒÑÑ‚Ñ€Ð¾Ð¹ÑÑ‚Ð²Ð°Ñ….</p>
+        <h1>Настройка синхронизации</h1>
+        <p>Включите интернет-синхронизацию для всех отделений и получите рабочие ссылки, которые будут открываться на других компьютерах и устройствах.</p>
       </div>
       <div class="toolbar-actions">
-        <span class="pill local" id="setupSourceLabel">Ð›Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾</span>
-        <a class="button-link" id="openMainBtn" href="./index.html">ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð³Ð»Ð°Ð²Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð»</a>
+        <span class="pill local" id="setupSourceLabel">Локально</span>
+        <a class="button-link" id="openMainBtn" href="./index.html">Открыть главный файл</a>
       </div>
     </div>
 
     <div class="setup-grid">
       <div class="info-stack">
         <div class="panel">
-          <h2>ÐŸÐ¾Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ðµ Ðº ÑÐµÑ€Ð²ÐµÑ€Ñƒ</h2>
-          <p>Ð¡ÑŽÐ´Ð° Ð²ÑÑ‚Ð°Ð²Ð»ÑÐµÑ‚ÑÑ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð¿ÑƒÐ±Ð»Ð¸Ñ‡Ð½Ñ‹Ð¹ ÐºÐ»ÑŽÑ‡ ÐºÐ»Ð¸ÐµÐ½Ñ‚Ð° Supabase. Ð¡ÐµÐºÑ€ÐµÑ‚Ð½Ñ‹Ð¹ <code>service_role</code> Ð·Ð´ÐµÑÑŒ Ð½Ðµ Ð½ÑƒÐ¶ÐµÐ½.</p>
+          <h2>Подключение к серверу</h2>
+          <p>Сюда вставляется только публичный ключ клиента Supabase. Секретный <code>service_role</code> здесь не нужен.</p>
 
           <div class="setup-form">
             <label class="setup-checkbox">
               <input type="checkbox" id="syncEnabledField">
-              Ð’ÐºÐ»ÑŽÑ‡Ð¸Ñ‚ÑŒ Supabase-ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð°Ñ†Ð¸ÑŽ
+              Включить Supabase-синхронизацию
             </label>
 
             <label class="setup-field">
@@ -49,37 +49,37 @@
               <span>Supabase anon key</span>
               <input type="text" id="supabaseAnonKeyField" placeholder="eyJhbGciOi...">
             </label>
-            <p class="hint">Ð”Ð»Ñ ÑÑ‚Ð¾Ð³Ð¾ Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹Ñ‚Ðµ Ð¸Ð¼ÐµÐ½Ð½Ð¾ <code>Legacy API Keys â†’ anon</code>. ÐÐµ Ð²ÑÑ‚Ð°Ð²Ð»ÑÐ¹Ñ‚Ðµ <code>service_role</code>.</p>
+            <p class="hint">Для этого проекта используйте именно <code>Legacy API Keys → anon</code>. Не вставляйте <code>service_role</code>.</p>
 
             <label class="setup-field">
-              <span>Ð˜Ð¼Ñ Ñ„ÑƒÐ½ÐºÑ†Ð¸Ð¸</span>
+              <span>Имя функции</span>
               <input type="text" id="functionNameField" value="sharsh-sync">
             </label>
 
             <label class="setup-field">
-              <span>Ð˜Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ, Ð¼Ñ</span>
+              <span>Интервал обновления, мс</span>
               <input type="text" id="refreshIntervalField" value="30000">
             </label>
 
             <label class="setup-checkbox">
               <input type="checkbox" id="requireAccessCodeField">
-              ÐŸÐ¾ÐºÐ°Ð·Ñ‹Ð²Ð°Ñ‚ÑŒ Ð¿Ð¾Ð»Ðµ ÐºÐ¾Ð´Ð° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ñ
+              Показывать поле кода отделения
             </label>
 
             <label class="setup-checkbox">
               <input type="checkbox" id="requireOwnerAuthField">
-              Ð¢Ð¾Ð»ÑŒÐºÐ¾ Ð²Ñ…Ð¾Ð´ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°
+              Только вход владельца
             </label>
 
             <label class="setup-checkbox">
               <input type="checkbox" id="autoRotateImagesField">
-              ÐÐ²Ñ‚Ð¾Ð¿Ð¾Ð²Ð¾Ñ€Ð¾Ñ‚ Ñ„Ð¾Ñ‚Ð¾ Ð¿ÐµÑ€ÐµÐ´ OCR
+              Автоповорот фото перед OCR
             </label>
 
             <div class="setup-actions">
-              <button type="button" id="testConnectionBtn">ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ðµ</button>
-              <button type="button" id="saveBrowserBtn">Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð² Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€Ðµ</button>
-              <button type="button" id="clearBrowserBtn">Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¹ Ñ€ÐµÐ¶Ð¸Ð¼</button>
+              <button type="button" id="testConnectionBtn">Проверить подключение</button>
+              <button type="button" id="saveBrowserBtn">Сохранить в браузере</button>
+              <button type="button" id="clearBrowserBtn">Вернуть локальный режим</button>
             </div>
 
             <p class="hint" id="setupStatusText"></p>
@@ -87,11 +87,11 @@
         </div>
 
         <div class="panel">
-          <h2>Ð“Ð¾Ñ‚Ð¾Ð²Ñ‹Ðµ ÑÑÑ‹Ð»ÐºÐ¸</h2>
-          <p>ÐŸÐ¾ÑÐ»Ðµ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð¿Ð¾Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ñ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹Ñ‚Ðµ ÑÑ‚Ð¸ ÑÑÑ‹Ð»ÐºÐ¸ Ð´Ð»Ñ Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¸ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ñ… Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹.</p>
+          <h2>Готовые ссылки</h2>
+          <p>После проверки подключения используйте эти ссылки для главной страницы и отдельных отделений.</p>
           <div class="setup-output">
             <label class="setup-field">
-              <span>Ð“Ð»Ð°Ð²Ð½Ð°Ñ ÑÑÑ‹Ð»ÐºÐ°</span>
+              <span>Главная ссылка</span>
               <input class="setup-link-url" type="text" id="mainLinkField" readonly>
             </label>
             <div class="setup-link-list" id="departmentLinks"></div>
@@ -100,18 +100,17 @@
       </div>
 
       <aside class="panel setup-aside">
-        <h2>ÐšÐ°Ðº Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¸Ñ‚ÑŒ</h2>
+        <h2>Как настроить</h2>
         <ol>
-          <li>Ð’ Supabase Ð¾Ñ‚ÐºÑ€Ð¾Ð¹Ñ‚Ðµ Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸ Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° Ð¸ ÑÐºÐ¾Ð¿Ð¸Ñ€ÑƒÐ¹Ñ‚Ðµ <code>Project URL</code> Ð¸ <code>Legacy anon key</code>.</li>
-          <li>Ð’ÑÑ‚Ð°Ð²ÑŒÑ‚Ðµ Ð¸Ñ… Ð² Ð¿Ð¾Ð»Ñ ÑÐ»ÐµÐ²Ð° Ð¸ Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ <b>ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ Ð¿Ð¾Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ðµ</b>.</li>
-          <li>Ð•ÑÐ»Ð¸ Ð¿Ð¾Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ðµ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚, Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ <b>Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð² Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€Ðµ</b>.</li>
-          <li>ÐžÑ‚ÐºÑ€Ð¾Ð¹Ñ‚Ðµ Ð³Ð»Ð°Ð²Ð½Ñ‹Ð¹ Ñ„Ð°Ð¹Ð» Ð¸Ð»Ð¸ ÑÐºÐ¾Ð¿Ð¸Ñ€ÑƒÐ¹Ñ‚Ðµ ÑÑÑ‹Ð»ÐºÐ¸ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹.</li>
-          <li>Ð•ÑÐ»Ð¸ Ñ‡Ñ‚Ð¾-Ñ‚Ð¾ Ð¿Ð¾ÑˆÐ»Ð¾ Ð½Ðµ Ñ‚Ð°Ðº, Ð½Ð°Ð¶Ð¼Ð¸Ñ‚Ðµ <b>Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¹ Ñ€ÐµÐ¶Ð¸Ð¼</b>.</li>
+          <li>В Supabase откройте настройки проекта и скопируйте <code>Project URL</code> и <code>Legacy anon key</code>.</li>
+          <li>Вставьте их в поля слева и нажмите <b>Проверить подключение</b>.</li>
+          <li>Если подключение работает, нажмите <b>Сохранить в браузере</b>.</li>
+          <li>Откройте главный файл или скопируйте ссылки отделений.</li>
+          <li>Если что-то пошло не так, нажмите <b>Вернуть локальный режим</b>.</li>
         </ol>
-        <p class="hint">ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÑŽÑ‚ÑÑ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² ÑÑ‚Ð¾Ð¼ Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€Ðµ. Ð¤Ð°Ð¹Ð»Ñ‹ Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° Ð¸ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ Ð½Ðµ Ð¼ÐµÐ½ÑÑŽÑ‚ÑÑ Ð´Ð¾ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€Ðµ.</p>
+        <p class="hint">Настройки сохраняются только в этом браузере. Файлы проекта и данные отделений не меняются до сохранения на сервере.</p>
       </aside>
     </div>
   </div>
 </body>
 </html>
-
