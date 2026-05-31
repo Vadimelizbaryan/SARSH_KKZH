@@ -4,6 +4,7 @@
     ? window.Telegram.WebApp
     : null;
   const root = document.getElementById("tg-sono-root");
+  let telegramViewportListenerAttached = false;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -31,6 +32,47 @@
     return telegram && typeof telegram.initData === "string"
       ? telegram.initData
       : "";
+  }
+
+  function syncViewportHeight() {
+    const viewportHeight = telegram &&
+        typeof telegram.viewportHeight === "number" &&
+        telegram.viewportHeight > 0
+      ? telegram.viewportHeight
+      : window.innerHeight;
+    document.documentElement.style.setProperty(
+      "--sono-vh",
+      `${Math.max(360, Math.round(viewportHeight || 0))}px`,
+    );
+  }
+
+  function maximizeTelegramWebApp() {
+    syncViewportHeight();
+    if (!telegram) {
+      return;
+    }
+
+    telegram.ready();
+    if (typeof telegram.expand === "function") {
+      telegram.expand();
+    }
+    if (typeof telegram.disableVerticalSwipes === "function") {
+      telegram.disableVerticalSwipes();
+    }
+    if (!telegramViewportListenerAttached &&
+      typeof telegram.onEvent === "function") {
+      telegram.onEvent("viewportChanged", syncViewportHeight);
+      telegramViewportListenerAttached = true;
+    }
+    if (typeof telegram.requestFullscreen === "function") {
+      setTimeout(function () {
+        try {
+          telegram.requestFullscreen();
+        } catch (_error) {
+          // Ignore clients that do not allow fullscreen requests.
+        }
+      }, 80);
+    }
   }
 
   function decodeBase64ToBytes(base64) {
@@ -314,10 +356,8 @@
   }
 
   async function init() {
-    if (telegram) {
-      telegram.ready();
-      telegram.expand();
-    }
+    maximizeTelegramWebApp();
+    window.addEventListener("resize", syncViewportHeight, { passive: true });
 
     if (!root) {
       return;
