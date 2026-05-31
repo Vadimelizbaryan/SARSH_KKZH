@@ -50,19 +50,19 @@ textarea {
   min-height: var(--sono-vh, 100dvh);
   margin: 0;
   padding:
-    calc(env(safe-area-inset-top) + 10px)
-    calc(env(safe-area-inset-right) + 10px)
-    calc(env(safe-area-inset-bottom) + 10px)
-    calc(env(safe-area-inset-left) + 10px);
+    calc(env(safe-area-inset-top) + 8px)
+    calc(env(safe-area-inset-right) + 8px)
+    calc(env(safe-area-inset-bottom) + 8px)
+    calc(env(safe-area-inset-left) + 8px);
 }
 
 .tg-sono-card {
   min-height: calc(var(--sono-vh, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px);
   background: var(--sono-paper);
   border: 1px solid var(--sono-line);
-  border-radius: 28px;
+  border-radius: 24px;
   box-shadow: var(--sono-shadow);
-  padding: 18px;
+  padding: 14px;
   backdrop-filter: blur(10px);
 }
 
@@ -77,14 +77,14 @@ textarea {
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .tg-sono-kicker {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   color: var(--sono-accent);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -92,8 +92,8 @@ textarea {
 
 .tg-sono-title {
   margin: 0;
-  font-size: clamp(24px, 5vw, 38px);
-  line-height: 1.04;
+  font-size: clamp(22px, 4.2vw, 34px);
+  line-height: 1.02;
 }
 
 .tg-sono-badge {
@@ -101,8 +101,8 @@ textarea {
   border: 1px solid rgba(31, 122, 90, 0.18);
   border-radius: 999px;
   background: var(--sono-accent-soft);
-  padding: 8px 12px;
-  font-size: 13px;
+  padding: 6px 10px;
+  font-size: 12px;
   font-weight: 900;
 }
 
@@ -118,37 +118,37 @@ textarea {
 .tg-sono-field,
 .tg-sono-footnote {
   border: 1px solid var(--sono-line);
-  border-radius: 22px;
+  border-radius: 18px;
   background: var(--sono-panel);
 }
 
 .tg-sono-note {
   display: grid;
-  gap: 6px;
-  margin-bottom: 14px;
-  padding: 14px;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
 }
 
 .tg-sono-note strong {
   color: var(--sono-accent);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .tg-sono-note span,
 .tg-sono-footnote span {
   color: var(--sono-muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
-  line-height: 1.45;
+  line-height: 1.35;
 }
 
 .tg-sono-form {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .tg-sono-section {
-  padding: 14px;
+  padding: 10px 12px;
 }
 
 .tg-sono-section-head {
@@ -157,12 +157,12 @@ textarea {
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .tg-sono-section-head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .tg-sono-section-head span {
@@ -176,7 +176,7 @@ textarea {
 .tg-sono-clinic-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .tg-sono-clinic-option {
@@ -192,11 +192,11 @@ textarea {
 
 .tg-sono-clinic-card {
   display: grid;
-  gap: 4px;
-  min-height: 92px;
-  padding: 14px;
+  gap: 3px;
+  min-height: 72px;
+  padding: 11px 12px;
   border: 1px solid rgba(37, 66, 57, 0.12);
-  border-radius: 18px;
+  border-radius: 16px;
   background:
     linear-gradient(
       145deg,
@@ -211,13 +211,14 @@ textarea {
 }
 
 .tg-sono-clinic-card strong {
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .tg-sono-clinic-card small {
   color: var(--sono-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
+  line-height: 1.3;
 }
 
 .tg-sono-clinic-option input:checked + .tg-sono-clinic-card {
@@ -229,17 +230,17 @@ textarea {
 .tg-sono-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .tg-sono-field {
   display: grid;
-  gap: 8px;
-  padding: 14px;
+  gap: 6px;
+  padding: 10px 12px;
 }
 
 .tg-sono-field span {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
   color: var(--sono-muted);
 }
@@ -248,22 +249,27 @@ textarea {
 .tg-sono-field textarea {
   width: 100%;
   border: 1px solid rgba(37, 66, 57, 0.16);
-  border-radius: 16px;
+  border-radius: 14px;
   background: #ffffff;
   color: var(--sono-ink);
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .tg-sono-field input {
-  min-height: 46px;
+  min-height: 42px;
   font-weight: 800;
 }
 
 .tg-sono-field textarea {
-  min-height: 250px;
+  min-height: 240px;
   resize: vertical;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.5;
+}
+
+.tg-sono-form > .tg-sono-field:last-of-type textarea {
+  min-height: clamp(340px, 46vh, 620px);
+  line-height: 1.55;
 }
 
 .tg-sono-field input:focus,
@@ -273,7 +279,7 @@ textarea {
 }
 
 .tg-sono-footnote {
-  padding: 14px;
+  padding: 10px 12px;
   background:
     linear-gradient(
       145deg,
@@ -289,9 +295,9 @@ textarea {
 }
 
 .tg-sono-submit {
-  min-height: 50px;
+  min-height: 48px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 16px;
   background: linear-gradient(135deg, #1f7a5a 0%, #205c8d 100%);
   color: #ffffff;
   font-size: 16px;
@@ -300,9 +306,9 @@ textarea {
 }
 
 .tg-sono-download {
-  min-height: 46px;
+  min-height: 44px;
   border: 1px solid rgba(31, 122, 90, 0.22);
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.9);
   color: var(--sono-ink);
   font-size: 15px;
@@ -319,7 +325,7 @@ textarea {
   margin: 0;
   min-height: 22px;
   color: var(--sono-muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -345,7 +351,7 @@ textarea {
     border-radius: 0;
     border: 0;
     box-shadow: none;
-    padding: 12px;
+    padding: 10px;
   }
 
   .tg-sono-clinic-grid,
@@ -354,10 +360,10 @@ textarea {
   }
 
   .tg-sono-title {
-    font-size: clamp(22px, 8vw, 30px);
+    font-size: clamp(20px, 7vw, 28px);
   }
 
-  .tg-sono-field textarea {
-    min-height: 220px;
+  .tg-sono-form > .tg-sono-field:last-of-type textarea {
+    min-height: clamp(300px, 52vh, 540px);
   }
 }
