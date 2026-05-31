@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Net.Http;
 using System.Net.NetworkInformation;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -11,7 +10,6 @@ namespace MAINFLOW.Desktop;
 
 public partial class Form1 : Form
 {
-    private const int SwRestore = 9;
     private const string DefaultRelativePage = "index.html";
     private const string RemoteSupabaseUrl = "https://ywecvlapdlaojpvijaqy.supabase.co";
     private const string RemoteSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZWN2bGFwZGxhb2pwdmlqYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNTAzMjgsImV4cCI6MjA5MzYyNjMyOH0._HEPdPB2bBTo_N-1Qo8jLau5g5oYGgvoGnBWPxDupL4";
@@ -21,15 +19,13 @@ public partial class Form1 : Form
     private const string RemoteDesktopManifestUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/MAINFLOW.Desktop/package-manifest.json";
     private const string RemoteDesktopSetupUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/Mainflow.exe";
     private const string PublishedSiteBaseUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/";
+    private const string PreferredDataBasePath = @"D:\SHARSH AI Data";
     private const string QrCodesDirectoryName = "qr-codes";
     private const string MainPageQrFileName = "main-index.png";
     private const string SetupPageQrFileName = "setup-sync.png";
     private const int AutoUpdateIntervalMs = 20 * 60 * 1000;
     private const int InitialVisibleUpdateDelayMs = 90 * 1000;
     private const int InitialBackgroundUpdateDelayMs = 15 * 1000;
-    private const int VisibleAutoUpdateGraceDelayMs = 10 * 1000;
-    private const int DataMirrorSyncIntervalMs = 5 * 60 * 1000;
-    private const int InitialDataMirrorSyncDelayMs = 30 * 1000;
 
     private readonly bool _startInBackground;
     private readonly EventWaitHandle? _restoreRequestEvent;
@@ -39,7 +35,6 @@ public partial class Form1 : Form
     private readonly string _stateFilePath;
     private readonly string _localPackageManifestPath;
     private readonly string _updateCacheDir;
-    private readonly DesktopDataMirrorService _dataMirrorService;
     private readonly HttpClient _releaseHttpClient = new()
     {
         Timeout = TimeSpan.FromMinutes(20)
@@ -69,7 +64,6 @@ public partial class Form1 : Form
     private readonly ToolStripMenuItem _trayMenuAutoStart;
     private readonly ToolStripMenuItem _trayMenuExit;
     private readonly System.Windows.Forms.Timer _autoUpdateTimer;
-    private readonly System.Windows.Forms.Timer _dataMirrorTimer;
     private RegisteredWaitHandle? _restoreRequestRegistration;
 
     private DesktopShellState _shellState;
@@ -80,7 +74,6 @@ public partial class Form1 : Form
     private bool _backgroundLaunchHandled;
     private bool _updateCheckInProgress;
     private bool _updateInstallInProgress;
-    private bool _dataMirrorSyncInProgress;
     private string _currentRelativePage = DefaultRelativePage;
     private string _pendingUpdateToken = string.Empty;
     private string _lastAnnouncedUpdateToken = string.Empty;
@@ -95,15 +88,11 @@ public partial class Form1 : Form
         Text = "Mainflow Desktop";
 
         _webRootPath = AppContext.BaseDirectory;
-        _appDataRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "MAINFLOW.Desktop"
-        );
+        _appDataRoot = ResolvePreferredDataRoot("MAINFLOW.Desktop");
         _webViewUserDataPath = Path.Combine(_appDataRoot, "WebView2");
         _stateFilePath = Path.Combine(_appDataRoot, "desktop-state.json");
         _localPackageManifestPath = Path.Combine(_webRootPath, "package-manifest.json");
         _updateCacheDir = Path.Combine(_appDataRoot, "updates");
-        _dataMirrorService = new DesktopDataMirrorService(Path.Combine(_appDataRoot, "DataMirror"));
 
         Directory.CreateDirectory(_appDataRoot);
         Directory.CreateDirectory(_webViewUserDataPath);
@@ -153,10 +142,10 @@ public partial class Form1 : Form
         };
         _toolStripButtonOpenBrowser.Click += (_, _) => OpenCurrentPageInBrowser();
 
-        _toolStripButtonShowQr = new ToolStripButton("QR Ð²Ñ…Ð¾Ð´")
+        _toolStripButtonShowQr = new ToolStripButton("QR вход")
         {
             DisplayStyle = ToolStripItemDisplayStyle.Text,
-            ToolTipText = "ÐŸÐ¾ÐºÐ°Ð·Ð°Ñ‚ÑŒ QR-ÐºÐ¾Ð´ Ð´Ð»Ñ Ð²Ñ…Ð¾Ð´Ð° Ñ Ñ‚ÐµÐ»ÐµÑ„Ð¾Ð½Ð°"
+            ToolTipText = "Показать QR-код для входа с телефона"
         };
         _toolStripButtonShowQr.Click += (_, _) => ShowMobileQrCode();
 
@@ -208,7 +197,7 @@ public partial class Form1 : Form
         _trayMenuOpenBrowser = new ToolStripMenuItem("Сайт в браузере");
         _trayMenuOpenBrowser.Click += (_, _) => OpenCurrentPageInBrowser();
         _trayMenu.Items.Insert(1, _trayMenuOpenBrowser);
-        _trayMenuShowQr = new ToolStripMenuItem("QR Ð²Ñ…Ð¾Ð´");
+        _trayMenuShowQr = new ToolStripMenuItem("QR вход");
         _trayMenuShowQr.Click += (_, _) => ShowMobileQrCode();
         _trayMenu.Items.Insert(2, _trayMenuShowQr);
 
@@ -227,11 +216,6 @@ public partial class Form1 : Form
             Interval = AutoUpdateIntervalMs
         };
         _autoUpdateTimer.Tick += async (_, _) => await CheckForDesktopUpdatesAsync();
-        _dataMirrorTimer = new System.Windows.Forms.Timer(components)
-        {
-            Interval = DataMirrorSyncIntervalMs
-        };
-        _dataMirrorTimer.Tick += async (_, _) => await RunDataMirrorSyncAsync();
 
         toolStripComboBoxMode.Items.Clear();
         toolStripComboBoxMode.Items.AddRange(["Оффлайн", "Онлайн"]);
@@ -257,7 +241,6 @@ public partial class Form1 : Form
             _restoreRequestRegistration?.Unregister(null);
             _restoreRequestEvent?.Dispose();
             _autoUpdateTimer.Dispose();
-            _dataMirrorTimer.Dispose();
             _releaseHttpClient.Dispose();
         };
         RegisterRestoreRequestHandler();
@@ -266,9 +249,7 @@ public partial class Form1 : Form
             await InitializeWebViewAsync();
             HandleInitialBackgroundLaunch();
             _autoUpdateTimer.Start();
-            _dataMirrorTimer.Start();
             FireAndForgetAutoUpdateCheck(_startInBackground ? InitialBackgroundUpdateDelayMs : InitialVisibleUpdateDelayMs);
-            FireAndForgetDataMirrorSync(_startInBackground ? 10_000 : InitialDataMirrorSyncDelayMs);
         };
         FormClosing += HandleFormClosing;
     }
@@ -327,30 +308,6 @@ public partial class Form1 : Form
         });
     }
 
-    private void FireAndForgetDataMirrorSync(int delayMs)
-    {
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                if (delayMs > 0)
-                {
-                    await Task.Delay(delayMs);
-                }
-
-                if (IsDisposed)
-                {
-                    return;
-                }
-
-                BeginInvoke(async () => await RunDataMirrorSyncAsync());
-            }
-            catch
-            {
-            }
-        });
-    }
-
     private async Task InitializeWebViewAsync()
     {
         if (_webViewReady)
@@ -361,11 +318,6 @@ public partial class Form1 : Form
         try
         {
             await webView.EnsureCoreWebView2Async();
-            webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                "mirror.mainflow.local",
-                _dataMirrorService.MirrorRoot,
-                CoreWebView2HostResourceAccessKind.Allow
-            );
             webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
             webView.CoreWebView2.Settings.IsStatusBarEnabled = true;
@@ -392,7 +344,6 @@ public partial class Form1 : Form
                 CaptureCurrentRelativePageFromWebView();
                 UpdateCurrentPageStatus();
                 SaveShellState();
-                FireAndForgetDataMirrorSync(2000);
             };
             _webViewReady = true;
             NavigateToRelativePage(_currentRelativePage, saveState: false);
@@ -442,7 +393,6 @@ public partial class Form1 : Form
         if (requestedMode == DesktopMode.Online)
         {
             FireAndForgetAutoUpdateCheck(2000);
-            FireAndForgetDataMirrorSync(2000);
         }
     }
 
@@ -483,7 +433,6 @@ public partial class Form1 : Form
 
             if (result.Ok)
             {
-                FireAndForgetDataMirrorSync(2000);
                 MessageBox.Show(
                     this,
                     result.SyncedCount > 0
@@ -520,32 +469,6 @@ public partial class Form1 : Form
         {
             toolStripButtonSyncQueue.Enabled = true;
             _trayMenuSync.Enabled = true;
-        }
-    }
-
-    private async Task RunDataMirrorSyncAsync()
-    {
-        if (_dataMirrorSyncInProgress || !_webViewReady || webView.CoreWebView2 is null)
-        {
-            return;
-        }
-
-        if (_shellState.Mode != DesktopMode.Online || !HasInternetAvailable())
-        {
-            return;
-        }
-
-        _dataMirrorSyncInProgress = true;
-        try
-        {
-            await _dataMirrorService.SyncAsync(webView.CoreWebView2);
-        }
-        catch
-        {
-        }
-        finally
-        {
-            _dataMirrorSyncInProgress = false;
         }
     }
 
@@ -596,23 +519,10 @@ public partial class Form1 : Form
             {
                 _lastAnnouncedUpdateToken = remoteToken;
                 ShowTrayBalloon(
-                    "Обновление Mainflow готово",
-                    $"Новая версия установится автоматически через {VisibleAutoUpdateGraceDelayMs / 1000} сек. Если появятся несохранённые данные, обновление подождёт."
+                    "Доступно обновление Mainflow",
+                    "Новая версия уже готова. Она установится автоматически, когда приложение уйдет в фон."
                 );
             }
-
-            await Task.Delay(VisibleAutoUpdateGraceDelayMs);
-            if (IsDisposed || !string.Equals(_pendingUpdateToken, remoteToken, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            if (await HasBlockingLocalWorkForUpdateAsync())
-            {
-                return;
-            }
-
-            await BeginSilentUpdateAsync();
         }
         catch
         {
@@ -721,18 +631,8 @@ public partial class Form1 : Form
         try
         {
             var rawResult = await webView.CoreWebView2.ExecuteScriptAsync(
-                "window.SHARSH_APP_API?.getDesktopUpdateBlockers ? window.SHARSH_APP_API.getDesktopUpdateBlockers() : (window.SHARSH_APP_API?.getPendingSyncStatus ? window.SHARSH_APP_API.getPendingSyncStatus() : null)"
+                "window.SHARSH_APP_API?.getPendingSyncStatus ? window.SHARSH_APP_API.getPendingSyncStatus() : null"
             );
-            var blockers = DeserializeScriptResult<DesktopUpdateBlockersResult>(rawResult);
-            if (blockers is not null)
-            {
-                return blockers.HasBlockingWork
-                    || blockers.HasBlockingUiWork
-                    || blockers.HasPendingSync
-                    || blockers.IsSyncing
-                    || blockers.PendingCount > 0;
-            }
-
             var result = DeserializeScriptResult<PendingSyncStatusResult>(rawResult);
             return result is not null && (result.HasPending || result.IsSyncing || result.Count > 0);
         }
@@ -997,7 +897,7 @@ public partial class Form1 : Form
         var normalizedRelativePage = NormalizeRelativePage(_currentRelativePage);
         var title = _pageTitles.TryGetValue(normalizedRelativePage, out var pageTitle)
             ? pageTitle
-            : "Ð¢ÐµÐºÑƒÑ‰Ð°Ñ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð°";
+            : "Текущая страница";
         var publishedUri = BuildPublishedSiteUri(normalizedRelativePage);
         var qrCodesRoot = Path.Combine(_webRootPath, QrCodesDirectoryName);
 
@@ -1024,7 +924,7 @@ public partial class Form1 : Form
             {
                 qrFileName = MainPageQrFileName;
                 publishedUri = BuildPublishedSiteUri(DefaultRelativePage);
-                title = "Ð“Ð»Ð°Ð²Ð½Ð°Ñ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð°";
+                title = "Главная страница";
                 isFallback = true;
             }
         }
@@ -1034,8 +934,8 @@ public partial class Form1 : Form
             publishedUri.AbsoluteUri,
             Path.Combine(qrCodesRoot, qrFileName),
             isFallback
-                ? "Ð”Ð»Ñ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ð¹ QR Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½, Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½ Ð²Ñ…Ð¾Ð´ Ð½Ð° Ð³Ð»Ð°Ð²Ð½ÑƒÑŽ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñƒ ÑÐ°Ð¹Ñ‚Ð°."
-                : "Ð¡ÐºÐ°Ð½Ð¸Ñ€ÑƒÐ¹Ñ‚Ðµ QR-ÐºÐ¾Ð´ Ñ‚ÐµÐ»ÐµÑ„Ð¾Ð½Ð¾Ð¼, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÑ‚Ñƒ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñƒ ÑÐ°Ð¹Ñ‚Ð° Ð½Ð° Ð¼Ð¾Ð±Ð¸Ð»ÑŒÐ½Ð¾Ð¼ ÑƒÑÑ‚Ñ€Ð¾Ð¹ÑÑ‚Ð²Ðµ."
+                ? "Для текущей страницы отдельный QR не найден, поэтому показан вход на главную страницу сайта."
+                : "Сканируйте QR-код телефоном, чтобы открыть эту страницу сайта на мобильном устройстве."
         );
     }
 
@@ -1054,13 +954,13 @@ public partial class Form1 : Form
             var payload = BuildQrDisplayPayload();
             if (!File.Exists(payload.ImagePath))
             {
-                throw new FileNotFoundException("ÐÐµ Ð½Ð°Ð¹Ð´ÐµÐ½ Ñ„Ð°Ð¹Ð» QR-ÐºÐ¾Ð´Ð°.", payload.ImagePath);
+                throw new FileNotFoundException("Не найден файл QR-кода.", payload.ImagePath);
             }
 
             var qrImage = LoadQrImage(payload.ImagePath);
             using var dialog = new Form
             {
-                Text = $"QR Ð²Ñ…Ð¾Ð´ â€¢ {payload.Title}",
+                Text = $"QR вход • {payload.Title}",
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -1117,25 +1017,25 @@ public partial class Form1 : Form
             var buttonsPanel = new FlowLayoutPanel
             {
                 Dock = DockStyle.Bottom,
-                Height = 64,
+                Height = 70,
+                Padding = new Padding(18, 12, 18, 18),
                 FlowDirection = FlowDirection.RightToLeft,
-                Padding = new Padding(18, 12, 18, 14),
                 WrapContents = false
             };
 
             var closeButton = new Button
             {
                 AutoSize = true,
-                Text = "Ð—Ð°ÐºÑ€Ñ‹Ñ‚ÑŒ"
+                Text = "Закрыть"
             };
             closeButton.Click += (_, _) => dialog.Close();
 
-            var openSiteButton = new Button
+            var openButton = new Button
             {
                 AutoSize = true,
-                Text = "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÐ°Ð¹Ñ‚"
+                Text = "Открыть сайт"
             };
-            openSiteButton.Click += (_, _) =>
+            openButton.Click += (_, _) =>
             {
                 try
                 {
@@ -1147,14 +1047,14 @@ public partial class Form1 : Form
 
                     if (started is null)
                     {
-                        throw new InvalidOperationException("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð¿ÑƒÑÑ‚Ð¸Ñ‚ÑŒ Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€.");
+                        throw new InvalidOperationException("Не удалось запустить браузер.");
                     }
                 }
                 catch (Exception error)
                 {
                     MessageBox.Show(
                         dialog,
-                        $"ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ.\n\n{error.Message}",
+                        $"Не удалось открыть ссылку.\n\n{error.Message}",
                         "Mainflow Desktop",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning
@@ -1162,50 +1062,53 @@ public partial class Form1 : Form
                 }
             };
 
-            var copyLinkButton = new Button
+            var copyButton = new Button
             {
                 AutoSize = true,
-                Text = "ÐšÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ"
+                Text = "Копировать ссылку"
             };
-            copyLinkButton.Click += (_, _) =>
+            copyButton.Click += (_, _) =>
             {
                 try
                 {
                     Clipboard.SetText(payload.Url);
-                    ShowTrayBalloon("QR-ÑÑÑ‹Ð»ÐºÐ°", "Ð¡ÑÑ‹Ð»ÐºÐ° Ð´Ð»Ñ Ð²Ñ…Ð¾Ð´Ð° ÑÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð° Ð² Ð±ÑƒÑ„ÐµÑ€ Ð¾Ð±Ð¼ÐµÐ½Ð°.");
+                    MessageBox.Show(
+                        dialog,
+                        "Ссылка скопирована в буфер обмена.",
+                        "Mainflow Desktop",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
                 }
-                catch (Exception error)
+                catch (Exception copyError)
                 {
                     MessageBox.Show(
                         dialog,
-                        $"ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ.\n\n{error.Message}",
+                        $"Не удалось скопировать ссылку.\n\n{copyError.Message}",
                         "Mainflow Desktop",
                         MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning
+                        MessageBoxIcon.Error
                     );
                 }
             };
 
             buttonsPanel.Controls.Add(closeButton);
-            buttonsPanel.Controls.Add(openSiteButton);
-            buttonsPanel.Controls.Add(copyLinkButton);
+            buttonsPanel.Controls.Add(openButton);
+            buttonsPanel.Controls.Add(copyButton);
 
             dialog.Controls.Add(buttonsPanel);
             dialog.Controls.Add(urlPanel);
             dialog.Controls.Add(pictureBox);
             dialog.Controls.Add(descriptionLabel);
             dialog.Controls.Add(titleLabel);
-            dialog.FormClosed += (_, _) =>
-            {
-                pictureBox.Image?.Dispose();
-            };
+            dialog.FormClosed += (_, _) => pictureBox.Image?.Dispose();
             dialog.ShowDialog(this);
         }
         catch (Exception error)
         {
             MessageBox.Show(
                 this,
-                $"ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾ÐºÐ°Ð·Ð°Ñ‚ÑŒ QR-ÐºÐ¾Ð´ Ð´Ð»Ñ Ð¼Ð¾Ð±Ð¸Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð²Ñ…Ð¾Ð´Ð°.\n\n{error.Message}",
+                $"Не удалось показать QR-код.\n\n{error.Message}",
                 "Mainflow Desktop",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
@@ -1237,11 +1140,32 @@ public partial class Form1 : Form
         }
     }
 
+    private static string ResolvePreferredDataRoot(string appFolderName)
+    {
+        try
+        {
+            if (Directory.Exists(@"D:\"))
+            {
+                var preferredPath = Path.Combine(PreferredDataBasePath, appFolderName);
+                Directory.CreateDirectory(preferredPath);
+                return preferredPath;
+            }
+        }
+        catch
+        {
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            appFolderName
+        );
+    }
+
     private void UpdateBannerText()
     {
         bannerLabel.Text = _shellState.Mode == DesktopMode.Offline
             ? "Оффлайн-режим: ввод и просмотр работают локально на этом ПК. Новые изменения попадают в оффлайн-очередь и после возврата связи отправляются автоматически в фоне."
-            : "Онлайн-режим: локальная копия сайта работает с сервером и получает новые данные автоматически. Уведомления приходят в фоне, а обновления Mainflow устанавливаются автоматически, когда нет несохранённых изменений.";
+            : "Онлайн-режим: локальная копия сайта работает с сервером и получает новые данные автоматически. Оставьте приложение в трее, чтобы получать уведомления и фоновое автообновление.";
     }
 
     private void UpdateNetworkStatus()
@@ -1367,62 +1291,10 @@ public partial class Form1 : Form
 
     private void RestoreFromTray()
     {
-        if (InvokeRequired)
-        {
-            BeginInvoke(RestoreFromTray);
-            return;
-        }
-
-        SuspendLayout();
-        try
-        {
-            ShowInTaskbar = true;
-            Visible = true;
-            Show();
-            if (WindowState == FormWindowState.Minimized)
-            {
-                WindowState = FormWindowState.Normal;
-            }
-
-            EnsureWindowVisibleOnScreen();
-        }
-        finally
-        {
-            ResumeLayout();
-        }
-
-        if (IsHandleCreated)
-        {
-            ShowWindow(Handle, SwRestore);
-            SetForegroundWindow(Handle);
-        }
-
-        BringToFront();
-        TopMost = true;
-        TopMost = false;
+        Show();
+        ShowInTaskbar = true;
+        WindowState = FormWindowState.Normal;
         Activate();
-        Focus();
-    }
-
-    private void EnsureWindowVisibleOnScreen()
-    {
-        var bounds = RestoreBounds.Width > 0 && RestoreBounds.Height > 0
-            ? RestoreBounds
-            : Bounds;
-        var visibleOnAnyScreen = Screen.AllScreens.Any(screen => screen.WorkingArea.IntersectsWith(bounds));
-        if (visibleOnAnyScreen)
-        {
-            return;
-        }
-
-        var area = Screen.PrimaryScreen?.WorkingArea ?? Screen.FromControl(this).WorkingArea;
-        var width = Math.Min(Math.Max(bounds.Width, 1100), area.Width);
-        var height = Math.Min(Math.Max(bounds.Height, 700), area.Height);
-        var x = area.Left + Math.Max(0, (area.Width - width) / 2);
-        var y = area.Top + Math.Max(0, (area.Height - height) / 2);
-
-        StartPosition = FormStartPosition.Manual;
-        Bounds = new Rectangle(x, y, width, height);
     }
 
     private void ExitApplication()
@@ -1677,15 +1549,6 @@ public partial class Form1 : Form
     private sealed record QrDisplayPayload(string Title, string Url, string ImagePath, string Description);
     private sealed record PendingSyncCommandResult(bool Ok, int SyncedCount, int RemainingCount, string Error);
     private sealed record PendingSyncStatusResult(bool HasPending, int Count, bool IsSyncing);
-    private sealed record DesktopUpdateBlockersResult(bool HasBlockingWork, bool HasBlockingUiWork, bool HasPendingSync, int PendingCount, bool IsSyncing);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
 
     private sealed class DesktopPackageManifest
     {
