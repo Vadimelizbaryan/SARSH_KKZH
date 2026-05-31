@@ -20,6 +20,7 @@ public partial class Form1 : Form
     private const string AutoStartRegistryValueName = "MAINFLOW Desktop";
     private const string RemoteDesktopManifestUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/MAINFLOW.Desktop/package-manifest.json";
     private const string RemoteDesktopSetupUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/Mainflow.exe";
+    private const string PublishedSiteBaseUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/";
     private const int AutoUpdateIntervalMs = 20 * 60 * 1000;
     private const int InitialVisibleUpdateDelayMs = 90 * 1000;
     private const int InitialBackgroundUpdateDelayMs = 15 * 1000;
@@ -53,9 +54,11 @@ public partial class Form1 : Form
 
     private readonly ToolStripButton _toolStripButtonBackground;
     private readonly ToolStripButton _toolStripButtonAutoStart;
+    private readonly ToolStripButton _toolStripButtonOpenBrowser;
     private readonly ContextMenuStrip _trayMenu;
     private readonly NotifyIcon _trayIcon;
     private readonly ToolStripMenuItem _trayMenuOpen;
+    private readonly ToolStripMenuItem _trayMenuOpenBrowser;
     private readonly ToolStripMenuItem _trayMenuSync;
     private readonly ToolStripMenuItem _trayMenuAutoStart;
     private readonly ToolStripMenuItem _trayMenuExit;
@@ -135,6 +138,13 @@ public partial class Form1 : Form
         };
         _toolStripButtonAutoStart.Click += (_, _) => ToggleAutoStartPreference();
 
+        _toolStripButtonOpenBrowser = new ToolStripButton("Сайт в браузере")
+        {
+            DisplayStyle = ToolStripItemDisplayStyle.Text,
+            ToolTipText = "Открыть текущую страницу Mainflow во внешнем браузере"
+        };
+        _toolStripButtonOpenBrowser.Click += (_, _) => OpenCurrentPageInBrowser();
+
         var syncQueueIndex = topToolStrip.Items.IndexOf(toolStripButtonSyncQueue);
         if (syncQueueIndex >= 0)
         {
@@ -145,6 +155,16 @@ public partial class Form1 : Form
         {
             topToolStrip.Items.Add(_toolStripButtonBackground);
             topToolStrip.Items.Add(_toolStripButtonAutoStart);
+        }
+
+        var openDataFolderIndex = topToolStrip.Items.IndexOf(toolStripButtonOpenDataFolder);
+        if (openDataFolderIndex >= 0)
+        {
+            topToolStrip.Items.Insert(openDataFolderIndex + 1, _toolStripButtonOpenBrowser);
+        }
+        else
+        {
+            topToolStrip.Items.Add(_toolStripButtonOpenBrowser);
         }
 
         _trayMenu = new ContextMenuStrip(components);
@@ -167,6 +187,10 @@ public partial class Form1 : Form
             new ToolStripSeparator(),
             _trayMenuExit
         ]);
+
+        _trayMenuOpenBrowser = new ToolStripMenuItem("Сайт в браузере");
+        _trayMenuOpenBrowser.Click += (_, _) => OpenCurrentPageInBrowser();
+        _trayMenu.Items.Insert(1, _trayMenuOpenBrowser);
 
         _trayIcon = new NotifyIcon(components)
         {
@@ -868,6 +892,50 @@ public partial class Form1 : Form
         }
         catch
         {
+        }
+    }
+
+    private static Uri BuildPublishedSiteUri(string? relativePage)
+    {
+        var publishedRootUri = new Uri(PublishedSiteBaseUrl, UriKind.Absolute);
+        var normalizedRelativePage = string.IsNullOrWhiteSpace(relativePage)
+            ? DefaultRelativePage
+            : relativePage.Trim().Replace('\\', '/').TrimStart('/');
+
+        if (string.IsNullOrWhiteSpace(normalizedRelativePage)
+            || string.Equals(normalizedRelativePage, DefaultRelativePage, StringComparison.OrdinalIgnoreCase))
+        {
+            return publishedRootUri;
+        }
+
+        return new Uri(publishedRootUri, normalizedRelativePage);
+    }
+
+    private void OpenCurrentPageInBrowser()
+    {
+        try
+        {
+            var browserUri = BuildPublishedSiteUri(_currentRelativePage);
+            var started = Process.Start(new ProcessStartInfo
+            {
+                FileName = browserUri.AbsoluteUri,
+                UseShellExecute = true
+            });
+
+            if (started is null)
+            {
+                throw new InvalidOperationException("Не удалось запустить браузер.");
+            }
+        }
+        catch (Exception error)
+        {
+            MessageBox.Show(
+                this,
+                $"Не удалось открыть сайт во внешнем браузере.\n\n{error.Message}",
+                "Mainflow Desktop",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
         }
     }
 
