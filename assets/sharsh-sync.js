@@ -2454,6 +2454,7 @@
     if (normalizedDate) {
       url.searchParams.set("date", normalizedDate);
     }
+    url.searchParams.set("t", String(Date.now()));
     return url.toString();
   }
 

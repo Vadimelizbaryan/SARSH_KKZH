@@ -8552,7 +8552,7 @@ function buildMainArchivePdfFileName(dateKey: string) {
   const baseName = MAIN_ARCHIVE_PDF_FILE_NAME.replace(/\.pdf$/i, "");
   const label = formatTelegramFormArchiveDateLabel(dateKey || getYerevanDateKey());
   const safeLabel = sanitizeSheetFileNamePart(label.replaceAll(".", ",").replaceAll("/", ",")) || dateKey || getYerevanDateKey();
-  return `${baseName}_${safeLabel}.pdf`;
+  return buildTimestampedPdfFileName(`${baseName}_${safeLabel}.pdf`);
 }
 
 function rowMatchesArchiveDateKey(row: Record<string, unknown>, dateKey: string) {
