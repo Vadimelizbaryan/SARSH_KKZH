@@ -21,6 +21,9 @@ const TELEGRAM_PENDING_COLLEAGUE_CHATS_META_KEY = "telegram_pending_colleague_ch
 const ANDROID_APPROVED_DEVICES_META_KEY = "android_approved_devices";
 const ANDROID_PENDING_DEVICES_META_KEY = "android_pending_devices";
 const ANDROID_BLOCKED_DEVICES_META_KEY = "android_blocked_devices";
+const SONO_DESKTOP_APPROVED_DEVICES_META_KEY = "sono_desktop_approved_devices";
+const SONO_DESKTOP_PENDING_DEVICES_META_KEY = "sono_desktop_pending_devices";
+const SONO_DESKTOP_BLOCKED_DEVICES_META_KEY = "sono_desktop_blocked_devices";
 const ANDROID_DEVICE_NOTIFICATIONS_META_KEY = "android_device_notifications";
 const ANDROID_OCR_SUCCESS_NOTIFICATION_MESSAGE = "\u041A\u043E\u043D\u0442\u0440\u043E\u043B \u0441\u0443\u043C \u043F\u0440\u043E\u0439\u0434\u0435\u043D, \u0434\u0430\u043D\u043D\u044B\u0435 \u0432\u0432\u0435\u0434\u0435\u043D\u044B \u0432 \u043E\u0441\u043D\u043E\u0432\u043D\u0443\u044E \u0442\u0430\u0431\u043B\u0438\u0446\u0443.";
 const ANDROID_OCR_FAILURE_NOTIFICATION_MESSAGE = "\u041A\u043E\u043D\u0442\u0440\u043E\u043B \u0441\u0443\u043C \u043D\u0435 \u043F\u0440\u043E\u0439\u0434\u0435\u043D, \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E \u0432\u0430\u0448\u0435\u0439 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043E\u0442\u0434\u0435\u043B\u0435\u043D\u0438\u044F \u043D\u0430 MAINFORM.app.";
@@ -2854,6 +2857,39 @@ async function saveBlockedAndroidDevices(
   await saveAndroidDeviceAccessRecords(supabase, ANDROID_BLOCKED_DEVICES_META_KEY, records);
 }
 
+async function loadApprovedSonoDesktopDevices(supabase: ReturnType<typeof createClient>) {
+  return await loadAndroidDeviceAccessRecords(supabase, SONO_DESKTOP_APPROVED_DEVICES_META_KEY);
+}
+
+async function saveApprovedSonoDesktopDevices(
+  supabase: ReturnType<typeof createClient>,
+  records: AndroidDeviceAccessRecord[]
+) {
+  await saveAndroidDeviceAccessRecords(supabase, SONO_DESKTOP_APPROVED_DEVICES_META_KEY, records);
+}
+
+async function loadPendingSonoDesktopDevices(supabase: ReturnType<typeof createClient>) {
+  return await loadAndroidDeviceAccessRecords(supabase, SONO_DESKTOP_PENDING_DEVICES_META_KEY);
+}
+
+async function savePendingSonoDesktopDevices(
+  supabase: ReturnType<typeof createClient>,
+  records: AndroidDeviceAccessRecord[]
+) {
+  await saveAndroidDeviceAccessRecords(supabase, SONO_DESKTOP_PENDING_DEVICES_META_KEY, records);
+}
+
+async function loadBlockedSonoDesktopDevices(supabase: ReturnType<typeof createClient>) {
+  return await loadAndroidDeviceAccessRecords(supabase, SONO_DESKTOP_BLOCKED_DEVICES_META_KEY);
+}
+
+async function saveBlockedSonoDesktopDevices(
+  supabase: ReturnType<typeof createClient>,
+  records: AndroidDeviceAccessRecord[]
+) {
+  await saveAndroidDeviceAccessRecords(supabase, SONO_DESKTOP_BLOCKED_DEVICES_META_KEY, records);
+}
+
 async function loadAndroidDeviceNotifications(supabase: any) {
   const { data, error } = await supabase
     .from("sharsh_report_meta")
@@ -3065,6 +3101,21 @@ function getAndroidDeviceDisplayName(record: AndroidDeviceAccessRecord) {
   return record.deviceName || `MAINFORM ${record.deviceId.slice(0, 8)}`;
 }
 
+function buildSonoDesktopDeviceApprovalReplyMarkup(deviceId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Հաստատել", callback_data: `approve_sono_desktop_device:${deviceId}` },
+        { text: "Մերժել", callback_data: `reject_sono_desktop_device:${deviceId}` }
+      ]
+    ]
+  };
+}
+
+function getSonoDesktopDeviceDisplayName(record: AndroidDeviceAccessRecord) {
+  return record.deviceName || `SONO Desktop ${record.deviceId.slice(0, 8)}`;
+}
+
 function buildWorkplaceLocationReplyMarkup(gpsEnabled = false) {
   const keyboard = gpsEnabled
     ? [
@@ -3216,6 +3267,63 @@ async function requestAndroidDeviceApproval(
   return nextRecord;
 }
 
+async function requestSonoDesktopDeviceApproval(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string,
+  deviceName: string
+) {
+  const pendingDevices = await loadPendingSonoDesktopDevices(supabase);
+  const existingRecord = pendingDevices.find((item) => item.deviceId === deviceId);
+  const alreadyPending = Boolean(existingRecord);
+  const now = new Date().toISOString();
+  const nextRecord: AndroidDeviceAccessRecord = {
+    deviceId,
+    deviceName,
+    requestedAt: existingRecord?.requestedAt || now,
+    updatedAt: now,
+    approvedAt: "",
+    blockedAt: "",
+    lastSeenAt: now,
+    lastDepartmentId: "sono_desktop",
+    fcmToken: "",
+    fcmTokenUpdatedAt: ""
+  };
+
+  await savePendingSonoDesktopDevices(
+    supabase,
+    [nextRecord, ...pendingDevices.filter((item) => item.deviceId !== deviceId)]
+  );
+
+  if (alreadyPending) {
+    return nextRecord;
+  }
+
+  const messageText = [
+    "SONO Desktop հավելվածը խնդրում է մուտքի թույլտվություն։",
+    `Սարք: ${getSonoDesktopDeviceDisplayName(nextRecord)}`,
+    `ID: ${deviceId}`,
+    "",
+    "Եթե հաստատեք, այս համակարգիչը SONO Desktop-ում կաշխատի առանց նոր հարցման։"
+  ].join("\n");
+
+  const adminChatIds = getTelegramAdminChatIds();
+  if (!adminChatIds.length) {
+    throw new Error("Telegram admin chats are not configured.");
+  }
+
+  for (const adminChatId of adminChatIds) {
+    await sendTelegramMessageWithReplyMarkup(
+      adminChatId,
+      messageText,
+      buildSonoDesktopDeviceApprovalReplyMarkup(deviceId)
+    ).catch((error) => {
+      console.error("Failed to send Sono desktop access request:", sanitizePublicErrorMessage(error));
+    });
+  }
+
+  return nextRecord;
+}
+
 async function approveAndroidDevice(
   supabase: ReturnType<typeof createClient>,
   deviceId: string
@@ -3307,6 +3415,103 @@ async function rejectAndroidDevice(
   return blockedRecord;
 }
 
+async function approveSonoDesktopDevice(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  if (!normalizedDeviceId) {
+    throw new Error("Sono desktop device id is missing.");
+  }
+
+  const [pendingDevices, approvedDevices, blockedDevices] = await Promise.all([
+    loadPendingSonoDesktopDevices(supabase),
+    loadApprovedSonoDesktopDevices(supabase),
+    loadBlockedSonoDesktopDevices(supabase)
+  ]);
+  const sourceRecord = pendingDevices.find((item) => item.deviceId === normalizedDeviceId)
+    || approvedDevices.find((item) => item.deviceId === normalizedDeviceId)
+    || blockedDevices.find((item) => item.deviceId === normalizedDeviceId);
+
+  if (!sourceRecord) {
+    throw new Error("Sono desktop device request not found.");
+  }
+
+  const now = new Date().toISOString();
+  const approvedRecord: AndroidDeviceAccessRecord = {
+    ...sourceRecord,
+    updatedAt: now,
+    approvedAt: sourceRecord.approvedAt || now,
+    blockedAt: "",
+    lastSeenAt: sourceRecord.lastSeenAt || now,
+    lastDepartmentId: "sono_desktop",
+    fcmToken: "",
+    fcmTokenUpdatedAt: sourceRecord.fcmTokenUpdatedAt || ""
+  };
+
+  await Promise.all([
+    saveApprovedSonoDesktopDevices(
+      supabase,
+      [approvedRecord, ...approvedDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    ),
+    savePendingSonoDesktopDevices(
+      supabase,
+      pendingDevices.filter((item) => item.deviceId !== normalizedDeviceId)
+    ),
+    saveBlockedSonoDesktopDevices(
+      supabase,
+      blockedDevices.filter((item) => item.deviceId !== normalizedDeviceId)
+    )
+  ]);
+
+  return approvedRecord;
+}
+
+async function rejectSonoDesktopDevice(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  if (!normalizedDeviceId) {
+    throw new Error("Sono desktop device id is missing.");
+  }
+
+  const [pendingDevices, blockedDevices] = await Promise.all([
+    loadPendingSonoDesktopDevices(supabase),
+    loadBlockedSonoDesktopDevices(supabase)
+  ]);
+  const sourceRecord = pendingDevices.find((item) => item.deviceId === normalizedDeviceId)
+    || blockedDevices.find((item) => item.deviceId === normalizedDeviceId);
+
+  if (!sourceRecord) {
+    throw new Error("Sono desktop device request not found.");
+  }
+
+  const now = new Date().toISOString();
+  const blockedRecord: AndroidDeviceAccessRecord = {
+    ...sourceRecord,
+    updatedAt: now,
+    approvedAt: "",
+    blockedAt: now,
+    lastDepartmentId: "sono_desktop",
+    fcmToken: "",
+    fcmTokenUpdatedAt: sourceRecord.fcmTokenUpdatedAt || ""
+  };
+
+  await Promise.all([
+    savePendingSonoDesktopDevices(
+      supabase,
+      pendingDevices.filter((item) => item.deviceId !== normalizedDeviceId)
+    ),
+    saveBlockedSonoDesktopDevices(
+      supabase,
+      [blockedRecord, ...blockedDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    )
+  ]);
+
+  return blockedRecord;
+}
+
 async function getAndroidDeviceAccessState(
   supabase: ReturnType<typeof createClient>,
   deviceId: string,
@@ -3369,6 +3574,74 @@ async function getAndroidDeviceAccessState(
     normalizedDeviceId,
     normalizedDeviceName,
     departmentId
+  );
+  return { status: "pending" as const, record: createdPendingRecord };
+}
+
+async function getSonoDesktopDeviceAccessState(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string,
+  deviceName: string
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  const normalizedDeviceName = sanitizeAndroidDeviceName(deviceName) || "SONO Desktop";
+  if (!normalizedDeviceId) {
+    return { status: "missing" as const, record: null };
+  }
+
+  const [approvedDevices, pendingDevices, blockedDevices] = await Promise.all([
+    loadApprovedSonoDesktopDevices(supabase),
+    loadPendingSonoDesktopDevices(supabase),
+    loadBlockedSonoDesktopDevices(supabase)
+  ]);
+
+  const approvedRecord = approvedDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (approvedRecord) {
+    const now = new Date().toISOString();
+    const nextApprovedRecord: AndroidDeviceAccessRecord = {
+      ...approvedRecord,
+      deviceName: normalizedDeviceName,
+      updatedAt: now,
+      lastSeenAt: now,
+      lastDepartmentId: "sono_desktop",
+      fcmToken: "",
+      fcmTokenUpdatedAt: approvedRecord.fcmTokenUpdatedAt || ""
+    };
+    await saveApprovedSonoDesktopDevices(
+      supabase,
+      [nextApprovedRecord, ...approvedDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    );
+    return { status: "approved" as const, record: nextApprovedRecord };
+  }
+
+  const blockedRecord = blockedDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (blockedRecord) {
+    return { status: "blocked" as const, record: blockedRecord };
+  }
+
+  const pendingRecord = pendingDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (pendingRecord) {
+    const now = new Date().toISOString();
+    const nextPendingRecord: AndroidDeviceAccessRecord = {
+      ...pendingRecord,
+      deviceName: normalizedDeviceName,
+      updatedAt: now,
+      lastSeenAt: now,
+      lastDepartmentId: "sono_desktop",
+      fcmToken: "",
+      fcmTokenUpdatedAt: pendingRecord.fcmTokenUpdatedAt || ""
+    };
+    await savePendingSonoDesktopDevices(
+      supabase,
+      [nextPendingRecord, ...pendingDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    );
+    return { status: "pending" as const, record: nextPendingRecord };
+  }
+
+  const createdPendingRecord = await requestSonoDesktopDeviceApproval(
+    supabase,
+    normalizedDeviceId,
+    normalizedDeviceName
   );
   return { status: "pending" as const, record: createdPendingRecord };
 }
@@ -11144,6 +11417,102 @@ async function handleTelegramSonoFormSubmit(request: Request) {
   }
 }
 
+async function handleSonoDesktopState(request: Request) {
+  try {
+    const currentUrl = new URL(request.url);
+    const deviceId = sanitizeAndroidDeviceId(currentUrl.searchParams.get("deviceId"));
+    const deviceName = sanitizeAndroidDeviceName(currentUrl.searchParams.get("deviceName")) || "SONO Desktop";
+    if (!deviceId) {
+      return jsonResponse({ ok: false, error: "Device id is required." }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const accessState = await getSonoDesktopDeviceAccessState(supabase, deviceId, deviceName);
+    if (accessState.status === "missing") {
+      return jsonResponse({
+        ok: false,
+        error: "device_required",
+        message: "Устройство не идентифицировано. Переустановите SONO Desktop."
+      }, 400);
+    }
+    if (accessState.status === "blocked") {
+      return jsonResponse({
+        ok: false,
+        error: "access_denied",
+        message: "Доступ для этого компьютера отклонён через Telegram."
+      }, 403);
+    }
+    if (accessState.status !== "approved") {
+      return jsonResponse({
+        ok: false,
+        error: "pending_approval",
+        message: "Запрос доступа уже отправлен в Telegram. После подтверждения нажмите «Проверить снова»."
+      }, 202);
+    }
+
+    return jsonResponse({
+      ok: true,
+      status: "approved",
+      deviceId,
+      deviceName: accessState.record?.deviceName || deviceName,
+      clinics: SONO_CLINICS.map((clinic) => ({
+        id: clinic.id,
+        label: clinic.labelRu,
+        hint: clinic.hintRu
+      })),
+      defaultReportDate: getYerevanDateKey()
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      error: sanitizePublicErrorMessage(error)
+    }, 500);
+  }
+}
+
+async function handleSonoDesktopSubmit(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const deviceId = sanitizeAndroidDeviceId(payload?.deviceId);
+    const deviceName = sanitizeAndroidDeviceName(payload?.deviceName) || "SONO Desktop";
+    if (!deviceId) {
+      return jsonResponse({ ok: false, error: "Device id is required." }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const accessState = await getSonoDesktopDeviceAccessState(supabase, deviceId, deviceName);
+    if (accessState.status === "blocked") {
+      return jsonResponse({ ok: false, error: "Доступ для этого компьютера отклонён через Telegram." }, 403);
+    }
+    if (accessState.status !== "approved") {
+      return jsonResponse({
+        ok: false,
+        error: "Сначала подтвердите этот компьютер в Telegram, потом повторите перевод."
+      }, 403);
+    }
+
+    const prepared = await prepareSonoFormDocument(
+      payload,
+      accessState.record?.deviceName || deviceName
+    );
+
+    return jsonResponse({
+      ok: true,
+      fileName: prepared.fileName,
+      message: prepared.caption,
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      fileBase64: Buffer.from(prepared.translatedDocxBytes).toString("base64"),
+      telegramDelivered: false
+    });
+  } catch (error) {
+    const message = sanitizePublicErrorMessage(error);
+    return jsonResponse({
+      ok: false,
+      error: message
+    }, isSonoFormValidationErrorMessage(message) ? 400 : 500);
+  }
+}
+
 function runTelegramBackgroundTask(task: Promise<unknown>, label: string) {
   const guardedTask = task.catch((error) => {
     console.error(`${label} failed:`, sanitizePublicErrorMessage(error));
@@ -12226,6 +12595,40 @@ async function handleTelegramCallbackQuery(
         ).catch(() => null);
       }
       console.error("Failed to apply night shift from Telegram callback:", sanitizePublicErrorMessage(error));
+    }
+    return;
+  }
+
+  const sonoDesktopDeviceMatch = data.match(/^(approve_sono_desktop_device|reject_sono_desktop_device):(.+)$/);
+  if (sonoDesktopDeviceMatch) {
+    const action = sonoDesktopDeviceMatch[1];
+    const targetDeviceId = sanitizeAndroidDeviceId(sonoDesktopDeviceMatch[2]);
+    if (!targetDeviceId) {
+      await answerTelegramCallbackQuery(callbackQueryId, "Սարքի նույնականացուցիչը չի գտնվել։").catch(() => null);
+      return;
+    }
+
+    if (action === "approve_sono_desktop_device") {
+      const device = await approveSonoDesktopDevice(supabase, targetDeviceId);
+      await answerTelegramCallbackQuery(callbackQueryId, "SONO Desktop հաստատված է։").catch(() => null);
+      if (callbackMessageChatId !== null) {
+        await clearTelegramInlineKeyboard(callbackMessageChatId, callbackMessageId).catch(() => null);
+        await sendTelegramMessage(
+          callbackMessageChatId,
+          `SONO Desktop հաստատված է: ${getSonoDesktopDeviceDisplayName(device)}.`
+        ).catch(() => null);
+      }
+      return;
+    }
+
+    const device = await rejectSonoDesktopDevice(supabase, targetDeviceId);
+    await answerTelegramCallbackQuery(callbackQueryId, "SONO Desktop մուտքը մերժվեց։").catch(() => null);
+    if (callbackMessageChatId !== null) {
+      await clearTelegramInlineKeyboard(callbackMessageChatId, callbackMessageId).catch(() => null);
+      await sendTelegramMessage(
+        callbackMessageChatId,
+        `SONO Desktop մուտքը մերժվեց: ${getSonoDesktopDeviceDisplayName(device)}.`
+      ).catch(() => null);
     }
     return;
   }
@@ -13506,6 +13909,10 @@ Deno.serve(async (request) => {
       });
     }
 
+    if (action === "sono-desktop-state") {
+      return await handleSonoDesktopState(request);
+    }
+
     if (action === "night-duty-reminder") {
       if (!isTelegramReminderRequestValid(request)) {
         return jsonResponse({ ok: false, error: "Invalid reminder secret." }, 403);
@@ -13848,6 +14255,9 @@ Deno.serve(async (request) => {
   const postUrl = new URL(request.url);
   if (postUrl.searchParams.get("action") === "sono-form-submit") {
     return await handleTelegramSonoFormSubmit(request);
+  }
+  if (postUrl.searchParams.get("action") === "sono-desktop-submit") {
+    return await handleSonoDesktopSubmit(request);
   }
   if (postUrl.searchParams.get("action") === "web-form-submit") {
     return await handleTelegramWebFormSubmit(request);
