@@ -21,6 +21,9 @@ public partial class Form1 : Form
     private const string RemoteDesktopManifestUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/MAINFLOW.Desktop/package-manifest.json";
     private const string RemoteDesktopSetupUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/Mainflow.exe";
     private const string PublishedSiteBaseUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/";
+    private const string QrCodesDirectoryName = "qr-codes";
+    private const string MainPageQrFileName = "main-index.png";
+    private const string SetupPageQrFileName = "setup-sync.png";
     private const int AutoUpdateIntervalMs = 20 * 60 * 1000;
     private const int InitialVisibleUpdateDelayMs = 90 * 1000;
     private const int InitialBackgroundUpdateDelayMs = 15 * 1000;
@@ -55,10 +58,12 @@ public partial class Form1 : Form
     private readonly ToolStripButton _toolStripButtonBackground;
     private readonly ToolStripButton _toolStripButtonAutoStart;
     private readonly ToolStripButton _toolStripButtonOpenBrowser;
+    private readonly ToolStripButton _toolStripButtonShowQr;
     private readonly ContextMenuStrip _trayMenu;
     private readonly NotifyIcon _trayIcon;
     private readonly ToolStripMenuItem _trayMenuOpen;
     private readonly ToolStripMenuItem _trayMenuOpenBrowser;
+    private readonly ToolStripMenuItem _trayMenuShowQr;
     private readonly ToolStripMenuItem _trayMenuSync;
     private readonly ToolStripMenuItem _trayMenuAutoStart;
     private readonly ToolStripMenuItem _trayMenuExit;
@@ -145,6 +150,13 @@ public partial class Form1 : Form
         };
         _toolStripButtonOpenBrowser.Click += (_, _) => OpenCurrentPageInBrowser();
 
+        _toolStripButtonShowQr = new ToolStripButton("QR Ð²Ñ…Ð¾Ð´")
+        {
+            DisplayStyle = ToolStripItemDisplayStyle.Text,
+            ToolTipText = "ÐŸÐ¾ÐºÐ°Ð·Ð°Ñ‚ÑŒ QR-ÐºÐ¾Ð´ Ð´Ð»Ñ Ð²Ñ…Ð¾Ð´Ð° Ñ Ñ‚ÐµÐ»ÐµÑ„Ð¾Ð½Ð°"
+        };
+        _toolStripButtonShowQr.Click += (_, _) => ShowMobileQrCode();
+
         var syncQueueIndex = topToolStrip.Items.IndexOf(toolStripButtonSyncQueue);
         if (syncQueueIndex >= 0)
         {
@@ -161,10 +173,12 @@ public partial class Form1 : Form
         if (openDataFolderIndex >= 0)
         {
             topToolStrip.Items.Insert(openDataFolderIndex + 1, _toolStripButtonOpenBrowser);
+            topToolStrip.Items.Insert(openDataFolderIndex + 2, _toolStripButtonShowQr);
         }
         else
         {
             topToolStrip.Items.Add(_toolStripButtonOpenBrowser);
+            topToolStrip.Items.Add(_toolStripButtonShowQr);
         }
 
         _trayMenu = new ContextMenuStrip(components);
@@ -191,6 +205,9 @@ public partial class Form1 : Form
         _trayMenuOpenBrowser = new ToolStripMenuItem("Сайт в браузере");
         _trayMenuOpenBrowser.Click += (_, _) => OpenCurrentPageInBrowser();
         _trayMenu.Items.Insert(1, _trayMenuOpenBrowser);
+        _trayMenuShowQr = new ToolStripMenuItem("QR Ð²Ñ…Ð¾Ð´");
+        _trayMenuShowQr.Click += (_, _) => ShowMobileQrCode();
+        _trayMenu.Items.Insert(2, _trayMenuShowQr);
 
         _trayIcon = new NotifyIcon(components)
         {
@@ -939,6 +956,227 @@ public partial class Form1 : Form
         }
     }
 
+    private QrDisplayPayload BuildQrDisplayPayload()
+    {
+        var normalizedRelativePage = NormalizeRelativePage(_currentRelativePage);
+        var title = _pageTitles.TryGetValue(normalizedRelativePage, out var pageTitle)
+            ? pageTitle
+            : "Ð¢ÐµÐºÑƒÑ‰Ð°Ñ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð°";
+        var publishedUri = BuildPublishedSiteUri(normalizedRelativePage);
+        var qrCodesRoot = Path.Combine(_webRootPath, QrCodesDirectoryName);
+
+        string qrFileName;
+        var isFallback = false;
+
+        if (string.Equals(normalizedRelativePage, "setup.html", StringComparison.OrdinalIgnoreCase))
+        {
+            qrFileName = SetupPageQrFileName;
+        }
+        else if (string.Equals(normalizedRelativePage, DefaultRelativePage, StringComparison.OrdinalIgnoreCase))
+        {
+            qrFileName = MainPageQrFileName;
+        }
+        else
+        {
+            var slugFileName = $"{Path.GetFileNameWithoutExtension(normalizedRelativePage)}.png";
+            var slugPath = Path.Combine(qrCodesRoot, slugFileName);
+            if (File.Exists(slugPath))
+            {
+                qrFileName = slugFileName;
+            }
+            else
+            {
+                qrFileName = MainPageQrFileName;
+                publishedUri = BuildPublishedSiteUri(DefaultRelativePage);
+                title = "Ð“Ð»Ð°Ð²Ð½Ð°Ñ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð°";
+                isFallback = true;
+            }
+        }
+
+        return new QrDisplayPayload(
+            title,
+            publishedUri.AbsoluteUri,
+            Path.Combine(qrCodesRoot, qrFileName),
+            isFallback
+                ? "Ð”Ð»Ñ Ñ‚ÐµÐºÑƒÑ‰ÐµÐ¹ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ð¹ QR Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½, Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½ Ð²Ñ…Ð¾Ð´ Ð½Ð° Ð³Ð»Ð°Ð²Ð½ÑƒÑŽ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñƒ ÑÐ°Ð¹Ñ‚Ð°."
+                : "Ð¡ÐºÐ°Ð½Ð¸Ñ€ÑƒÐ¹Ñ‚Ðµ QR-ÐºÐ¾Ð´ Ñ‚ÐµÐ»ÐµÑ„Ð¾Ð½Ð¾Ð¼, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÑ‚Ñƒ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñƒ ÑÐ°Ð¹Ñ‚Ð° Ð½Ð° Ð¼Ð¾Ð±Ð¸Ð»ÑŒÐ½Ð¾Ð¼ ÑƒÑÑ‚Ñ€Ð¾Ð¹ÑÑ‚Ð²Ðµ."
+        );
+    }
+
+    private static Image LoadQrImage(string imagePath)
+    {
+        var imageBytes = File.ReadAllBytes(imagePath);
+        using var memory = new MemoryStream(imageBytes);
+        using var sourceImage = Image.FromStream(memory);
+        return new Bitmap(sourceImage);
+    }
+
+    private void ShowMobileQrCode()
+    {
+        try
+        {
+            var payload = BuildQrDisplayPayload();
+            if (!File.Exists(payload.ImagePath))
+            {
+                throw new FileNotFoundException("ÐÐµ Ð½Ð°Ð¹Ð´ÐµÐ½ Ñ„Ð°Ð¹Ð» QR-ÐºÐ¾Ð´Ð°.", payload.ImagePath);
+            }
+
+            var qrImage = LoadQrImage(payload.ImagePath);
+            using var dialog = new Form
+            {
+                Text = $"QR Ð²Ñ…Ð¾Ð´ â€¢ {payload.Title}",
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ClientSize = new Size(430, 560),
+                BackColor = Color.FromArgb(252, 248, 240)
+            };
+
+            var titleLabel = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 62,
+                Padding = new Padding(18, 18, 18, 6),
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                Text = payload.Title
+            };
+
+            var descriptionLabel = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 78,
+                Padding = new Padding(18, 0, 18, 8),
+                ForeColor = Color.FromArgb(86, 76, 61),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
+                Text = payload.Description
+            };
+
+            var pictureBox = new PictureBox
+            {
+                Dock = DockStyle.Top,
+                Height = 270,
+                Margin = new Padding(0),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Image = qrImage
+            };
+
+            var urlBox = new TextBox
+            {
+                Dock = DockStyle.Top,
+                Margin = new Padding(18, 0, 18, 0),
+                ReadOnly = true,
+                BorderStyle = BorderStyle.FixedSingle,
+                Text = payload.Url
+            };
+
+            var urlPanel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 46,
+                Padding = new Padding(18, 0, 18, 0)
+            };
+            urlPanel.Controls.Add(urlBox);
+
+            var buttonsPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 64,
+                FlowDirection = FlowDirection.RightToLeft,
+                Padding = new Padding(18, 12, 18, 14),
+                WrapContents = false
+            };
+
+            var closeButton = new Button
+            {
+                AutoSize = true,
+                Text = "Ð—Ð°ÐºÑ€Ñ‹Ñ‚ÑŒ"
+            };
+            closeButton.Click += (_, _) => dialog.Close();
+
+            var openSiteButton = new Button
+            {
+                AutoSize = true,
+                Text = "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÐ°Ð¹Ñ‚"
+            };
+            openSiteButton.Click += (_, _) =>
+            {
+                try
+                {
+                    var started = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = payload.Url,
+                        UseShellExecute = true
+                    });
+
+                    if (started is null)
+                    {
+                        throw new InvalidOperationException("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð¿ÑƒÑÑ‚Ð¸Ñ‚ÑŒ Ð±Ñ€Ð°ÑƒÐ·ÐµÑ€.");
+                    }
+                }
+                catch (Exception error)
+                {
+                    MessageBox.Show(
+                        dialog,
+                        $"ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ.\n\n{error.Message}",
+                        "Mainflow Desktop",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                }
+            };
+
+            var copyLinkButton = new Button
+            {
+                AutoSize = true,
+                Text = "ÐšÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ"
+            };
+            copyLinkButton.Click += (_, _) =>
+            {
+                try
+                {
+                    Clipboard.SetText(payload.Url);
+                    ShowTrayBalloon("QR-ÑÑÑ‹Ð»ÐºÐ°", "Ð¡ÑÑ‹Ð»ÐºÐ° Ð´Ð»Ñ Ð²Ñ…Ð¾Ð´Ð° ÑÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð° Ð² Ð±ÑƒÑ„ÐµÑ€ Ð¾Ð±Ð¼ÐµÐ½Ð°.");
+                }
+                catch (Exception error)
+                {
+                    MessageBox.Show(
+                        dialog,
+                        $"ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐºÐ¾Ð¿Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ.\n\n{error.Message}",
+                        "Mainflow Desktop",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                }
+            };
+
+            buttonsPanel.Controls.Add(closeButton);
+            buttonsPanel.Controls.Add(openSiteButton);
+            buttonsPanel.Controls.Add(copyLinkButton);
+
+            dialog.Controls.Add(buttonsPanel);
+            dialog.Controls.Add(urlPanel);
+            dialog.Controls.Add(pictureBox);
+            dialog.Controls.Add(descriptionLabel);
+            dialog.Controls.Add(titleLabel);
+            dialog.FormClosed += (_, _) =>
+            {
+                pictureBox.Image?.Dispose();
+            };
+            dialog.ShowDialog(this);
+        }
+        catch (Exception error)
+        {
+            MessageBox.Show(
+                this,
+                $"ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¿Ð¾ÐºÐ°Ð·Ð°Ñ‚ÑŒ QR-ÐºÐ¾Ð´ Ð´Ð»Ñ Ð¼Ð¾Ð±Ð¸Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð²Ñ…Ð¾Ð´Ð°.\n\n{error.Message}",
+                "Mainflow Desktop",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+        }
+    }
+
     private void OpenDataFolder()
     {
         try
@@ -1400,6 +1638,7 @@ public partial class Form1 : Form
         public static DesktopShellState Default { get; } = new();
     }
 
+    private sealed record QrDisplayPayload(string Title, string Url, string ImagePath, string Description);
     private sealed record PendingSyncCommandResult(bool Ok, int SyncedCount, int RemainingCount, string Error);
     private sealed record PendingSyncStatusResult(bool HasPending, int Count, bool IsSyncing);
     private sealed record DesktopUpdateBlockersResult(bool HasBlockingWork, bool HasBlockingUiWork, bool HasPendingSync, int PendingCount, bool IsSyncing);
