@@ -7774,10 +7774,10 @@ function collectWordParagraphText(paragraph: Element) {
       }
     }
 
-    Array.from(node.childNodes).forEach(walk);
+    Array.from(node.childNodes || []).forEach(walk);
   };
 
-  Array.from(paragraph.childNodes).forEach(walk);
+  Array.from(paragraph.childNodes || []).forEach(walk);
   return chunks.join("");
 }
 
