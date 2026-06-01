@@ -8,6 +8,7 @@ on:
       - "supabase/functions/sharsh-sync/**"
       - "supabase/functions/Mainflow-telegram/**"
       - "supabase/config.toml"
+      - ".github/workflows/supabase-functions.yml"
   workflow_dispatch:
 
 jobs:
@@ -25,11 +26,19 @@ jobs:
         run: |
           echo "SUPABASE_ACCESS_TOKEN secret is not configured for this repository."
 
-      - name: Setup Supabase CLI
+      - name: Setup Node.js
         if: env.SUPABASE_ACCESS_TOKEN != ''
-        uses: supabase/setup-cli@v1
+        uses: actions/setup-node@v4
         with:
-          version: latest
+          node-version: 22
+
+      - name: Install Supabase CLI
+        if: env.SUPABASE_ACCESS_TOKEN != ''
+        run: npm install --global supabase@latest
+
+      - name: Verify Supabase CLI
+        if: env.SUPABASE_ACCESS_TOKEN != ''
+        run: supabase --version
 
       - name: Deploy sharsh-sync
         if: env.SUPABASE_ACCESS_TOKEN != ''
