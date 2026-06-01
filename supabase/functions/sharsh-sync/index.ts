@@ -1865,7 +1865,7 @@ async function loadSnapshot(supabase: ReturnType<typeof createClient>) {
 }
 
 function buildSnapshotFromArchivePayload(snapshot: Record<string, unknown> | null | undefined) {
-  const normalized = snapshot && typeof snapshot === "object" ? snapshot : {};
+  const normalized = coerceArchiveSnapshotObject(snapshot) || {};
   const rows = Array.isArray(normalized.rows) ? normalized.rows : [];
   const rowMap = new Map(rows
     .filter((row) => row && typeof row === "object" && typeof (row as { id?: unknown }).id === "string")
@@ -1900,13 +1900,27 @@ function buildSnapshotFromArchivePayload(snapshot: Record<string, unknown> | nul
   };
 }
 
+function coerceArchiveSnapshotObject(value: unknown) {
+  if (value && typeof value === "object") {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object"
+        ? parsed as Record<string, unknown>
+        : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+  return null;
+}
+
 function readMainArchiveStoredPdfMeta(snapshot: Record<string, unknown> | null | undefined) {
-  const source = snapshot
-    && typeof snapshot === "object"
-    && snapshot[MAIN_ARCHIVE_SNAPSHOT_META_KEY]
-    && typeof snapshot[MAIN_ARCHIVE_SNAPSHOT_META_KEY] === "object"
-      ? snapshot[MAIN_ARCHIVE_SNAPSHOT_META_KEY] as Record<string, unknown>
-      : null;
+  const normalizedSnapshot = coerceArchiveSnapshotObject(snapshot);
+  const rawSource = normalizedSnapshot?.[MAIN_ARCHIVE_SNAPSHOT_META_KEY];
+  const source = coerceArchiveSnapshotObject(rawSource);
 
   if (!source) {
     return null;
