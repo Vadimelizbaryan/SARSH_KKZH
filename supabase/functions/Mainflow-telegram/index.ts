@@ -9123,6 +9123,13 @@ async function uploadMainArchivePdf(
     .split("/")
     .map((part) => encodeURIComponent(part))
     .join("/")}`;
+  const uploadBytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const bodyStream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(uploadBytes);
+      controller.close();
+    }
+  });
   const response = await fetch(uploadUrl, {
     method: "POST",
     headers: {
@@ -9132,7 +9139,8 @@ async function uploadMainArchivePdf(
       "cache-control": "max-age=3600",
       "content-type": "application/pdf"
     },
-    body: bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+    body: bodyStream,
+    duplex: "half"
   });
 
   if (!response.ok) {
