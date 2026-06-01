@@ -9042,8 +9042,20 @@ function withMainArchiveStoredPdfMeta(
   };
 }
 
-function buildMainArchiveStoragePath(dateKey: string, fileName = buildMainArchivePdfFileName(dateKey)) {
-  return `${dateKey}/${fileName}`;
+function buildMainArchiveStorageVersionTag(value: string) {
+  const normalized = String(value || "")
+    .replace(/[^0-9A-Za-z]+/g, "")
+    .trim();
+  return normalized || String(Date.now());
+}
+
+function buildMainArchiveStoragePath(
+  dateKey: string,
+  fileName = buildMainArchivePdfFileName(dateKey),
+  versionTag = ""
+) {
+  const normalizedVersionTag = buildMainArchiveStorageVersionTag(versionTag || Date.now().toString());
+  return `${dateKey}/${normalizedVersionTag}/${fileName}`;
 }
 
 async function ensureMainArchiveStorageBucket(_supabase: ReturnType<typeof createClient>) {
@@ -9124,7 +9136,8 @@ async function loadStoredMainArchivePdfMeta(
 async function uploadMainArchivePdf(
   supabase: ReturnType<typeof createClient>,
   dateKey: string,
-  bytes: Uint8Array
+  bytes: Uint8Array,
+  options: { generatedAt?: string } = {}
 ) {
   try {
     await ensureMainArchiveStorageBucket(supabase);
@@ -9137,7 +9150,11 @@ async function uploadMainArchivePdf(
     throw new Error("Supabase environment variables are missing.");
   }
   const fileName = buildMainArchivePdfFileName(dateKey);
-  const storagePath = buildMainArchiveStoragePath(dateKey, fileName);
+  const storagePath = buildMainArchiveStoragePath(
+    dateKey,
+    fileName,
+    options.generatedAt || new Date().toISOString()
+  );
   const uploadUrl = `${supabaseUrl}/storage/v1/object/${MAIN_ARCHIVE_STORAGE_BUCKET}/${storagePath
     .split("/")
     .map((part) => encodeURIComponent(part))
@@ -9157,7 +9174,7 @@ async function uploadMainArchivePdf(
         Authorization: `Bearer ${serviceRoleKey}`,
         apikey: serviceRoleKey,
         "x-upsert": "true",
-        "cache-control": "max-age=3600",
+        "cache-control": "no-store",
         "content-type": "application/pdf"
       },
       body: bodyStream,
@@ -9197,6 +9214,19 @@ async function downloadStoredMainArchivePdfBytes(
   }
 
   return new Uint8Array(await data.arrayBuffer());
+}
+
+async function deleteStoredMainArchivePdf(
+  supabase: ReturnType<typeof createClient>,
+  storedPdf: Pick<MainArchiveStoredPdfMeta, "storageBucket" | "storagePath">
+) {
+  const { error } = await supabase.storage
+    .from(storedPdf.storageBucket)
+    .remove([storedPdf.storagePath]);
+
+  if (error) {
+    throw error;
+  }
 }
 
 function rowMatchesArchiveDateKey(row: Record<string, unknown>, dateKey: string) {
@@ -9660,7 +9690,9 @@ async function persistDailyMainArchivePdf(
     : await (async () => {
         try {
           const pdfBytes = await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey);
-          return await uploadMainArchivePdf(supabase, dateKey, pdfBytes);
+          return await uploadMainArchivePdf(supabase, dateKey, pdfBytes, {
+            generatedAt
+          });
         } catch (error) {
           throw new Error(`Failed to create and upload the daily archive PDF: ${getErrorText(error)}`);
         }
@@ -9698,6 +9730,14 @@ async function persistDailyMainArchivePdf(
     await saveStoredMainArchiveRecord(supabase, dateKey, snapshot, finalStoredMeta);
   } catch (error) {
     throw new Error(`Failed to save the final daily archive record: ${getErrorText(error)}`);
+  }
+
+  if (existingStored?.storagePath && existingStored.storagePath !== finalStoredMeta.storagePath) {
+    try {
+      await deleteStoredMainArchivePdf(supabase, existingStored);
+    } catch (error) {
+      console.warn("Failed to remove previous stored archive PDF:", getErrorText(error));
+    }
   }
 
   return {
