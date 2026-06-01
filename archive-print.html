@@ -1,17 +1,76 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Archive SARSH_KKZH</title>
-  <link rel="stylesheet" href="assets/sharsh.css?v=20260528maincollapsepub1">
-  <script defer src="assets/sharsh-runtime-config.js?v=20260513h"></script>
-  <script defer src="assets/sharsh-config.js?v=20260513h"></script>
-  <script defer src="assets/sharsh-sync.js?v=20260601mainarchivebtn1"></script>
-  <script defer src="assets/sharsh-app.js?v=20260601mainarchivebtn1"></script>
+  <title>Архив отключен</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f2e7;
+      --card: #fffdf7;
+      --border: #d7c9ab;
+      --text: #1f2b28;
+      --muted: #6d756b;
+      --accent: #1f7a5a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(212, 178, 102, 0.22), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(78, 134, 120, 0.18), transparent 24%),
+        var(--bg);
+      font: 16px/1.5 "Segoe UI", Tahoma, sans-serif;
+      color: var(--text);
+    }
+
+    .card {
+      width: min(720px, 100%);
+      padding: 32px;
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      box-shadow: 0 22px 50px rgba(74, 61, 33, 0.12);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(32px, 5vw, 44px);
+      line-height: 1.05;
+    }
+
+    p {
+      margin: 0 0 10px;
+      color: var(--muted);
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 18px;
+      padding: 12px 18px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+    }
+  </style>
 </head>
-<body data-view="archive" data-base-path=".">
-  <div id="app"></div>
+<body>
+  <main class="card">
+    <h1>Архив отключен</h1>
+    <p>Архивные PDF-функции удалены из сайта и desktop-версии, чтобы не нагружать проект и сервер.</p>
+    <p>Для работы используйте текущие данные на главной странице.</p>
+    <a href="./index.html">Вернуться на главную</a>
+  </main>
 </body>
 </html>
-

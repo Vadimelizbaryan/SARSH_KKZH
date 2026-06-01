@@ -13537,127 +13537,15 @@ Deno.serve(async (request) => {
     }
 
     if (action === "telegram-form-archive-pdf") {
-      try {
-        const currentUrl = new URL(request.url);
-        const dateKey = normalizeTelegramFormArchiveDateKey(currentUrl.searchParams.get("date") || "");
-        if (!dateKey) {
-          return jsonResponse({ ok: false, error: "Archive date is required." }, 400);
-        }
-
-        const formsOnlyRaw = (currentUrl.searchParams.get("formsOnly") || "").trim().toLowerCase();
-        const formsOnly = formsOnlyRaw === "1" || formsOnlyRaw === "true" || formsOnlyRaw === "yes";
-        const supabase = createSupabaseAdmin();
-        if (!formsOnly) {
-          const snapshot = await loadSnapshot(supabase);
-          const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
-          const archivePdf = await buildOrLoadMainArchivePdfResult(
-            supabase,
-            snapshot,
-            snapshotReportDate,
-            dateKey
-          );
-          return buildPdfBytesResponse(
-            archivePdf.bytes,
-            archivePdf.fileName
-          );
-        }
-
-        const records = await loadTelegramWebFormArchiveRecordsForDate(supabase, dateKey);
-        if (!records.length) {
-          const snapshot = await loadSnapshot(supabase);
-          const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
-          const archivePdf = await buildOrLoadMainArchivePdfResult(
-            supabase,
-            snapshot,
-            snapshotReportDate,
-            dateKey
-          );
-          return buildPdfBytesResponse(
-            archivePdf.bytes,
-            archivePdf.fileName
-          );
-        }
-
-        const pdfBytes = await buildTelegramWebFormArchiveDatePdfBytes(records);
-        return buildPdfBytesResponse(
-          pdfBytes,
-          `Telegram_forms_${dateKey}.pdf`
-        );
-      } catch (error) {
-        return jsonResponse({
-          ok: false,
-          service: "Mainflow-telegram",
-          status: "telegram_form_archive_pdf_failed",
-          error: getErrorText(error)
-        }, 500);
-      }
+      return jsonResponse({ ok: false, error: "Archive feature is disabled." }, 410);
     }
 
     if (action === "main-archive-pdf") {
-      try {
-        const currentUrl = new URL(request.url);
-        const supabase = createSupabaseAdmin();
-        const snapshot = await loadSnapshot(supabase);
-        const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
-        const requestedDate = (currentUrl.searchParams.get("date") || "").trim();
-        const downloadRaw = (currentUrl.searchParams.get("download") || "").trim().toLowerCase();
-        const shouldDownload = downloadRaw === "1" || downloadRaw === "true" || downloadRaw === "yes";
-        const dateKey = normalizeTelegramFormArchiveDateKey(requestedDate || snapshotReportDate) || getYerevanDateKey();
-        const archivePdf = await buildOrLoadMainArchivePdfResult(
-          supabase,
-          snapshot,
-          snapshotReportDate,
-          dateKey
-        );
-        return buildPdfBytesResponse(
-          archivePdf.bytes,
-          archivePdf.fileName,
-          { download: shouldDownload }
-        );
-      } catch (error) {
-        return jsonResponse({
-          ok: false,
-          service: "Mainflow-telegram",
-          status: "main_archive_pdf_failed",
-          error: getErrorText(error)
-        }, 500);
-      }
+      return jsonResponse({ ok: false, error: "Archive feature is disabled." }, 410);
     }
 
     if (action === "daily-main-archive") {
-      if (!isTelegramReminderRequestValid(request)) {
-        return jsonResponse({ ok: false, error: "Unauthorized." }, 403);
-      }
-
-      try {
-        const currentUrl = new URL(request.url);
-        const forceRaw = (currentUrl.searchParams.get("force") || "").trim().toLowerCase();
-        const requestedDateKey = normalizeTelegramFormArchiveDateKey(currentUrl.searchParams.get("date") || "");
-        const force = forceRaw === "1" || forceRaw === "true" || forceRaw === "yes";
-        const supabase = createSupabaseAdmin();
-        const result = await persistDailyMainArchivePdf(supabase, {
-          requestedDateKey,
-          force
-        });
-        return jsonResponse({
-          ok: true,
-          service: "Mainflow-telegram",
-          status: result.skipped ? "daily_main_archive_already_ready" : "daily_main_archive_saved",
-          archiveKey: result.archiveKey,
-          reportDate: result.reportDate,
-          deletedFeedbackCount: result.deletedFeedbackCount,
-          fileName: result.storedPdf.fileName,
-          storagePath: result.storedPdf.storagePath,
-          skipped: result.skipped
-        });
-      } catch (error) {
-        return jsonResponse({
-          ok: false,
-          service: "Mainflow-telegram",
-          status: "daily_main_archive_failed",
-          error: getErrorText(error)
-        }, 500);
-      }
+      return jsonResponse({ ok: false, error: "Archive feature is disabled." }, 410);
     }
 
     if (action === "feedback-photo") {

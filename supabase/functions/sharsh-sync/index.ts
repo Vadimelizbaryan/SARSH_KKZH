@@ -2796,24 +2796,11 @@ Deno.serve(async (request) => {
       const currentUrl = new URL(request.url);
       const action = (currentUrl.searchParams.get("action") || "").trim();
       if (action === "main-archive-record") {
-        const archiveKey = (currentUrl.searchParams.get("archiveKey") || "").trim();
-        if (!archiveKey) {
-          return jsonResponse({ error: "Archive key is required." }, 400);
-        }
-
-        const archiveRecord = await loadMainArchiveRecord(supabase, archiveKey);
-        if (!archiveRecord) {
-          return jsonResponse({ error: "Archive record not found." }, 404);
-        }
-
-        return jsonResponse(archiveRecord);
+        return jsonResponse({ error: "Archive feature is disabled." }, 410);
       }
 
       if (action === "main-archive-list") {
-        const limit = Number(currentUrl.searchParams.get("limit") || 120);
-        return jsonResponse({
-          records: await listMainArchiveRecords(supabase, limit)
-        });
+        return jsonResponse({ error: "Archive feature is disabled." }, 410);
       }
 
       return jsonResponse(await loadSnapshot(supabase));
@@ -2975,15 +2962,7 @@ Deno.serve(async (request) => {
     }
 
     if (type === "save_main_archive_pdf") {
-      const requestedDateKey = typeof payload?.dateKey === "string"
-        ? payload.dateKey
-        : "";
-      return jsonResponse(
-        await saveMainArchivePdfFromSync({
-          requestedDateKey,
-          force: Boolean(payload?.force)
-        })
-      );
+      return jsonResponse({ error: "Archive feature is disabled." }, 410);
     }
 
     if (type === "save_ocr_feedback") {
@@ -3123,87 +3102,7 @@ Deno.serve(async (request) => {
     }
 
     if (type === "rollover_main_after_archive") {
-      const archiveKey = typeof payload.archiveKey === "string" ? payload.archiveKey.trim() : "";
-      if (!archiveKey) {
-        return jsonResponse({ error: "Archive key is required." }, 400);
-      }
-
-      const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()
-        ? payload.reportDate.trim()
-        : DEFAULT_DATE;
-
-      const { data: rolloverMeta, error: rolloverMetaError } = await supabase
-        .from("sharsh_report_meta")
-        .select("report_date, updated_at")
-        .eq("report_key", MORNING_ROLLOVER_META_KEY)
-        .maybeSingle();
-
-      if (rolloverMetaError) {
-        throw rolloverMetaError;
-      }
-
-      const existingArchiveRecord = await loadMainArchiveRecord(supabase, archiveKey);
-
-      if (rolloverMeta?.report_date === archiveKey) {
-        return jsonResponse({
-          ...await loadSnapshot(supabase),
-          archiveRecord: existingArchiveRecord,
-          rolloverApplied: false,
-          rolloverAlreadyApplied: true
-        });
-      }
-
-      const snapshot = await loadSnapshot(supabase);
-      const archiveRecord = existingArchiveRecord || await saveMainArchiveRecord(supabase, archiveKey, snapshot);
-      const now = new Date().toISOString();
-      const updates = snapshot.rows.map((row) => {
-        const departmentMeta = DEPARTMENTS[row.id as keyof typeof DEPARTMENTS];
-        return {
-          department_id: row.id,
-          department_name: departmentMeta.department,
-          department_group: departmentMeta.group,
-          values: applyMorningRolloverValues(row.id, row.values),
-          updated_at: now,
-          photo_workflow_status: "processed_rollover",
-          photo_feedback_id: null,
-          photo_feedback_updated_at: null,
-          photo_name: null
-        };
-      });
-
-      const { error: rowsError } = await supabase
-        .from("sharsh_departments")
-        .upsert(updates);
-
-      if (rowsError) {
-        throw rowsError;
-      }
-
-      const { error: metaError } = await supabase
-        .from("sharsh_report_meta")
-        .upsert([
-          {
-            report_key: "main",
-            report_date: reportDate,
-            updated_at: now
-          },
-          {
-            report_key: MORNING_ROLLOVER_META_KEY,
-            report_date: archiveKey,
-            updated_at: now
-          }
-        ]);
-
-      if (metaError) {
-        throw metaError;
-      }
-
-      return jsonResponse({
-        ...await loadSnapshot(supabase),
-        archiveRecord,
-        rolloverApplied: true,
-        rolloverAlreadyApplied: false
-      });
+      return jsonResponse({ error: "Archive feature is disabled." }, 410);
     }
 
     if (type === "apply_night_shift") {

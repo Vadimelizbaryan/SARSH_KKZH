@@ -1533,6 +1533,10 @@ public partial class Form1 : Form
         }
 
         var pathOnly = GetRelativePagePathOnly(normalized);
+        if (string.Equals(pathOnly, "archive-print.html", StringComparison.OrdinalIgnoreCase))
+        {
+            return DefaultRelativePage;
+        }
         var query = SanitizeRelativePageQuery(GetRelativePageQuery(normalized));
         var rebuilt = string.IsNullOrWhiteSpace(query)
             ? pathOnly

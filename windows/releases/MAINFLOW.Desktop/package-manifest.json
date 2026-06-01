@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-06-01T17:41:31.6515944Z",
+    "generatedAtUtc":  "2026-06-01T21:12:17.8903541Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -8,33 +8,33 @@
                   },
                   {
                       "path":  "android-intake.html",
-                      "size":  642,
-                      "sha256":  "246551C518F7844B155C6D457FFB69C766BB4CDFC4987F396296D75F4D6C2034"
+                      "size":  658,
+                      "sha256":  "600A14436B562B7EDE02A1C1EA4D1082DAFBDE99D977BDD87B5CBD7D5AFF5CF5"
                   },
                   {
                       "path":  "archive-print.html",
-                      "size":  665,
-                      "sha256":  "D7B847A374EB348419AA7A58A505B30A551B33FAE4B35C09D8D4472355F2BA06"
+                      "size":  667,
+                      "sha256":  "ECB6CC8A981D6B20B7E97A32079BB1104713653BC0FF1D26996D4FEF975F1FF1"
                   },
                   {
                       "path":  "assets/android-intake.css",
-                      "size":  4669,
-                      "sha256":  "E8810C128BC15366D6667C1702B633DFD71358672081777C26A6816608A8CE72"
+                      "size":  4950,
+                      "sha256":  "EC058CA103EF0633A101E7D4F562C3FF2EAE84FD5B5062900235807271A11942"
                   },
                   {
                       "path":  "assets/android-intake.js",
-                      "size":  21235,
-                      "sha256":  "E01F9BA15EF73AD43E931D985CFD5F31EAAEC97D0ADFBD9B8D5A3DB558E884FC"
+                      "size":  21809,
+                      "sha256":  "06BB0045034BC4EBDC8CEBDA805648A464E38F46AB43401691F96098EDA56579"
                   },
                   {
                       "path":  "assets/civil-referrals.js",
-                      "size":  47581,
-                      "sha256":  "45FAF0BE98D67B8EA33002EB1931DE2BB4DBB1AB69F26168DA3B5E0DD0633FE5"
+                      "size":  48864,
+                      "sha256":  "452299C5B6A056DB183DB06713FC8D65A63C6331A9563AC5457ADD70008F6962"
                   },
                   {
                       "path":  "assets/night-shift.js",
-                      "size":  13205,
-                      "sha256":  "559FD8DA823E18C2360B19F3FD50586DCEC470084159E9152EEE01D72D617BBC"
+                      "size":  13577,
+                      "sha256":  "E1909792708D0C784D684FA6BE80016AD56DE925C71604C5071BC374449CBEF5"
                   },
                   {
                       "path":  "assets/ocr-template-blank.jpg",
@@ -43,48 +43,48 @@
                   },
                   {
                       "path":  "assets/sharsh.css",
-                      "size":  90248,
-                      "sha256":  "A8787B125B868C04DCCCB51F733E364C38FE9B9524D66DF64469C1473BFB2211"
+                      "size":  92418,
+                      "sha256":  "8CDC2AAF6728CF37260EBD60DD0AFABE8149AB6DA2E7AF0FB77AB1F827B5F620"
                   },
                   {
                       "path":  "assets/sharsh-app.js",
-                      "size":  670187,
-                      "sha256":  "96C49E817C977E8B3F39414A45F60067934AE39E307CEEE1BC652EF5A51D29E7"
+                      "size":  671822,
+                      "sha256":  "095ACE43D82651D7DF1494335552DF3E0A5A42ADB8E228EF4712F979973B079C"
                   },
                   {
                       "path":  "assets/sharsh-auth.js",
-                      "size":  11406,
-                      "sha256":  "446F93C1AEAF619F3240B67C3D01CB4F7801E6989874D647141C7F782FC3E315"
+                      "size":  11738,
+                      "sha256":  "CFFE58E3FD92B36A1892516CAD8DA55C1000C05CA10373FD02B9869AD686958F"
                   },
                   {
                       "path":  "assets/sharsh-config.js",
-                      "size":  18666,
-                      "sha256":  "F279DD5F7061EC2FA1151E43A44A7F8A7326EB524819AC64ED0A20AD9D0134CA"
+                      "size":  19299,
+                      "sha256":  "F2E764C1CF0066C8FF239535699BE6C4085ABAE3D95D498B7965341EEC495E15"
                   },
                   {
                       "path":  "assets/sharsh-runtime-config.js",
-                      "size":  8148,
-                      "sha256":  "A078F6B1187C2DAEA22204B283A95FB7F0C43BC637970F00A5BCA699115B4671"
+                      "size":  8383,
+                      "sha256":  "109CA9166C2404A06C02A160A25D933472A4C72217F9A36313E8DAC4EE7E484B"
                   },
                   {
                       "path":  "assets/sharsh-setup.js",
-                      "size":  11751,
-                      "sha256":  "356B7C01191849940820B1466F0A8D99FD5E383C3207BA91330193A33EE6F042"
+                      "size":  11823,
+                      "sha256":  "47177F085137B235174046AF9B166C48541056D7CF11568D4B844134D95434DE"
                   },
                   {
                       "path":  "assets/sharsh-sync.js",
-                      "size":  91266,
-                      "sha256":  "D4A521A944429F507C9972290F340516E70A8786692409A8E3D31E1B8947E9B1"
+                      "size":  91456,
+                      "sha256":  "981B0F7E72EB1A6200DC7B7E02E850283A2A453A5A436A3CAFC489954B8E9A8F"
                   },
                   {
                       "path":  "assets/shift-admissions.js",
-                      "size":  26348,
-                      "sha256":  "360E4AE78F8055DABCC31BC1C87C6A0E5F5383C8E33DEDE95EB9C908DA728405"
+                      "size":  27091,
+                      "sha256":  "07EEC8CE06E49E641BCA2920C73478ADA71936F054E84BA17D22D15C7A52C54E"
                   },
                   {
                       "path":  "assets/sono-desktop.js",
-                      "size":  23114,
-                      "sha256":  "F09DD6091923C34CB144B7AED9A068E53A1A9CB6B9376E46F48E651E75089081"
+                      "size":  23787,
+                      "sha256":  "EDA3A5EB74E3FA5D714DECBB590D4CB3427D3D5133BDD24AB65642E17E222985"
                   },
                   {
                       "path":  "assets/templates/SHARSH_KKZH_template.xlsx",
@@ -103,53 +103,53 @@
                   },
                   {
                       "path":  "assets/tg-civil-referrals.js",
-                      "size":  28647,
-                      "sha256":  "F1B29AF72599B8E5924A339A6B3F266B4CC86DB6076A7D60086AFFBFCD03DB61"
+                      "size":  29434,
+                      "sha256":  "A6FED576301862F696E23B3ABD3289F7C76657A24F9AA6BDA0250EBF27511521"
                   },
                   {
                       "path":  "assets/tg-form.css",
-                      "size":  24381,
-                      "sha256":  "AFF9CA375D19F8F0932F59A0AAEBC17DD4967FC82FF2F7A2D54E5AF54F1A84B2"
+                      "size":  25801,
+                      "sha256":  "25C8FF02814819D56FE0B991CD4C124967C1906B5C8058F3AE8EC9B40CEB4220"
                   },
                   {
                       "path":  "assets/tg-form.js",
-                      "size":  69567,
-                      "sha256":  "20B14B16EB8966FD1161B7B6509FE18F1AA01F692622F396755A894603930BDE"
+                      "size":  69966,
+                      "sha256":  "CD082AAAFDA0A86B5845AE4AD65FB8E775D3B6FEEFFC3E7C4142F6E6B5C5BDA6"
                   },
                   {
                       "path":  "assets/tg-night-form.js",
-                      "size":  9952,
-                      "sha256":  "EA9A87AB320A6FA73AEBCAAF858E02B624A1E2CD227C63C7EB909814B7EBB25E"
+                      "size":  10237,
+                      "sha256":  "7311179EED3C2DE2B017D97603834684A647AA668D2AB886794AE3FBC4BFCB32"
                   },
                   {
                       "path":  "assets/tg-qh-form.js",
-                      "size":  47700,
-                      "sha256":  "52C9643B9C080F6A7B913082CC710546F26D17BB3C55039F3AC9A035CA31DEC0"
+                      "size":  48100,
+                      "sha256":  "B8BEB331C719534AF598A490950BEE40718B67D94BDAA85B36C43C02421A8F0A"
                   },
                   {
                       "path":  "assets/tg-shift-form.js",
-                      "size":  15908,
-                      "sha256":  "B175D7A5C02C4CE6B48C10EB1E5887242AEA7959004FC11A72063B6E8C6374F8"
+                      "size":  16338,
+                      "sha256":  "3D9FEC0FB744F3EB8A0D0B16A192756D4E2174354FF9C4F20FE519457D636C15"
                   },
                   {
                       "path":  "assets/tg-sono-form.css",
-                      "size":  7457,
-                      "sha256":  "38FCFA61CFEBC2AF1CB984A5FB20DEA19F9FFD3F5A1FE69C6C38EF0D5F7A29AB"
+                      "size":  7877,
+                      "sha256":  "1AC9C9B9E619C275FC002647C2E5C091C1C311F8FD838E3698705B665C641267"
                   },
                   {
                       "path":  "assets/tg-sono-form.js",
-                      "size":  14500,
-                      "sha256":  "D91BA649F6DB1279A8B12F8E8E849EFA0C39ED5083C03AB2DA0A811BC14D9762"
+                      "size":  14913,
+                      "sha256":  "111B394C52E1E5F7382E9B195222C16701D02A108668A4CEA4A96B49C6BA755A"
                   },
                   {
                       "path":  "assets/vendor/pdfjs/pdf.mjs",
-                      "size":  817035,
-                      "sha256":  "F36805AA525535F968B9DF66C9925BB1410F71B76F16822A783DD2B2C54C14EE"
+                      "size":  843985,
+                      "sha256":  "8BB1D257676A17F9A66A4D26D58F64B993F5C7654190497B1239F01768EAF896"
                   },
                   {
                       "path":  "assets/vendor/pdfjs/pdf.worker.mjs",
-                      "size":  2161149,
-                      "sha256":  "535304B72E8A4354480292070FFC0574BE1106F571A6C3949768BD46F3923AF6"
+                      "size":  2224281,
+                      "sha256":  "02AF1AA60DB0F36311BD66518FAA5053B2485AAD083BB1772624FFF05ED2C508"
                   },
                   {
                       "path":  "bgej6lyx/08xa44ew.html",
@@ -238,8 +238,8 @@
                   },
                   {
                       "path":  "civil-referrals.html",
-                      "size":  727,
-                      "sha256":  "BEFD435A8A27FC0FE4204C5C3E3482EB9DF000E0C0ADDA90A343A77213F11F25"
+                      "size":  728,
+                      "sha256":  "A90A0D42CAC07BC01A0D7C2039BA60AAB0EE28CB3264645B774D2C06ECB8D79D"
                   },
                   {
                       "path":  "clretwrc.dll",
@@ -278,8 +278,8 @@
                   },
                   {
                       "path":  "day-shift.html",
-                      "size":  576,
-                      "sha256":  "CDC9D077B10D415F6967C76F91DB67FFE229580E03416FCBE230E9CED3A07173"
+                      "size":  596,
+                      "sha256":  "F52987EA1A135BFA36FB47B2211CCDA60AA4871F69E77242D41701F6CF4DACCF"
                   },
                   {
                       "path":  "department-instructions.html",
@@ -293,8 +293,8 @@
                   },
                   {
                       "path":  "department-links.txt",
-                      "size":  1672,
-                      "sha256":  "BE687416FA52D5BC21A29F975905E9FAE67B20E6A81B7686AFA9F097B97A2E96"
+                      "size":  1729,
+                      "sha256":  "32D17DA512FF81A0159DB42EBDE010E8B7B3E00EB65893252267BD1DE2397A88"
                   },
                   {
                       "path":  "DirectWriteForwarder.dll",
@@ -313,8 +313,8 @@
                   },
                   {
                       "path":  "hospital-report.html",
-                      "size":  772,
-                      "sha256":  "B070E548110F27FCD0AFE202E876E303925D677AA6863A8542FAA0026A807C2C"
+                      "size":  773,
+                      "sha256":  "D837503D56F488BB46A221AB7280EF09D130A874FFB957ED3207B5255F2535B8"
                   },
                   {
                       "path":  "hostfxr.dll",
@@ -328,8 +328,8 @@
                   },
                   {
                       "path":  "index.html",
-                      "size":  1074,
-                      "sha256":  "DDD154F729FD06EFB1B264DF340604455DC2902BAEC91C778C61A33DB25F557D"
+                      "size":  1077,
+                      "sha256":  "194808C572E6D0B3FB781D0F202EDAACFFCD926F78DD919B6364EDF70FA328B9"
                   },
                   {
                       "path":  "Mainflow.deps.json",
@@ -338,13 +338,13 @@
                   },
                   {
                       "path":  "Mainflow.dll",
-                      "size":  94208,
-                      "sha256":  "23BB3EFE5B4918C7AE9CD4F8E8FFBD9240A555C81D73761CF6E8208AAEDE8987"
+                      "size":  126464,
+                      "sha256":  "B8C5DE5A138CB8B6A94504FD6F286BE000BC1EF58E15180FB80B14212F9A0959"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "1B793D956871E8A729C123E5660E2DD4BFBEC28BAAC1356D7ECCC63020D59267"
+                      "sha256":  "6458FC0C044E5B218ADEE88AA681A3317B4C50D0915BE3048ABC382E82A718C6"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",
@@ -428,8 +428,8 @@
                   },
                   {
                       "path":  "morning-discharge.html",
-                      "size":  596,
-                      "sha256":  "68D7EB17228C3713C2C496EE1BC933819D971083EFEB56E504494655082AF393"
+                      "size":  616,
+                      "sha256":  "4143A6CB1A263A281EB66F79F197A2A85B5BC986AE77215C0F3D19115B185BA9"
                   },
                   {
                       "path":  "mscordaccore.dll",
@@ -468,13 +468,13 @@
                   },
                   {
                       "path":  "night.html",
-                      "size":  576,
-                      "sha256":  "CDC9D077B10D415F6967C76F91DB67FFE229580E03416FCBE230E9CED3A07173"
+                      "size":  596,
+                      "sha256":  "F52987EA1A135BFA36FB47B2211CCDA60AA4871F69E77242D41701F6CF4DACCF"
                   },
                   {
                       "path":  "night-shift.html",
-                      "size":  576,
-                      "sha256":  "CDC9D077B10D415F6967C76F91DB67FFE229580E03416FCBE230E9CED3A07173"
+                      "size":  596,
+                      "sha256":  "F52987EA1A135BFA36FB47B2211CCDA60AA4871F69E77242D41701F6CF4DACCF"
                   },
                   {
                       "path":  "ocr-feedback.html",
@@ -568,8 +568,8 @@
                   },
                   {
                       "path":  "program-table-blank.html",
-                      "size":  14476,
-                      "sha256":  "AF6C0A60F07901EF6D77CF121A1BD9755C084D9E10B66117ABD096A149EB5510"
+                      "size":  14477,
+                      "sha256":  "C3A616DBF53112A4087BC4FA3401EDF685FDB19FBB4C3C9C0B78BA983EAAE6B0"
                   },
                   {
                       "path":  "qr-codes/08xa44ew.png",
@@ -648,8 +648,8 @@
                   },
                   {
                       "path":  "qr-codes/qr-manifest.txt",
-                      "size":  3612,
-                      "sha256":  "FA9110A214E4D88A61F1AA2AD0416BF26FFBADFD5B6A5330C8F7B390C483F482"
+                      "size":  3708,
+                      "sha256":  "AB828282E9B05C21F812E1BAB70D80DA85DBC8608D096A27D9F19DDD9EB35084"
                   },
                   {
                       "path":  "qr-codes/setup-sync.png",
@@ -778,13 +778,13 @@
                   },
                   {
                       "path":  "setup.html",
-                      "size":  5983,
-                      "sha256":  "51844E48A1C8171B53F27E335D2AE75583FCFE9E6C9C24D52D4005583D6FCCF4"
+                      "size":  5999,
+                      "sha256":  "E0E8CAABA6519250CB88CC4165CFDF8F0334C2F72122D1B07DD9B7764ACDB9AE"
                   },
                   {
                       "path":  "sono-desktop.html",
-                      "size":  947,
-                      "sha256":  "50DAB42355B4C5A5FCA8C7BCCABB81A855F233BBE130BA7F83179E4F69115199"
+                      "size":  972,
+                      "sha256":  "01F2C34F452C9D5CC2F91A84C878A4725D67AECD224360019E9B17EF1B7B6D31"
                   },
                   {
                       "path":  "System.AppContext.dll",
@@ -1738,8 +1738,8 @@
                   },
                   {
                       "path":  "tg-form.html",
-                      "size":  901,
-                      "sha256":  "ECF1E57DC393A05DBF0CCA4634B3FEFE3B765B79DF808CD2AFDFF593FB6E6695"
+                      "size":  903,
+                      "sha256":  "35769011735929EBA0DC757835EA060ED1106DAA46877C45C53D4C40173D55D0"
                   },
                   {
                       "path":  "tg-night-form.html",
@@ -1748,18 +1748,13 @@
                   },
                   {
                       "path":  "tg-qh-form.html",
-                      "size":  929,
-                      "sha256":  "9AAADC0D119CE37C0167B022027159538DF72BBC334BB0D20C14864A53FF7BAA"
+                      "size":  931,
+                      "sha256":  "D42F68FA51E93DE22EEEF00BF3336F5361B5DB5D0D51F90FCF5F82532A705CE5"
                   },
                   {
                       "path":  "tg-sono-form.html",
-                      "size":  960,
-                      "sha256":  "18A90516A578F3AC77B57D49B426BC3A477F86DD32E6EB9F5C7BEDC9089D57D0"
-                  },
-                  {
-                      "path":  "tmp_main_click_archive.html",
-                      "size":  1559,
-                      "sha256":  "EF0490A14E9727772C47E8C6C22381C95FB9AA477609D6FDC31AAA9BF62A6797"
+                      "size":  983,
+                      "sha256":  "ECC79EC9EF65BD05118686A5A139ECE5FE13A67750CD1BA9D9822BAD56DA83B2"
                   },
                   {
                       "path":  "UIAutomationClient.dll",
@@ -1988,8 +1983,8 @@
                   },
                   {
                       "path":  "Օրվա շարժ․.html",
-                      "size":  727,
-                      "sha256":  "111346A54593ACE027D0CE4C8D8EC21B544E424DAAFA1315E2FE71DBBA317671"
+                      "size":  729,
+                      "sha256":  "6215954FF334D13EE1880F8BFA37EBD641F78AA0150458848FB5D40B85FF763E"
                   }
               ]
 }
