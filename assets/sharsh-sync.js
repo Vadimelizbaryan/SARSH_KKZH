@@ -528,6 +528,36 @@
     }
   }
 
+  async function loadMainArchiveRecord(archiveKey) {
+    const normalizedArchiveKey = String(archiveKey || "").trim();
+    if (!hasRemoteSync() || !normalizedArchiveKey) {
+      return null;
+    }
+
+    const url = new URL(getSyncEndpoint());
+    url.searchParams.set("action", "main-archive-record");
+    url.searchParams.set("archiveKey", normalizedArchiveKey);
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      if (response.status === 404) {
+        return null;
+      }
+      throw buildResponseError(response, payload, "Не удалось загрузить архив главной таблицы");
+    }
+
+    const payload = await response.json().catch(() => null);
+    return payload && typeof payload.archiveKey === "string" ? payload : null;
+  }
+
   async function syncPendingChanges() {
     if (pendingSyncInFlightPromise) {
       return pendingSyncInFlightPromise;
@@ -2479,6 +2509,7 @@
     runtime,
     hasRemoteSync,
     loadSnapshot,
+    loadMainArchiveRecord,
     getPendingSyncStatus,
     syncPendingChanges,
     saveDepartment,

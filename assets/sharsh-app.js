@@ -15968,6 +15968,20 @@ function buildInitialPhotoLightboxState() {
     if (mode === "archive") {
       state.archiveRecords = readArchiveRecords();
       state.departmentPdfArchiveRecords = readDepartmentPdfArchiveRecords();
+      if (
+        archiveKeyFromQuery
+        && !getArchiveRecordByKey(archiveKeyFromQuery)
+        && sync.hasRemoteSync?.()
+        && typeof sync.loadMainArchiveRecord === "function"
+      ) {
+        try {
+          const remoteArchiveRecord = await sync.loadMainArchiveRecord(archiveKeyFromQuery);
+          if (remoteArchiveRecord) {
+            writeArchiveRecords([remoteArchiveRecord, ...state.archiveRecords]);
+          }
+        } catch (_error) {
+        }
+      }
       const hasPrintableArchive = archiveKeyFromQuery
         ? Boolean(getArchiveRecordByKey(archiveKeyFromQuery))
         : departmentArchiveKeyFromQuery

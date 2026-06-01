@@ -2677,6 +2677,22 @@ Deno.serve(async (request) => {
   try {
     const supabase = createSupabaseAdmin();
     if (request.method === "GET") {
+      const currentUrl = new URL(request.url);
+      const action = (currentUrl.searchParams.get("action") || "").trim();
+      if (action === "main-archive-record") {
+        const archiveKey = (currentUrl.searchParams.get("archiveKey") || "").trim();
+        if (!archiveKey) {
+          return jsonResponse({ error: "Archive key is required." }, 400);
+        }
+
+        const archiveRecord = await loadMainArchiveRecord(supabase, archiveKey);
+        if (!archiveRecord) {
+          return jsonResponse({ error: "Archive record not found." }, 404);
+        }
+
+        return jsonResponse(archiveRecord);
+      }
+
       return jsonResponse(await loadSnapshot(supabase));
     }
 
