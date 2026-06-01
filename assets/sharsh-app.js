@@ -9376,8 +9376,6 @@ function buildInitialPhotoLightboxState() {
       Boolean(freshnessStats.newestRow)
     );
     const currentDateTime = getCurrentDateTimeParts();
-    const archiveRecords = ensureArchiveRecordsLoaded();
-    const latestArchive = archiveRecords[0] || null;
     const mainTableSavedRecords = ensureMainTableSavedRecordsLoaded();
     const activeMainTableSavedRecord = getActiveMainTableSavedPreviewRecord(mainTableSavedRecords);
     const displayedMainTableSnapshot = activeMainTableSavedRecord
@@ -9645,22 +9643,6 @@ function buildInitialPhotoLightboxState() {
               <p>Точный список по каждому отделению: когда именно пришли последние данные.</p>
               <div class="updates-list" id="departmentUpdatesList">
                 ${state.snapshot.rows.map((row) => buildDepartmentUpdateItem(row)).join("")}
-              </div>
-            </section>
-            <section class="panel no-print archive-panel main-daily-archive-panel">
-              <h2>Ежедневный архив 10:00</h2>
-              <p id="archiveSummaryText">${
-                latestArchive
-                  ? escapeHtml(`Последний снимок: ${latestArchive.archiveLabel}, сохранён ${formatTimestamp(latestArchive.capturedAt)}.`)
-                  : "Архивов пока нет. Первый снимок появится автоматически после 10:00 по Еревану."
-              }</p>
-              <p class="hint">Снимок сохраняется в этом браузере один раз в день после 10:00 по времени Еревана.</p>
-              <div class="archive-list" id="archiveList">
-                ${
-                  archiveRecords.length
-                    ? buildArchivePicker(archiveRecords)
-                    : '<div class="archive-empty">Пока нет сохранённых дат.</div>'
-                }
               </div>
             </section>
             <section class="panel no-print archive-panel department-pdf-archive-panel">
