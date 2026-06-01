@@ -9129,7 +9129,7 @@ async function uploadMainArchivePdf(
   try {
     await ensureMainArchiveStorageBucket(supabase);
   } catch (error) {
-    throw new Error(`main_archive_upload_stage:ensure_bucket ${getErrorText(error)}`);
+    throw new Error(`Failed to prepare archive storage bucket: ${getErrorText(error)}`);
   }
   const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").trim().replace(/\/+$/, "");
   const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
@@ -9164,7 +9164,7 @@ async function uploadMainArchivePdf(
       duplex: "half"
     });
   } catch (error) {
-    throw new Error(`main_archive_upload_stage:fetch_upload ${getErrorText(error)}`);
+    throw new Error(`Failed to upload archive PDF: ${getErrorText(error)}`);
   }
 
   if (!response.ok) {
@@ -9172,7 +9172,7 @@ async function uploadMainArchivePdf(
     try {
       responseText = await response.text();
     } catch (error) {
-      throw new Error(`main_archive_upload_stage:read_error_response ${getErrorText(error)}`);
+      throw new Error(`Failed to read storage upload error response: ${getErrorText(error)}`);
     }
     throw new Error(`Storage upload failed: ${response.status} ${responseText}`);
   }
@@ -9518,7 +9518,7 @@ async function buildMainArchivePdfBytes(
   try {
     archivePhotoRecords = await listMainArchivePhotoRecordsForDate(supabase, dateKey);
   } catch (error) {
-    throw new Error(`main_archive_stage:photo_records ${getErrorText(error)}`);
+    throw new Error(`Failed to load archive photo records: ${getErrorText(error)}`);
   }
   const normalizedDateLabel = formatTelegramFormArchiveDateLabel(dateKey);
 
@@ -9536,17 +9536,17 @@ async function buildMainArchivePdfBytes(
   try {
     await appendPdfBytesToDocument(output, await buildReportPdfBytes(snapshot));
   } catch (error) {
-    throw new Error(`main_archive_stage:report_pdf ${getErrorText(error)}`);
+    throw new Error(`Failed to append Report.pdf to the archive: ${getErrorText(error)}`);
   }
   try {
     await appendPdfBytesToDocument(output, await buildMainMovementPdfBytes(snapshot));
   } catch (error) {
-    throw new Error(`main_archive_stage:mainflow_pdf ${getErrorText(error)}`);
+    throw new Error(`Failed to append MAINFLOW.pdf to the archive: ${getErrorText(error)}`);
   }
   try {
     await appendPdfBytesToDocument(output, await buildAllCurrentDepartmentsPdfBytes(snapshot, reportDate));
   } catch (error) {
-    throw new Error(`main_archive_stage:all_departments_pdf ${getErrorText(error)}`);
+    throw new Error(`Failed to append All_departments_current to the archive: ${getErrorText(error)}`);
   }
 
   if (archivePhotoRecords.length) {
@@ -9563,7 +9563,7 @@ async function buildMainArchivePdfBytes(
       try {
         await addMainArchivePhotoPage(output, fonts, record);
       } catch (error) {
-        throw new Error(`main_archive_stage:photo_page:${record.id} ${getErrorText(error)}`);
+        throw new Error(`Failed to append archive photo ${record.id}: ${getErrorText(error)}`);
       }
     }
   }
@@ -9571,7 +9571,7 @@ async function buildMainArchivePdfBytes(
   try {
     return await output.save();
   } catch (error) {
-    throw new Error(`main_archive_stage:save_pdf ${getErrorText(error)}`);
+    throw new Error(`Failed to finalize the archive PDF: ${getErrorText(error)}`);
   }
 }
 
@@ -9662,7 +9662,7 @@ async function persistDailyMainArchivePdf(
           const pdfBytes = await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey);
           return await uploadMainArchivePdf(supabase, dateKey, pdfBytes);
         } catch (error) {
-          throw new Error(`daily_main_archive_stage:upload_pdf ${getErrorText(error)}`);
+          throw new Error(`Failed to create and upload the daily archive PDF: ${getErrorText(error)}`);
         }
       })();
 
@@ -9680,14 +9680,14 @@ async function persistDailyMainArchivePdf(
   try {
     await saveStoredMainArchiveRecord(supabase, dateKey, snapshot, initialStoredMeta);
   } catch (error) {
-    throw new Error(`daily_main_archive_stage:save_initial_record ${getErrorText(error)}`);
+    throw new Error(`Failed to save the initial daily archive record: ${getErrorText(error)}`);
   }
 
   let deletedFeedbackCount = 0;
   try {
     deletedFeedbackCount = await cleanupMainArchiveSourceFeedback(supabase, dateKey);
   } catch (error) {
-    throw new Error(`daily_main_archive_stage:cleanup_feedback ${getErrorText(error)}`);
+    throw new Error(`Failed to clean up source feedback after saving the archive: ${getErrorText(error)}`);
   }
   const finalStoredMeta: MainArchiveStoredPdfMeta = {
     ...initialStoredMeta,
@@ -9697,7 +9697,7 @@ async function persistDailyMainArchivePdf(
   try {
     await saveStoredMainArchiveRecord(supabase, dateKey, snapshot, finalStoredMeta);
   } catch (error) {
-    throw new Error(`daily_main_archive_stage:save_final_record ${getErrorText(error)}`);
+    throw new Error(`Failed to save the final daily archive record: ${getErrorText(error)}`);
   }
 
   return {
