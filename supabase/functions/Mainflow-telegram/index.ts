@@ -13028,10 +13028,28 @@ Deno.serve(async (request) => {
           return jsonResponse({ ok: false, error: "Archive date is required." }, 400);
         }
 
+        const formsOnlyRaw = (currentUrl.searchParams.get("formsOnly") || "").trim().toLowerCase();
+        const formsOnly = formsOnlyRaw === "1" || formsOnlyRaw === "true" || formsOnlyRaw === "yes";
         const supabase = createSupabaseAdmin();
+        if (!formsOnly) {
+          const snapshot = await loadSnapshot(supabase);
+          const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
+          const pdfBytes = await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey);
+          return buildPdfBytesResponse(
+            pdfBytes,
+            buildMainArchivePdfFileName(dateKey)
+          );
+        }
+
         const records = await loadTelegramWebFormArchiveRecordsForDate(supabase, dateKey);
         if (!records.length) {
-          return jsonResponse({ ok: false, error: "Telegram Web App forms not found." }, 404);
+          const snapshot = await loadSnapshot(supabase);
+          const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
+          const pdfBytes = await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey);
+          return buildPdfBytesResponse(
+            pdfBytes,
+            buildMainArchivePdfFileName(dateKey)
+          );
         }
 
         const pdfBytes = await buildTelegramWebFormArchiveDatePdfBytes(records);

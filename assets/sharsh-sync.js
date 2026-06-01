@@ -2470,6 +2470,7 @@
     const url = new URL(getTelegramFunctionEndpoint());
     url.searchParams.set("action", "telegram-form-archive-pdf");
     url.searchParams.set("date", normalizedDate);
+    url.searchParams.set("formsOnly", "1");
     return url.toString();
   }
 
