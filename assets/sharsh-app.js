@@ -14633,7 +14633,7 @@ function buildInitialPhotoLightboxState() {
     setInfo(`Сохраняю общий архив PDF за ${dateKey}...`, false);
 
     try {
-      const result = await sync.saveMainArchivePdf(dateKey);
+      const result = await sync.saveMainArchivePdf(dateKey, { force: true });
       await refreshMainArchiveRecordsFromRemote();
 
       const refreshedRecord = getArchiveRecordByKey(result?.archiveKey || dateKey);
