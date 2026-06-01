@@ -9114,9 +9114,10 @@ async function uploadMainArchivePdf(
   await ensureMainArchiveStorageBucket(supabase);
   const fileName = buildMainArchivePdfFileName(dateKey);
   const storagePath = buildMainArchiveStoragePath(dateKey, fileName);
+  const uploadBytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const { error } = await supabase.storage
     .from(MAIN_ARCHIVE_STORAGE_BUCKET)
-    .upload(storagePath, new Blob([bytes], { type: "application/pdf" }), {
+    .upload(storagePath, uploadBytes, {
       contentType: "application/pdf",
       upsert: true
     });
@@ -9605,11 +9606,14 @@ async function persistDailyMainArchivePdf(
         storagePath: existingStored.storagePath,
         fileName: existingStored.fileName || buildMainArchivePdfFileName(dateKey)
       }
-    : await uploadMainArchivePdf(
-        supabase,
-        dateKey,
-        await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey)
-      );
+    : await (async () => {
+        try {
+          const pdfBytes = await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey);
+          return await uploadMainArchivePdf(supabase, dateKey, pdfBytes);
+        } catch (error) {
+          throw new Error(`daily_main_archive_stage:upload_pdf ${getErrorText(error)}`);
+        }
+      })();
 
   const initialStoredMeta: MainArchiveStoredPdfMeta = {
     storageBucket: uploaded.storageBucket,
@@ -9622,15 +9626,28 @@ async function persistDailyMainArchivePdf(
     cleanupCompletedAt: existingStored?.cleanupCompletedAt || null
   };
 
-  await saveStoredMainArchiveRecord(supabase, dateKey, snapshot, initialStoredMeta);
+  try {
+    await saveStoredMainArchiveRecord(supabase, dateKey, snapshot, initialStoredMeta);
+  } catch (error) {
+    throw new Error(`daily_main_archive_stage:save_initial_record ${getErrorText(error)}`);
+  }
 
-  const deletedFeedbackCount = await cleanupMainArchiveSourceFeedback(supabase, dateKey);
+  let deletedFeedbackCount = 0;
+  try {
+    deletedFeedbackCount = await cleanupMainArchiveSourceFeedback(supabase, dateKey);
+  } catch (error) {
+    throw new Error(`daily_main_archive_stage:cleanup_feedback ${getErrorText(error)}`);
+  }
   const finalStoredMeta: MainArchiveStoredPdfMeta = {
     ...initialStoredMeta,
     sourceFeedbackDeletedCount: deletedFeedbackCount,
     cleanupCompletedAt: new Date().toISOString()
   };
-  await saveStoredMainArchiveRecord(supabase, dateKey, snapshot, finalStoredMeta);
+  try {
+    await saveStoredMainArchiveRecord(supabase, dateKey, snapshot, finalStoredMeta);
+  } catch (error) {
+    throw new Error(`daily_main_archive_stage:save_final_record ${getErrorText(error)}`);
+  }
 
   return {
     ok: true,
