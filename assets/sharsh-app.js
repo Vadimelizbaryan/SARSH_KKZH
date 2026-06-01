@@ -10957,6 +10957,14 @@ function buildInitialPhotoLightboxState() {
   }
 
   function renderDepartmentPdfArchiveDatePage() {
+    if (typeof sync.buildMainArchivePdfUrl === "function") {
+      const remoteUrl = sync.buildMainArchivePdfUrl(departmentArchiveDateFromQuery);
+      if (remoteUrl) {
+        window.location.replace(remoteUrl);
+        return;
+      }
+    }
+
     const records = getDepartmentPdfArchiveRecordsForDate(departmentArchiveDateFromQuery);
     if (!records.length) {
       renderArchiveNotFoundPage("PDF-архив за дату не найден", "За эту дату PDF-копии отделений в текущем браузере не найдены.");
