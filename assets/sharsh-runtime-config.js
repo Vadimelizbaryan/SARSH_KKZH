@@ -225,6 +225,9 @@
         ? "local-env"
         : (usePublishedDefaults ? "published-default" : (storedConfig ? "storage" : "default"))),
     isLocalEnvironment,
+    defaultConfig: normalizeConfig(DEFAULT_CONFIG),
+    baseConfig: normalizeConfig(baseConfig),
+    effectiveConfig: normalizeConfig(effectiveConfig),
     shareQuery: buildShareQueryString(effectiveConfig),
     buildShareQueryString,
     normalizeConfig,

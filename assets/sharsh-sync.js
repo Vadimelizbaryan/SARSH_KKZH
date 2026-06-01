@@ -32,8 +32,44 @@
   }
 
   function getTelegramFunctionEndpoint() {
-    const baseUrl = String(runtime.supabaseUrl || "").replace(/\/+$/, "");
+    const remoteConfig = getRemoteLinkConfig();
+    const baseUrl = String(remoteConfig.supabaseUrl || "").replace(/\/+$/, "");
     return `${baseUrl}/functions/v1/Mainflow-telegram`;
+  }
+
+  function getRemoteLinkConfig() {
+    if (
+      typeof runtime.supabaseUrl === "string" && runtime.supabaseUrl.trim() !== ""
+      && typeof runtime.supabaseAnonKey === "string" && runtime.supabaseAnonKey.trim() !== ""
+    ) {
+      return runtime;
+    }
+
+    if (runtimeMeta && typeof runtimeMeta.loadStoredConfig === "function") {
+      const storedConfig = runtimeMeta.loadStoredConfig();
+      if (
+        storedConfig
+        && storedConfig.syncMode === "supabase-function"
+        && typeof storedConfig.supabaseUrl === "string" && storedConfig.supabaseUrl.trim() !== ""
+        && typeof storedConfig.supabaseAnonKey === "string" && storedConfig.supabaseAnonKey.trim() !== ""
+      ) {
+        return storedConfig;
+      }
+    }
+
+    const defaultConfig = runtimeMeta && runtimeMeta.defaultConfig && typeof runtimeMeta.defaultConfig === "object"
+      ? runtimeMeta.defaultConfig
+      : null;
+    if (
+      defaultConfig
+      && defaultConfig.syncMode === "supabase-function"
+      && typeof defaultConfig.supabaseUrl === "string" && defaultConfig.supabaseUrl.trim() !== ""
+      && typeof defaultConfig.supabaseAnonKey === "string" && defaultConfig.supabaseAnonKey.trim() !== ""
+    ) {
+      return defaultConfig;
+    }
+
+    return runtime;
   }
 
   function getAuthHeaders() {
@@ -2448,7 +2484,12 @@
 
   function buildTelegramFormPdfUrl(feedbackId, departmentId) {
     const normalizedId = String(feedbackId || "").trim();
-    if (!hasRemoteSync() || !normalizedId) {
+    const remoteConfig = getRemoteLinkConfig();
+    if (
+      !normalizedId
+      || remoteConfig.syncMode !== "supabase-function"
+      || typeof remoteConfig.supabaseUrl !== "string" || remoteConfig.supabaseUrl.trim() === ""
+    ) {
       return "";
     }
 
@@ -2463,7 +2504,12 @@
 
   function buildTelegramFormArchiveDatePdfUrl(dateKey) {
     const normalizedDate = String(dateKey || "").trim();
-    if (!hasRemoteSync() || !normalizedDate) {
+    const remoteConfig = getRemoteLinkConfig();
+    if (
+      !normalizedDate
+      || remoteConfig.syncMode !== "supabase-function"
+      || typeof remoteConfig.supabaseUrl !== "string" || remoteConfig.supabaseUrl.trim() === ""
+    ) {
       return "";
     }
 
@@ -2476,7 +2522,12 @@
 
   function buildMainArchivePdfUrl(reportDate) {
     const normalizedDate = String(reportDate || "").trim();
-    if (!hasRemoteSync()) {
+    const remoteConfig = getRemoteLinkConfig();
+    if (
+      remoteConfig.syncMode !== "supabase-function"
+      || typeof remoteConfig.supabaseUrl !== "string"
+      || remoteConfig.supabaseUrl.trim() === ""
+    ) {
       return "";
     }
 
