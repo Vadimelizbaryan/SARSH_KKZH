@@ -9181,27 +9181,29 @@ async function listMainArchivePhotoRecordsForDate(
   const dateLabel = formatTelegramFormArchiveDateLabel(dateKey || getYerevanDateKey());
   const yerevanStart = new Date(`${dateKey || getYerevanDateKey()}T00:00:00+04:00`);
   const yerevanEnd = new Date(yerevanStart.getTime() + (24 * 60 * 60 * 1000));
-  const selectColumns = "id, department_id, department_name, report_date, photo_report_date, image_name, image_data_url, notes, created_at";
+  const metadataSelectColumns = "id, department_id, department_name, report_date, photo_report_date, image_name, notes, created_at";
+  const imageSelectColumns = "id, image_data_url";
+  const imageBatchSize = 8;
   const resultMap = new Map<string, Record<string, unknown>>();
 
   const queries = [
     (supabase as any)
       .from("sharsh_ocr_feedback")
-      .select(selectColumns)
+      .select(metadataSelectColumns)
       .eq("report_date", dateLabel)
       .not("image_data_url", "is", null)
       .order("created_at", { ascending: true })
       .limit(1000),
     (supabase as any)
       .from("sharsh_ocr_feedback")
-      .select(selectColumns)
+      .select(metadataSelectColumns)
       .eq("photo_report_date", dateLabel)
       .not("image_data_url", "is", null)
       .order("created_at", { ascending: true })
       .limit(1000),
     (supabase as any)
       .from("sharsh_ocr_feedback")
-      .select(selectColumns)
+      .select(metadataSelectColumns)
       .gte("created_at", yerevanStart.toISOString())
       .lt("created_at", yerevanEnd.toISOString())
       .not("image_data_url", "is", null)
@@ -9224,18 +9226,43 @@ async function listMainArchivePhotoRecordsForDate(
     }
   }
 
+  const imageIds = Array.from(resultMap.keys()).filter(Boolean);
+  const imageMap = new Map<string, string>();
+
+  for (let offset = 0; offset < imageIds.length; offset += imageBatchSize) {
+    const batchIds = imageIds.slice(offset, offset + imageBatchSize);
+    const { data, error } = await (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .select(imageSelectColumns)
+      .in("id", batchIds);
+
+    if (error) {
+      throw error;
+    }
+
+    for (const item of Array.isArray(data) ? data : []) {
+      const row = item as Record<string, unknown>;
+      const id = String(row.id || "");
+      const imageDataUrl = typeof row.image_data_url === "string" ? row.image_data_url.trim() : "";
+      if (id && imageDataUrl.startsWith("data:image/")) {
+        imageMap.set(id, imageDataUrl);
+      }
+    }
+  }
+
   const departmentOrder = Object.keys(DEPARTMENTS) as DepartmentId[];
   const rows = Array.from(resultMap.values())
     .filter((row) => rowMatchesArchiveDateKey(row, dateKey))
     .map((row) => {
       const departmentId = parseDepartmentId(row.department_id);
-      const imageDataUrl = typeof row.image_data_url === "string" ? row.image_data_url.trim() : "";
+      const rowId = String(row.id || "");
+      const imageDataUrl = imageMap.get(rowId) || "";
       if (!departmentId || !imageDataUrl.startsWith("data:image/")) {
         return null;
       }
       const imageName = typeof row.image_name === "string" ? row.image_name : "";
       return {
-        id: String(row.id || ""),
+        id: rowId,
         departmentId,
         departmentName: typeof row.department_name === "string" && row.department_name.trim()
           ? row.department_name.trim()
