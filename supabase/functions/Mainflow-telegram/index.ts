@@ -9263,9 +9263,7 @@ async function listMainArchivePhotoRecordsForDate(
   const dateLabel = formatTelegramFormArchiveDateLabel(dateKey || getYerevanDateKey());
   const yerevanStart = new Date(`${dateKey || getYerevanDateKey()}T00:00:00+04:00`);
   const yerevanEnd = new Date(yerevanStart.getTime() + (24 * 60 * 60 * 1000));
-  const metadataSelectColumns = "id, department_id, department_name, report_date, photo_report_date, image_name, notes, created_at";
-  const imageSelectColumns = "id, image_data_url";
-  const imageBatchSize = 8;
+  const metadataSelectColumns = "id, department_id, department_name, report_date, photo_report_date, image_name, image_data_url, notes, created_at";
   const resultMap = new Map<string, Record<string, unknown>>();
 
   const queries = [
@@ -9308,37 +9306,13 @@ async function listMainArchivePhotoRecordsForDate(
     }
   }
 
-  const imageIds = Array.from(resultMap.keys()).filter(Boolean);
-  const imageMap = new Map<string, string>();
-
-  for (let offset = 0; offset < imageIds.length; offset += imageBatchSize) {
-    const batchIds = imageIds.slice(offset, offset + imageBatchSize);
-    const { data, error } = await (supabase as any)
-      .from("sharsh_ocr_feedback")
-      .select(imageSelectColumns)
-      .in("id", batchIds);
-
-    if (error) {
-      throw error;
-    }
-
-    for (const item of Array.isArray(data) ? data : []) {
-      const row = item as Record<string, unknown>;
-      const id = String(row.id || "");
-      const imageDataUrl = typeof row.image_data_url === "string" ? row.image_data_url.trim() : "";
-      if (id && imageDataUrl.startsWith("data:image/")) {
-        imageMap.set(id, imageDataUrl);
-      }
-    }
-  }
-
   const departmentOrder = Object.keys(DEPARTMENTS) as DepartmentId[];
   const rows = Array.from(resultMap.values())
     .filter((row) => rowMatchesArchiveDateKey(row, dateKey))
     .map((row) => {
       const departmentId = parseDepartmentId(row.department_id);
       const rowId = String(row.id || "");
-      const imageDataUrl = imageMap.get(rowId) || "";
+      const imageDataUrl = typeof row.image_data_url === "string" ? row.image_data_url.trim() : "";
       if (!departmentId || !imageDataUrl.startsWith("data:image/")) {
         return null;
       }
