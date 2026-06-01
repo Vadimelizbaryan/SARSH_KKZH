@@ -26,6 +26,20 @@ public partial class Form1 : Form
     private const int AutoUpdateIntervalMs = 20 * 60 * 1000;
     private const int InitialVisibleUpdateDelayMs = 90 * 1000;
     private const int InitialBackgroundUpdateDelayMs = 15 * 1000;
+    private const int MaxPersistedRelativePageLength = 2048;
+    private static readonly HashSet<string> NonPersistentQueryKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "sync",
+        "sbUrl",
+        "sbKey",
+        "fn",
+        "oa",
+        "archivePayload",
+        "departmentArchivePayload",
+        "departmentArchiveDatePayload",
+        "savedMainPayload",
+        "autoprint"
+    };
 
     private readonly bool _startInBackground;
     private readonly EventWaitHandle? _restoreRequestEvent;
@@ -785,9 +799,7 @@ public partial class Form1 : Form
 
     private static string BuildModeAwareQuery(DesktopMode mode, string? existingQuery = null)
     {
-        var trimmedExisting = string.IsNullOrWhiteSpace(existingQuery)
-            ? string.Empty
-            : existingQuery.Trim().TrimStart('?');
+        var trimmedExisting = SanitizeRelativePageQuery(existingQuery);
         var remoteQuery = mode == DesktopMode.Online ? BuildRemoteQueryString() : string.Empty;
 
         if (string.IsNullOrWhiteSpace(remoteQuery))
@@ -1520,7 +1532,15 @@ public partial class Form1 : Form
             return DefaultRelativePage;
         }
 
-        return normalized;
+        var pathOnly = GetRelativePagePathOnly(normalized);
+        var query = SanitizeRelativePageQuery(GetRelativePageQuery(normalized));
+        var rebuilt = string.IsNullOrWhiteSpace(query)
+            ? pathOnly
+            : $"{pathOnly}?{query}";
+
+        return rebuilt.Length > MaxPersistedRelativePageLength
+            ? DefaultRelativePage
+            : rebuilt;
     }
 
     private static string GetRelativePagePathOnly(string? relativePage)
@@ -1565,6 +1585,53 @@ public partial class Form1 : Form
         }
 
         return query.Trim();
+    }
+
+    private static string SanitizeRelativePageQuery(string? queryString)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(queryString)
+            ? string.Empty
+            : queryString.Trim().TrimStart('?');
+
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return string.Empty;
+        }
+
+        var kept = new List<string>();
+        var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var rawSegment in trimmed.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var segment = rawSegment.Trim();
+            if (string.IsNullOrWhiteSpace(segment))
+            {
+                continue;
+            }
+
+            var equalsIndex = segment.IndexOf('=');
+            var rawKey = equalsIndex >= 0 ? segment[..equalsIndex] : segment;
+            var rawValue = equalsIndex >= 0 ? segment[(equalsIndex + 1)..] : string.Empty;
+            var decodedKey = Uri.UnescapeDataString(rawKey.Replace("+", " ")).Trim();
+
+            if (string.IsNullOrWhiteSpace(decodedKey)
+                || NonPersistentQueryKeys.Contains(decodedKey)
+                || !seenKeys.Add(decodedKey))
+            {
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(rawValue))
+            {
+                kept.Add(Uri.EscapeDataString(decodedKey));
+                continue;
+            }
+
+            var decodedValue = Uri.UnescapeDataString(rawValue.Replace("+", " "));
+            kept.Add($"{Uri.EscapeDataString(decodedKey)}={Uri.EscapeDataString(decodedValue)}");
+        }
+
+        return string.Join("&", kept);
     }
 
     private DesktopShellState LoadShellState()

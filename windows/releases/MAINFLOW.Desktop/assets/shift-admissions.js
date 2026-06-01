@@ -101,7 +101,7 @@
 
   function escapeHtml(value) {
     return String(value ?? "")
-      .replaceAll("&", "&")
+      .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");

@@ -7,7 +7,7 @@
     functionName: "sharsh-sync",
     autoSync: true,
     autoRotateImages: false,
-    refreshIntervalMs: 60000,
+    refreshIntervalMs: 30000,
     requireAccessCode: false,
     requireOwnerAuth: true
   };

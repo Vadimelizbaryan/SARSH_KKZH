@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   const config = window.SHARSH_CONFIG;
   const sync = window.SHARSH_SYNC;
   const auth = window.SHARSH_AUTH || null;
@@ -29,6 +29,10 @@
   const savedMainKeyFromQuery = queryParams.get("savedMain") || "";
   const departmentArchiveKeyFromQuery = queryParams.get("departmentArchive") || "";
   const departmentArchiveDateFromQuery = queryParams.get("departmentArchiveDate") || "";
+  const archivePayloadFromQuery = decodeQueryPayloadParam(queryParams.get("archivePayload"));
+  const savedMainPayloadFromQuery = decodeQueryPayloadParam(queryParams.get("savedMainPayload"));
+  const departmentArchivePayloadFromQuery = decodeQueryPayloadParam(queryParams.get("departmentArchivePayload"));
+  const departmentArchiveDatePayloadFromQuery = decodeQueryPayloadParam(queryParams.get("departmentArchiveDatePayload"));
   const archiveAutoPrint = queryParams.get("autoprint") !== "0";
   const PRINT_REPORT_TITLE = "ԿԿԶՀ-Շարժ․";
   const SAVE_RULE_TEXT = "13-22 = (1 + 4 + 11) - (7 + 10)";
@@ -57,6 +61,7 @@
   const MAX_MAIN_TABLE_SAVED_RECORDS = 60;
   const DEPARTMENT_PDF_ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:department-pdf-archive:v1`;
   const MAX_DEPARTMENT_PDF_ARCHIVE_RECORDS = 240;
+  const ARCHIVE_WINDOW_NAME_PREFIX = "__SARSH_ARCHIVE_PAYLOAD__:";
   const DEPARTMENT_UNLOCK_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:department-unlock:`;
   const PHOTO_MAX_DIMENSION = 1800;
   const PHOTO_JPEG_QUALITY = 0.88;
@@ -602,14 +607,15 @@ function buildInitialPhotoLightboxState() {
     updateAttentionBound: false,
     archiveRecords: [],
     selectedArchiveKey: "",
+    mainArchiveRemoteLoaded: false,
+    mainArchiveRemoteLoading: false,
+    mainArchiveSaveInFlight: false,
     mainTableSavedRecords: [],
     selectedMainTableSavedKey: "",
     activeMainTableSavedPreviewKey: "",
     departmentPdfArchiveRecords: [],
     selectedDepartmentPdfArchiveKey: "",
     selectedDepartmentPdfArchiveDate: "",
-    mainArchiveSaveStatus: "",
-    mainArchiveSaveStatusIsError: false,
     departmentPdfArchiveRemoteLoaded: false,
     departmentPdfArchiveRemoteLoading: false,
     morningRolloverInFlight: false,
@@ -636,6 +642,148 @@ function buildInitialPhotoLightboxState() {
 
   function deepCopy(value) {
     return config.deepCopy(value);
+  }
+
+  function encodeQueryPayloadParam(value) {
+    if (value === null || value === undefined) {
+      return "";
+    }
+
+    try {
+      const json = JSON.stringify(value);
+      if (!json) {
+        return "";
+      }
+      const bytes = new TextEncoder().encode(json);
+      let binary = "";
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function decodeQueryPayloadParam(rawValue) {
+    const value = String(rawValue || "").trim();
+    if (!value) {
+      return null;
+    }
+
+    try {
+      const normalized = value
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
+      const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+      const binary = atob(padded);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      return JSON.parse(new TextDecoder().decode(bytes));
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function mergeNormalizedRecords(currentRecords, payload, normalizeRecord, sortRecords, limit, getKey) {
+    const baseRecords = Array.isArray(currentRecords) ? currentRecords.slice() : [];
+    const payloadRecords = Array.isArray(payload)
+      ? payload
+      : (payload ? [payload] : []);
+    const normalizedPayloadRecords = payloadRecords
+      .map(normalizeRecord)
+      .filter(Boolean);
+
+    if (!normalizedPayloadRecords.length) {
+      return baseRecords;
+    }
+
+    const mergedByKey = new Map();
+    [...normalizedPayloadRecords, ...baseRecords].forEach((record) => {
+      const key = getKey(record);
+      if (!key || mergedByKey.has(key)) {
+        return;
+      }
+      mergedByKey.set(key, record);
+    });
+
+    return sortRecords(Array.from(mergedByKey.values())).slice(0, limit);
+  }
+
+  function writeArchiveWindowNamePayload(payload) {
+    const encoded = encodeQueryPayloadParam(payload);
+    if (!encoded) {
+      return false;
+    }
+
+    try {
+      window.name = `${ARCHIVE_WINDOW_NAME_PREFIX}${encoded}`;
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function readArchiveWindowNamePayload() {
+    try {
+      if (typeof window.name !== "string" || !window.name.startsWith(ARCHIVE_WINDOW_NAME_PREFIX)) {
+        return null;
+      }
+      return decodeQueryPayloadParam(window.name.slice(ARCHIVE_WINDOW_NAME_PREFIX.length));
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function buildArchiveWindowNamePayloadFromHref(href) {
+    if (window.location.protocol !== "file:" || !href) {
+      return null;
+    }
+
+    try {
+      const url = new URL(href, window.location.href);
+      if (PathnameWithoutTrailingSlash(url.pathname) !== "archive-print.html") {
+        return null;
+      }
+
+      const archiveKey = url.searchParams.get("archive") || "";
+      if (archiveKey) {
+        const record = getArchiveRecordByKey(archiveKey);
+        return record ? { kind: "main-archive-record", archiveKey, record } : null;
+      }
+
+      const savedMainKey = url.searchParams.get("savedMain") || "";
+      if (savedMainKey) {
+        const record = getMainTableSavedRecordByKey(savedMainKey);
+        return record ? { kind: "saved-main-record", savedMainKey, record } : null;
+      }
+
+      const departmentArchiveKey = url.searchParams.get("departmentArchive") || "";
+      if (departmentArchiveKey) {
+        const record = getDepartmentPdfArchiveRecordByKey(departmentArchiveKey);
+        return record ? { kind: "department-archive-record", departmentArchiveKey, record } : null;
+      }
+
+      const departmentArchiveDate = url.searchParams.get("departmentArchiveDate") || "";
+      if (departmentArchiveDate) {
+        const records = getDepartmentPdfArchiveRecordsForDate(departmentArchiveDate);
+        return records.length
+          ? { kind: "department-archive-date-records", departmentArchiveDate, records }
+          : null;
+      }
+    } catch (_error) {
+    }
+
+    return null;
+  }
+
+  function PathnameWithoutTrailingSlash(pathname) {
+    return String(pathname || "")
+      .split("/")
+      .filter(Boolean)
+      .pop() || "";
   }
 
   function escapeHtml(text) {
@@ -979,12 +1127,6 @@ function buildInitialPhotoLightboxState() {
       {
         selector: ".updates-panel",
         id: "department-updates",
-        persistentSelector: "h2",
-        defaultCollapsed: true
-      },
-      {
-        selector: ".main-daily-archive-panel",
-        id: "daily-archive",
         persistentSelector: "h2",
         defaultCollapsed: true
       },
@@ -4199,11 +4341,14 @@ function buildInitialPhotoLightboxState() {
     }
   }
 
+  function sortArchiveRecords(records) {
+    return records.sort((left, right) => right.archiveKey.localeCompare(left.archiveKey));
+  }
+
   function writeArchiveRecords(records) {
-    const normalized = records
+    const normalized = sortArchiveRecords(records
       .map(normalizeArchiveRecord)
-      .filter(Boolean)
-      .sort((left, right) => right.archiveKey.localeCompare(left.archiveKey))
+      .filter(Boolean))
       .slice(0, MAX_ARCHIVE_RECORDS);
 
     state.archiveRecords = normalized;
@@ -4382,7 +4527,7 @@ function buildInitialPhotoLightboxState() {
 
   function getArchiveSummaryText(records) {
     if (!Array.isArray(records) || !records.length) {
-      return "Архивов пока нет. Первый снимок появится автоматически после 10:00 по Еревану.";
+      return "Общих PDF-архивов пока нет. Можно сохранить архив кнопкой ниже или дождаться ежедневной сборки в 10:01 по Еревану.";
     }
 
     const latestArchive = records[0];
@@ -4407,7 +4552,7 @@ function buildInitialPhotoLightboxState() {
   function buildArchivePicker(records) {
     const selectedRecord = getSelectedArchiveRecord(records);
     if (!selectedRecord) {
-      return '<div class="archive-empty">Пока нет сохранённых дат.</div>';
+      return '<div class="archive-empty">Пока нет сохранённых общих PDF-архивов.</div>';
     }
 
     return `
@@ -4419,7 +4564,7 @@ function buildInitialPhotoLightboxState() {
               ${buildArchiveOptions(records, selectedRecord.archiveKey)}
             </select>
           </label>
-          <a class="archive-open-link" id="archivePdfLink" href="${escapeHtml(getArchivePrintPath(selectedRecord.archiveKey))}" target="_blank" rel="noopener">PDF</a>
+          <a class="archive-open-link" id="archivePdfLink" href="${escapeHtml(getArchivePrintPath(selectedRecord.archiveKey))}"${getInternalPageTargetAttrs()}>PDF</a>
         </div>
         <div class="archive-selected-meta" id="archiveSelectedMeta">${escapeHtml(getArchiveSelectionText(selectedRecord))}</div>
       </div>
@@ -4446,11 +4591,73 @@ function buildInitialPhotoLightboxState() {
       }
     }
     if (meta) {
-      if (selectedGroup && selectedGroup.hasMainPdf) {
-        meta.textContent = `Date: ${selectedGroup.label}. Ready server PDF archive is saved.`;
-        return;
-      }
       meta.textContent = getArchiveSelectionText(selectedRecord);
+    }
+  }
+
+  function refreshMainArchiveUi() {
+    const records = ensureArchiveRecordsLoaded();
+    const summary = document.getElementById("mainArchiveSummaryText");
+    if (summary) {
+      summary.textContent = getArchiveSummaryText(records);
+    }
+    const list = document.getElementById("mainArchiveList");
+    if (list) {
+      list.innerHTML = buildArchivePicker(records);
+    }
+    const select = document.getElementById("archiveSelect");
+    if (select instanceof HTMLSelectElement && !select.dataset.bound) {
+      select.addEventListener("change", () => {
+        state.selectedArchiveKey = select.value || "";
+        syncArchivePickerUi();
+      });
+      select.dataset.bound = "1";
+    }
+    syncArchivePickerUi();
+    const saveButton = document.getElementById("saveMainArchiveBtn");
+    if (saveButton instanceof HTMLButtonElement) {
+      saveButton.disabled = state.mainArchiveSaveInFlight;
+      saveButton.textContent = state.mainArchiveSaveInFlight
+        ? "Сохраняю архив..."
+        : "Сохранить архив сейчас";
+    }
+  }
+
+  async function refreshMainArchiveRecordsFromRemote() {
+    if (
+      state.mainArchiveRemoteLoading
+      || !sync.hasRemoteSync?.()
+      || typeof sync.listMainArchiveRecords !== "function"
+    ) {
+      refreshMainArchiveUi();
+      return;
+    }
+
+    state.mainArchiveRemoteLoading = true;
+    try {
+      const records = await sync.listMainArchiveRecords(120);
+      const normalized = sortArchiveRecords(
+        (Array.isArray(records) ? records : [])
+          .map(normalizeArchiveRecord)
+          .filter(Boolean)
+      ).slice(0, MAX_ARCHIVE_RECORDS);
+
+      if (normalized.length) {
+        const localRecords = ensureArchiveRecordsLoaded();
+        const mergedByKey = new Map();
+        [...normalized, ...localRecords].forEach((record) => {
+          if (record && typeof record.archiveKey === "string" && !mergedByKey.has(record.archiveKey)) {
+            mergedByKey.set(record.archiveKey, record);
+          }
+        });
+        writeArchiveRecords(Array.from(mergedByKey.values()));
+        state.mainArchiveRemoteLoaded = true;
+      }
+    } catch (error) {
+      console.warn("Failed to load main archive list.", error);
+    } finally {
+      state.mainArchiveRemoteLoading = false;
+      refreshMainArchiveUi();
     }
   }
 
@@ -4640,11 +4847,15 @@ function buildInitialPhotoLightboxState() {
   }
 
   function getMainTableSavedSnapshotPath(snapshotKey) {
+    const query = new URLSearchParams();
+    query.set("savedMain", String(snapshotKey || ""));
+    query.set("autoprint", "0");
+
     if (basePath === "@site") {
-      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&savedMain=${encodeURIComponent(snapshotKey)}&autoprint=0`);
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&${query.toString()}`);
     }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
-    return `${prefix}archive-print.html?savedMain=${encodeURIComponent(snapshotKey)}&autoprint=0`;
+    return `${prefix}archive-print.html?${query.toString()}`;
   }
 
   function moveMainTableSavedSelection(direction) {
@@ -4706,7 +4917,7 @@ function buildInitialPhotoLightboxState() {
           <div class="archive-current-stamp" id="mainTableSavedStamp">${escapeHtml(buildMainTableSavedSelectionText(selectedRecord))}</div>
           <button type="button" class="archive-open-link archive-nav-button" data-main-saved-nav="1" aria-label="Вперёд">→</button>
           <button type="button" class="archive-open-link archive-open-link--secondary" id="mainTableSavedLiveBtn">Текущая таблица</button>
-          <a class="archive-open-link archive-open-link--secondary" id="mainTableSavedOpenLink" href="${escapeHtml(getMainTableSavedSnapshotPath(selectedRecord.snapshotKey))}" target="_blank" rel="noopener">Открыть</a>
+          <a class="archive-open-link archive-open-link--secondary" id="mainTableSavedOpenLink" href="${escapeHtml(getMainTableSavedSnapshotPath(selectedRecord.snapshotKey))}"${getInternalPageTargetAttrs()}>Открыть</a>
         </div>
         <div class="archive-selected-meta" id="mainTableSavedMeta">${escapeHtml(buildMainTableSavedDisplayMetaText(selectedRecord))}</div>
       </div>
@@ -4783,9 +4994,6 @@ function buildInitialPhotoLightboxState() {
 
     return {
       archiveKey: record.archiveKey,
-      archiveKind: typeof record.archiveKind === "string" && record.archiveKind.trim()
-        ? record.archiveKind.trim()
-        : "department-pdf",
       archiveDateKey: typeof record.archiveDateKey === "string" && record.archiveDateKey.trim()
         ? record.archiveDateKey.trim()
         : fallbackDateKey,
@@ -5057,51 +5265,6 @@ function buildInitialPhotoLightboxState() {
     });
   }
 
-  function normalizeStoredMainArchivePdfRecord(record) {
-    if (!record || typeof record !== "object") {
-      return null;
-    }
-
-    const archiveKey = String(record.archiveKey || "").trim();
-    const pdfStoragePath = String(record.pdfStoragePath || "").trim();
-    if (!archiveKey || !pdfStoragePath) {
-      return null;
-    }
-
-    const archiveDateKey = normalizeDepartmentPdfArchiveDateKey(
-      archiveKey
-      || record.reportDate
-      || record.capturedAt
-      || record.pdfGeneratedAt
-    );
-    if (!archiveDateKey) {
-      return null;
-    }
-
-    const archiveDateLabel = formatDepartmentPdfArchiveDateLabel(
-      archiveDateKey,
-      record.archiveLabel || record.reportDate || archiveKey
-    );
-    const capturedAt = String(record.pdfGeneratedAt || record.capturedAt || new Date().toISOString()).trim();
-
-    return normalizeDepartmentPdfArchiveRecord({
-      archiveKey: `${archiveDateKey}--main-pdf`,
-      archiveKind: "main-pdf",
-      archiveDateKey,
-      archiveLabel: archiveDateLabel,
-      archiveDateLabel,
-      capturedAt,
-      reportDate: String(record.reportDate || "").trim(),
-      source: "server-main-archive",
-      feedbackId: "",
-      departmentId: "__main_archive__",
-      departmentName: "Main archive PDF",
-      departmentMarker: "",
-      values: {},
-      updatedAt: capturedAt
-    });
-  }
-
   function refreshDepartmentPdfArchiveUi() {
     const records = ensureDepartmentPdfArchiveRecordsLoaded();
     const summary = document.getElementById("departmentPdfArchiveSummaryText");
@@ -5114,13 +5277,13 @@ function buildInitialPhotoLightboxState() {
     }
     syncDepartmentPdfArchivePickerUi();
     syncMainDepartmentPdfArchivePickerUi();
-    syncMainArchiveSaveControlsUi();
   }
 
   async function refreshDepartmentPdfArchiveRecordsFromRemote() {
     if (
       state.departmentPdfArchiveRemoteLoading ||
-      !sync.hasRemoteSync?.()
+      !sync.hasRemoteSync?.() ||
+      typeof sync.listOcrFeedback !== "function"
     ) {
       refreshDepartmentPdfArchiveUi();
       return;
@@ -5128,23 +5291,11 @@ function buildInitialPhotoLightboxState() {
 
     state.departmentPdfArchiveRemoteLoading = true;
     try {
-      const [storedMainArchiveRecords, feedbackRecords] = await Promise.all([
-        typeof sync.listMainArchiveRecords === "function"
-          ? sync.listMainArchiveRecords(180)
-          : Promise.resolve([]),
-        typeof sync.listOcrFeedback === "function"
-          ? sync.listOcrFeedback(500)
-          : Promise.resolve([])
-      ]);
+      const records = await sync.listOcrFeedback(500);
       const normalized = sortDepartmentPdfArchiveRecords(
-        [
-          ...(Array.isArray(storedMainArchiveRecords) ? storedMainArchiveRecords : [])
-            .map(normalizeStoredMainArchivePdfRecord)
-            .filter(Boolean),
-          ...(Array.isArray(feedbackRecords) ? feedbackRecords : [])
-            .map(normalizeTelegramWebFormArchiveRecord)
-            .filter(Boolean)
-        ]
+        (Array.isArray(records) ? records : [])
+          .map(normalizeTelegramWebFormArchiveRecord)
+          .filter(Boolean)
       ).slice(0, MAX_DEPARTMENT_PDF_ARCHIVE_RECORDS);
 
       if (normalized.length) {
@@ -5187,17 +5338,13 @@ function buildInitialPhotoLightboxState() {
           label: record.archiveDateLabel || record.archiveLabel || dateKey,
           count: 0,
           departmentIds: new Set(),
-          latestCapturedAt: record.capturedAt,
-          hasMainPdf: false
+          latestCapturedAt: record.capturedAt
         });
       }
 
       const group = groupsByDate.get(dateKey);
       group.count += 1;
       group.departmentIds.add(record.departmentId);
-      if (record.archiveKind === "main-pdf") {
-        group.hasMainPdf = true;
-      }
       if (getTimestampSortValue(record.capturedAt) > getTimestampSortValue(group.latestCapturedAt)) {
         group.latestCapturedAt = record.capturedAt;
       }
@@ -5209,8 +5356,7 @@ function buildInitialPhotoLightboxState() {
         label: group.label,
         count: group.count,
         departmentCount: group.departmentIds.size,
-        latestCapturedAt: group.latestCapturedAt,
-        hasMainPdf: Boolean(group.hasMainPdf)
+        latestCapturedAt: group.latestCapturedAt
       }))
       .sort((left, right) => right.dateKey.localeCompare(left.dateKey));
   }
@@ -5311,31 +5457,7 @@ function buildInitialPhotoLightboxState() {
     }
     const groups = getDepartmentPdfArchiveDateGroups(records);
     const latest = groups[0];
-    const readyMainArchiveGroups = groups.filter((group) => group.hasMainPdf);
-    if (readyMainArchiveGroups.length) {
-      return `Ð“Ð¾Ñ‚Ð¾Ð²Ñ‹Ñ… ÑÐµÑ€Ð²ÐµÑ€Ð½Ñ‹Ñ… PDF-Ð°Ñ€Ñ…Ð¸Ð²Ð¾Ð²: ${readyMainArchiveGroups.length}. ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ Ð´Ð°Ñ‚Ð°: ${latest ? latest.label : "-"}.`;
-    }
     return `PDF-бланков: ${records.length}. Дат: ${groups.length}. Последняя дата: ${latest ? latest.label : "-"}.`;
-  }
-
-  function getMainDepartmentPdfArchiveSelectionText(selectedGroup) {
-    if (!selectedGroup) {
-      return "Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð´Ð°Ñ‚Ñƒ PDF-Ð°Ñ€Ñ…Ð¸Ð²Ð° Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹.";
-    }
-    if (selectedGroup.hasMainPdf) {
-      return `Ð”Ð°Ñ‚Ð°: ${selectedGroup.label}. Ð“Ð¾Ñ‚Ð¾Ð²Ñ‹Ð¹ ÑÐµÑ€Ð²ÐµÑ€Ð½Ñ‹Ð¹ PDF-Ð°Ñ€Ñ…Ð¸Ð² ÑƒÐ¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½.`;
-    }
-    return `Ð”Ð°Ñ‚Ð°: ${selectedGroup.label}. ÐžÑ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹ Ð² PDF: ${selectedGroup.departmentCount}. Ð‘Ð»Ð°Ð½ÐºÐ¾Ð² Ð² Ð°Ñ€Ñ…Ð¸Ð²Ðµ: ${selectedGroup.count}.`;
-  }
-
-  function getCurrentMainArchiveDateKey() {
-    const normalizedFromSnapshot = normalizeDepartmentPdfArchiveDateKey(
-      typeof state.snapshot?.reportDate === "string" ? state.snapshot.reportDate : ""
-    );
-    if (normalizedFromSnapshot) {
-      return normalizedFromSnapshot;
-    }
-    return normalizeDepartmentPdfArchiveDateKey(getCurrentDateTimeParts().date);
   }
 
   function getDepartmentPdfArchiveSelectionText(record) {
@@ -5378,7 +5500,7 @@ function buildInitialPhotoLightboxState() {
                   ${buildDepartmentPdfArchiveOptions(records, selectedRecord ? selectedRecord.archiveKey : "")}
                 </select>
               </label>
-              <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchivePdfLink" href="${escapeHtml(getDepartmentPdfArchivePrintPath(selectedRecord.archiveKey))}" target="_blank" rel="noopener">PDF</a>
+              <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchivePdfLink" href="${escapeHtml(getDepartmentPdfArchivePrintPath(selectedRecord.archiveKey))}"${getInternalPageTargetAttrs()}>PDF</a>
             </div>
             <div class="archive-selected-meta" id="departmentPdfArchiveSelectedMeta">${escapeHtml(getDepartmentPdfArchiveSelectionText(selectedRecord))}</div>
           </div>
@@ -5403,7 +5525,7 @@ function buildInitialPhotoLightboxState() {
               ${buildDepartmentPdfArchiveDateOptions(groups, selectedGroup.dateKey)}
             </select>
           </label>
-          <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchiveDatePdfLink" href="${escapeHtml(getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey))}" target="_blank" rel="noopener">Архив PDF</a>
+          <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchiveDatePdfLink" href="${escapeHtml(getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey))}"${getInternalPageTargetAttrs()}>Общий PDF</a>
         </div>
         <div class="archive-selected-meta" id="departmentPdfArchiveDateSelectedMeta">
           ${escapeHtml(`Дата: ${selectedGroup.label}. Отделений в PDF: ${selectedGroup.departmentCount}. Бланков в архиве: ${selectedGroup.count}.`)}
@@ -5462,149 +5584,6 @@ function buildInitialPhotoLightboxState() {
       meta.textContent = selectedGroup
         ? `Дата: ${selectedGroup.label}. Отделений в PDF: ${selectedGroup.departmentCount}. Бланков в архиве: ${selectedGroup.count}.`
         : "Выберите дату PDF-архива отделений.";
-    }
-  }
-
-  function buildMainDepartmentPdfArchivePicker(records) {
-    const groups = getDepartmentPdfArchiveDateGroups(records);
-    const selectedGroup = getSelectedDepartmentPdfArchiveDateGroup(groups);
-    if (!selectedGroup) {
-      return '<div class="archive-empty">ÐŸÐ¾ÐºÐ° Ð½ÐµÑ‚ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð½Ñ‹Ñ… PDF-Ð±Ð»Ð°Ð½ÐºÐ¾Ð² Ð¾Ñ‚Ð´ÐµÐ»ÐµÐ½Ð¸Ð¹.</div>';
-    }
-
-    return `
-      <div class="archive-selector">
-        <div class="archive-selector-row">
-          <label class="archive-picker" for="departmentPdfArchiveDateSelect">
-            <span>Ð”Ð°Ñ‚Ð° Ð±Ð»Ð°Ð½ÐºÐ¾Ð²</span>
-            <select id="departmentPdfArchiveDateSelect">
-              ${buildDepartmentPdfArchiveDateOptions(groups, selectedGroup.dateKey)}
-            </select>
-          </label>
-          <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchiveDatePdfLink" href="${escapeHtml(getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey))}" target="_blank" rel="noopener">ÐÑ€Ñ…Ð¸Ð² PDF</a>
-        </div>
-        <div class="archive-selected-meta" id="departmentPdfArchiveDateSelectedMeta">
-          ${escapeHtml(getMainDepartmentPdfArchiveSelectionText(selectedGroup))}
-        </div>
-      </div>
-    `;
-  }
-
-  function syncMainDepartmentPdfArchivePickerUi() {
-    const groups = getDepartmentPdfArchiveDateGroups();
-    const selectedGroup = getSelectedDepartmentPdfArchiveDateGroup(groups);
-    const select = document.getElementById("departmentPdfArchiveDateSelect");
-    const link = document.getElementById("departmentPdfArchiveDatePdfLink");
-    const meta = document.getElementById("departmentPdfArchiveDateSelectedMeta");
-
-    if (select && selectedGroup) {
-      select.value = selectedGroup.dateKey;
-    }
-    if (link) {
-      if (selectedGroup) {
-        link.href = getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey);
-        link.removeAttribute("aria-disabled");
-      } else {
-        link.removeAttribute("href");
-        link.setAttribute("aria-disabled", "true");
-      }
-    }
-    if (meta) {
-      meta.textContent = getMainDepartmentPdfArchiveSelectionText(selectedGroup);
-    }
-  }
-
-  function getDepartmentPdfArchiveSummaryText(records) {
-    if (!Array.isArray(records) || !records.length) {
-      return "\u0410\u0440\u0445\u0438\u0432 PDF \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0439 \u043f\u043e\u043a\u0430 \u043f\u0443\u0441\u0442. \u041e\u043d \u043d\u0430\u0447\u043d\u0435\u0442 \u0437\u0430\u043f\u043e\u043b\u043d\u044f\u0442\u044c\u0441\u044f \u043f\u043e\u0441\u043b\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0439.";
-    }
-    const groups = getDepartmentPdfArchiveDateGroups(records);
-    const latest = groups[0];
-    const readyMainArchiveGroups = groups.filter((group) => group.hasMainPdf);
-    if (readyMainArchiveGroups.length) {
-      return `\u0413\u043e\u0442\u043e\u0432\u044b\u0445 \u0441\u0435\u0440\u0432\u0435\u0440\u043d\u044b\u0445 PDF-\u0430\u0440\u0445\u0438\u0432\u043e\u0432: ${readyMainArchiveGroups.length}. \u041f\u043e\u0441\u043b\u0435\u0434\u043d\u044f\u044f \u0434\u0430\u0442\u0430: ${latest ? latest.label : "-"}.`;
-    }
-    return `PDF-\u0431\u043b\u0430\u043d\u043a\u043e\u0432: ${records.length}. \u0414\u0430\u0442: ${groups.length}. \u041f\u043e\u0441\u043b\u0435\u0434\u043d\u044f\u044f \u0434\u0430\u0442\u0430: ${latest ? latest.label : "-"}.`;
-  }
-
-  function getMainDepartmentPdfArchiveSelectionText(selectedGroup) {
-    if (!selectedGroup) {
-      return "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u0430\u0442\u0443 PDF-\u0430\u0440\u0445\u0438\u0432\u0430 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0439.";
-    }
-    if (selectedGroup.hasMainPdf) {
-      return `\u0414\u0430\u0442\u0430: ${selectedGroup.label}. \u0413\u043e\u0442\u043e\u0432\u044b\u0439 \u0441\u0435\u0440\u0432\u0435\u0440\u043d\u044b\u0439 PDF-\u0430\u0440\u0445\u0438\u0432 \u0443\u0436\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d.`;
-    }
-    return `\u0414\u0430\u0442\u0430: ${selectedGroup.label}. \u041e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0439 \u0432 PDF: ${selectedGroup.departmentCount}. \u0411\u043b\u0430\u043d\u043a\u043e\u0432 \u0432 \u0430\u0440\u0445\u0438\u0432\u0435: ${selectedGroup.count}.`;
-  }
-
-  function buildMainDepartmentPdfArchivePicker(records) {
-    const groups = getDepartmentPdfArchiveDateGroups(records);
-    const selectedGroup = getSelectedDepartmentPdfArchiveDateGroup(groups);
-    if (!selectedGroup) {
-      return '<div class="archive-empty">\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0445 PDF-\u0431\u043b\u0430\u043d\u043a\u043e\u0432 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0439.</div>';
-    }
-
-    return `
-      <div class="archive-selector">
-        <div class="archive-selector-row">
-          <label class="archive-picker" for="departmentPdfArchiveDateSelect">
-            <span>\u0414\u0430\u0442\u0430 \u0431\u043b\u0430\u043d\u043a\u043e\u0432</span>
-            <select id="departmentPdfArchiveDateSelect">
-              ${buildDepartmentPdfArchiveDateOptions(groups, selectedGroup.dateKey)}
-            </select>
-          </label>
-          <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchiveDatePdfLink" href="${escapeHtml(getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey))}" target="_blank" rel="noopener">\u0410\u0440\u0445\u0438\u0432 PDF</a>
-        </div>
-        <div class="archive-selected-meta" id="departmentPdfArchiveDateSelectedMeta">
-          ${escapeHtml(getMainDepartmentPdfArchiveSelectionText(selectedGroup))}
-        </div>
-      </div>
-    `;
-  }
-
-  function syncMainDepartmentPdfArchivePickerUi() {
-    const groups = getDepartmentPdfArchiveDateGroups();
-    const selectedGroup = getSelectedDepartmentPdfArchiveDateGroup(groups);
-    const select = document.getElementById("departmentPdfArchiveDateSelect");
-    const link = document.getElementById("departmentPdfArchiveDatePdfLink");
-    const meta = document.getElementById("departmentPdfArchiveDateSelectedMeta");
-
-    if (select && selectedGroup) {
-      select.value = selectedGroup.dateKey;
-    }
-    if (link) {
-      if (selectedGroup) {
-        link.href = getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey);
-        link.removeAttribute("aria-disabled");
-      } else {
-        link.removeAttribute("href");
-        link.setAttribute("aria-disabled", "true");
-      }
-    }
-    if (meta) {
-      meta.textContent = getMainDepartmentPdfArchiveSelectionText(selectedGroup);
-    }
-  }
-
-  function getMainArchiveSaveStatusText(archiveDateKey = getCurrentMainArchiveDateKey()) {
-    if (state.mainArchiveSaveStatus) {
-      return state.mainArchiveSaveStatus;
-    }
-    if (archiveDateKey) {
-      return `\u0422\u0435\u043a\u0443\u0449\u0430\u044f \u0434\u0430\u0442\u0430 \u0430\u0440\u0445\u0438\u0432\u0430: ${archiveDateKey}.`;
-    }
-    return "\u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u043a\u043d\u043e\u043f\u043a\u0443, \u0447\u0442\u043e\u0431\u044b \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043e\u0431\u0449\u0438\u0439 PDF-\u0430\u0440\u0445\u0438\u0432 \u043d\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435.";
-  }
-
-  function syncMainArchiveSaveControlsUi() {
-    const button = document.getElementById("saveMainArchivePdfBtn");
-    const status = document.getElementById("saveMainArchivePdfStatus");
-    if (button instanceof HTMLButtonElement && !button.disabled) {
-      button.textContent = "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0430\u0440\u0445\u0438\u0432 \u043d\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435";
-    }
-    if (status) {
-      status.textContent = getMainArchiveSaveStatusText();
-      status.className = `hint${state.mainArchiveSaveStatusIsError ? " warning-note" : ""}`;
     }
   }
 
@@ -8554,11 +8533,27 @@ function buildInitialPhotoLightboxState() {
   }
 
   function getArchivePrintPath(archiveKey) {
+    const record = getArchiveRecordByKey(archiveKey);
+    if (
+      record?.archiveKey
+      && sync.hasRemoteSync?.()
+      && typeof sync.buildMainArchivePdfUrl === "function"
+    ) {
+      const remoteUrl = sync.buildMainArchivePdfUrl(record.archiveKey || record.reportDate);
+      if (remoteUrl) {
+        return remoteUrl;
+      }
+    }
+
+    const query = new URLSearchParams();
+    query.set("archive", String(archiveKey || ""));
+    query.set("autoprint", "1");
+
     if (basePath === "@site") {
-      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&archive=${encodeURIComponent(archiveKey)}&autoprint=1`);
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&${query.toString()}`);
     }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
-    return `${prefix}archive-print.html?archive=${encodeURIComponent(archiveKey)}&autoprint=1`;
+    return `${prefix}archive-print.html?${query.toString()}`;
   }
 
   function getDepartmentPdfArchivePrintPath(archiveKey) {
@@ -8575,28 +8570,40 @@ function buildInitialPhotoLightboxState() {
     }
 
     if (basePath === "@site") {
-      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&departmentArchive=${encodeURIComponent(archiveKey)}&autoprint=1`);
+      const query = new URLSearchParams();
+      query.set("departmentArchive", String(archiveKey || ""));
+      query.set("autoprint", "1");
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&${query.toString()}`);
     }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
-    return `${prefix}archive-print.html?departmentArchive=${encodeURIComponent(archiveKey)}&autoprint=1`;
+    const query = new URLSearchParams();
+    query.set("departmentArchive", String(archiveKey || ""));
+    query.set("autoprint", "1");
+    return `${prefix}archive-print.html?${query.toString()}`;
   }
 
   function getDepartmentPdfArchiveDatePrintPath(dateKey) {
     if (
       sync.hasRemoteSync?.() &&
-      typeof sync.buildMainArchivePdfUrl === "function"
+      typeof sync.buildTelegramFormArchiveDatePdfUrl === "function"
     ) {
-      const remoteUrl = sync.buildMainArchivePdfUrl(dateKey);
+      const remoteUrl = sync.buildTelegramFormArchiveDatePdfUrl(dateKey);
       if (remoteUrl) {
         return remoteUrl;
       }
     }
 
     if (basePath === "@site") {
-      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&departmentArchiveDate=${encodeURIComponent(dateKey)}&autoprint=1`);
+      const query = new URLSearchParams();
+      query.set("departmentArchiveDate", String(dateKey || ""));
+      query.set("autoprint", "1");
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent("archive-print.html")}&${query.toString()}`);
     }
     const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
-    return `${prefix}archive-print.html?departmentArchiveDate=${encodeURIComponent(dateKey)}&autoprint=1`;
+    const query = new URLSearchParams();
+    query.set("departmentArchiveDate", String(dateKey || ""));
+    query.set("autoprint", "1");
+    return `${prefix}archive-print.html?${query.toString()}`;
   }
 
   function getSetupPath() {
@@ -8830,22 +8837,6 @@ function buildInitialPhotoLightboxState() {
     const report = buildHospitalReportData(state.snapshot);
     const mainPath = appendShareQuery(config.getMainPagePath(basePath));
     const summaryFreshness = getFreshnessMeta(report.updatedAt);
-    const currentMainArchiveDateKey = getCurrentMainArchiveDateKey();
-    const saveMainArchiveButtonHtml = sync.hasRemoteSync?.() && typeof sync.saveMainArchivePdf === "function"
-      ? `
-        <div class="archive-panel-actions">
-          <button type="button" id="saveMainArchivePdfBtn">Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð°Ñ€Ñ…Ð¸Ð² Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€Ðµ</button>
-          <span class="hint" id="saveMainArchivePdfStatus">${
-            escapeHtml(
-              currentMainArchiveDateKey
-                ? `Ð¢ÐµÐºÑƒÑ‰Ð°Ñ Ð´Ð°Ñ‚Ð° Ð°Ñ€Ñ…Ð¸Ð²Ð°: ${currentMainArchiveDateKey}.`
-                : "ÐÐ°Ð¶Ð¼Ð¸Ñ‚Ðµ ÐºÐ½Ð¾Ð¿ÐºÑƒ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð¾Ð±Ñ‰Ð¸Ð¹ PDF-Ð°Ñ€Ñ…Ð¸Ð² Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€Ðµ."
-            )
-          }</span>
-        </div>
-      `
-      : "";
-
     app.innerHTML = `
       <div class="page hospital-report-page">
         <div class="toolbar no-print">
@@ -9658,6 +9649,7 @@ function buildInitialPhotoLightboxState() {
     });
     const mainTableTelegramFormContent = buildMainTableTelegramFormContent();
     const mainTableTelegramFormBulkDeleteMeta = getMainTableTelegramFormBulkDeleteMeta();
+    const mainArchiveRecords = ensureArchiveRecordsLoaded();
     const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
     const canEditMainTable = canEditMainTableDirectly();
     const mainBlankPdfPath = config.getMainBlankPdfPath
@@ -9677,32 +9669,6 @@ function buildInitialPhotoLightboxState() {
       : "";
     const downloadMainPdfButtonHtml = mainBlankPdfPath
       ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">PDF ներբ.</a>`
-      : "";
-    const mainArchiveDateKey = normalizeDepartmentPdfArchiveDateKey(
-      displayedMainTableSnapshot.reportDate || state.snapshot.reportDate || ""
-    );
-    const mainArchivePdfUrl = typeof sync.buildMainArchivePdfUrl === "function"
-      ? sync.buildMainArchivePdfUrl(
-        mainArchiveDateKey || displayedMainTableSnapshot.reportDate || state.snapshot.reportDate || ""
-      )
-      : "";
-    const currentMainArchiveDateKey = getCurrentMainArchiveDateKey();
-    const saveMainArchiveButtonHtml = sync.hasRemoteSync?.() && typeof sync.saveMainArchivePdf === "function"
-      ? `
-        <div class="archive-panel-actions">
-          <button type="button" id="saveMainArchivePdfBtn">Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð°Ñ€Ñ…Ð¸Ð² Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€Ðµ</button>
-          <span class="hint" id="saveMainArchivePdfStatus">${
-            escapeHtml(
-              currentMainArchiveDateKey
-                ? `Ð¢ÐµÐºÑƒÑ‰Ð°Ñ Ð´Ð°Ñ‚Ð° Ð°Ñ€Ñ…Ð¸Ð²Ð°: ${currentMainArchiveDateKey}.`
-                : "ÐÐ°Ð¶Ð¼Ð¸Ñ‚Ðµ ÐºÐ½Ð¾Ð¿ÐºÑƒ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð¾Ð±Ñ‰Ð¸Ð¹ PDF-Ð°Ñ€Ñ…Ð¸Ð² Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€Ðµ."
-            )
-          }</span>
-        </div>
-      `
-      : "";
-    const downloadMainArchivePdfButtonHtml = mainArchivePdfUrl
-      ? `<a class="button-link" href="${escapeHtml(mainArchivePdfUrl)}" target="_blank" rel="noopener">PDF архив</a>`
       : "";
 
     app.innerHTML = `
@@ -9729,7 +9695,6 @@ function buildInitialPhotoLightboxState() {
               ${downloadSonoDesktopButtonHtml}
               ${downloadDesktopButtonHtml}
               ${downloadMainPdfButtonHtml}
-              ${downloadMainArchivePdfButtonHtml}
               <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
               <a class="button-link" href="${escapeHtml(getHospitalReportPath())}"${getInternalPageTargetAttrs()}>Հաշվետվ.</a>
               <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
@@ -9916,9 +9881,16 @@ function buildInitialPhotoLightboxState() {
             </section>
             <section class="panel no-print archive-panel department-pdf-archive-panel">
               <h2>Архив PDF отделений</h2>
+              <p id="mainArchiveSummaryText">${escapeHtml(getArchiveSummaryText(mainArchiveRecords))}</p>
+              <p class="hint">Общий PDF-архив собирает главную таблицу, данные отделений и вложения за выбранную дату. Его можно сохранить вручную или открыть из списка.</p>
+              <div class="archive-list" id="mainArchiveList">
+                ${buildArchivePicker(mainArchiveRecords)}
+              </div>
+              <div class="archive-selector-row archive-selector-row--actions">
+                <button type="button" class="archive-open-link archive-open-link--secondary" id="saveMainArchiveBtn"${state.mainArchiveSaveInFlight ? " disabled" : ""}>${state.mainArchiveSaveInFlight ? "Сохраняю архив..." : "Сохранить архив сейчас"}</button>
+              </div>
               <p id="departmentPdfArchiveSummaryText">${escapeHtml(getDepartmentPdfArchiveSummaryText(departmentPdfArchiveRecords))}</p>
-              <p class="hint">После сохранения отделения здесь остается PDF-копия бланка. Можно открыть отдельный бланк на странице отделения или общий PDF за выбранную дату.</p>
-              ${saveMainArchiveButtonHtml}
+              <p class="hint">Ниже остаётся отдельный PDF-архив бланков Telegram-форм за выбранную дату.</p>
               <div class="archive-list" id="departmentPdfArchiveList">
                 ${buildMainDepartmentPdfArchivePicker(departmentPdfArchiveRecords)}
               </div>
@@ -11227,14 +11199,6 @@ function buildInitialPhotoLightboxState() {
   }
 
   function renderDepartmentPdfArchiveDatePage() {
-    if (typeof sync.buildMainArchivePdfUrl === "function") {
-      const remoteUrl = sync.buildMainArchivePdfUrl(departmentArchiveDateFromQuery);
-      if (remoteUrl) {
-        window.location.replace(remoteUrl);
-        return;
-      }
-    }
-
     const records = getDepartmentPdfArchiveRecordsForDate(departmentArchiveDateFromQuery);
     if (!records.length) {
       renderArchiveNotFoundPage("PDF-архив за дату не найден", "За эту дату PDF-копии отделений в текущем браузере не найдены.");
@@ -11712,7 +11676,6 @@ function buildInitialPhotoLightboxState() {
     document.title = getAppDocumentTitle();
     enhanceMainPageCollapsiblePanels();
     attachCommonEvents();
-    syncMainArchiveSaveControlsUi();
     applyZoom(loadZoom());
     if (mode === "archive") {
       refreshComputedCells();
@@ -12118,13 +12081,13 @@ function buildInitialPhotoLightboxState() {
       const overallUpdateBanner = document.getElementById("overallUpdateBanner");
       const overallUpdateLabel = document.getElementById("overallUpdateLabel");
       const overallUpdateDetail = document.getElementById("overallUpdateDetail");
-      const archiveSummaryText = document.getElementById("archiveSummaryText");
-      const archiveList = document.getElementById("archiveList");
-      const archiveRecords = ensureArchiveRecordsLoaded();
       const savedTablesSummaryText = document.getElementById("mainTableSavedSummaryText");
       const savedTablesList = document.getElementById("mainTableSavedList");
       const savedTableRecords = ensureMainTableSavedRecordsLoaded();
       const mainDisplayContext = getMainTableDisplaySnapshotContext(savedTableRecords);
+      const mainArchiveSummaryText = document.getElementById("mainArchiveSummaryText");
+      const mainArchiveList = document.getElementById("mainArchiveList");
+      const mainArchiveRecords = ensureArchiveRecordsLoaded();
       const departmentPdfArchiveSummaryText = document.getElementById("departmentPdfArchiveSummaryText");
       const departmentPdfArchiveList = document.getElementById("departmentPdfArchiveList");
       const departmentPdfArchiveRecords = ensureDepartmentPdfArchiveRecordsLoaded();
@@ -12163,20 +12126,6 @@ function buildInitialPhotoLightboxState() {
         overallUpdateDetail.textContent = overallUpdateStatus.detail;
       }
 
-      if (archiveSummaryText) {
-        const nextArchiveSummary = getArchiveSummaryText(archiveRecords);
-        if (archiveSummaryText.textContent !== nextArchiveSummary) {
-          archiveSummaryText.textContent = nextArchiveSummary;
-        }
-      }
-      if (archiveList) {
-        const archiveRenderKey = getArchivePickerRenderKey(archiveRecords);
-        if (archiveList.dataset.renderKey !== archiveRenderKey) {
-          archiveList.innerHTML = buildArchivePicker(archiveRecords);
-          archiveList.dataset.renderKey = archiveRenderKey;
-        }
-      }
-      syncArchivePickerUi();
       if (savedTablesSummaryText) {
         const nextSavedTablesSummary = savedTableRecords.length
           ? `Сохранённых таблиц: ${savedTableRecords.length}. ${state.activeMainTableSavedPreviewKey ? "Показан" : "Выбран"} снимок: ${buildMainTableSavedSelectionText(selectedSavedRecord)}.`
@@ -12212,6 +12161,9 @@ function buildInitialPhotoLightboxState() {
       }
       if (applyDischargeShiftNowBtn instanceof HTMLButtonElement) {
         applyDischargeShiftNowBtn.disabled = shiftTransferBusy;
+      }
+      if (mainArchiveSummaryText || mainArchiveList) {
+        refreshMainArchiveUi();
       }
       if (departmentPdfArchiveSummaryText) {
         departmentPdfArchiveSummaryText.textContent = getDepartmentPdfArchiveSummaryText(departmentPdfArchiveRecords);
@@ -14664,11 +14616,69 @@ function buildInitialPhotoLightboxState() {
 </html>`;
   }
 
+  async function handleSaveMainArchiveNow() {
+    if (state.mainArchiveSaveInFlight) {
+      return;
+    }
+    if (!sync.hasRemoteSync?.() || typeof sync.saveMainArchivePdf !== "function") {
+      setInfo("Ручное сохранение архива доступно только в онлайн-режиме.", true);
+      return;
+    }
+
+    const dateKey = normalizeDepartmentPdfArchiveDateKey(state.snapshot.reportDate || "")
+      || getArchiveContext().key;
+
+    state.mainArchiveSaveInFlight = true;
+    refreshMainArchiveUi();
+    setInfo(`Сохраняю общий архив PDF за ${dateKey}...`, false);
+
+    try {
+      const result = await sync.saveMainArchivePdf(dateKey);
+      await refreshMainArchiveRecordsFromRemote();
+
+      const refreshedRecord = getArchiveRecordByKey(result?.archiveKey || dateKey);
+      if (refreshedRecord) {
+        state.selectedArchiveKey = refreshedRecord.archiveKey;
+      }
+      refreshMainArchiveUi();
+
+      const pdfUrl = typeof sync.buildMainArchivePdfUrl === "function"
+        ? sync.buildMainArchivePdfUrl(result?.archiveKey || dateKey)
+        : "";
+      const deletedFeedbackCount = Math.max(0, Number(result?.deletedFeedbackCount) || 0);
+      const saveMessage = result?.skipped
+        ? `Общий архив за ${result?.archiveKey || dateKey} уже был сохранён ранее.`
+        : `Общий архив за ${result?.archiveKey || dateKey} сохранён. Очищено исходных записей: ${deletedFeedbackCount}.`;
+      setInfo(saveMessage, false);
+
+      if (pdfUrl) {
+        window.open(pdfUrl, "_blank", "noopener");
+      }
+    } catch (error) {
+      setInfo(error instanceof Error ? error.message : "Не удалось сохранить общий архив PDF.", true);
+    } finally {
+      state.mainArchiveSaveInFlight = false;
+      refreshMainArchiveUi();
+    }
+  }
+
   function printArchiveRecord(archiveKey) {
     const record = ensureArchiveRecordsLoaded().find((item) => item.archiveKey === archiveKey);
     if (!record) {
       setInfo("Не удалось найти сохранённый архив.", true);
       return;
+    }
+
+    if (
+      sync.hasRemoteSync?.()
+      && typeof sync.buildMainArchivePdfUrl === "function"
+    ) {
+      const remoteUrl = sync.buildMainArchivePdfUrl(record.archiveKey || record.reportDate);
+      if (remoteUrl) {
+        window.open(remoteUrl, "_blank", "noopener");
+        setInfo(`Архив ${record.archiveLabel} открыт в PDF.`, false);
+        return;
+      }
     }
 
     const blob = new Blob([buildArchivePrintHtml(record)], {
@@ -14698,121 +14708,6 @@ function buildInitialPhotoLightboxState() {
     state.info = message || "";
     state.infoIsError = Boolean(isError);
     refreshTableData();
-  }
-
-  async function handleSaveMainArchivePdf() {
-    if (!sync.hasRemoteSync?.() || typeof sync.saveMainArchivePdf !== "function") {
-      setInfo("Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ Ð°Ñ€Ñ…Ð¸Ð²Ð° Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð¾Ð½Ð»Ð°Ð¹Ð½-Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð°.", true);
-      return;
-    }
-
-    const archiveDateKey = getCurrentMainArchiveDateKey();
-    if (!archiveDateKey) {
-      setInfo("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ Ð´Ð°Ñ‚Ñƒ Ð´Ð»Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ Ð¾Ð±Ñ‰ÐµÐ³Ð¾ Ð°Ñ€Ñ…Ð¸Ð²Ð°.", true);
-      return;
-    }
-
-    const button = document.getElementById("saveMainArchivePdfBtn");
-    const status = document.getElementById("saveMainArchivePdfStatus");
-    if (button instanceof HTMLButtonElement) {
-      button.disabled = true;
-      button.textContent = "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ Ð°Ñ€Ñ…Ð¸Ð²...";
-    }
-    if (status) {
-      status.textContent = `Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÑŽ Ð¾Ð±Ñ‰Ð¸Ð¹ PDF-Ð°Ñ€Ñ…Ð¸Ð² Ð·Ð° ${archiveDateKey}...`;
-      status.className = "hint";
-    }
-
-    try {
-      state.selectedDepartmentPdfArchiveDate = archiveDateKey;
-      const result = await sync.saveMainArchivePdf(archiveDateKey);
-      await refreshDepartmentPdfArchiveRecordsFromRemote();
-      const deletedFeedbackCount = Number(result?.deletedFeedbackCount) || 0;
-      const effectiveArchiveKey = typeof result?.archiveKey === "string" && result.archiveKey.trim()
-        ? result.archiveKey.trim()
-        : archiveDateKey;
-      const message = result?.skipped
-        ? `ÐÑ€Ñ…Ð¸Ð² Ð·Ð° ${effectiveArchiveKey} ÑƒÐ¶Ðµ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€Ðµ.`
-        : `ÐÑ€Ñ…Ð¸Ð² Ð·Ð° ${effectiveArchiveKey} ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½ Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€Ðµ. ÐžÑ‡Ð¸Ñ‰ÐµÐ½Ð¾ Ð²Ñ…Ð¾Ð´ÑÑ‰Ð¸Ñ… Ð·Ð°Ð¿Ð¸ÑÐµÐ¹: ${deletedFeedbackCount}.`;
-
-      if (status) {
-        status.textContent = message;
-        status.className = "hint";
-      }
-      setInfo(message, false);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð¾Ð±Ñ‰Ð¸Ð¹ PDF-Ð°Ñ€Ñ…Ð¸Ð².";
-      if (status) {
-        status.textContent = message;
-        status.className = "hint warning-note";
-      }
-      setInfo(message, true);
-    } finally {
-      if (button instanceof HTMLButtonElement) {
-        button.disabled = false;
-        button.textContent = "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ Ð°Ñ€Ñ…Ð¸Ð² Ð½Ð° ÑÐµÑ€Ð²ÐµÑ€Ðµ";
-      }
-    }
-  }
-
-  async function handleSaveMainArchivePdf() {
-    if (!sync.hasRemoteSync?.() || typeof sync.saveMainArchivePdf !== "function") {
-      const message = "\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435 \u0430\u0440\u0445\u0438\u0432\u0430 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u0442\u043e\u043b\u044c\u043a\u043e \u0432 \u043e\u043d\u043b\u0430\u0439\u043d-\u0440\u0435\u0436\u0438\u043c\u0435 \u0432\u043b\u0430\u0434\u0435\u043b\u044c\u0446\u0430.";
-      state.mainArchiveSaveStatus = message;
-      state.mainArchiveSaveStatusIsError = true;
-      syncMainArchiveSaveControlsUi();
-      setInfo(message, true);
-      return;
-    }
-
-    const archiveDateKey = getCurrentMainArchiveDateKey();
-    if (!archiveDateKey) {
-      const message = "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u043f\u0440\u0435\u0434\u0435\u043b\u0438\u0442\u044c \u0434\u0430\u0442\u0443 \u0434\u043b\u044f \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u043e\u0431\u0449\u0435\u0433\u043e \u0430\u0440\u0445\u0438\u0432\u0430.";
-      state.mainArchiveSaveStatus = message;
-      state.mainArchiveSaveStatusIsError = true;
-      syncMainArchiveSaveControlsUi();
-      setInfo(message, true);
-      return;
-    }
-
-    const button = document.getElementById("saveMainArchivePdfBtn");
-    state.selectedDepartmentPdfArchiveDate = archiveDateKey;
-    state.mainArchiveSaveStatus = `\u0421\u043e\u0445\u0440\u0430\u043d\u044f\u044e \u043e\u0431\u0449\u0438\u0439 PDF-\u0430\u0440\u0445\u0438\u0432 \u0437\u0430 ${archiveDateKey}...`;
-    state.mainArchiveSaveStatusIsError = false;
-    if (button instanceof HTMLButtonElement) {
-      button.disabled = true;
-      button.textContent = "\u0421\u043e\u0445\u0440\u0430\u043d\u044f\u044e \u0430\u0440\u0445\u0438\u0432...";
-    }
-    syncMainArchiveSaveControlsUi();
-
-    try {
-      const result = await sync.saveMainArchivePdf(archiveDateKey);
-      await refreshDepartmentPdfArchiveRecordsFromRemote();
-      const deletedFeedbackCount = Math.max(0, Number(result?.deletedFeedbackCount) || 0);
-      const effectiveArchiveKey = typeof result?.archiveKey === "string" && result.archiveKey.trim()
-        ? result.archiveKey.trim()
-        : archiveDateKey;
-      const message = result?.skipped
-        ? `\u0410\u0440\u0445\u0438\u0432 \u0437\u0430 ${effectiveArchiveKey} \u0443\u0436\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d \u043d\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435.`
-        : `\u0410\u0440\u0445\u0438\u0432 \u0437\u0430 ${effectiveArchiveKey} \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d \u043d\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435. \u041e\u0447\u0438\u0449\u0435\u043d\u043e \u0432\u0445\u043e\u0434\u044f\u0449\u0438\u0445 \u0437\u0430\u043f\u0438\u0441\u0435\u0439: ${deletedFeedbackCount}.`;
-      state.mainArchiveSaveStatus = message;
-      state.mainArchiveSaveStatusIsError = false;
-      syncMainArchiveSaveControlsUi();
-      setInfo(message, false);
-    } catch (error) {
-      const message = error instanceof Error
-        ? error.message
-        : "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043e\u0431\u0449\u0438\u0439 PDF-\u0430\u0440\u0445\u0438\u0432.";
-      state.mainArchiveSaveStatus = message;
-      state.mainArchiveSaveStatusIsError = true;
-      syncMainArchiveSaveControlsUi();
-      setInfo(message, true);
-    } finally {
-      if (button instanceof HTMLButtonElement) {
-        button.disabled = false;
-      }
-      syncMainArchiveSaveControlsUi();
-    }
   }
 
   function handleMainTableEditToggle(unlocked) {
@@ -15943,6 +15838,13 @@ function buildInitialPhotoLightboxState() {
       });
     }
 
+    const saveMainArchiveBtn = document.getElementById("saveMainArchiveBtn");
+    if (saveMainArchiveBtn) {
+      saveMainArchiveBtn.addEventListener("click", () => {
+        void handleSaveMainArchiveNow();
+      });
+    }
+
     attachMainTableSavedNavigatorEvents();
 
     const departmentPdfArchiveSelect = document.getElementById("departmentPdfArchiveSelect");
@@ -15961,18 +15863,19 @@ function buildInitialPhotoLightboxState() {
       });
     }
 
-    const saveMainArchivePdfBtn = document.getElementById("saveMainArchivePdfBtn");
-    if (saveMainArchivePdfBtn) {
-      saveMainArchivePdfBtn.addEventListener("click", () => {
-        void handleSaveMainArchivePdf();
-      });
-    }
-
     if (!app.dataset.archiveDownloadBound) {
       app.addEventListener("click", (event) => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) {
           return;
+        }
+
+        const archiveLink = target.closest("a[href]");
+        if (archiveLink instanceof HTMLAnchorElement) {
+          const payload = buildArchiveWindowNamePayloadFromHref(archiveLink.href);
+          if (payload) {
+            writeArchiveWindowNamePayload(payload);
+          }
         }
 
         const button = target.closest("[data-print-archive]");
@@ -16361,8 +16264,60 @@ function buildInitialPhotoLightboxState() {
     }
 
     if (mode === "archive") {
-      state.archiveRecords = readArchiveRecords();
-      state.departmentPdfArchiveRecords = readDepartmentPdfArchiveRecords();
+      const windowNamePayload = readArchiveWindowNamePayload();
+      state.archiveRecords = mergeNormalizedRecords(
+        readArchiveRecords(),
+        [
+          ...(archivePayloadFromQuery ? [archivePayloadFromQuery] : []),
+          ...(windowNamePayload?.kind === "main-archive-record"
+            && windowNamePayload.archiveKey === archiveKeyFromQuery
+            && windowNamePayload.record
+              ? [windowNamePayload.record]
+              : [])
+        ],
+        normalizeArchiveRecord,
+        sortArchiveRecords,
+        MAX_ARCHIVE_RECORDS,
+        (record) => record.archiveKey
+      );
+      state.mainTableSavedRecords = mergeNormalizedRecords(
+        readMainTableSavedRecords(),
+        [
+          ...(savedMainPayloadFromQuery ? [savedMainPayloadFromQuery] : []),
+          ...(windowNamePayload?.kind === "saved-main-record"
+            && windowNamePayload.savedMainKey === savedMainKeyFromQuery
+            && windowNamePayload.record
+              ? [windowNamePayload.record]
+              : [])
+        ],
+        normalizeMainTableSavedRecord,
+        sortMainTableSavedRecords,
+        MAX_MAIN_TABLE_SAVED_RECORDS,
+        (record) => record.snapshotKey
+      );
+      state.departmentPdfArchiveRecords = mergeNormalizedRecords(
+        readDepartmentPdfArchiveRecords(),
+        [
+          ...(departmentArchivePayloadFromQuery ? [departmentArchivePayloadFromQuery] : []),
+          ...(Array.isArray(departmentArchiveDatePayloadFromQuery)
+            ? departmentArchiveDatePayloadFromQuery
+            : (departmentArchiveDatePayloadFromQuery ? [departmentArchiveDatePayloadFromQuery] : [])),
+          ...(windowNamePayload?.kind === "department-archive-record"
+            && windowNamePayload.departmentArchiveKey === departmentArchiveKeyFromQuery
+            && windowNamePayload.record
+              ? [windowNamePayload.record]
+              : []),
+          ...(windowNamePayload?.kind === "department-archive-date-records"
+            && windowNamePayload.departmentArchiveDate === departmentArchiveDateFromQuery
+            && Array.isArray(windowNamePayload.records)
+              ? windowNamePayload.records
+              : [])
+        ],
+        normalizeDepartmentPdfArchiveRecord,
+        sortDepartmentPdfArchiveRecords,
+        MAX_DEPARTMENT_PDF_ARCHIVE_RECORDS,
+        (record) => record.archiveKey
+      );
       if (
         archiveKeyFromQuery
         && !getArchiveRecordByKey(archiveKeyFromQuery)
@@ -16413,6 +16368,7 @@ function buildInitialPhotoLightboxState() {
     renderPage();
     bindBackgroundPendingSyncEvents();
     bindShiftTransferEvents();
+    void refreshMainArchiveRecordsFromRemote();
     void refreshDepartmentPdfArchiveRecordsFromRemote();
     startAutoRefreshIfNeeded();
     startFreshnessTicker();
@@ -16618,3 +16574,4 @@ function buildInitialPhotoLightboxState() {
     `;
   });
 })();
+

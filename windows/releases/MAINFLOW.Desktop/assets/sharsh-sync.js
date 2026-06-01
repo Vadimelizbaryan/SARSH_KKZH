@@ -32,8 +32,44 @@
   }
 
   function getTelegramFunctionEndpoint() {
-    const baseUrl = String(runtime.supabaseUrl || "").replace(/\/+$/, "");
+    const remoteConfig = getRemoteLinkConfig();
+    const baseUrl = String(remoteConfig.supabaseUrl || "").replace(/\/+$/, "");
     return `${baseUrl}/functions/v1/Mainflow-telegram`;
+  }
+
+  function getRemoteLinkConfig() {
+    if (
+      typeof runtime.supabaseUrl === "string" && runtime.supabaseUrl.trim() !== ""
+      && typeof runtime.supabaseAnonKey === "string" && runtime.supabaseAnonKey.trim() !== ""
+    ) {
+      return runtime;
+    }
+
+    if (runtimeMeta && typeof runtimeMeta.loadStoredConfig === "function") {
+      const storedConfig = runtimeMeta.loadStoredConfig();
+      if (
+        storedConfig
+        && storedConfig.syncMode === "supabase-function"
+        && typeof storedConfig.supabaseUrl === "string" && storedConfig.supabaseUrl.trim() !== ""
+        && typeof storedConfig.supabaseAnonKey === "string" && storedConfig.supabaseAnonKey.trim() !== ""
+      ) {
+        return storedConfig;
+      }
+    }
+
+    const defaultConfig = runtimeMeta && runtimeMeta.defaultConfig && typeof runtimeMeta.defaultConfig === "object"
+      ? runtimeMeta.defaultConfig
+      : null;
+    if (
+      defaultConfig
+      && defaultConfig.syncMode === "supabase-function"
+      && typeof defaultConfig.supabaseUrl === "string" && defaultConfig.supabaseUrl.trim() !== ""
+      && typeof defaultConfig.supabaseAnonKey === "string" && defaultConfig.supabaseAnonKey.trim() !== ""
+    ) {
+      return defaultConfig;
+    }
+
+    return runtime;
   }
 
   function getAuthHeaders() {
@@ -526,6 +562,82 @@
       default:
         throw new Error(`Неизвестный тип офлайн-операции: ${String(item?.type || "")}`);
     }
+  }
+
+  async function loadMainArchiveRecord(archiveKey) {
+    const normalizedArchiveKey = String(archiveKey || "").trim();
+    if (!hasRemoteSync() || !normalizedArchiveKey) {
+      return null;
+    }
+
+    const url = new URL(getSyncEndpoint());
+    url.searchParams.set("action", "main-archive-record");
+    url.searchParams.set("archiveKey", normalizedArchiveKey);
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Сессия владельца недействительна. Войдите снова.");
+      }
+      if (response.status === 404) {
+        return null;
+      }
+      throw buildResponseError(response, payload, "Не удалось загрузить архив главной таблицы");
+    }
+
+    const payload = await response.json().catch(() => null);
+    return payload && typeof payload.archiveKey === "string" ? payload : null;
+  }
+
+  async function listMainArchiveRecords(limit = 120) {
+    if (!hasRemoteSync()) {
+      return [];
+    }
+
+    const url = new URL(getSyncEndpoint());
+    url.searchParams.set("action", "main-archive-list");
+    url.searchParams.set(
+      "limit",
+      String(Number.isFinite(Number(limit)) ? Number(limit) : 120)
+    );
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Ð¡ÐµÑÑÐ¸Ñ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð° Ð½ÐµÐ´ÐµÐ¹ÑÑ‚Ð²Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ð°. Ð’Ð¾Ð¹Ð´Ð¸Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°.");
+      }
+      throw buildResponseError(response, payload, "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑÐ¿Ð¸ÑÐ¾Ðº Ð°Ñ€Ñ…Ð¸Ð²Ð¾Ð²");
+    }
+
+    return Array.isArray(payload?.records) ? payload.records : [];
+  }
+
+  async function saveMainArchivePdf(dateKey, options = {}) {
+    if (!hasRemoteSync()) {
+      throw new Error("Сохранение архива доступно только в онлайн-режиме владельца.");
+    }
+
+    const normalizedDateKey = typeof dateKey === "string" ? dateKey.trim() : "";
+    const payload = await postRemotePayload(
+      {
+        type: "save_main_archive_pdf",
+        dateKey: normalizedDateKey,
+        force: Boolean(options?.force)
+      },
+      "Не удалось сохранить общий PDF-архив"
+    );
+
+    return payload || { ok: true };
   }
 
   async function syncPendingChanges() {
@@ -2020,7 +2132,6 @@
     });
 
     const payload = await response.json().catch(() => null);
-    if (!response.ok) { return { autoRotateImages: Boolean(runtime.autoRotateImages) }; }
     if (!response.ok) {
       if (await handleOwnerAuthFailure(response)) {
         throw new Error("Сессия владельца недействительна. Войдите снова.");
@@ -2418,7 +2529,12 @@
 
   function buildTelegramFormPdfUrl(feedbackId, departmentId) {
     const normalizedId = String(feedbackId || "").trim();
-    if (!hasRemoteSync() || !normalizedId) {
+    const remoteConfig = getRemoteLinkConfig();
+    if (
+      !normalizedId
+      || remoteConfig.syncMode !== "supabase-function"
+      || typeof remoteConfig.supabaseUrl !== "string" || remoteConfig.supabaseUrl.trim() === ""
+    ) {
       return "";
     }
 
@@ -2433,19 +2549,30 @@
 
   function buildTelegramFormArchiveDatePdfUrl(dateKey) {
     const normalizedDate = String(dateKey || "").trim();
-    if (!hasRemoteSync() || !normalizedDate) {
+    const remoteConfig = getRemoteLinkConfig();
+    if (
+      !normalizedDate
+      || remoteConfig.syncMode !== "supabase-function"
+      || typeof remoteConfig.supabaseUrl !== "string" || remoteConfig.supabaseUrl.trim() === ""
+    ) {
       return "";
     }
 
     const url = new URL(getTelegramFunctionEndpoint());
     url.searchParams.set("action", "telegram-form-archive-pdf");
     url.searchParams.set("date", normalizedDate);
+    url.searchParams.set("formsOnly", "1");
     return url.toString();
   }
 
   function buildMainArchivePdfUrl(reportDate) {
     const normalizedDate = String(reportDate || "").trim();
-    if (!hasRemoteSync()) {
+    const remoteConfig = getRemoteLinkConfig();
+    if (
+      remoteConfig.syncMode !== "supabase-function"
+      || typeof remoteConfig.supabaseUrl !== "string"
+      || remoteConfig.supabaseUrl.trim() === ""
+    ) {
       return "";
     }
 
@@ -2454,7 +2581,26 @@
     if (normalizedDate) {
       url.searchParams.set("date", normalizedDate);
     }
+    url.searchParams.set("t", String(Date.now()));
     return url.toString();
+  }
+
+  async function saveMainArchivePdf(dateKey, options = {}) {
+    if (!hasRemoteSync()) {
+      throw new Error("\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435 \u0430\u0440\u0445\u0438\u0432\u0430 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u0442\u043e\u043b\u044c\u043a\u043e \u0432 \u043e\u043d\u043b\u0430\u0439\u043d-\u0440\u0435\u0436\u0438\u043c\u0435 \u0432\u043b\u0430\u0434\u0435\u043b\u044c\u0446\u0430.");
+    }
+
+    const normalizedDateKey = typeof dateKey === "string" ? dateKey.trim() : "";
+    const payload = await postRemotePayload(
+      {
+        type: "save_main_archive_pdf",
+        dateKey: normalizedDateKey,
+        force: Boolean(options?.force)
+      },
+      "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043e\u0431\u0449\u0438\u0439 PDF-\u0430\u0440\u0445\u0438\u0432"
+    );
+
+    return payload || { ok: true };
   }
 
   function getSourceLabel(source) {
@@ -2478,6 +2624,9 @@
     runtime,
     hasRemoteSync,
     loadSnapshot,
+    loadMainArchiveRecord,
+    listMainArchiveRecords,
+    saveMainArchivePdf,
     getPendingSyncStatus,
     syncPendingChanges,
     saveDepartment,

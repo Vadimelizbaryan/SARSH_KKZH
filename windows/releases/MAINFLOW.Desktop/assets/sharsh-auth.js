@@ -44,8 +44,8 @@
 
   function escapeAttr(value) {
     return String(value || "")
-      .replaceAll("&", "&")
-      .replaceAll('"', """)
+      .replaceAll("&", "&amp;")
+      .replaceAll('"', "&quot;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;");
   }
@@ -109,7 +109,7 @@
     }
 
     const title = document.title || "";
-    return /[�]/.test(title) ? "SARSH_KKZH" : title;
+    return /[ÃƒÒ�]/.test(title) ? "SARSH_KKZH" : title;
   }
 
   async function notifyLoginToTelegram(email) {
