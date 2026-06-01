@@ -7,6 +7,7 @@ on:
     - cron: "1 3 * * *"   # 07:01 Yerevan: night-shift summary
     - cron: "31 3 * * *"  # 07:31 Yerevan: night-duty reminder
     - cron: "1 4 * * *"   # 08:01 Yerevan: morning PDFs
+    - cron: "1 6 * * *"   # 10:01 Yerevan: save daily main archive PDF + cleanup source data
     - cron: "1 8 * * *"   # 12:01 Yerevan: midday reminder
     - cron: "1 13 * * *"  # 17:01 Yerevan: evening reminder
   workflow_dispatch:
@@ -19,6 +20,7 @@ on:
           - night-summary
           - night-duty
           - morning-pdfs
+          - daily-main-archive
           - midday
           - evening
       force:
@@ -56,6 +58,10 @@ jobs:
                 slot="morning-pdfs"
                 action="send-main-pdfs"
                 ;;
+              "1 6 * * *")
+                slot="daily-main-archive"
+                action="daily-main-archive"
+                ;;
               "1 8 * * *")
                 slot="midday"
                 ;;
@@ -81,6 +87,9 @@ jobs:
           if [ "$slot" = "night-summary" ]; then
             action="night-shift-summary"
           fi
+          if [ "$slot" = "daily-main-archive" ]; then
+            action="daily-main-archive"
+          fi
 
           echo "action=$action" >> "$GITHUB_OUTPUT"
           echo "slot=$slot" >> "$GITHUB_OUTPUT"
@@ -95,6 +104,8 @@ jobs:
             url="$FUNCTION_URL?action=night-duty-reminder"
           elif [ "${{ steps.params.outputs.action }}" = "night-shift-summary" ]; then
             url="$FUNCTION_URL?action=night-shift-summary"
+          elif [ "${{ steps.params.outputs.action }}" = "daily-main-archive" ]; then
+            url="$FUNCTION_URL?action=daily-main-archive"
           else
             url="$FUNCTION_URL?action=daily-reminder&slot=${{ steps.params.outputs.slot }}"
           fi

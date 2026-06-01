@@ -594,6 +594,52 @@
     return payload && typeof payload.archiveKey === "string" ? payload : null;
   }
 
+  async function listMainArchiveRecords(limit = 120) {
+    if (!hasRemoteSync()) {
+      return [];
+    }
+
+    const url = new URL(getSyncEndpoint());
+    url.searchParams.set("action", "main-archive-list");
+    url.searchParams.set(
+      "limit",
+      String(Number.isFinite(Number(limit)) ? Number(limit) : 120)
+    );
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (await handleOwnerAuthFailure(response)) {
+        throw new Error("Ð¡ÐµÑÑÐ¸Ñ Ð²Ð»Ð°Ð´ÐµÐ»ÑŒÑ†Ð° Ð½ÐµÐ´ÐµÐ¹ÑÑ‚Ð²Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ð°. Ð’Ð¾Ð¹Ð´Ð¸Ñ‚Ðµ ÑÐ½Ð¾Ð²Ð°.");
+      }
+      throw buildResponseError(response, payload, "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑÐ¿Ð¸ÑÐ¾Ðº Ð°Ñ€Ñ…Ð¸Ð²Ð¾Ð²");
+    }
+
+    return Array.isArray(payload?.records) ? payload.records : [];
+  }
+
+  async function saveMainArchivePdf(dateKey, options = {}) {
+    if (!hasRemoteSync()) {
+      throw new Error("Сохранение архива доступно только в онлайн-режиме владельца.");
+    }
+
+    const normalizedDateKey = typeof dateKey === "string" ? dateKey.trim() : "";
+    const payload = await postRemotePayload(
+      {
+        type: "save_main_archive_pdf",
+        dateKey: normalizedDateKey,
+        force: Boolean(options?.force)
+      },
+      "Не удалось сохранить общий PDF-архив"
+    );
+
+    return payload || { ok: true };
+  }
+
   async function syncPendingChanges() {
     if (pendingSyncInFlightPromise) {
       return pendingSyncInFlightPromise;
@@ -2540,6 +2586,24 @@
     return url.toString();
   }
 
+  async function saveMainArchivePdf(dateKey, options = {}) {
+    if (!hasRemoteSync()) {
+      throw new Error("\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435 \u0430\u0440\u0445\u0438\u0432\u0430 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u0442\u043e\u043b\u044c\u043a\u043e \u0432 \u043e\u043d\u043b\u0430\u0439\u043d-\u0440\u0435\u0436\u0438\u043c\u0435 \u0432\u043b\u0430\u0434\u0435\u043b\u044c\u0446\u0430.");
+    }
+
+    const normalizedDateKey = typeof dateKey === "string" ? dateKey.trim() : "";
+    const payload = await postRemotePayload(
+      {
+        type: "save_main_archive_pdf",
+        dateKey: normalizedDateKey,
+        force: Boolean(options?.force)
+      },
+      "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043e\u0431\u0449\u0438\u0439 PDF-\u0430\u0440\u0445\u0438\u0432"
+    );
+
+    return payload || { ok: true };
+  }
+
   function getSourceLabel(source) {
     if (source === "remote") {
       return "Առցանց սինխր.";
@@ -2562,6 +2626,8 @@
     hasRemoteSync,
     loadSnapshot,
     loadMainArchiveRecord,
+    listMainArchiveRecords,
+    saveMainArchivePdf,
     getPendingSyncStatus,
     syncPendingChanges,
     saveDepartment,

@@ -45,6 +45,8 @@ const TELEGRAM_APPLY_NIGHT_SHIFT_CALLBACK = "apply_night_shift_to_main";
 const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
 const REPORT_PDF_FILE_NAME = "Report.pdf";
 const MAIN_ARCHIVE_PDF_FILE_NAME = "Main_archive.pdf";
+const MAIN_ARCHIVE_STORAGE_BUCKET = "sharsh-main-archives";
+const MAIN_ARCHIVE_SNAPSHOT_META_KEY = "__mainArchivePdf";
 const SONO_TRANSLATION_MODEL = (Deno.env.get("OPENAI_TRANSLATION_MODEL") || "gpt-5.4").trim();
 const SONO_FORM_UI_VERSION = "20260531sono5";
 const SONO_BASE_DOCX_TEMPLATE_PATH = "/program-table-blank.docx";
@@ -8973,11 +8975,176 @@ type MainArchivePhotoRecord = {
   sourceLabel: string;
 };
 
+type MainArchiveStoredPdfMeta = {
+  storageBucket: string;
+  storagePath: string;
+  fileName: string;
+  generatedAt: string;
+  sourceFeedbackDeletedCount: number;
+  cleanupCompletedAt: string | null;
+};
+
 function buildMainArchivePdfFileName(dateKey: string) {
   const baseName = MAIN_ARCHIVE_PDF_FILE_NAME.replace(/\.pdf$/i, "");
   const label = formatTelegramFormArchiveDateLabel(dateKey || getYerevanDateKey());
   const safeLabel = sanitizeSheetFileNamePart(label.replaceAll(".", ",").replaceAll("/", ",")) || dateKey || getYerevanDateKey();
   return `${baseName}_${safeLabel}.pdf`;
+}
+
+function normalizeMainArchiveStoredPdfMeta(meta: unknown): MainArchiveStoredPdfMeta | null {
+  if (!meta || typeof meta !== "object") {
+    return null;
+  }
+
+  const source = meta as Record<string, unknown>;
+  const storageBucket = typeof source.storageBucket === "string" && source.storageBucket.trim()
+    ? source.storageBucket.trim()
+    : MAIN_ARCHIVE_STORAGE_BUCKET;
+  const storagePath = typeof source.storagePath === "string" ? source.storagePath.trim() : "";
+  const fileName = typeof source.fileName === "string" && source.fileName.trim()
+    ? source.fileName.trim()
+    : "";
+  if (!storagePath || !fileName) {
+    return null;
+  }
+
+  return {
+    storageBucket,
+    storagePath,
+    fileName,
+    generatedAt: typeof source.generatedAt === "string" && source.generatedAt.trim()
+      ? source.generatedAt.trim()
+      : new Date().toISOString(),
+    sourceFeedbackDeletedCount: Math.max(0, Math.trunc(Number(source.sourceFeedbackDeletedCount) || 0)),
+    cleanupCompletedAt: typeof source.cleanupCompletedAt === "string" && source.cleanupCompletedAt.trim()
+      ? source.cleanupCompletedAt.trim()
+      : null
+  };
+}
+
+function getMainArchiveStoredPdfMetaFromSnapshot(snapshot: unknown) {
+  if (!snapshot || typeof snapshot !== "object") {
+    return null;
+  }
+
+  return normalizeMainArchiveStoredPdfMeta(
+    (snapshot as Record<string, unknown>)[MAIN_ARCHIVE_SNAPSHOT_META_KEY]
+  );
+}
+
+function withMainArchiveStoredPdfMeta(
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
+  meta: MainArchiveStoredPdfMeta
+) {
+  return {
+    ...snapshot,
+    [MAIN_ARCHIVE_SNAPSHOT_META_KEY]: meta
+  };
+}
+
+function buildMainArchiveStoragePath(dateKey: string, fileName = buildMainArchivePdfFileName(dateKey)) {
+  return `${dateKey}/${fileName}`;
+}
+
+async function ensureMainArchiveStorageBucket(supabase: ReturnType<typeof createClient>) {
+  const { data, error } = await supabase.storage.getBucket(MAIN_ARCHIVE_STORAGE_BUCKET);
+  if (!error && data) {
+    return;
+  }
+
+  const { error: createError } = await supabase.storage.createBucket(MAIN_ARCHIVE_STORAGE_BUCKET, {
+    public: false,
+    fileSizeLimit: 100 * 1024 * 1024,
+    allowedMimeTypes: ["application/pdf"]
+  });
+
+  if (createError) {
+    const text = getErrorText(createError).toLowerCase();
+    if (!text.includes("already exists") && !text.includes("duplicate")) {
+      throw createError;
+    }
+  }
+}
+
+async function loadStoredMainArchivePdfMeta(
+  supabase: ReturnType<typeof createClient>,
+  archiveKey: string
+) {
+  const { data, error } = await supabase
+    .from("sharsh_main_archives")
+    .select("archive_key, archive_label, captured_at, report_date, snapshot")
+    .eq("archive_key", archiveKey)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const storedPdf = getMainArchiveStoredPdfMetaFromSnapshot(data.snapshot);
+  if (!storedPdf) {
+    return null;
+  }
+
+  return {
+    archiveKey: typeof data.archive_key === "string" && data.archive_key.trim()
+      ? data.archive_key.trim()
+      : archiveKey,
+    archiveLabel: typeof data.archive_label === "string" && data.archive_label.trim()
+      ? data.archive_label.trim()
+      : formatTelegramFormArchiveDateLabel(archiveKey),
+    capturedAt: typeof data.captured_at === "string" && data.captured_at.trim()
+      ? data.captured_at.trim()
+      : storedPdf.generatedAt,
+    reportDate: typeof data.report_date === "string" && data.report_date.trim()
+      ? data.report_date.trim()
+      : formatTelegramFormArchiveDateLabel(archiveKey),
+    ...storedPdf
+  };
+}
+
+async function uploadMainArchivePdf(
+  supabase: ReturnType<typeof createClient>,
+  dateKey: string,
+  bytes: Uint8Array
+) {
+  await ensureMainArchiveStorageBucket(supabase);
+  const fileName = buildMainArchivePdfFileName(dateKey);
+  const storagePath = buildMainArchiveStoragePath(dateKey, fileName);
+  const { error } = await supabase.storage
+    .from(MAIN_ARCHIVE_STORAGE_BUCKET)
+    .upload(storagePath, new Blob([bytes], { type: "application/pdf" }), {
+      contentType: "application/pdf",
+      upsert: true
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    storageBucket: MAIN_ARCHIVE_STORAGE_BUCKET,
+    storagePath,
+    fileName
+  };
+}
+
+async function downloadStoredMainArchivePdfBytes(
+  supabase: ReturnType<typeof createClient>,
+  storedPdf: Pick<MainArchiveStoredPdfMeta, "storageBucket" | "storagePath">
+) {
+  const { data, error } = await supabase.storage
+    .from(storedPdf.storageBucket)
+    .download(storedPdf.storagePath);
+
+  if (error) {
+    throw error;
+  }
+
+  return new Uint8Array(await data.arrayBuffer());
 }
 
 function rowMatchesArchiveDateKey(row: Record<string, unknown>, dateKey: string) {
@@ -9090,6 +9257,98 @@ async function listMainArchivePhotoRecordsForDate(
     }
     return Date.parse(left.createdAt || "") - Date.parse(right.createdAt || "");
   });
+}
+
+async function listMainArchiveSourceFeedbackRowsForDate(
+  supabase: ReturnType<typeof createClient>,
+  dateKey: string
+) {
+  const dateLabel = formatTelegramFormArchiveDateLabel(dateKey || getYerevanDateKey());
+  const yerevanStart = new Date(`${dateKey || getYerevanDateKey()}T00:00:00+04:00`);
+  const yerevanEnd = new Date(yerevanStart.getTime() + (24 * 60 * 60 * 1000));
+  const selectColumns = "id, report_date, photo_report_date, created_at";
+  const resultMap = new Map<string, Record<string, unknown>>();
+
+  const queries = [
+    (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .select(selectColumns)
+      .eq("report_date", dateLabel)
+      .order("created_at", { ascending: true })
+      .limit(2000),
+    (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .select(selectColumns)
+      .eq("photo_report_date", dateLabel)
+      .order("created_at", { ascending: true })
+      .limit(2000),
+    (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .select(selectColumns)
+      .gte("created_at", yerevanStart.toISOString())
+      .lt("created_at", yerevanEnd.toISOString())
+      .order("created_at", { ascending: true })
+      .limit(2000)
+  ];
+
+  const settled = await Promise.all(queries);
+  for (const { data, error } of settled) {
+    if (error) {
+      throw error;
+    }
+    for (const item of Array.isArray(data) ? data : []) {
+      const row = item as Record<string, unknown>;
+      const id = String(row.id || "");
+      if (!id) {
+        continue;
+      }
+      resultMap.set(id, row);
+    }
+  }
+
+  return Array.from(resultMap.values())
+    .filter((row) => rowMatchesArchiveDateKey(row, dateKey))
+    .map((row) => ({ id: String(row.id || "") }))
+    .filter((row) => row.id);
+}
+
+async function cleanupMainArchiveSourceFeedback(
+  supabase: ReturnType<typeof createClient>,
+  dateKey: string
+) {
+  const records = await listMainArchiveSourceFeedbackRowsForDate(supabase, dateKey);
+  const ids = records
+    .map((row) => Number(row.id))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  if (!ids.length) {
+    return 0;
+  }
+
+  const { error: deleteError } = await supabase
+    .from("sharsh_ocr_feedback")
+    .delete()
+    .in("id", ids);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  const { error: updateError } = await supabase
+    .from("sharsh_departments")
+    .update({
+      photo_workflow_status: "idle",
+      photo_feedback_id: null,
+      photo_feedback_updated_at: null,
+      photo_name: null
+    })
+    .in("photo_feedback_id", ids);
+
+  if (updateError) {
+    console.warn("Failed to clear photo feedback references after archive cleanup:", getErrorText(updateError));
+  }
+
+  return ids.length;
 }
 
 function appendPdfBytesToDocument(
@@ -9210,6 +9469,125 @@ async function buildMainArchivePdfBytes(
   }
 
   return await output.save();
+}
+
+async function saveStoredMainArchiveRecord(
+  supabase: ReturnType<typeof createClient>,
+  archiveKey: string,
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
+  storedPdf: MainArchiveStoredPdfMeta
+) {
+  const now = new Date().toISOString();
+  const row = {
+    archive_key: archiveKey,
+    archive_label: formatTelegramFormArchiveDateLabel(archiveKey),
+    captured_at: storedPdf.generatedAt || now,
+    report_date: snapshot.reportDate || DEFAULT_DATE,
+    source: "remote",
+    snapshot: withMainArchiveStoredPdfMeta(snapshot, storedPdf),
+    updated_at: now
+  };
+
+  const { error } = await supabase
+    .from("sharsh_main_archives")
+    .upsert([row]);
+
+  if (error) {
+    throw error;
+  }
+
+  return row;
+}
+
+async function buildOrLoadMainArchivePdfResult(
+  supabase: ReturnType<typeof createClient>,
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
+  reportDate: string,
+  dateKey: string
+) {
+  const stored = await loadStoredMainArchivePdfMeta(supabase, dateKey);
+  if (stored?.storagePath) {
+    return {
+      bytes: await downloadStoredMainArchivePdfBytes(supabase, stored),
+      fileName: stored.fileName || buildMainArchivePdfFileName(dateKey),
+      source: "stored" as const,
+      stored
+    };
+  }
+
+  return {
+    bytes: await buildMainArchivePdfBytes(supabase, snapshot, reportDate, dateKey),
+    fileName: buildMainArchivePdfFileName(dateKey),
+    source: "dynamic" as const,
+    stored: null
+  };
+}
+
+async function persistDailyMainArchivePdf(
+  supabase: ReturnType<typeof createClient>,
+  options: { requestedDateKey?: string; force?: boolean } = {}
+) {
+  const dateKey = normalizeTelegramFormArchiveDateKey(options.requestedDateKey || getYerevanDateKey()) || getYerevanDateKey();
+  const existingStored = await loadStoredMainArchivePdfMeta(supabase, dateKey);
+  const shouldReuseStoredPdf = Boolean(existingStored?.storagePath) && !options.force;
+  const alreadyCleanedUp = Boolean(existingStored?.cleanupCompletedAt) && !options.force;
+
+  if (shouldReuseStoredPdf && alreadyCleanedUp) {
+    return {
+      ok: true,
+      archiveKey: dateKey,
+      reportDate: existingStored.reportDate,
+      storedPdf: existingStored,
+      deletedFeedbackCount: existingStored.sourceFeedbackDeletedCount || 0,
+      skipped: true
+    };
+  }
+
+  const snapshot = await loadSnapshot(supabase);
+  const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
+  const generatedAt = new Date().toISOString();
+
+  const uploaded = shouldReuseStoredPdf && existingStored
+    ? {
+        storageBucket: existingStored.storageBucket,
+        storagePath: existingStored.storagePath,
+        fileName: existingStored.fileName || buildMainArchivePdfFileName(dateKey)
+      }
+    : await uploadMainArchivePdf(
+        supabase,
+        dateKey,
+        await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey)
+      );
+
+  const initialStoredMeta: MainArchiveStoredPdfMeta = {
+    storageBucket: uploaded.storageBucket,
+    storagePath: uploaded.storagePath,
+    fileName: uploaded.fileName,
+    generatedAt: shouldReuseStoredPdf && existingStored?.generatedAt
+      ? existingStored.generatedAt
+      : generatedAt,
+    sourceFeedbackDeletedCount: existingStored?.sourceFeedbackDeletedCount || 0,
+    cleanupCompletedAt: existingStored?.cleanupCompletedAt || null
+  };
+
+  await saveStoredMainArchiveRecord(supabase, dateKey, snapshot, initialStoredMeta);
+
+  const deletedFeedbackCount = await cleanupMainArchiveSourceFeedback(supabase, dateKey);
+  const finalStoredMeta: MainArchiveStoredPdfMeta = {
+    ...initialStoredMeta,
+    sourceFeedbackDeletedCount: deletedFeedbackCount,
+    cleanupCompletedAt: new Date().toISOString()
+  };
+  await saveStoredMainArchiveRecord(supabase, dateKey, snapshot, finalStoredMeta);
+
+  return {
+    ok: true,
+    archiveKey: dateKey,
+    reportDate: snapshotReportDate,
+    storedPdf: finalStoredMeta,
+    deletedFeedbackCount,
+    skipped: false
+  };
 }
 
 async function sendAllCurrentDepartmentsPdf(
@@ -13034,10 +13412,15 @@ Deno.serve(async (request) => {
         if (!formsOnly) {
           const snapshot = await loadSnapshot(supabase);
           const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
-          const pdfBytes = await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey);
+          const archivePdf = await buildOrLoadMainArchivePdfResult(
+            supabase,
+            snapshot,
+            snapshotReportDate,
+            dateKey
+          );
           return buildPdfBytesResponse(
-            pdfBytes,
-            buildMainArchivePdfFileName(dateKey)
+            archivePdf.bytes,
+            archivePdf.fileName
           );
         }
 
@@ -13045,10 +13428,15 @@ Deno.serve(async (request) => {
         if (!records.length) {
           const snapshot = await loadSnapshot(supabase);
           const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
-          const pdfBytes = await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey);
+          const archivePdf = await buildOrLoadMainArchivePdfResult(
+            supabase,
+            snapshot,
+            snapshotReportDate,
+            dateKey
+          );
           return buildPdfBytesResponse(
-            pdfBytes,
-            buildMainArchivePdfFileName(dateKey)
+            archivePdf.bytes,
+            archivePdf.fileName
           );
         }
 
@@ -13075,16 +13463,57 @@ Deno.serve(async (request) => {
         const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
         const requestedDate = (currentUrl.searchParams.get("date") || "").trim();
         const dateKey = normalizeTelegramFormArchiveDateKey(requestedDate || snapshotReportDate) || getYerevanDateKey();
-        const pdfBytes = await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey);
+        const archivePdf = await buildOrLoadMainArchivePdfResult(
+          supabase,
+          snapshot,
+          snapshotReportDate,
+          dateKey
+        );
         return buildPdfBytesResponse(
-          pdfBytes,
-          buildMainArchivePdfFileName(dateKey)
+          archivePdf.bytes,
+          archivePdf.fileName
         );
       } catch (error) {
         return jsonResponse({
           ok: false,
           service: "Mainflow-telegram",
           status: "main_archive_pdf_failed",
+          error: getErrorText(error)
+        }, 500);
+      }
+    }
+
+    if (action === "daily-main-archive") {
+      if (!isTelegramReminderRequestValid(request)) {
+        return jsonResponse({ ok: false, error: "Unauthorized." }, 403);
+      }
+
+      try {
+        const currentUrl = new URL(request.url);
+        const forceRaw = (currentUrl.searchParams.get("force") || "").trim().toLowerCase();
+        const requestedDateKey = normalizeTelegramFormArchiveDateKey(currentUrl.searchParams.get("date") || "");
+        const force = forceRaw === "1" || forceRaw === "true" || forceRaw === "yes";
+        const supabase = createSupabaseAdmin();
+        const result = await persistDailyMainArchivePdf(supabase, {
+          requestedDateKey,
+          force
+        });
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          status: result.skipped ? "daily_main_archive_already_ready" : "daily_main_archive_saved",
+          archiveKey: result.archiveKey,
+          reportDate: result.reportDate,
+          deletedFeedbackCount: result.deletedFeedbackCount,
+          fileName: result.storedPdf.fileName,
+          storagePath: result.storedPdf.storagePath,
+          skipped: result.skipped
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "daily_main_archive_failed",
           error: getErrorText(error)
         }, 500);
       }

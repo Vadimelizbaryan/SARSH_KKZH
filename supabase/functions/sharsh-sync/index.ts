@@ -87,6 +87,7 @@ const CIVIL_REFERRAL_VALUE_KEYS = [
 ] as const;
 const CIVIL_REFERRAL_HASH_KEYS = CIVIL_REFERRAL_VALUE_KEYS.filter((key) => key !== "dischargeDate");
 const MAIN_ARCHIVE_SOURCE = "remote";
+const MAIN_ARCHIVE_SNAPSHOT_META_KEY = "__mainArchivePdf";
 const TELEGRAM_PHOTO_AUTOROTATE_META_KEY = "pref:telegram_photo_auto_rotate";
 
 const PHOTO_FIELD_MAPPINGS = [
@@ -1248,6 +1249,43 @@ async function sendMainPdfsToTelegramFromSync() {
   return payload || { ok: true };
 }
 
+async function saveMainArchivePdfFromSync(options: { requestedDateKey?: string; force?: boolean } = {}) {
+  const url = new URL(getMainflowTelegramFunctionUrl());
+  url.searchParams.set("action", "daily-main-archive");
+
+  const normalizedDateKey = typeof options.requestedDateKey === "string"
+    ? options.requestedDateKey.trim()
+    : "";
+  if (normalizedDateKey) {
+    url.searchParams.set("date", normalizedDateKey);
+  }
+  if (options.force) {
+    url.searchParams.set("force", "1");
+  }
+
+  const secret = (Deno.env.get("TELEGRAM_REMINDER_SECRET") || "").trim();
+  if (!secret) {
+    throw new Error("TELEGRAM_REMINDER_SECRET is not configured for archive save.");
+  }
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      "x-telegram-reminder-secret": secret
+    }
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = payload && typeof payload.error === "string"
+      ? payload.error
+      : `Main archive save failed (${response.status}).`;
+    throw new Error(message);
+  }
+
+  return payload || { ok: true };
+}
+
 function normalizeShiftFormMode(value: unknown) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "day" || normalized === "day_shift") {
@@ -1862,6 +1900,41 @@ function buildSnapshotFromArchivePayload(snapshot: Record<string, unknown> | nul
   };
 }
 
+function readMainArchiveStoredPdfMeta(snapshot: Record<string, unknown> | null | undefined) {
+  const source = snapshot
+    && typeof snapshot === "object"
+    && snapshot[MAIN_ARCHIVE_SNAPSHOT_META_KEY]
+    && typeof snapshot[MAIN_ARCHIVE_SNAPSHOT_META_KEY] === "object"
+      ? snapshot[MAIN_ARCHIVE_SNAPSHOT_META_KEY] as Record<string, unknown>
+      : null;
+
+  if (!source) {
+    return null;
+  }
+
+  const storagePath = typeof source.storagePath === "string" ? source.storagePath.trim() : "";
+  if (!storagePath) {
+    return null;
+  }
+
+  return {
+    storageBucket: typeof source.storageBucket === "string" && source.storageBucket.trim()
+      ? source.storageBucket.trim()
+      : "sharsh-main-archives",
+    storagePath,
+    fileName: typeof source.fileName === "string" && source.fileName.trim()
+      ? source.fileName.trim()
+      : "",
+    generatedAt: typeof source.generatedAt === "string" && source.generatedAt.trim()
+      ? source.generatedAt.trim()
+      : "",
+    sourceFeedbackDeletedCount: Math.max(0, Math.trunc(Number(source.sourceFeedbackDeletedCount) || 0)),
+    cleanupCompletedAt: typeof source.cleanupCompletedAt === "string" && source.cleanupCompletedAt.trim()
+      ? source.cleanupCompletedAt.trim()
+      : null
+  };
+}
+
 function normalizeMainArchiveRecord(row: Record<string, unknown> | null | undefined) {
   if (!row || typeof row !== "object") {
     return null;
@@ -1871,6 +1944,8 @@ function normalizeMainArchiveRecord(row: Record<string, unknown> | null | undefi
   if (!archiveKey) {
     return null;
   }
+
+  const storedPdf = readMainArchiveStoredPdfMeta(row.snapshot as Record<string, unknown> | null | undefined);
 
   return {
     archiveKey,
@@ -1886,7 +1961,14 @@ function normalizeMainArchiveRecord(row: Record<string, unknown> | null | undefi
     source: typeof row.source === "string" && row.source.trim()
       ? row.source.trim()
       : MAIN_ARCHIVE_SOURCE,
-    snapshot: buildSnapshotFromArchivePayload(row.snapshot as Record<string, unknown> | null | undefined)
+    snapshot: buildSnapshotFromArchivePayload(row.snapshot as Record<string, unknown> | null | undefined),
+    hasStoredPdf: Boolean(storedPdf?.storagePath),
+    pdfStorageBucket: storedPdf?.storageBucket || "",
+    pdfStoragePath: storedPdf?.storagePath || "",
+    pdfFileName: storedPdf?.fileName || "",
+    pdfGeneratedAt: storedPdf?.generatedAt || "",
+    sourceFeedbackDeletedCount: storedPdf?.sourceFeedbackDeletedCount || 0,
+    cleanupCompletedAt: storedPdf?.cleanupCompletedAt || null
   };
 }
 
@@ -1905,6 +1987,26 @@ async function loadMainArchiveRecord(
   }
 
   return normalizeMainArchiveRecord(data as Record<string, unknown> | null | undefined);
+}
+
+async function listMainArchiveRecords(
+  supabase: ReturnType<typeof createClient>,
+  limit = 120
+) {
+  const safeLimit = Math.min(365, Math.max(1, Math.trunc(Number(limit) || 120)));
+  const { data, error } = await supabase
+    .from("sharsh_main_archives")
+    .select("archive_key, archive_label, captured_at, report_date, source, snapshot")
+    .order("archive_key", { ascending: false })
+    .limit(safeLimit);
+
+  if (error) {
+    throw error;
+  }
+
+  return (Array.isArray(data) ? data : [])
+    .map((row) => normalizeMainArchiveRecord(row as Record<string, unknown>))
+    .filter((row) => row && row.hasStoredPdf);
 }
 
 async function saveMainArchiveRecord(
@@ -2693,6 +2795,13 @@ Deno.serve(async (request) => {
         return jsonResponse(archiveRecord);
       }
 
+      if (action === "main-archive-list") {
+        const limit = Number(currentUrl.searchParams.get("limit") || 120);
+        return jsonResponse({
+          records: await listMainArchiveRecords(supabase, limit)
+        });
+      }
+
       return jsonResponse(await loadSnapshot(supabase));
     }
 
@@ -2849,6 +2958,18 @@ Deno.serve(async (request) => {
           Number.isFinite(limit) ? limit : 80
         )
       });
+    }
+
+    if (type === "save_main_archive_pdf") {
+      const requestedDateKey = typeof payload?.dateKey === "string"
+        ? payload.dateKey
+        : "";
+      return jsonResponse(
+        await saveMainArchivePdfFromSync({
+          requestedDateKey,
+          force: Boolean(payload?.force)
+        })
+      );
     }
 
     if (type === "save_ocr_feedback") {
