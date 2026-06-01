@@ -61,8 +61,7 @@ public partial class Form1 : Form
     private readonly Dictionary<string, string> _pageTitles = new(StringComparer.OrdinalIgnoreCase)
     {
         [DefaultRelativePage] = "Главная таблица",
-        ["setup.html"] = "Настройки",
-        ["ocr-feedback.html"] = "OCR журнал"
+        ["setup.html"] = "Настройки"
     };
 
     private readonly ToolStripButton _toolStripButtonBackground;
@@ -240,10 +239,10 @@ public partial class Form1 : Form
         UpdateBannerText();
         UpdateNetworkStatus();
         UpdateCurrentPageStatus();
+        toolStripButtonFeedback.Visible = false;
 
         toolStripButtonHome.Click += (_, _) => NavigateToRelativePage(DefaultRelativePage);
         toolStripButtonSetup.Click += (_, _) => NavigateToRelativePage("setup.html");
-        toolStripButtonFeedback.Click += (_, _) => NavigateToRelativePage("ocr-feedback.html");
         toolStripButtonReload.Click += (_, _) => ReloadCurrentPage();
         toolStripButtonSyncQueue.Click += async (_, _) => await HandleSyncQueueAsync();
         toolStripButtonOpenDataFolder.Click += (_, _) => OpenDataFolder();
@@ -1533,7 +1532,10 @@ public partial class Form1 : Form
         }
 
         var pathOnly = GetRelativePagePathOnly(normalized);
-        if (string.Equals(pathOnly, "archive-print.html", StringComparison.OrdinalIgnoreCase))
+        if (
+            string.Equals(pathOnly, "archive-print.html", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(pathOnly, "ocr-feedback.html", StringComparison.OrdinalIgnoreCase)
+        )
         {
             return DefaultRelativePage;
         }

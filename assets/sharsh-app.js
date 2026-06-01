@@ -9696,7 +9696,6 @@ function buildInitialPhotoLightboxState() {
               ${downloadMainPdfButtonHtml}
               <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
               <a class="button-link" href="${escapeHtml(getHospitalReportPath())}"${getInternalPageTargetAttrs()}>Հաշվետվ.</a>
-              <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
             </div>
             <div class="main-toolbar-group">
               <a class="button-link" href="${escapeHtml(getDayShiftPath())}"${getInternalPageTargetAttrs()}>Ընդունում</a>
@@ -11054,7 +11053,6 @@ function buildInitialPhotoLightboxState() {
               <input type="range" id="zoomRange" min="60" max="140" step="5" value="100">
               <span class="zoom-value" id="zoomValue">100%</span>
             </div>
-            <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR feedback</a>
             <a class="button-link" href="${escapeHtml(getSetupPath())}">Настройка</a>
             <button type="button" id="saveBtn">Сохранить</button>
             <button type="button" id="refreshBtn">Обновить</button>

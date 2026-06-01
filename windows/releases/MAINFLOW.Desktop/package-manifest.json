@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-06-01T21:27:20.9650663Z",
+    "generatedAtUtc":  "2026-06-01T21:41:47.1662124Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -48,8 +48,8 @@
                   },
                   {
                       "path":  "assets/sharsh-app.js",
-                      "size":  671822,
-                      "sha256":  "095ACE43D82651D7DF1494335552DF3E0A5A42ADB8E228EF4712F979973B079C"
+                      "size":  663707,
+                      "sha256":  "3761402953ADC66735347BE0DD142D9CB07A7BB7BF329DF219F296F161C29113"
                   },
                   {
                       "path":  "assets/sharsh-auth.js",
@@ -339,12 +339,12 @@
                   {
                       "path":  "Mainflow.dll",
                       "size":  126464,
-                      "sha256":  "4FEDD3AE3F2FAA9EA527334583BF3BA3ECB468D77932B317B372604D7E7E17FC"
+                      "sha256":  "6576EF52E5286242B01048E42EAD7ED3AFE006E0795BCFFFEED7CEFCF33B323C"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "665F64C2190EC104321E789F26E2650360DCD77A3C2EBF688294BB618937D0CB"
+                      "sha256":  "057DC0DDFBBA4586F2D0D93782626D5A5EF3C253C9D4EABDA5AC9E2AC72B8D20"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",
@@ -475,11 +475,6 @@
                       "path":  "night-shift.html",
                       "size":  596,
                       "sha256":  "F52987EA1A135BFA36FB47B2211CCDA60AA4871F69E77242D41701F6CF4DACCF"
-                  },
-                  {
-                      "path":  "ocr-feedback.html",
-                      "size":  988,
-                      "sha256":  "4EAE7477DEC938B673CD9A83E9E7B992211E321124A4A906E3DDD61EE51C870D"
                   },
                   {
                       "path":  "PenImc_cor3.dll",
