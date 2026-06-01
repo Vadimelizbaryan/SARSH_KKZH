@@ -9111,7 +9111,11 @@ async function uploadMainArchivePdf(
   dateKey: string,
   bytes: Uint8Array
 ) {
-  await ensureMainArchiveStorageBucket(supabase);
+  try {
+    await ensureMainArchiveStorageBucket(supabase);
+  } catch (error) {
+    throw new Error(`main_archive_upload_stage:ensure_bucket ${getErrorText(error)}`);
+  }
   const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").trim().replace(/\/+$/, "");
   const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
   if (!supabaseUrl || !serviceRoleKey) {
@@ -9130,21 +9134,32 @@ async function uploadMainArchivePdf(
       controller.close();
     }
   });
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${serviceRoleKey}`,
-      apikey: serviceRoleKey,
-      "x-upsert": "true",
-      "cache-control": "max-age=3600",
-      "content-type": "application/pdf"
-    },
-    body: bodyStream,
-    duplex: "half"
-  });
+  let response: Response;
+  try {
+    response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        "x-upsert": "true",
+        "cache-control": "max-age=3600",
+        "content-type": "application/pdf"
+      },
+      body: bodyStream,
+      duplex: "half"
+    });
+  } catch (error) {
+    throw new Error(`main_archive_upload_stage:fetch_upload ${getErrorText(error)}`);
+  }
 
   if (!response.ok) {
-    throw new Error(`Storage upload failed: ${response.status} ${await response.text()}`);
+    let responseText = "";
+    try {
+      responseText = await response.text();
+    } catch (error) {
+      throw new Error(`main_archive_upload_stage:read_error_response ${getErrorText(error)}`);
+    }
+    throw new Error(`Storage upload failed: ${response.status} ${responseText}`);
   }
 
   return {
