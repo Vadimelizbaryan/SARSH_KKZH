@@ -33,6 +33,8 @@ jobs:
           cp tg-form.html _site/
           cp tg-qh-form.html _site/
           cp tg-sono-form.html _site/
+          cp android-intake.html _site/
+          cp sono-desktop.html _site/
           cp tg-night-form.html _site/
           cp tg-day-form.html _site/
           cp tg-discharge-form.html _site/
