@@ -8908,14 +8908,18 @@ async function buildTelegramWebFormArchiveDatePdfBytes(records: TelegramWebFormA
   return await output.save();
 }
 
-function buildPdfBytesResponse(bytes: Uint8Array, fileName: string) {
+function buildPdfBytesResponse(
+  bytes: Uint8Array,
+  fileName: string,
+  options: { download?: boolean } = {}
+) {
   const safeFileName = fileName.replace(/["\r\n]/g, "_");
   const body = new Blob([bytes], { type: "application/pdf" });
   return new Response(body, {
     headers: {
       ...corsHeaders,
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${safeFileName}"`
+      "Content-Disposition": `${options.download ? "attachment" : "inline"}; filename="${safeFileName}"`
     }
   });
 }
@@ -13596,6 +13600,8 @@ Deno.serve(async (request) => {
         const snapshot = await loadSnapshot(supabase);
         const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
         const requestedDate = (currentUrl.searchParams.get("date") || "").trim();
+        const downloadRaw = (currentUrl.searchParams.get("download") || "").trim().toLowerCase();
+        const shouldDownload = downloadRaw === "1" || downloadRaw === "true" || downloadRaw === "yes";
         const dateKey = normalizeTelegramFormArchiveDateKey(requestedDate || snapshotReportDate) || getYerevanDateKey();
         const archivePdf = await buildOrLoadMainArchivePdfResult(
           supabase,
@@ -13605,7 +13611,8 @@ Deno.serve(async (request) => {
         );
         return buildPdfBytesResponse(
           archivePdf.bytes,
-          archivePdf.fileName
+          archivePdf.fileName,
+          { download: shouldDownload }
         );
       } catch (error) {
         return jsonResponse({

@@ -4621,6 +4621,13 @@ function buildInitialPhotoLightboxState() {
         ? "Сохраняю архив..."
         : "Сохранить архив сейчас";
     }
+    const downloadButton = document.getElementById("downloadMainArchiveBtn");
+    if (downloadButton instanceof HTMLButtonElement) {
+      downloadButton.disabled = state.mainArchiveSaveInFlight;
+      downloadButton.textContent = state.mainArchiveSaveInFlight
+        ? "Готовлю общий архив..."
+        : "Скачать одним архивом";
+    }
   }
 
   async function refreshMainArchiveRecordsFromRemote() {
@@ -9888,6 +9895,7 @@ function buildInitialPhotoLightboxState() {
               </div>
               <div class="archive-selector-row archive-selector-row--actions">
                 <button type="button" class="archive-open-link archive-open-link--secondary" id="saveMainArchiveBtn"${state.mainArchiveSaveInFlight ? " disabled" : ""}>${state.mainArchiveSaveInFlight ? "Сохраняю архив..." : "Сохранить архив сейчас"}</button>
+                <button type="button" class="archive-open-link" id="downloadMainArchiveBtn"${state.mainArchiveSaveInFlight ? " disabled" : ""}>${state.mainArchiveSaveInFlight ? "Готовлю общий архив..." : "Скачать одним архивом"}</button>
               </div>
               <p id="departmentPdfArchiveSummaryText">${escapeHtml(getDepartmentPdfArchiveSummaryText(departmentPdfArchiveRecords))}</p>
               <p class="hint">Ниже остаётся отдельный PDF-архив бланков Telegram-форм за выбранную дату.</p>
@@ -14662,6 +14670,52 @@ function buildInitialPhotoLightboxState() {
     }
   }
 
+  async function handleDownloadMainArchiveNow() {
+    if (state.mainArchiveSaveInFlight) {
+      return;
+    }
+    if (!sync.hasRemoteSync?.() || typeof sync.saveMainArchivePdf !== "function") {
+      setInfo("Скачивание общего архива доступно только в онлайн-режиме.", true);
+      return;
+    }
+
+    const dateKey = normalizeDepartmentPdfArchiveDateKey(state.snapshot.reportDate || "")
+      || getArchiveContext().key;
+
+    state.mainArchiveSaveInFlight = true;
+    refreshMainArchiveUi();
+    setInfo(`Собираю один общий архив PDF за ${dateKey}...`, false);
+
+    try {
+      const result = await sync.saveMainArchivePdf(dateKey, { force: true });
+      await refreshMainArchiveRecordsFromRemote();
+
+      const refreshedRecord = getArchiveRecordByKey(result?.archiveKey || dateKey);
+      if (refreshedRecord) {
+        state.selectedArchiveKey = refreshedRecord.archiveKey;
+      }
+      refreshMainArchiveUi();
+
+      const pdfUrl = typeof sync.buildMainArchivePdfUrl === "function"
+        ? sync.buildMainArchivePdfUrl(result?.archiveKey || dateKey, { download: true })
+        : "";
+      const deletedFeedbackCount = Math.max(0, Number(result?.deletedFeedbackCount) || 0);
+      setInfo(
+        `Один общий архив за ${result?.archiveKey || dateKey} подготовлен. Очищено исходных записей: ${deletedFeedbackCount}.`,
+        false
+      );
+
+      if (pdfUrl) {
+        window.open(pdfUrl, "_blank", "noopener");
+      }
+    } catch (error) {
+      setInfo(error instanceof Error ? error.message : "Не удалось скачать один общий архив PDF.", true);
+    } finally {
+      state.mainArchiveSaveInFlight = false;
+      refreshMainArchiveUi();
+    }
+  }
+
   function printArchiveRecord(archiveKey) {
     const record = ensureArchiveRecordsLoaded().find((item) => item.archiveKey === archiveKey);
     if (!record) {
@@ -15842,6 +15896,13 @@ function buildInitialPhotoLightboxState() {
     if (saveMainArchiveBtn) {
       saveMainArchiveBtn.addEventListener("click", () => {
         void handleSaveMainArchiveNow();
+      });
+    }
+
+    const downloadMainArchiveBtn = document.getElementById("downloadMainArchiveBtn");
+    if (downloadMainArchiveBtn) {
+      downloadMainArchiveBtn.addEventListener("click", () => {
+        void handleDownloadMainArchiveNow();
       });
     }
 

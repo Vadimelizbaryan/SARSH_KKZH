@@ -2565,7 +2565,7 @@
     return url.toString();
   }
 
-  function buildMainArchivePdfUrl(reportDate) {
+  function buildMainArchivePdfUrl(reportDate, options = {}) {
     const normalizedDate = String(reportDate || "").trim();
     const remoteConfig = getRemoteLinkConfig();
     if (
@@ -2580,6 +2580,9 @@
     url.searchParams.set("action", "main-archive-pdf");
     if (normalizedDate) {
       url.searchParams.set("date", normalizedDate);
+    }
+    if (options && options.download) {
+      url.searchParams.set("download", "1");
     }
     url.searchParams.set("t", String(Date.now()));
     return url.toString();
