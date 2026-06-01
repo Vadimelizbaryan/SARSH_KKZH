@@ -9112,18 +9112,31 @@ async function uploadMainArchivePdf(
   bytes: Uint8Array
 ) {
   await ensureMainArchiveStorageBucket(supabase);
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").trim().replace(/\/+$/, "");
+  const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Supabase environment variables are missing.");
+  }
   const fileName = buildMainArchivePdfFileName(dateKey);
   const storagePath = buildMainArchiveStoragePath(dateKey, fileName);
-  const uploadBytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  const { error } = await supabase.storage
-    .from(MAIN_ARCHIVE_STORAGE_BUCKET)
-    .upload(storagePath, uploadBytes, {
-      contentType: "application/pdf",
-      upsert: true
-    });
+  const uploadUrl = `${supabaseUrl}/storage/v1/object/${MAIN_ARCHIVE_STORAGE_BUCKET}/${storagePath
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/")}`;
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      "x-upsert": "true",
+      "cache-control": "max-age=3600",
+      "content-type": "application/pdf"
+    },
+    body: bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+  });
 
-  if (error) {
-    throw error;
+  if (!response.ok) {
+    throw new Error(`Storage upload failed: ${response.status} ${await response.text()}`);
   }
 
   return {
