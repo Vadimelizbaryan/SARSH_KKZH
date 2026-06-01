@@ -44,6 +44,7 @@ const TELEGRAM_SONO_BUTTON_TEXT = "Sono УЗИ";
 const TELEGRAM_APPLY_NIGHT_SHIFT_CALLBACK = "apply_night_shift_to_main";
 const MAIN_MOVEMENT_PDF_FILE_NAME = "MAINFLOW.pdf";
 const REPORT_PDF_FILE_NAME = "Report.pdf";
+const MAIN_ARCHIVE_PDF_FILE_NAME = "Main_archive.pdf";
 const SONO_TRANSLATION_MODEL = (Deno.env.get("OPENAI_TRANSLATION_MODEL") || "gpt-5.4").trim();
 const SONO_FORM_UI_VERSION = "20260531sono5";
 const SONO_BASE_DOCX_TEMPLATE_PATH = "/program-table-blank.docx";
@@ -5214,6 +5215,24 @@ function drawPdfCenteredText(
   drawPdfText(page, safeText, centerX - (textWidth / 2), y, options);
 }
 
+function drawPdfMultilineText(
+  page: any,
+  text: string,
+  x: number,
+  firstLineY: number,
+  lineHeight: number,
+  options: {
+    font: any;
+    size?: number;
+    color?: ReturnType<typeof rgb>;
+  }
+) {
+  const lines = String(text ?? "").split(/\r?\n/);
+  lines.forEach((line, index) => {
+    drawPdfText(page, line, x, firstLineY - (index * lineHeight), options);
+  });
+}
+
 function getMainPdfPrintedAtText(date = new Date()) {
   const weekdays: Record<string, string> = {
     Sunday: "Կիրակի",
@@ -8937,6 +8956,257 @@ async function buildAllCurrentDepartmentsPdfBytes(
     const source = await PDFDocument.load(bytes);
     const pages = await output.copyPages(source, source.getPageIndices());
     pages.forEach((page) => output.addPage(page));
+  }
+
+  return await output.save();
+}
+
+type MainArchivePhotoRecord = {
+  id: string;
+  departmentId: DepartmentId;
+  departmentName: string;
+  reportDate: string;
+  photoReportDate: string;
+  imageName: string;
+  imageDataUrl: string;
+  createdAt: string;
+  sourceLabel: string;
+};
+
+function buildMainArchivePdfFileName(dateKey: string) {
+  const baseName = MAIN_ARCHIVE_PDF_FILE_NAME.replace(/\.pdf$/i, "");
+  const label = formatTelegramFormArchiveDateLabel(dateKey || getYerevanDateKey());
+  const safeLabel = sanitizeSheetFileNamePart(label.replaceAll(".", ",").replaceAll("/", ",")) || dateKey || getYerevanDateKey();
+  return `${baseName}_${safeLabel}.pdf`;
+}
+
+function rowMatchesArchiveDateKey(row: Record<string, unknown>, dateKey: string) {
+  const reportDateKey = normalizeTelegramFormArchiveDateKey(row.report_date);
+  const photoReportDateKey = normalizeTelegramFormArchiveDateKey(row.photo_report_date);
+  const createdAtKey = normalizeTelegramFormArchiveDateKey(row.created_at);
+  return reportDateKey === dateKey || photoReportDateKey === dateKey || createdAtKey === dateKey;
+}
+
+function buildMainArchivePhotoSourceLabel(imageName: string, notes: unknown) {
+  const normalizedNotes = Array.isArray(notes)
+    ? notes.map((item) => String(item || ""))
+    : [];
+  if (normalizedNotes.some((note) => /Submitted via Android MAINFORM/i.test(note))) {
+    return "Android MAINFORM";
+  }
+  if (normalizedNotes.some((note) => /Admission hub Android photo/i.test(note))) {
+    return "Ընդունարան";
+  }
+  if (
+    imageName === "telegram-web-app-form"
+    || imageName === "telegram-qh-form"
+    || normalizedNotes.some((note) => /Telegram Web App form submission\./i.test(note))
+  ) {
+    return "Telegram Web App";
+  }
+  return "Фото бланка";
+}
+
+async function listMainArchivePhotoRecordsForDate(
+  supabase: ReturnType<typeof createClient>,
+  dateKey: string
+) {
+  const dateLabel = formatTelegramFormArchiveDateLabel(dateKey || getYerevanDateKey());
+  const yerevanStart = new Date(`${dateKey || getYerevanDateKey()}T00:00:00+04:00`);
+  const yerevanEnd = new Date(yerevanStart.getTime() + (24 * 60 * 60 * 1000));
+  const selectColumns = "id, department_id, department_name, report_date, photo_report_date, image_name, image_data_url, notes, created_at";
+  const resultMap = new Map<string, Record<string, unknown>>();
+
+  const queries = [
+    (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .select(selectColumns)
+      .eq("report_date", dateLabel)
+      .not("image_data_url", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(1000),
+    (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .select(selectColumns)
+      .eq("photo_report_date", dateLabel)
+      .not("image_data_url", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(1000),
+    (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .select(selectColumns)
+      .gte("created_at", yerevanStart.toISOString())
+      .lt("created_at", yerevanEnd.toISOString())
+      .not("image_data_url", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(1000)
+  ];
+
+  const settled = await Promise.all(queries);
+  for (const { data, error } of settled) {
+    if (error) {
+      throw error;
+    }
+    for (const item of Array.isArray(data) ? data : []) {
+      const row = item as Record<string, unknown>;
+      const id = String(row.id || "");
+      if (!id) {
+        continue;
+      }
+      resultMap.set(id, row);
+    }
+  }
+
+  const departmentOrder = Object.keys(DEPARTMENTS) as DepartmentId[];
+  const rows = Array.from(resultMap.values())
+    .filter((row) => rowMatchesArchiveDateKey(row, dateKey))
+    .map((row) => {
+      const departmentId = parseDepartmentId(row.department_id);
+      const imageDataUrl = typeof row.image_data_url === "string" ? row.image_data_url.trim() : "";
+      if (!departmentId || !imageDataUrl.startsWith("data:image/")) {
+        return null;
+      }
+      const imageName = typeof row.image_name === "string" ? row.image_name : "";
+      return {
+        id: String(row.id || ""),
+        departmentId,
+        departmentName: typeof row.department_name === "string" && row.department_name.trim()
+          ? row.department_name.trim()
+          : DEPARTMENTS[departmentId].department,
+        reportDate: typeof row.report_date === "string" ? row.report_date : "",
+        photoReportDate: typeof row.photo_report_date === "string" ? row.photo_report_date : "",
+        imageName,
+        imageDataUrl,
+        createdAt: typeof row.created_at === "string" ? row.created_at : "",
+        sourceLabel: buildMainArchivePhotoSourceLabel(imageName, row.notes)
+      } satisfies MainArchivePhotoRecord;
+    })
+    .filter(Boolean) as MainArchivePhotoRecord[];
+
+  return rows.sort((left, right) => {
+    const departmentDiff = departmentOrder.indexOf(left.departmentId) - departmentOrder.indexOf(right.departmentId);
+    if (departmentDiff !== 0) {
+      return departmentDiff;
+    }
+    return Date.parse(left.createdAt || "") - Date.parse(right.createdAt || "");
+  });
+}
+
+function appendPdfBytesToDocument(
+  output: PDFDocument,
+  bytes: Uint8Array
+) {
+  return PDFDocument.load(bytes)
+    .then(async (source) => {
+      const pages = await output.copyPages(source, source.getPageIndices());
+      pages.forEach((page) => output.addPage(page));
+    });
+}
+
+function addMainArchiveSectionPage(
+  output: PDFDocument,
+  fonts: Awaited<ReturnType<typeof buildPdfFonts>>,
+  title: string,
+  lines: string[]
+) {
+  const page = output.addPage([595.32, 841.92]);
+  drawPdfText(page, title, 42, 790, { font: fonts.bold, size: 24 });
+  drawPdfText(page, getMainPdfPrintedAtText(), 42, 765, { font: fonts.regular, size: 10 });
+  drawPdfMultilineText(page, lines.join("\n"), 42, 720, 20, {
+    font: fonts.regular,
+    size: 12
+  });
+}
+
+async function addMainArchivePhotoPage(
+  output: PDFDocument,
+  fonts: Awaited<ReturnType<typeof buildPdfFonts>>,
+  record: MainArchivePhotoRecord
+) {
+  const { mimeType, bytes } = parseImageDataUrl(record.imageDataUrl);
+  const isPng = mimeType === "image/png";
+  const embeddedImage = isPng
+    ? await output.embedPng(bytes)
+    : await output.embedJpg(bytes);
+  const imageWidth = embeddedImage.width;
+  const imageHeight = embeddedImage.height;
+  const isLandscape = imageWidth >= imageHeight;
+  const pageWidth = isLandscape ? 841.92 : 595.32;
+  const pageHeight = isLandscape ? 595.32 : 841.92;
+  const page = output.addPage([pageWidth, pageHeight]);
+  const margin = 32;
+  const headerLines = [
+    `${record.departmentName} (${DEPARTMENTS[record.departmentId].marker})`,
+    `Источник: ${record.sourceLabel}`,
+    `Время отправки: ${Number.isFinite(Date.parse(record.createdAt || "")) ? getYerevanHyDateTimeText(new Date(record.createdAt)) : (record.createdAt || "не указано")}`,
+    record.reportDate ? `Дата отчёта: ${record.reportDate}` : "",
+    record.photoReportDate ? `Дата фото: ${record.photoReportDate}` : ""
+  ].filter(Boolean);
+
+  drawPdfText(page, "Фото бланка", margin, pageHeight - 34, {
+    font: fonts.bold,
+    size: 18
+  });
+  drawPdfMultilineText(page, headerLines.join("\n"), margin, pageHeight - 58, 14, {
+    font: fonts.regular,
+    size: 10
+  });
+
+  const headerHeight = 82;
+  const availableWidth = pageWidth - (margin * 2);
+  const availableHeight = pageHeight - headerHeight - (margin * 2);
+  const scale = Math.min(availableWidth / imageWidth, availableHeight / imageHeight);
+  const drawWidth = imageWidth * scale;
+  const drawHeight = imageHeight * scale;
+  const x = (pageWidth - drawWidth) / 2;
+  const y = margin + ((availableHeight - drawHeight) / 2);
+  page.drawImage(embeddedImage, {
+    x,
+    y,
+    width: drawWidth,
+    height: drawHeight
+  });
+}
+
+async function buildMainArchivePdfBytes(
+  supabase: ReturnType<typeof createClient>,
+  snapshot: Awaited<ReturnType<typeof loadSnapshot>>,
+  reportDate: string,
+  dateKey: string
+) {
+  const output = await PDFDocument.create();
+  const fonts = await buildPdfFonts(output);
+  const archivePhotoRecords = await listMainArchivePhotoRecordsForDate(supabase, dateKey);
+  const normalizedDateLabel = formatTelegramFormArchiveDateLabel(dateKey);
+
+  addMainArchiveSectionPage(
+    output,
+    fonts,
+    "Архивный комплект MAINFLOW",
+    [
+      `Дата архива: ${normalizedDateLabel}`,
+      `Дата сводки: ${reportDate}`,
+      "Ниже объединены Report.pdf, MAINFLOW.pdf, All_departments_current_<дата>.pdf и все связанные фото бланков."
+    ]
+  );
+
+  await appendPdfBytesToDocument(output, await buildReportPdfBytes(snapshot));
+  await appendPdfBytesToDocument(output, await buildMainMovementPdfBytes(snapshot));
+  await appendPdfBytesToDocument(output, await buildAllCurrentDepartmentsPdfBytes(snapshot, reportDate));
+
+  if (archivePhotoRecords.length) {
+    addMainArchiveSectionPage(
+      output,
+      fonts,
+      "Фото бланков за дату",
+      [
+        `Связанных фото: ${archivePhotoRecords.length}.`,
+        "Каждое фото добавлено на отдельную страницу с подписью отделения и времени отправки."
+      ]
+    );
+    for (const record of archivePhotoRecords) {
+      await addMainArchivePhotoPage(output, fonts, record);
+    }
   }
 
   return await output.save();
@@ -12774,6 +13044,29 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "telegram_form_archive_pdf_failed",
+          error: getErrorText(error)
+        }, 500);
+      }
+    }
+
+    if (action === "main-archive-pdf") {
+      try {
+        const currentUrl = new URL(request.url);
+        const supabase = createSupabaseAdmin();
+        const snapshot = await loadSnapshot(supabase);
+        const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
+        const requestedDate = (currentUrl.searchParams.get("date") || "").trim();
+        const dateKey = normalizeTelegramFormArchiveDateKey(requestedDate || snapshotReportDate) || getYerevanDateKey();
+        const pdfBytes = await buildMainArchivePdfBytes(supabase, snapshot, snapshotReportDate, dateKey);
+        return buildPdfBytesResponse(
+          pdfBytes,
+          buildMainArchivePdfFileName(dateKey)
+        );
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "main_archive_pdf_failed",
           error: getErrorText(error)
         }, 500);
       }

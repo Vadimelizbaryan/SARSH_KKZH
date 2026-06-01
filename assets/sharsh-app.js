@@ -9426,6 +9426,12 @@ function buildInitialPhotoLightboxState() {
     const downloadMainPdfButtonHtml = mainBlankPdfPath
       ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">PDF ներբ.</a>`
       : "";
+    const mainArchivePdfUrl = typeof sync.buildMainArchivePdfUrl === "function"
+      ? sync.buildMainArchivePdfUrl(displayedMainTableSnapshot.reportDate || state.snapshot.reportDate || "")
+      : "";
+    const downloadMainArchivePdfButtonHtml = mainArchivePdfUrl
+      ? `<a class="button-link" href="${escapeHtml(mainArchivePdfUrl)}" target="_blank" rel="noopener">PDF архив</a>`
+      : "";
 
     app.innerHTML = `
       <div class="page">
@@ -9451,6 +9457,7 @@ function buildInitialPhotoLightboxState() {
               ${downloadSonoDesktopButtonHtml}
               ${downloadDesktopButtonHtml}
               ${downloadMainPdfButtonHtml}
+              ${downloadMainArchivePdfButtonHtml}
               <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
               <a class="button-link" href="${escapeHtml(getHospitalReportPath())}"${getInternalPageTargetAttrs()}>Հաշվետվ.</a>
               <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
