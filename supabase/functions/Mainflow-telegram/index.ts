@@ -9046,24 +9046,40 @@ function buildMainArchiveStoragePath(dateKey: string, fileName = buildMainArchiv
   return `${dateKey}/${fileName}`;
 }
 
-async function ensureMainArchiveStorageBucket(supabase: ReturnType<typeof createClient>) {
-  const { data, error } = await supabase.storage.getBucket(MAIN_ARCHIVE_STORAGE_BUCKET);
-  if (!error && data) {
+async function ensureMainArchiveStorageBucket(_supabase: ReturnType<typeof createClient>) {
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").trim().replace(/\/+$/, "");
+  const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Supabase environment variables are missing.");
+  }
+
+  const response = await fetch(`${supabaseUrl}/storage/v1/bucket`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      id: MAIN_ARCHIVE_STORAGE_BUCKET,
+      name: MAIN_ARCHIVE_STORAGE_BUCKET,
+      public: false,
+      file_size_limit: 100 * 1024 * 1024,
+      allowed_mime_types: ["application/pdf"]
+    })
+  });
+
+  if (response.ok) {
     return;
   }
 
-  const { error: createError } = await supabase.storage.createBucket(MAIN_ARCHIVE_STORAGE_BUCKET, {
-    public: false,
-    fileSizeLimit: 100 * 1024 * 1024,
-    allowedMimeTypes: ["application/pdf"]
-  });
-
-  if (createError) {
-    const text = getErrorText(createError).toLowerCase();
-    if (!text.includes("already exists") && !text.includes("duplicate")) {
-      throw createError;
-    }
+  const responseText = await response.text();
+  const normalizedText = responseText.toLowerCase();
+  if (response.status === 409 || normalizedText.includes("already exists") || normalizedText.includes("duplicate")) {
+    return;
   }
+
+  throw new Error(`Storage bucket ensure failed: ${response.status} ${responseText}`);
 }
 
 async function loadStoredMainArchivePdfMeta(
