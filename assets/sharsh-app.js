@@ -5308,7 +5308,7 @@ function buildInitialPhotoLightboxState() {
               ${buildDepartmentPdfArchiveDateOptions(groups, selectedGroup.dateKey)}
             </select>
           </label>
-          <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchiveDatePdfLink" href="${escapeHtml(getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey))}" target="_blank" rel="noopener">Общий PDF</a>
+          <a class="archive-open-link archive-open-link--secondary" id="departmentPdfArchiveDatePdfLink" href="${escapeHtml(getDepartmentPdfArchiveDatePrintPath(selectedGroup.dateKey))}" target="_blank" rel="noopener">Архив PDF</a>
         </div>
         <div class="archive-selected-meta" id="departmentPdfArchiveDateSelectedMeta">
           ${escapeHtml(`Дата: ${selectedGroup.label}. Отделений в PDF: ${selectedGroup.departmentCount}. Бланков в архиве: ${selectedGroup.count}.`)}
@@ -8346,9 +8346,9 @@ function buildInitialPhotoLightboxState() {
   function getDepartmentPdfArchiveDatePrintPath(dateKey) {
     if (
       sync.hasRemoteSync?.() &&
-      typeof sync.buildTelegramFormArchiveDatePdfUrl === "function"
+      typeof sync.buildMainArchivePdfUrl === "function"
     ) {
-      const remoteUrl = sync.buildTelegramFormArchiveDatePdfUrl(dateKey);
+      const remoteUrl = sync.buildMainArchivePdfUrl(dateKey);
       if (remoteUrl) {
         return remoteUrl;
       }
@@ -9426,8 +9426,13 @@ function buildInitialPhotoLightboxState() {
     const downloadMainPdfButtonHtml = mainBlankPdfPath
       ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">PDF ներբ.</a>`
       : "";
+    const mainArchiveDateKey = normalizeDepartmentPdfArchiveDateKey(
+      displayedMainTableSnapshot.reportDate || state.snapshot.reportDate || ""
+    );
     const mainArchivePdfUrl = typeof sync.buildMainArchivePdfUrl === "function"
-      ? sync.buildMainArchivePdfUrl(displayedMainTableSnapshot.reportDate || state.snapshot.reportDate || "")
+      ? sync.buildMainArchivePdfUrl(
+        mainArchiveDateKey || displayedMainTableSnapshot.reportDate || state.snapshot.reportDate || ""
+      )
       : "";
     const downloadMainArchivePdfButtonHtml = mainArchivePdfUrl
       ? `<a class="button-link" href="${escapeHtml(mainArchivePdfUrl)}" target="_blank" rel="noopener">PDF архив</a>`
