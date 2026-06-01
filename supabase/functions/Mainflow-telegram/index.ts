@@ -9462,7 +9462,12 @@ async function buildMainArchivePdfBytes(
 ) {
   const output = await PDFDocument.create();
   const fonts = await buildPdfFonts(output);
-  const archivePhotoRecords = await listMainArchivePhotoRecordsForDate(supabase, dateKey);
+  let archivePhotoRecords: MainArchivePhotoRecord[] = [];
+  try {
+    archivePhotoRecords = await listMainArchivePhotoRecordsForDate(supabase, dateKey);
+  } catch (error) {
+    throw new Error(`main_archive_stage:photo_records ${getErrorText(error)}`);
+  }
   const normalizedDateLabel = formatTelegramFormArchiveDateLabel(dateKey);
 
   addMainArchiveSectionPage(
@@ -9476,9 +9481,21 @@ async function buildMainArchivePdfBytes(
     ]
   );
 
-  await appendPdfBytesToDocument(output, await buildReportPdfBytes(snapshot));
-  await appendPdfBytesToDocument(output, await buildMainMovementPdfBytes(snapshot));
-  await appendPdfBytesToDocument(output, await buildAllCurrentDepartmentsPdfBytes(snapshot, reportDate));
+  try {
+    await appendPdfBytesToDocument(output, await buildReportPdfBytes(snapshot));
+  } catch (error) {
+    throw new Error(`main_archive_stage:report_pdf ${getErrorText(error)}`);
+  }
+  try {
+    await appendPdfBytesToDocument(output, await buildMainMovementPdfBytes(snapshot));
+  } catch (error) {
+    throw new Error(`main_archive_stage:mainflow_pdf ${getErrorText(error)}`);
+  }
+  try {
+    await appendPdfBytesToDocument(output, await buildAllCurrentDepartmentsPdfBytes(snapshot, reportDate));
+  } catch (error) {
+    throw new Error(`main_archive_stage:all_departments_pdf ${getErrorText(error)}`);
+  }
 
   if (archivePhotoRecords.length) {
     addMainArchiveSectionPage(
@@ -9491,11 +9508,19 @@ async function buildMainArchivePdfBytes(
       ]
     );
     for (const record of archivePhotoRecords) {
-      await addMainArchivePhotoPage(output, fonts, record);
+      try {
+        await addMainArchivePhotoPage(output, fonts, record);
+      } catch (error) {
+        throw new Error(`main_archive_stage:photo_page:${record.id} ${getErrorText(error)}`);
+      }
     }
   }
 
-  return await output.save();
+  try {
+    return await output.save();
+  } catch (error) {
+    throw new Error(`main_archive_stage:save_pdf ${getErrorText(error)}`);
+  }
 }
 
 async function saveStoredMainArchiveRecord(
