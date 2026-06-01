@@ -5,10 +5,7 @@
   const app = document.getElementById("app");
   const PENDING_SYNC_EVENT_NAME = "sharsh-pending-sync-changed";
   const AUTO_PENDING_SYNC_DELAY_MS = 1500;
-  const AUTO_PENDING_SYNC_RETRY_MS = Math.max(
-    15000,
-    Math.min(30000, Number(sync?.runtime?.refreshIntervalMs) || 30000)
-  );
+  const AUTO_PENDING_SYNC_RETRY_MS = Math.max(15000, Number(sync?.runtime?.refreshIntervalMs) || 30000);
 
   if (!config || !sync || !app) {
     return;
@@ -78,14 +75,13 @@
   const SHIFT_DRAFT_DISCHARGE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:discharge-shift:v3`;
   const SHIFT_DRAFT_COLUMNS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"];
   const REMOTE_AUX_PANEL_REFRESH_MS = 45 * 1000;
-  const DESKTOP_REMOTE_LIST_TIMEOUT_MS = 8000;
   const SAVE_VERIFICATION_ATTEMPTS = 3;
   const SAVE_VERIFICATION_DELAY_MS = 700;
   const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
   const CIVIL_REFERRALS_FILENAME = "civil-referrals.html";
-  const NIGHT_SHIFT_FILENAME = "index.html";
-  const DAY_SHIFT_FILENAME = "index.html";
-  const DISCHARGE_SHIFT_FILENAME = "index.html";
+  const NIGHT_SHIFT_FILENAME = "night.html";
+  const DAY_SHIFT_FILENAME = "day.html";
+  const DISCHARGE_SHIFT_FILENAME = "discharge.html";
   const PHOTO_FIELD_DEFINITIONS = [
     { cell: 1, key: "beenTotal", label: "1" },
     { cell: 2, key: "beenSoldier", label: "2" },
@@ -581,16 +577,6 @@ function buildInitialPhotoLightboxState() {
     };
   }
 
-  function buildInitialMainTableAndroidAppState() {
-    return {
-      records: [],
-      isLoading: false,
-      error: "",
-      loaded: false,
-      lastLoadedAt: 0
-    };
-  }
-
   const state = {
     snapshot: config.buildDefaultSnapshot(),
     loadedSnapshot: config.buildDefaultSnapshot(),
@@ -636,7 +622,6 @@ function buildInitialPhotoLightboxState() {
     feedback: buildInitialFeedbackState(),
     mainTablePhotoGallery: buildInitialMainTablePhotoGalleryState(),
     mainTableTelegramForms: buildInitialMainTableTelegramFormState(),
-    mainTableAndroidApp: buildInitialMainTableAndroidAppState(),
     selectedMainCalcDepartmentId: "",
     departmentTopCellsUnlocked: false,
     shiftAutoTransferEnabled: readShiftAutoTransferEnabled(),
@@ -653,7 +638,7 @@ function buildInitialPhotoLightboxState() {
 
   function escapeHtml(text) {
     return String(text)
-      .replaceAll("&", "&")
+      .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
@@ -2647,41 +2632,6 @@ function buildInitialPhotoLightboxState() {
     return normalized === "telegram-web-app-form" || normalized === "telegram-qh-form";
   }
 
-  function hasAndroidMainformFeedbackMarker(notes) {
-    const normalizedNotes = Array.isArray(notes)
-      ? notes.map((item) => String(item || "").trim()).filter(Boolean)
-      : [];
-    return normalizedNotes.some((note) => /Submitted via Android MAINFORM/i.test(note));
-  }
-
-  function hasTelegramFormFeedbackMarker(imageName, notes) {
-    const normalizedImageName = typeof imageName === "string" ? imageName.trim() : "";
-    const normalizedNotes = Array.isArray(notes)
-      ? notes.map((item) => String(item || "").trim()).filter(Boolean)
-      : [];
-    return isTelegramFormFeedbackImageName(normalizedImageName)
-      || normalizedNotes.some((note) => /Telegram\s+(Web App|QH)\s+form submission\./i.test(note));
-  }
-
-  function inferTelegramFormLabel(record) {
-    const notes = normalizeOcrNotes(record?.notes);
-    const imageName = typeof record?.imageName === "string" ? record.imageName.trim() : "";
-    return imageName === "telegram-qh-form"
-      || notes.some((note) => /Telegram\s+QH\s+form submission\./i.test(note))
-      ? "Telegram QH"
-      : "Telegram Web";
-  }
-
-  function isTelegramFormFeedbackRecord(record) {
-    if (!record || typeof record !== "object") {
-      return false;
-    }
-
-    const notes = normalizeOcrNotes(record.notes);
-    return hasTelegramFormFeedbackMarker(record.imageName, notes)
-      && !hasAndroidMainformFeedbackMarker(notes);
-  }
-
   function isAndroidMainTablePhotoRecord(record) {
     const notes = Array.isArray(record?.notes)
       ? record.notes.map((item) => String(item || "").trim()).filter(Boolean)
@@ -2842,7 +2792,7 @@ function buildInitialPhotoLightboxState() {
 
     const id = Number(record.id);
     const imageName = typeof record.imageName === "string" ? record.imageName.trim() : "";
-    if (!Number.isFinite(id) || !isTelegramFormFeedbackRecord(record)) {
+    if (!Number.isFinite(id) || !isTelegramFormFeedbackImageName(imageName)) {
       return null;
     }
 
@@ -2875,152 +2825,6 @@ function buildInitialPhotoLightboxState() {
     return state.mainTableTelegramForms.records;
   }
 
-  function ensureMainTableAndroidAppRecordsLoaded() {
-    if (!Array.isArray(state.mainTableAndroidApp.records)) {
-      state.mainTableAndroidApp.records = [];
-    }
-    return state.mainTableAndroidApp.records;
-  }
-
-  function canUseDesktopMirror() {
-    return canPostDesktopHostMessage() && window.location.protocol === "file:";
-  }
-
-  function buildDesktopMirrorUrl(relativePath) {
-    const normalizedPath = String(relativePath || "")
-      .replaceAll("\\", "/")
-      .replace(/^\/+/, "");
-    return `https://mirror.mainflow.local/${normalizedPath}`;
-  }
-
-  async function fetchDesktopMirrorJson(relativePath) {
-    const response = await fetch(buildDesktopMirrorUrl(relativePath), {
-      cache: "no-store"
-    });
-    if (!response.ok) {
-      throw new Error(`Desktop mirror fetch failed: ${response.status}`);
-    }
-    return response.json();
-  }
-
-  async function loadDesktopMirrorCollection(collectionName) {
-    const payload = await fetchDesktopMirrorJson(`${collectionName}/data.json`);
-    if (Array.isArray(payload)) {
-      return payload;
-    }
-    if (payload && Array.isArray(payload.records)) {
-      return payload.records;
-    }
-    return [];
-  }
-
-  async function loadDesktopMirrorSnapshotResult() {
-    const payload = await fetchDesktopMirrorJson("snapshot/latest.json");
-    if (payload && payload.payload && typeof payload.payload === "object") {
-      return payload.payload;
-    }
-    if (payload && payload.snapshot && typeof payload === "object") {
-      return payload;
-    }
-    throw new Error("Desktop mirror snapshot is unavailable");
-  }
-
-  function createTimeoutError(message) {
-    const error = new Error(message);
-    error.code = "timeout";
-    return error;
-  }
-
-  async function runWithTimeout(task, timeoutMs, timeoutMessage) {
-    const effectiveTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0
-      ? timeoutMs
-      : DESKTOP_REMOTE_LIST_TIMEOUT_MS;
-    let timeoutId = 0;
-    try {
-      return await Promise.race([
-        Promise.resolve().then(task),
-        new Promise((_, reject) => {
-          timeoutId = window.setTimeout(() => {
-            reject(createTimeoutError(timeoutMessage));
-          }, effectiveTimeout);
-        })
-      ]);
-    } finally {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
-    }
-  }
-
-  async function loadRemoteCollectionWithDesktopMirrorFallback(remoteLoader, collectionName, timeoutMessage) {
-    if (canUseDesktopMirror()) {
-      try {
-        return await runWithTimeout(remoteLoader, DESKTOP_REMOTE_LIST_TIMEOUT_MS, timeoutMessage);
-      } catch (_error) {
-        return loadDesktopMirrorCollection(collectionName);
-      }
-    }
-    return remoteLoader();
-  }
-
-  function getTimestampValue(value) {
-    const timestamp = Date.parse(String(value || ""));
-    return Number.isFinite(timestamp) ? timestamp : 0;
-  }
-
-  async function loadDesktopMirrorDepartmentPhotoRecord(feedbackId, targetDepartmentId = departmentId) {
-    const normalizedFeedbackId = Number(feedbackId);
-    const normalizedDepartmentId = String(targetDepartmentId || "").trim();
-    const collections = await Promise.all([
-      loadDesktopMirrorCollection("ocr-feedback"),
-      loadDesktopMirrorCollection("android-mainform")
-    ]);
-
-    const records = collections
-      .flat()
-      .map((record) => normalizeMainTablePhotoGalleryRecord(record))
-      .filter(Boolean);
-
-    if (Number.isFinite(normalizedFeedbackId)) {
-      const exactMatch = records.find((record) => Number(record.id) === normalizedFeedbackId);
-      if (exactMatch) {
-        return exactMatch;
-      }
-    }
-
-    if (!normalizedDepartmentId) {
-      return null;
-    }
-
-    return records
-      .filter((record) => String(record.departmentId || "").trim() === normalizedDepartmentId)
-      .filter((record) => typeof record.imageDataUrl === "string" && record.imageDataUrl.startsWith("data:image/"))
-      .sort((left, right) => getTimestampValue(right.createdAt) - getTimestampValue(left.createdAt))[0] || null;
-  }
-
-  async function loadDesktopMirrorTelegramFormRecord(feedbackId, targetDepartmentId = departmentId) {
-    const normalizedFeedbackId = Number(feedbackId);
-    const normalizedDepartmentId = String(targetDepartmentId || "").trim();
-    const records = (await loadDesktopMirrorCollection("telegram-forms"))
-      .map((record) => normalizeMainTableTelegramFormRecord(record))
-      .filter(Boolean);
-
-    if (Number.isFinite(normalizedFeedbackId)) {
-      const exactMatch = records.find((record) => Number(record.id) === normalizedFeedbackId);
-      if (exactMatch) {
-        return exactMatch;
-      }
-    }
-
-    if (!normalizedDepartmentId) {
-      return null;
-    }
-
-    return records
-      .filter((record) => String(record.departmentId || "").trim() === normalizedDepartmentId)
-      .sort((left, right) => getTimestampValue(right.createdAt) - getTimestampValue(left.createdAt))[0] || null;
-  }
-
   function getMainTableTelegramFormRecordById(feedbackId) {
     const normalizedFeedbackId = Number(feedbackId);
     return ensureMainTableTelegramFormRecordsLoaded()
@@ -3030,14 +2834,7 @@ function buildInitialPhotoLightboxState() {
 
   function getMainTablePhotoGalleryRecordById(feedbackId) {
     const normalizedFeedbackId = Number(feedbackId);
-    const photoGalleryRecord = ensureMainTablePhotoGalleryRecordsLoaded()
-      .map((record) => normalizeMainTablePhotoGalleryRecord(record))
-      .find((record) => record && Number(record.id) === normalizedFeedbackId) || null;
-    if (photoGalleryRecord) {
-      return photoGalleryRecord;
-    }
-
-    return ensureMainTableAndroidAppRecordsLoaded()
+    return ensureMainTablePhotoGalleryRecordsLoaded()
       .map((record) => normalizeMainTablePhotoGalleryRecord(record))
       .find((record) => record && Number(record.id) === normalizedFeedbackId) || null;
   }
@@ -3144,46 +2941,16 @@ function buildInitialPhotoLightboxState() {
           recognizedKeys,
           appliedKeys,
           alreadySaved,
-          formLabel: inferTelegramFormLabel(record)
+          formLabel: record.imageName === "telegram-qh-form" ? "Telegram QH" : "Telegram Web"
         };
       })
       .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
   }
 
-  function getMainTableAndroidAppTodayItems(rows) {
-    const records = ensureMainTableAndroidAppRecordsLoaded();
-    const todayDateKey = getArchiveDateKey();
-    const rowsById = new Map(
-      (Array.isArray(rows) ? rows : [])
-        .filter((row) => row && typeof row.id === "string")
-        .map((row) => [row.id, row])
-    );
-
-    return records
-      .map((record) => normalizeMainTablePhotoGalleryRecord(record))
-      .filter(Boolean)
-      .filter((record) => getArchiveDateKeyForTimestamp(record.createdAt) === todayDateKey)
-      .map((record) => {
-        const boundRow = rowsById.get(record.departmentId) || null;
-        const sourceMeta = getMainTablePhotoGallerySourceMeta(record);
-        return {
-          ...record,
-          feedbackId: record.id,
-          rowId: boundRow?.id || record.departmentId,
-          departmentId: boundRow?.id || record.departmentId,
-          departmentName: boundRow?.department || record.departmentName || record.departmentId || "Неизвестное отделение",
-          photoSentAt: record.createdAt,
-          sourceMeta,
-          workflowStatus: boundRow?.photoWorkflowStatus || "",
-          freshness: boundRow ? getRowFreshnessMeta(boundRow) : null
-        };
-      })
-      .sort((left, right) => getTimestampSortValue(right.createdAt) - getTimestampSortValue(left.createdAt));
-  }
-
   function buildMainTableAndroidAppItems(displayContext = getMainTableDisplaySnapshotContext()) {
     const rows = Array.isArray(displayContext?.rows) ? displayContext.rows : [];
-    return getMainTableAndroidAppTodayItems(rows)
+    return getMainTablePhotoGalleryTodayItems(rows)
+      .filter((item) => isAndroidMainTablePhotoRecord(item))
       .map((item) => {
         const previewValues = buildPhotoPreviewValuesFromRecord(item);
         const recognizedKeys = Array.isArray(item.recognizedKeys) && item.recognizedKeys.length
@@ -3540,10 +3307,8 @@ function buildInitialPhotoLightboxState() {
   function buildMainTableTelegramFormContent() {
     const items = buildMainTableTelegramFormItems();
     const isDeletingAll = Boolean(state.mainTableTelegramForms.isDeletingAll);
-    const remoteAvailable = Boolean(sync.hasRemoteSync?.() && typeof sync.listTelegramFormFeedback === "function");
-    const desktopMirrorAvailable = canUseDesktopMirror();
 
-    if (!remoteAvailable && !desktopMirrorAvailable && !items.length) {
+    if (!sync.hasRemoteSync?.() || typeof sync.listTelegramFormFeedback !== "function") {
       return {
         summary: "Блок Telegram Web форм доступен только в онлайн-режиме владельца.",
         html: '<div class="archive-empty">Telegram Web формы на сервере недоступны в локальном режиме.</div>'
@@ -3747,7 +3512,9 @@ function buildInitialPhotoLightboxState() {
         if (!Number.isFinite(feedbackId)) {
           return;
         }
-        const record = getMainTablePhotoGalleryRecordById(feedbackId);
+        const record = ensureMainTablePhotoGalleryRecordsLoaded()
+          .map((item) => normalizeMainTablePhotoGalleryRecord(item))
+          .find((item) => item && item.id === feedbackId);
         if (!record) {
           return;
         }
@@ -3767,7 +3534,9 @@ function buildInitialPhotoLightboxState() {
         if (!Number.isFinite(feedbackId)) {
           return;
         }
-        const record = getMainTablePhotoGalleryRecordById(feedbackId);
+        const record = ensureMainTablePhotoGalleryRecordsLoaded()
+          .map((item) => normalizeMainTablePhotoGalleryRecord(item))
+          .find((item) => item && item.id === feedbackId);
         if (!record) {
           return;
         }
@@ -3896,12 +3665,11 @@ function buildInitialPhotoLightboxState() {
   }
 
   async function refreshMainTablePhotoGalleryRecordsFromRemote(displayContext = getMainTableDisplaySnapshotContext()) {
-    const remoteAvailable = Boolean(sync.hasRemoteSync?.() && typeof sync.listOcrFeedback === "function");
-    const desktopMirrorAvailable = canUseDesktopMirror();
     if (
       mode !== "main"
       || state.mainTablePhotoGallery.isLoading
-      || (!remoteAvailable && !desktopMirrorAvailable)
+      || !sync.hasRemoteSync?.()
+      || typeof sync.listOcrFeedback !== "function"
     ) {
       refreshMainTablePhotoGalleryUi(displayContext);
       return;
@@ -3932,19 +3700,10 @@ function buildInitialPhotoLightboxState() {
           .map(normalizeMainTablePhotoGalleryRecord)
           .filter(Boolean)
         : [];
-      let records;
-      if (remoteAvailable) {
-        records = await loadRemoteCollectionWithDesktopMirrorFallback(
-          () => sync.listOcrFeedback(80, {
-            createdDateKey: getArchiveDateKey(),
-            excludeTelegramForms: true
-          }),
-          "ocr-feedback",
-          "Timeout while loading OCR photo gallery"
-        );
-      } else {
-        records = await loadDesktopMirrorCollection("ocr-feedback");
-      }
+      const records = await sync.listOcrFeedback(80, {
+        createdDateKey: getArchiveDateKey(),
+        excludeTelegramForms: true
+      });
       const nextRecords = (Array.isArray(records) ? records : [])
         .map(normalizeMainTablePhotoGalleryRecord)
         .filter(Boolean);
@@ -3964,71 +3723,12 @@ function buildInitialPhotoLightboxState() {
     }
   }
 
-  async function refreshMainTableAndroidAppRecordsFromRemote(displayContext = getMainTableDisplaySnapshotContext()) {
-    const remoteAvailable = Boolean(sync.hasRemoteSync?.() && typeof sync.listAndroidMainformFeedback === "function");
-    const desktopMirrorAvailable = canUseDesktopMirror();
-    if (
-      mode !== "main"
-      || state.mainTableAndroidApp.isLoading
-      || (!remoteAvailable && !desktopMirrorAvailable)
-    ) {
-      refreshMainTableAndroidAppUi(displayContext);
-      return;
-    }
-
-    if (state.mainTableAndroidApp.loaded && ensureMainTableAndroidAppRecordsLoaded().length) {
-      refreshMainTableAndroidAppUi(displayContext);
-    }
-
-    const now = Date.now();
-    if (
-      state.mainTableAndroidApp.loaded
-      && Number.isFinite(state.mainTableAndroidApp.lastLoadedAt)
-      && now - state.mainTableAndroidApp.lastLoadedAt < REMOTE_AUX_PANEL_REFRESH_MS
-    ) {
-      refreshMainTableAndroidAppUi(displayContext);
-      return;
-    }
-
-    state.mainTableAndroidApp.isLoading = true;
-    state.mainTableAndroidApp.error = "";
-    refreshMainTableAndroidAppUi(displayContext);
-
-    try {
-      let records;
-      if (remoteAvailable) {
-        records = await loadRemoteCollectionWithDesktopMirrorFallback(
-          () => sync.listAndroidMainformFeedback(120, {
-            createdDateKey: getArchiveDateKey()
-          }),
-          "android-mainform",
-          "Timeout while loading Android MAINFORM data"
-        );
-      } else {
-        records = await loadDesktopMirrorCollection("android-mainform");
-      }
-      state.mainTableAndroidApp.records = (Array.isArray(records) ? records : [])
-        .map(normalizeMainTablePhotoGalleryRecord)
-        .filter(Boolean);
-      state.mainTableAndroidApp.loaded = true;
-      state.mainTableAndroidApp.error = "";
-      state.mainTableAndroidApp.lastLoadedAt = Date.now();
-    } catch (error) {
-      state.mainTableAndroidApp.loaded = true;
-      state.mainTableAndroidApp.error = error instanceof Error ? error.message : "Не удалось загрузить отправки Android MAINFORM.";
-    } finally {
-      state.mainTableAndroidApp.isLoading = false;
-      refreshMainTableAndroidAppUi(displayContext);
-    }
-  }
-
   async function refreshMainTableTelegramFormRecordsFromRemote() {
-    const remoteAvailable = Boolean(sync.hasRemoteSync?.() && typeof sync.listTelegramFormFeedback === "function");
-    const desktopMirrorAvailable = canUseDesktopMirror();
     if (
       mode !== "main"
       || state.mainTableTelegramForms.isLoading
-      || (!remoteAvailable && !desktopMirrorAvailable)
+      || !sync.hasRemoteSync?.()
+      || typeof sync.listTelegramFormFeedback !== "function"
     ) {
       refreshMainTableTelegramFormUi();
       return;
@@ -4055,16 +3755,7 @@ function buildInitialPhotoLightboxState() {
           .map((record) => normalizeMainTableTelegramFormRecord(record))
           .filter(Boolean)
         : [];
-      let records;
-      if (remoteAvailable) {
-        records = await loadRemoteCollectionWithDesktopMirrorFallback(
-          () => sync.listTelegramFormFeedback(120),
-          "telegram-forms",
-          "Timeout while loading Telegram forms"
-        );
-      } else {
-        records = await loadDesktopMirrorCollection("telegram-forms");
-      }
+      const records = await sync.listTelegramFormFeedback(120);
       const nextRecords = (Array.isArray(records) ? records : [])
         .map((record) => normalizeMainTableTelegramFormRecord(record))
         .filter(Boolean);
@@ -4703,33 +4394,6 @@ function buildInitialPhotoLightboxState() {
     return `Выбран архив ${record.archiveLabel}. Дата документа: ${record.reportDate}. Сохранён: ${formatTimestamp(record.capturedAt)}.`;
   }
 
-  function getArchiveDateKey(record) {
-    if (!record || typeof record !== "object") {
-      return "";
-    }
-    const archiveKey = typeof record.archiveKey === "string" ? record.archiveKey.trim() : "";
-    if (/^\d{4}-\d{2}-\d{2}/.test(archiveKey)) {
-      return archiveKey.slice(0, 10);
-    }
-    const reportDate = typeof record.reportDate === "string" ? record.reportDate.trim() : "";
-    if (reportDate) {
-      const normalized = normalizeTelegramFormArchiveDateKey(reportDate);
-      if (normalized) {
-        return normalized;
-      }
-    }
-    const archiveLabel = typeof record.archiveLabel === "string" ? record.archiveLabel.trim() : "";
-    return normalizeTelegramFormArchiveDateKey(archiveLabel) || "";
-  }
-
-  function getMainArchiveSelectionText(record) {
-    if (!record) {
-      return "Выбери дату, чтобы открыть общий архивный PDF.";
-    }
-    const dateKey = getArchiveDateKey(record);
-    return `Выбран архив ${record.archiveLabel}. Дата комплекта: ${dateKey || record.reportDate}. Сохранён: ${formatTimestamp(record.capturedAt)}.`;
-  }
-
   function buildArchiveOptions(records, selectedArchiveKey) {
     return records.map((record) => `
       <option value="${escapeHtml(record.archiveKey)}"${record.archiveKey === selectedArchiveKey ? " selected" : ""}>
@@ -4753,9 +4417,9 @@ function buildInitialPhotoLightboxState() {
               ${buildArchiveOptions(records, selectedRecord.archiveKey)}
             </select>
           </label>
-          <a class="archive-open-link" id="archivePdfLink" href="${escapeHtml(typeof sync.buildMainArchivePdfUrl === "function" ? sync.buildMainArchivePdfUrl(getArchiveDateKey(selectedRecord) || selectedRecord.reportDate || "") : "")}" target="_blank" rel="noopener">PDF архив</a>
+          <a class="archive-open-link" id="archivePdfLink" href="${escapeHtml(getArchivePrintPath(selectedRecord.archiveKey))}" target="_blank" rel="noopener">PDF</a>
         </div>
-        <div class="archive-selected-meta" id="archiveSelectedMeta">${escapeHtml(getMainArchiveSelectionText(selectedRecord))}</div>
+        <div class="archive-selected-meta" id="archiveSelectedMeta">${escapeHtml(getArchiveSelectionText(selectedRecord))}</div>
       </div>
     `;
   }
@@ -4772,9 +4436,7 @@ function buildInitialPhotoLightboxState() {
     }
     if (link) {
       if (selectedRecord) {
-        link.href = typeof sync.buildMainArchivePdfUrl === "function"
-          ? sync.buildMainArchivePdfUrl(getArchiveDateKey(selectedRecord) || selectedRecord.reportDate || "")
-          : "#";
+        link.href = getArchivePrintPath(selectedRecord.archiveKey);
         link.removeAttribute("aria-disabled");
       } else {
         link.removeAttribute("href");
@@ -4782,50 +4444,7 @@ function buildInitialPhotoLightboxState() {
       }
     }
     if (meta) {
-      meta.textContent = getMainArchiveSelectionText(selectedRecord);
-    }
-  }
-
-  function normalizeMainArchivePanels() {
-    if (mode !== "main") {
-      return;
-    }
-
-    const dailyPanel = document.querySelector(".main-daily-archive-panel");
-    if (dailyPanel instanceof HTMLElement) {
-      const heading = dailyPanel.querySelector("h2");
-      if (heading) {
-        heading.textContent = "PDF архив";
-      }
-
-      const summary = document.getElementById("archiveSummaryText");
-      const records = ensureArchiveRecordsLoaded();
-      const latestArchive = records[0] || null;
-      if (summary) {
-        summary.textContent = latestArchive
-          ? `Архивных комплектов: ${records.length}. Последний комплект: ${latestArchive.archiveLabel}, сохранён ${formatTimestamp(latestArchive.capturedAt)}.`
-          : "Архивных комплектов пока нет. Первый комплект появится автоматически после сохранения дневного снимка.";
-      }
-
-      const hint = dailyPanel.querySelector(".hint");
-      if (hint) {
-        hint.textContent = "В один PDF объединяются Report.pdf, MAINFLOW.pdf, All_departments_current_<дата>.pdf и все связанные фото бланков за выбранную дату.";
-      }
-
-      const archiveButton = document.getElementById("archivePdfLink");
-      if (archiveButton) {
-        archiveButton.textContent = "PDF архив";
-      }
-
-      const archiveMeta = document.getElementById("archiveSelectedMeta");
-      if (archiveMeta) {
-        archiveMeta.textContent = getMainArchiveSelectionText(getSelectedArchiveRecord(records));
-      }
-    }
-
-    const departmentArchivePanel = document.querySelector(".department-pdf-archive-panel");
-    if (departmentArchivePanel instanceof HTMLElement) {
-      departmentArchivePanel.remove();
+      meta.textContent = getArchiveSelectionText(selectedRecord);
     }
   }
 
@@ -8595,7 +8214,7 @@ function buildInitialPhotoLightboxState() {
     status.className = `qh-calc-status${invalidColumns.length ? " qh-calc-status--bad" : ""}`;
     status.innerHTML = invalidColumns.length
       ? invalidColumns.map((column) => (
-        `<div>${escapeHtml(`${column.label}: չի կարող լինել բացասական արժեք`)}</div>`
+        `<div>${escapeHtml(`${column.label}: Õ¹Õ« Õ¯Õ¡Ö€Õ¸Õ² Õ¬Õ«Õ¶Õ¥Õ¬ Õ¢Õ¡ÖÕ¡Õ½Õ¡Õ¯Õ¡Õ¶ Õ¡Ö€ÕªÕ¥Ö„`)}</div>`
       )).join("")
       : "";
   }
@@ -8677,6 +8296,12 @@ function buildInitialPhotoLightboxState() {
       return path;
     }
     return path.includes("?") ? `${path}${shareQuery.replace("?", "&")}` : `${path}${shareQuery}`;
+  }
+
+  function getInternalPageTargetAttrs() {
+    return window.location.protocol === "file:"
+      ? ""
+      : ' target="_blank" rel="noopener"';
   }
 
   function appendQueryParams(path, params) {
@@ -8790,6 +8415,15 @@ function buildInitialPhotoLightboxState() {
     } catch (_error) {
       const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
       return appendShareQuery(`${prefix}windows/releases/Mainflow.exe`);
+    }
+  }
+
+  function getSonoDesktopSetupPath() {
+    try {
+      return appendShareQuery(new URL("windows/releases/Sono.exe", window.location.href).href);
+    } catch (_error) {
+      const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+      return appendShareQuery(`${prefix}windows/releases/Sono.exe`);
     }
   }
 
@@ -9176,23 +8810,6 @@ function buildInitialPhotoLightboxState() {
     };
   }
 
-  function getDesktopUpdateBlockers() {
-    const pending = getPendingSyncStatus();
-    const hasBlockingUiWork = hasBlockingLocalWorkForBackgroundSync();
-    return {
-      hasBlockingWork: Boolean(
-        hasBlockingUiWork
-        || pending.hasPending
-        || pending.isSyncing
-        || pending.count > 0
-      ),
-      hasBlockingUiWork,
-      hasPendingSync: Boolean(pending.hasPending),
-      pendingCount: Number(pending.count) || 0,
-      isSyncing: Boolean(pending.isSyncing)
-    };
-  }
-
   function getPendingSyncButtonLabel(status = getPendingSyncStatus()) {
     if (status.isSyncing) {
       return status.count > 0 ? `Синхр. накопл. (${status.count})...` : "Синхр. накопл....";
@@ -9541,14 +9158,14 @@ function buildInitialPhotoLightboxState() {
   function buildMainTableAndroidAppContent(displayContext = getMainTableDisplaySnapshotContext()) {
     const items = buildMainTableAndroidAppItems(displayContext);
 
-    if (state.mainTableAndroidApp.error && !items.length) {
+    if (state.mainTablePhotoGallery.error && !items.length) {
       return {
-        summary: state.mainTableAndroidApp.error,
+        summary: state.mainTablePhotoGallery.error,
         html: '<div class="archive-empty">Не удалось загрузить отправки Android MAINFORM.</div>'
       };
     }
 
-    if (state.mainTableAndroidApp.isLoading && !items.length) {
+    if (state.mainTablePhotoGallery.isLoading && !items.length) {
       return {
         summary: "Загружаю Android MAINFORM отправки за сегодня...",
         html: '<div class="archive-empty">Загружаю Android MAINFORM данные...</div>'
@@ -9797,17 +9414,17 @@ function buildInitialPhotoLightboxState() {
     const desktopSetupPath = window.location.protocol !== "file:"
       ? getWindowsDesktopSetupPath()
       : "";
+    const sonoDesktopSetupPath = window.location.protocol !== "file:"
+      ? getSonoDesktopSetupPath()
+      : "";
     const downloadDesktopButtonHtml = desktopSetupPath
       ? `<a class="button-link" href="${escapeHtml(desktopSetupPath)}" download="Mainflow.exe" target="_blank" rel="noopener">Mainflow.exe</a>`
       : "";
+    const downloadSonoDesktopButtonHtml = sonoDesktopSetupPath
+      ? `<a class="button-link" href="${escapeHtml(sonoDesktopSetupPath)}" download="Sono.exe" target="_blank" rel="noopener">SONO.exe</a>`
+      : "";
     const downloadMainPdfButtonHtml = mainBlankPdfPath
       ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">PDF ներբ.</a>`
-      : "";
-    const mainArchivePdfUrl = typeof sync.buildMainArchivePdfUrl === "function"
-      ? sync.buildMainArchivePdfUrl(displayedMainTableSnapshot.reportDate || state.snapshot.reportDate || "")
-      : "";
-    const downloadMainArchivePdfButtonHtml = mainArchivePdfUrl
-      ? `<a class="button-link" href="${escapeHtml(mainArchivePdfUrl)}" target="_blank" rel="noopener">PDF архив</a>`
       : "";
 
     app.innerHTML = `
@@ -9831,17 +9448,17 @@ function buildInitialPhotoLightboxState() {
               </div>
             </div>
             <div class="main-toolbar-group">
+              ${downloadSonoDesktopButtonHtml}
               ${downloadDesktopButtonHtml}
               ${downloadMainPdfButtonHtml}
-              ${downloadMainArchivePdfButtonHtml}
               <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
-              <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Հաշվետվ.</a>
+              <a class="button-link" href="${escapeHtml(getHospitalReportPath())}"${getInternalPageTargetAttrs()}>Հաշվետվ.</a>
               <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
             </div>
             <div class="main-toolbar-group">
-              <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Ընդունում</a>
-              <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Դուրսգրում</a>
-              <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}" target="_blank" rel="noopener">Քաղ. ԲԿ բազա</a>
+              <a class="button-link" href="${escapeHtml(getDayShiftPath())}"${getInternalPageTargetAttrs()}>Ընդունում</a>
+              <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}"${getInternalPageTargetAttrs()}>Դուրսգրում</a>
+              <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}"${getInternalPageTargetAttrs()}>Քաղ. ԲԿ բազա</a>
               <a class="button-link" href="${escapeHtml(getSetupPath())}">Կարգավ.</a>
             </div>
             <div class="main-toolbar-group main-toolbar-group--actions">
@@ -11820,7 +11437,6 @@ function buildInitialPhotoLightboxState() {
       renderMainPage();
     }
 
-    normalizeMainArchivePanels();
     document.title = getAppDocumentTitle();
     enhanceMainPageCollapsiblePanels();
     attachCommonEvents();
@@ -11830,7 +11446,6 @@ function buildInitialPhotoLightboxState() {
       return;
     }
     refreshTableData();
-    normalizeMainArchivePanels();
   }
 
   function refreshComputedCells() {
@@ -12334,8 +11949,6 @@ function buildInitialPhotoLightboxState() {
       syncMainDepartmentPdfArchivePickerUi();
       refreshMainTablePhotoGalleryUi(mainDisplayContext);
       void refreshMainTablePhotoGalleryRecordsFromRemote(mainDisplayContext);
-      refreshMainTableAndroidAppUi(mainDisplayContext);
-      void refreshMainTableAndroidAppRecordsFromRemote(mainDisplayContext);
       refreshMainTableTelegramFormUi();
       void refreshMainTableTelegramFormRecordsFromRemote();
 
@@ -13859,9 +13472,6 @@ function buildInitialPhotoLightboxState() {
     state.mainTablePhotoGallery.records = ensureMainTablePhotoGalleryRecordsLoaded().filter(
       (record) => Number(record?.id) !== normalizedFeedbackId
     );
-    state.mainTableAndroidApp.records = ensureMainTableAndroidAppRecordsLoaded().filter(
-      (record) => Number(record?.id) !== normalizedFeedbackId
-    );
   }
 
   function upsertMainTablePhotoGalleryRecord(record) {
@@ -13885,23 +13495,6 @@ function buildInitialPhotoLightboxState() {
       nextRecords.push(normalizedRecord);
     }
     state.mainTablePhotoGallery.records = nextRecords;
-
-    const nextAndroidRecords = [];
-    let replacedAndroid = false;
-    ensureMainTableAndroidAppRecordsLoaded().forEach((currentRecord) => {
-      if (Number(currentRecord?.id) === normalizedId) {
-        if (isAndroidMainTablePhotoRecord(normalizedRecord)) {
-          nextAndroidRecords.push(normalizedRecord);
-        }
-        replacedAndroid = true;
-        return;
-      }
-      nextAndroidRecords.push(currentRecord);
-    });
-    if (!replacedAndroid && isAndroidMainTablePhotoRecord(normalizedRecord)) {
-      nextAndroidRecords.push(normalizedRecord);
-    }
-    state.mainTableAndroidApp.records = nextAndroidRecords;
   }
 
   async function handleDeleteMainTablePhotoGalleryFeedback(button) {
@@ -14566,14 +14159,12 @@ function buildInitialPhotoLightboxState() {
     }
 
     const feedbackId = queryParams.get("tgFeedback") || "";
-    if (!feedbackId) {
+    if (!feedbackId || !sync.hasRemoteSync() || typeof sync.loadTelegramPhotoFeedback !== "function") {
       return;
     }
 
     try {
-      const record = sync.hasRemoteSync() && typeof sync.loadTelegramPhotoFeedback === "function"
-        ? await sync.loadTelegramPhotoFeedback(feedbackId, departmentId)
-        : await loadDesktopMirrorDepartmentPhotoRecord(feedbackId, departmentId);
+      const record = await sync.loadTelegramPhotoFeedback(feedbackId, departmentId);
       if (!record) {
         return;
       }
@@ -14608,46 +14199,6 @@ function buildInitialPhotoLightboxState() {
       void playPhotoReceivedSound();
       renderPage();
     } catch (_error) {
-      if (!canUseDesktopMirror()) {
-        return;
-      }
-
-      try {
-        const record = await loadDesktopMirrorDepartmentPhotoRecord(feedbackId, departmentId);
-        if (!record) {
-          return;
-        }
-
-        const imageDataUrl = getOcrFeedbackImageOverride(feedbackId)
-          || (typeof record.imageDataUrl === "string" ? record.imageDataUrl : "");
-        if (!imageDataUrl.startsWith("data:image/")) {
-          return;
-        }
-
-        const recordNotes = Array.isArray(record.notes) ? record.notes : [];
-        const preparedPhoto = await normalizeTelegramFeedbackImageDataUrl(imageDataUrl, recordNotes);
-
-        state.photoImport = buildInitialPhotoImportState();
-        state.photoImport.feedbackId = String(record.id || feedbackId);
-        state.photoImport.workflowStatus = "pending";
-        state.photoImport.imageName = typeof record.imageName === "string" ? record.imageName : "";
-        state.photoImport.imageDataUrl = preparedPhoto.dataUrl;
-        state.photoImport.lastReportDate = typeof record.photoReportDate === "string" && record.photoReportDate.trim()
-          ? record.photoReportDate
-          : (typeof record.reportDate === "string" ? record.reportDate : "");
-        state.photoImport.lastAppliedKeys = Array.isArray(record.recognizedKeys)
-          ? record.recognizedKeys.map((item) => String(item))
-          : [];
-        state.photoImport.recognizedValues = buildPhotoPreviewValuesFromRecord(record);
-        state.photoImport.notes = normalizeOcrNotes(recordNotes);
-        state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
-        state.photoImport.status = preparedPhoto.rotatedToLandscape
-          ? "Фото бланка загружено из локального зеркала и автоматически выровнено: SR сверху справа. Проверьте значения и при необходимости сохраните."
-          : "Фото бланка загружено из локального зеркала. Проверьте значения и при необходимости сохраните.";
-        state.photoImport.isError = false;
-        renderPage();
-      } catch (_mirrorError) {
-      }
     }
   }
 
@@ -14670,16 +14221,13 @@ function buildInitialPhotoLightboxState() {
       candidateIds.push(fallbackTelegramFormId);
     }
 
-    if (!candidateIds.length && !canUseDesktopMirror()) {
+    if (!candidateIds.length || !sync.hasRemoteSync() || typeof sync.loadTelegramPhotoFeedback !== "function") {
       return;
     }
 
-    const effectiveCandidateIds = candidateIds.length ? candidateIds : [""];
-    for (const candidateId of effectiveCandidateIds) {
+    for (const candidateId of candidateIds) {
       try {
-        const record = candidateId && sync.hasRemoteSync() && typeof sync.loadTelegramPhotoFeedback === "function"
-          ? await sync.loadTelegramPhotoFeedback(candidateId, departmentId)
-          : await loadDesktopMirrorTelegramFormRecord(candidateId, departmentId);
+        const record = await sync.loadTelegramPhotoFeedback(candidateId, departmentId);
         if (!record) {
           continue;
         }
@@ -14716,7 +14264,7 @@ function buildInitialPhotoLightboxState() {
   }
 
   async function maybeLoadStoredDepartmentPhotoAdjusted(forceReplace = false) {
-    if (mode !== "department") {
+    if (mode !== "department" || !sync.hasRemoteSync() || typeof sync.loadTelegramPhotoFeedback !== "function") {
       return;
     }
 
@@ -14727,7 +14275,7 @@ function buildInitialPhotoLightboxState() {
 
     const row = getCurrentRow();
     const feedbackId = row && row.photoFeedbackId ? String(row.photoFeedbackId) : "";
-    if (!feedbackId && !canUseDesktopMirror()) {
+    if (!feedbackId) {
       return;
     }
 
@@ -14741,9 +14289,7 @@ function buildInitialPhotoLightboxState() {
     }
 
     try {
-      const record = sync.hasRemoteSync() && typeof sync.loadTelegramPhotoFeedback === "function"
-        ? await sync.loadTelegramPhotoFeedback(feedbackId, departmentId)
-        : await loadDesktopMirrorDepartmentPhotoRecord(feedbackId, departmentId);
+      const record = await sync.loadTelegramPhotoFeedback(feedbackId, departmentId);
       if (!record) {
         return;
       }
@@ -14786,52 +14332,6 @@ function buildInitialPhotoLightboxState() {
       }
       renderPage();
     } catch (_error) {
-      if (!canUseDesktopMirror()) {
-        return;
-      }
-
-      try {
-        const record = await loadDesktopMirrorDepartmentPhotoRecord(feedbackId, departmentId);
-        if (!record) {
-          return;
-        }
-
-        const imageDataUrl = getOcrFeedbackImageOverride(feedbackId)
-          || (typeof record.imageDataUrl === "string" ? record.imageDataUrl : "");
-        if (!imageDataUrl.startsWith("data:image/")) {
-          return;
-        }
-
-        const recordNotes = Array.isArray(record.notes) ? record.notes : [];
-        const preparedPhoto = await normalizeTelegramFeedbackImageDataUrl(imageDataUrl, recordNotes);
-        const workflowStatus = row && typeof row.photoWorkflowStatus === "string" ? row.photoWorkflowStatus : "idle";
-
-        state.photoImport = buildInitialPhotoImportState();
-        state.photoImport.feedbackId = String(record.id || feedbackId);
-        state.photoImport.workflowStatus = workflowStatus;
-        state.photoImport.imageName = typeof record.imageName === "string" && record.imageName.trim()
-          ? record.imageName
-          : (row && typeof row.photoName === "string" ? row.photoName : "");
-        state.photoImport.imageDataUrl = preparedPhoto.dataUrl;
-        state.photoImport.lastReportDate = typeof record.photoReportDate === "string" && record.photoReportDate.trim()
-          ? record.photoReportDate
-          : (typeof record.reportDate === "string" ? record.reportDate : "");
-        state.photoImport.lastAppliedKeys = Array.isArray(record.recognizedKeys)
-          ? record.recognizedKeys.map((item) => String(item))
-          : [];
-        state.photoImport.recognizedValues = buildPhotoPreviewValuesFromRecord(record);
-        state.photoImport.notes = normalizeOcrNotes(recordNotes);
-        state.photoImport.cellReviews = Array.isArray(record.cellReviews) ? record.cellReviews : [];
-        state.photoImport.status = workflowStatus === "pending"
-          ? "Новый бланк загружен из локального зеркала. Проверьте значения и сохраните данные после корректировок."
-          : "Показан последний сохранённый бланк отделения из локального зеркала.";
-        if (preparedPhoto.rotatedToLandscape) {
-          state.photoImport.status = `Фото автоматически выровнено: SR сверху справа. ${state.photoImport.status}`;
-        }
-        state.photoImport.isError = false;
-        renderPage();
-      } catch (_mirrorError) {
-      }
     }
   }
 
@@ -15032,29 +14532,7 @@ function buildInitialPhotoLightboxState() {
   }
 
   async function loadWorkingSnapshot() {
-    let result;
-    if (sync.hasRemoteSync?.() && canUseDesktopMirror()) {
-      try {
-        result = await runWithTimeout(
-          () => sync.loadSnapshot(),
-          DESKTOP_REMOTE_LIST_TIMEOUT_MS,
-          "Timeout while loading main snapshot"
-        );
-      } catch (error) {
-        const fallback = await loadDesktopMirrorSnapshotResult();
-        const fallbackMessage = error instanceof Error && error.message
-          ? error.message
-          : "Не удалось загрузить данные с сервера.";
-        result = {
-          ...fallback,
-          source: "desktop-mirror",
-          warning: `Показана локальная копия данных: ${fallbackMessage}`
-        };
-      }
-    } else {
-      result = await sync.loadSnapshot();
-    }
-
+    const result = await sync.loadSnapshot();
     applyLoadedSnapshot(result);
     state.archiveRecords = readArchiveRecords();
     state.departmentPdfArchiveRecords = readDepartmentPdfArchiveRecords();
@@ -16069,7 +15547,31 @@ function buildInitialPhotoLightboxState() {
       });
     }
 
+    const archiveSelect = document.getElementById("archiveSelect");
+    if (archiveSelect) {
+      archiveSelect.addEventListener("change", () => {
+        state.selectedArchiveKey = archiveSelect.value || "";
+        syncArchivePickerUi();
+      });
+    }
+
     attachMainTableSavedNavigatorEvents();
+
+    const departmentPdfArchiveSelect = document.getElementById("departmentPdfArchiveSelect");
+    if (departmentPdfArchiveSelect) {
+      departmentPdfArchiveSelect.addEventListener("change", () => {
+        state.selectedDepartmentPdfArchiveKey = departmentPdfArchiveSelect.value || "";
+        syncDepartmentPdfArchivePickerUi();
+      });
+    }
+
+    const departmentPdfArchiveDateSelect = document.getElementById("departmentPdfArchiveDateSelect");
+    if (departmentPdfArchiveDateSelect) {
+      departmentPdfArchiveDateSelect.addEventListener("change", () => {
+        state.selectedDepartmentPdfArchiveDate = departmentPdfArchiveDateSelect.value || "";
+        syncMainDepartmentPdfArchivePickerUi();
+      });
+    }
 
     if (!app.dataset.archiveDownloadBound) {
       app.addEventListener("click", (event) => {
@@ -16091,33 +15593,6 @@ function buildInitialPhotoLightboxState() {
         printArchiveRecord(archiveKey);
       });
       app.dataset.archiveDownloadBound = "1";
-    }
-
-    if (!app.dataset.archiveChangeBound) {
-      app.addEventListener("change", (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLSelectElement)) {
-          return;
-        }
-
-        if (target.id === "archiveSelect") {
-          state.selectedArchiveKey = target.value || "";
-          syncArchivePickerUi();
-          return;
-        }
-
-        if (target.id === "departmentPdfArchiveSelect") {
-          state.selectedDepartmentPdfArchiveKey = target.value || "";
-          syncDepartmentPdfArchivePickerUi();
-          return;
-        }
-
-        if (target.id === "departmentPdfArchiveDateSelect") {
-          state.selectedDepartmentPdfArchiveDate = target.value || "";
-          syncMainDepartmentPdfArchivePickerUi();
-        }
-      });
-      app.dataset.archiveChangeBound = "1";
     }
 
     if (!window.__sharshPhotoDraftGuardBound) {
@@ -16427,9 +15902,6 @@ function buildInitialPhotoLightboxState() {
     }
 
     state.refreshIntervalId = window.setInterval(async () => {
-      if (document.hidden) {
-        return;
-      }
       if (mode === "department" && hasDepartmentPendingLocalChanges()) {
         return;
       }
@@ -16488,53 +15960,6 @@ function buildInitialPhotoLightboxState() {
     }, 30000);
   }
 
-  async function refreshRemoteDataAfterVisibilityRestore() {
-    if (document.hidden || mode === "archive" || !sync.hasRemoteSync()) {
-      return;
-    }
-    if (mode === "department" && hasDepartmentPendingLocalChanges()) {
-      return;
-    }
-    if (mode === "main" && (state.mainTableUnlocked || hasMainTablePendingLocalChanges())) {
-      return;
-    }
-
-    try {
-      const previousPendingPhotoSignature = mode === "main"
-        ? getPendingPhotoWorkflowSignature(state.snapshot)
-        : "";
-      const result = await sync.loadSnapshot();
-      applyLoadedSnapshot(result);
-      const nextPendingPhotoSignature = mode === "main"
-        ? getPendingPhotoWorkflowSignature(state.snapshot)
-        : "";
-      if (mode === "feedback") {
-        await loadFeedbackRecords(false);
-        renderPage();
-        return;
-      }
-      if (
-        mode === "main"
-        && nextPendingPhotoSignature
-        && nextPendingPhotoSignature !== previousPendingPhotoSignature
-      ) {
-        void playPhotoReceivedSound();
-        triggerBackgroundUpdateAttention("photo");
-      }
-      restorePendingMainSaveNotice();
-      refreshTableData();
-      if (mode === "department") {
-        await maybeLoadTelegramFeedbackValues();
-        cancelAutoAppliedTelegramSelectionIfNeeded();
-        await maybeLoadStoredDepartmentPhotoAdjusted();
-        await maybeAutoRecognizeLoadedTelegramPhoto();
-      }
-    } catch (error) {
-      state.warning = error instanceof Error ? error.message : "Не удалось обновить данные.";
-      refreshTableData();
-    }
-  }
-
   async function init() {
     if (window.SHARSH_AUTH_READY) {
       await window.SHARSH_AUTH_READY;
@@ -16572,7 +15997,6 @@ function buildInitialPhotoLightboxState() {
 
     syncCurrentReportDate();
     setInfo("Загружаю данные...", false);
-    renderPage();
     await loadWorkingSnapshot();
     if (mode === "feedback") {
       await loadFeedbackRecords(true);
@@ -16769,99 +16193,10 @@ function buildInitialPhotoLightboxState() {
     statusEl.className = "qh-calc-status";
   }
 
-  function buildDesktopMirrorPayload() {
-    return {
-      generatedAtUtc: new Date().toISOString(),
-      snapshotResult: {
-        snapshot: deepCopy(state.snapshot),
-        source: String(state.source || ""),
-        warning: String(state.warning || ""),
-        info: String(state.info || ""),
-        infoIsError: Boolean(state.infoIsError)
-      },
-      ocrRecords: deepCopy(Array.isArray(state.mainTablePhotoGallery.records) ? state.mainTablePhotoGallery.records : []),
-      telegramRecords: deepCopy(Array.isArray(state.mainTableTelegramForms.records) ? state.mainTableTelegramForms.records : []),
-      androidRecords: deepCopy(Array.isArray(state.mainTableAndroidApp.records) ? state.mainTableAndroidApp.records : [])
-    };
-  }
-
-  async function ensureDesktopMirrorPayloadData() {
-    if (sync.hasRemoteSync?.()) {
-      const createdDateKey = getArchiveDateKey();
-
-      if (typeof sync.listOcrFeedback === "function") {
-        try {
-          state.mainTablePhotoGallery.records = (await runWithTimeout(
-            () => sync.listOcrFeedback(80, {
-              createdDateKey,
-              excludeTelegramForms: true
-            }),
-            DESKTOP_REMOTE_LIST_TIMEOUT_MS,
-            "Timeout while refreshing OCR mirror payload"
-          ) || [])
-            .map(normalizeMainTablePhotoGalleryRecord)
-            .filter(Boolean);
-          state.mainTablePhotoGallery.loaded = true;
-          state.mainTablePhotoGallery.error = "";
-          state.mainTablePhotoGallery.lastLoadedAt = Date.now();
-        } catch (_error) {
-          // Keep the last known in-memory photo records if the mirror refresh fails.
-        }
-      }
-
-      if (typeof sync.listTelegramFormFeedback === "function") {
-        try {
-          state.mainTableTelegramForms.records = (await runWithTimeout(
-            () => sync.listTelegramFormFeedback(120),
-            DESKTOP_REMOTE_LIST_TIMEOUT_MS,
-            "Timeout while refreshing Telegram mirror payload"
-          ) || [])
-            .map((record) => normalizeMainTableTelegramFormRecord(record))
-            .filter(Boolean);
-          state.mainTableTelegramForms.loaded = true;
-          state.mainTableTelegramForms.error = "";
-          state.mainTableTelegramForms.lastLoadedAt = Date.now();
-        } catch (_error) {
-          // Keep the last known in-memory Telegram form records if the mirror refresh fails.
-        }
-      }
-
-      if (typeof sync.listAndroidMainformFeedback === "function") {
-        try {
-          state.mainTableAndroidApp.records = (await runWithTimeout(
-            () => sync.listAndroidMainformFeedback(120, {
-              createdDateKey
-            }),
-            DESKTOP_REMOTE_LIST_TIMEOUT_MS,
-            "Timeout while refreshing Android mirror payload"
-          ) || [])
-            .map(normalizeMainTablePhotoGalleryRecord)
-            .filter(Boolean);
-          state.mainTableAndroidApp.loaded = true;
-          state.mainTableAndroidApp.error = "";
-          state.mainTableAndroidApp.lastLoadedAt = Date.now();
-        } catch (_error) {
-          // Keep the last known in-memory Android records if the mirror refresh fails.
-        }
-      }
-    }
-
-    return buildDesktopMirrorPayload();
-  }
-
   window.SHARSH_APP_API = {
     syncPendingChanges: runPendingSyncNow,
-    getPendingSyncStatus,
-    getDesktopUpdateBlockers,
-    getDesktopMirrorPayload: buildDesktopMirrorPayload,
-    ensureDesktopMirrorPayloadData
+    getPendingSyncStatus
   };
-
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      void refreshRemoteDataAfterVisibilityRestore();
-    }
-  });
 
   init().catch((error) => {
     app.innerHTML = `

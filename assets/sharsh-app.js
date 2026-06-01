@@ -79,9 +79,9 @@
   const SAVE_VERIFICATION_DELAY_MS = 700;
   const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
   const CIVIL_REFERRALS_FILENAME = "civil-referrals.html";
-  const NIGHT_SHIFT_FILENAME = "index.html";
-  const DAY_SHIFT_FILENAME = "index.html";
-  const DISCHARGE_SHIFT_FILENAME = "index.html";
+  const NIGHT_SHIFT_FILENAME = "night.html";
+  const DAY_SHIFT_FILENAME = "day.html";
+  const DISCHARGE_SHIFT_FILENAME = "discharge.html";
   const PHOTO_FIELD_DEFINITIONS = [
     { cell: 1, key: "beenTotal", label: "1" },
     { cell: 2, key: "beenSoldier", label: "2" },
@@ -8298,6 +8298,12 @@ function buildInitialPhotoLightboxState() {
     return path.includes("?") ? `${path}${shareQuery.replace("?", "&")}` : `${path}${shareQuery}`;
   }
 
+  function getInternalPageTargetAttrs() {
+    return window.location.protocol === "file:"
+      ? ""
+      : ' target="_blank" rel="noopener"';
+  }
+
   function appendQueryParams(path, params) {
     const url = new URL(appendShareQuery(path), window.location.href);
     Object.entries(params || {}).forEach(([key, value]) => {
@@ -9446,13 +9452,13 @@ function buildInitialPhotoLightboxState() {
               ${downloadDesktopButtonHtml}
               ${downloadMainPdfButtonHtml}
               <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
-              <a class="button-link" href="${escapeHtml(getHospitalReportPath())}" target="_blank" rel="noopener">Հաշվետվ.</a>
+              <a class="button-link" href="${escapeHtml(getHospitalReportPath())}"${getInternalPageTargetAttrs()}>Հաշվետվ.</a>
               <a class="button-link" href="${escapeHtml(getFeedbackPath())}">OCR ստուգ.</a>
             </div>
             <div class="main-toolbar-group">
-              <a class="button-link" href="${escapeHtml(getDayShiftPath())}" target="_blank" rel="noopener">Ընդունում</a>
-              <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}" target="_blank" rel="noopener">Դուրսգրում</a>
-              <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}" target="_blank" rel="noopener">Քաղ. ԲԿ բազա</a>
+              <a class="button-link" href="${escapeHtml(getDayShiftPath())}"${getInternalPageTargetAttrs()}>Ընդունում</a>
+              <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}"${getInternalPageTargetAttrs()}>Դուրսգրում</a>
+              <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}"${getInternalPageTargetAttrs()}>Քաղ. ԲԿ բազա</a>
               <a class="button-link" href="${escapeHtml(getSetupPath())}">Կարգավ.</a>
             </div>
             <div class="main-toolbar-group main-toolbar-group--actions">

@@ -722,9 +722,11 @@ public partial class Form1 : Form
         }
 
         var normalizedRelativePage = NormalizeRelativePage(relativePage);
+        var pagePathOnly = GetRelativePagePathOnly(normalizedRelativePage);
+        var pageQuery = GetRelativePageQuery(normalizedRelativePage);
         var pagePath = Path.Combine(
             _webRootPath,
-            normalizedRelativePage.Replace('/', Path.DirectorySeparatorChar)
+            pagePathOnly.Replace('/', Path.DirectorySeparatorChar)
         );
 
         if (!File.Exists(pagePath))
@@ -739,7 +741,7 @@ public partial class Form1 : Form
             return;
         }
 
-        var targetUri = BuildPageUri(pagePath, _shellState.Mode);
+        var targetUri = BuildPageUri(pagePath, _shellState.Mode, pageQuery);
         _currentRelativePage = normalizedRelativePage;
         if (saveState)
         {
@@ -772,13 +774,33 @@ public partial class Form1 : Form
         webView.CoreWebView2.Navigate(redirectUri.AbsoluteUri);
     }
 
-    private Uri BuildPageUri(string pagePath, DesktopMode mode)
+    private Uri BuildPageUri(string pagePath, DesktopMode mode, string? existingQuery = null)
     {
         var builder = new UriBuilder(new Uri(pagePath))
         {
-            Query = mode == DesktopMode.Online ? BuildRemoteQueryString() : string.Empty
+            Query = BuildModeAwareQuery(mode, existingQuery)
         };
         return builder.Uri;
+    }
+
+    private static string BuildModeAwareQuery(DesktopMode mode, string? existingQuery = null)
+    {
+        var trimmedExisting = string.IsNullOrWhiteSpace(existingQuery)
+            ? string.Empty
+            : existingQuery.Trim().TrimStart('?');
+        var remoteQuery = mode == DesktopMode.Online ? BuildRemoteQueryString() : string.Empty;
+
+        if (string.IsNullOrWhiteSpace(remoteQuery))
+        {
+            return trimmedExisting;
+        }
+
+        if (string.IsNullOrWhiteSpace(trimmedExisting))
+        {
+            return remoteQuery;
+        }
+
+        return $"{remoteQuery}&{trimmedExisting}";
     }
 
     private static string BuildRemoteQueryString()
@@ -816,7 +838,7 @@ public partial class Form1 : Form
                 return false;
             }
 
-            redirectUri = BuildPageUri(localPath, mode);
+            redirectUri = BuildPageUri(localPath, mode, parsedUri.Query);
             return true;
         }
         catch
@@ -839,7 +861,8 @@ public partial class Form1 : Form
                 .Replace(Path.DirectorySeparatorChar, '/');
             if (!string.IsNullOrWhiteSpace(relativePath) && !relativePath.StartsWith("..", StringComparison.Ordinal))
             {
-                _currentRelativePage = NormalizeRelativePage(relativePath);
+                var query = webView.Source.Query;
+                _currentRelativePage = NormalizeRelativePage(string.IsNullOrWhiteSpace(query) ? relativePath : $"{relativePath}{query}");
                 _shellState = _shellState with { LastRelativePage = _currentRelativePage };
             }
         }
@@ -854,14 +877,18 @@ public partial class Form1 : Form
         var normalizedRelativePage = string.IsNullOrWhiteSpace(relativePage)
             ? DefaultRelativePage
             : relativePage.Trim().Replace('\\', '/').TrimStart('/');
+        var pathOnly = GetRelativePagePathOnly(normalizedRelativePage);
+        var query = GetRelativePageQuery(normalizedRelativePage);
 
-        if (string.IsNullOrWhiteSpace(normalizedRelativePage)
-            || string.Equals(normalizedRelativePage, DefaultRelativePage, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(pathOnly)
+            || string.Equals(pathOnly, DefaultRelativePage, StringComparison.OrdinalIgnoreCase))
         {
-            return publishedRootUri;
+            return string.IsNullOrWhiteSpace(query)
+                ? publishedRootUri
+                : new Uri(publishedRootUri, $"{DefaultRelativePage}?{query}");
         }
 
-        return new Uri(publishedRootUri, normalizedRelativePage);
+        return new Uri(publishedRootUri, string.IsNullOrWhiteSpace(query) ? pathOnly : $"{pathOnly}?{query}");
     }
 
     private void OpenCurrentPageInBrowser()
@@ -895,7 +922,8 @@ public partial class Form1 : Form
     private QrDisplayPayload BuildQrDisplayPayload()
     {
         var normalizedRelativePage = NormalizeRelativePage(_currentRelativePage);
-        var title = _pageTitles.TryGetValue(normalizedRelativePage, out var pageTitle)
+        var titleKey = GetRelativePagePathOnly(normalizedRelativePage);
+        var title = _pageTitles.TryGetValue(titleKey, out var pageTitle)
             ? pageTitle
             : "Текущая страница";
         var publishedUri = BuildPublishedSiteUri(normalizedRelativePage);
@@ -904,17 +932,17 @@ public partial class Form1 : Form
         string qrFileName;
         var isFallback = false;
 
-        if (string.Equals(normalizedRelativePage, "setup.html", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(titleKey, "setup.html", StringComparison.OrdinalIgnoreCase))
         {
             qrFileName = SetupPageQrFileName;
         }
-        else if (string.Equals(normalizedRelativePage, DefaultRelativePage, StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(titleKey, DefaultRelativePage, StringComparison.OrdinalIgnoreCase))
         {
             qrFileName = MainPageQrFileName;
         }
         else
         {
-            var slugFileName = $"{Path.GetFileNameWithoutExtension(normalizedRelativePage)}.png";
+            var slugFileName = $"{Path.GetFileNameWithoutExtension(titleKey)}.png";
             var slugPath = Path.Combine(qrCodesRoot, slugFileName);
             if (File.Exists(slugPath))
             {
@@ -1178,7 +1206,8 @@ public partial class Form1 : Form
 
     private void UpdateCurrentPageStatus()
     {
-        var title = _pageTitles.TryGetValue(_currentRelativePage, out var pageTitle)
+        var titleKey = GetRelativePagePathOnly(_currentRelativePage);
+        var title = _pageTitles.TryGetValue(titleKey, out var pageTitle)
             ? pageTitle
             : _currentRelativePage;
         toolStripStatusLabelPage.Text = $"Страница: {title}";
@@ -1492,6 +1521,50 @@ public partial class Form1 : Form
         }
 
         return normalized;
+    }
+
+    private static string GetRelativePagePathOnly(string? relativePage)
+    {
+        var normalized = string.IsNullOrWhiteSpace(relativePage)
+            ? DefaultRelativePage
+            : relativePage.Trim().Replace('\\', '/').TrimStart('/');
+        var hashIndex = normalized.IndexOf('#');
+        if (hashIndex >= 0)
+        {
+            normalized = normalized[..hashIndex];
+        }
+
+        var queryIndex = normalized.IndexOf('?');
+        if (queryIndex >= 0)
+        {
+            normalized = normalized[..queryIndex];
+        }
+
+        return string.IsNullOrWhiteSpace(normalized) ? DefaultRelativePage : normalized;
+    }
+
+    private static string GetRelativePageQuery(string? relativePage)
+    {
+        if (string.IsNullOrWhiteSpace(relativePage))
+        {
+            return string.Empty;
+        }
+
+        var normalized = relativePage.Trim();
+        var queryIndex = normalized.IndexOf('?');
+        if (queryIndex < 0)
+        {
+            return string.Empty;
+        }
+
+        var query = normalized[(queryIndex + 1)..];
+        var hashIndex = query.IndexOf('#');
+        if (hashIndex >= 0)
+        {
+            query = query[..hashIndex];
+        }
+
+        return query.Trim();
     }
 
     private DesktopShellState LoadShellState()

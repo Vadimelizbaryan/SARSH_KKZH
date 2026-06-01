@@ -9,7 +9,7 @@
 
   const SESSION_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:android-intake-hub:v1`;
   const PREVIEW_TAP_DELAY_MS = 260;
-  const POLL_INTERVAL_MS = 3 * 60 * 1000;
+  const POLL_INTERVAL_MS = 60 * 1000;
   const query = new URLSearchParams(window.location.search);
   const deviceId = String(query.get("androidDeviceId") || "").trim();
   const deviceName = String(query.get("androidDeviceName") || "").trim();
@@ -44,7 +44,7 @@
 
   function escapeHtml(value) {
     return String(value ?? "")
-      .replace(/&/g, "&")
+      .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
@@ -68,13 +68,6 @@
     const url = new URL(getTelegramFunctionEndpoint());
     url.searchParams.set("action", "android-intake-photo-submit");
     return url.toString();
-  }
-
-  function getNativeBridge() {
-    const bridge = window.MainflowAndroidBridge;
-    return bridge && typeof bridge.captureAdmissionHubPhoto === "function"
-      ? bridge
-      : null;
   }
 
   function getStorageKey(sessionKey) {
@@ -250,16 +243,6 @@
 
   function openFilePicker(departmentId) {
     state.pendingDepartmentId = departmentId;
-    const nativeBridge = getNativeBridge();
-    if (nativeBridge) {
-      try {
-        setMessage("Открываю камеру...", "info");
-        nativeBridge.captureAdmissionHubPhoto(String(departmentId || ""));
-        return;
-      } catch (_error) {
-        // Fallback to standard file picker below.
-      }
-    }
     const input = document.getElementById("androidIntakeFileInput");
     if (!(input instanceof HTMLInputElement)) {
       return;
@@ -383,25 +366,6 @@
     }
   }
 
-  function handleNativeCapturedPhoto(payload) {
-    const departmentId = String(payload?.departmentId || "").trim();
-    const slot = getSlotByDepartmentId(departmentId);
-    if (!slot) {
-      return;
-    }
-
-    const photo = normalizeLocalDraft(payload?.photo);
-    if (!photo) {
-      setMessage("Не удалось получить фото с камеры.", "error");
-      return;
-    }
-
-    slot.localDraft = photo;
-    writeLocalDrafts();
-    render();
-    setMessage(`Фото для ${slot.departmentName} готово. Если нужно, сделайте пересъёмку двойным тапом.`, "success");
-  }
-
   function syncServerPhotoIntoSlot(departmentId, record) {
     const slot = getSlotByDepartmentId(departmentId);
     if (!slot) {
@@ -427,8 +391,6 @@
 
     state.isSending = true;
     render();
-    const successDepartments = [];
-    const failedDepartments = [];
 
     try {
       for (let index = 0; index < queue.length; index += 1) {
@@ -464,26 +426,11 @@
           reportDate: state.reportDate,
           sourceLabel: "Ընդունարան"
         });
-        if (payload.controlPassed) {
-          successDepartments.push(slot.departmentName);
-        } else {
-          failedDepartments.push(slot.departmentName);
-        }
         render();
       }
       state.isSending = false;
       render();
       setMessage("Все новые фото отправлены. OCR обработал снимки. На веб-странице откройте блок «Фото бланков текущей таблицы» и проверьте результаты.", "success");
-      const resultParts = [];
-      if (successDepartments.length) {
-        resultParts.push(`\u0412 \u043E\u0441\u043D\u043E\u0432\u043D\u0443\u044E \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u044B: ${successDepartments.join(", ")}.`);
-      }
-      if (failedDepartments.length) {
-        resultParts.push(`\u041D\u0443\u0436\u043D\u0430 \u0440\u0443\u0447\u043D\u0430\u044F \u043E\u0442\u043F\u0440\u0430\u0432\u043A\u0430 \u0438\u0437 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043E\u0442\u0434\u0435\u043B\u0435\u043D\u0438\u044F: ${failedDepartments.join(", ")}.`);
-      }
-      if (resultParts.length) {
-        setMessage(resultParts.join(" "), failedDepartments.length ? "info" : "success");
-      }
       void loadState(false);
     } catch (error) {
       state.isSending = false;
@@ -545,7 +492,6 @@
           </div>
         </section>
         <p class="android-intake__hint">Один тап по готовому фото открывает просмотр. Двойной тап по готовому фото делает пересъёмку. Старые фото автоматически сбрасываются при новой вечерней сессии в 19:00.</p>
-        <p class="android-intake__hint">Старые фото также автоматически сбрасываются утром в 10:05.</p>
         <p class="android-intake__message${state.messageTone === "error" ? " android-intake__message--error" : (state.messageTone === "success" ? " android-intake__message--success" : "")}">${escapeHtml(state.message)}</p>
         <section class="android-intake__grid">
           ${state.slots.map(buildSlotCard).join("")}
@@ -620,16 +566,6 @@
     if (!document.hidden) {
       void loadState(false);
     }
-  });
-
-  window.MAINFORM_ANDROID_INTAKE_HUB = {
-    receiveCapturedPhoto(payload) {
-      handleNativeCapturedPhoto(payload);
-    }
-  };
-
-  window.addEventListener("mainform-android-intake-photo", (event) => {
-    handleNativeCapturedPhoto(event?.detail || {});
   });
 
   render();
