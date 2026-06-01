@@ -9064,7 +9064,6 @@ async function ensureMainArchiveStorageBucket(_supabase: ReturnType<typeof creat
       id: MAIN_ARCHIVE_STORAGE_BUCKET,
       name: MAIN_ARCHIVE_STORAGE_BUCKET,
       public: false,
-      file_size_limit: 100 * 1024 * 1024,
       allowed_mime_types: ["application/pdf"]
     })
   });
