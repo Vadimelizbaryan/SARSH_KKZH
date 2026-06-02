@@ -70,6 +70,14 @@
     return url.toString();
   }
 
+  function getFeedbackPhotoUrl(feedbackId, departmentId) {
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "feedback-photo");
+    url.searchParams.set("id", feedbackId);
+    url.searchParams.set("departmentId", departmentId);
+    return url.toString();
+  }
+
   function getStorageKey(sessionKey) {
     return `${SESSION_STORAGE_PREFIX}:${deviceId}:${sessionKey || "pending"}`;
   }
@@ -132,6 +140,10 @@
     return slot.localDraft || slot.serverPhoto || null;
   }
 
+  function hasPhotoImageData(photo) {
+    return typeof photo?.imageDataUrl === "string" && photo.imageDataUrl.startsWith("data:image/");
+  }
+
   function isSlotComplete(slot) {
     return Boolean(getSlotDisplayPhoto(slot));
   }
@@ -162,12 +174,15 @@
       return null;
     }
     const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
-    if (!imageDataUrl.startsWith("data:image/")) {
+    const hasImageDataUrl = imageDataUrl.startsWith("data:image/");
+    const feedbackId = String(record.feedbackId || record.id || "").trim();
+    if (!feedbackId && !hasImageDataUrl) {
       return null;
     }
     return {
-      feedbackId: String(record.feedbackId || record.id || ""),
-      imageDataUrl,
+      feedbackId,
+      imageDataUrl: hasImageDataUrl ? imageDataUrl : "",
+      hasImageDataUrl: Boolean(hasImageDataUrl || record.hasImageDataUrl),
       imageName: String(record.imageName || ""),
       createdAt: String(record.createdAt || ""),
       reportDate: String(record.reportDate || ""),
@@ -201,11 +216,23 @@
     const serverDepartments = Array.isArray(payload?.departments) ? payload.departments : [];
     state.slots = departments.map((department) => {
       const serverDepartment = serverDepartments.find((item) => String(item.departmentId || "") === department.id) || {};
+      const previousSlot = getSlotByDepartmentId(department.id);
+      const serverPhoto = normalizeServerPhoto(serverDepartment.latestPhoto);
+      if (
+        serverPhoto
+        && previousSlot?.serverPhoto
+        && serverPhoto.feedbackId
+        && serverPhoto.feedbackId === previousSlot.serverPhoto.feedbackId
+        && hasPhotoImageData(previousSlot.serverPhoto)
+      ) {
+        serverPhoto.imageDataUrl = previousSlot.serverPhoto.imageDataUrl;
+        serverPhoto.hasImageDataUrl = true;
+      }
       return {
         departmentId: department.id,
         marker: department.marker,
         departmentName: department.name,
-        serverPhoto: normalizeServerPhoto(serverDepartment.latestPhoto),
+        serverPhoto,
         localDraft: normalizeLocalDraft(storedDrafts[department.id])
       };
     });
@@ -274,6 +301,46 @@
     render();
   }
 
+  async function openPreviewDeferred(departmentId) {
+    const slot = getSlotByDepartmentId(departmentId);
+    const photo = getSlotDisplayPhoto(slot);
+    if (!slot || !photo) {
+      return;
+    }
+    if (slot.localDraft || hasPhotoImageData(photo)) {
+      openPreview(departmentId);
+      return;
+    }
+    if (!photo.feedbackId) {
+      setMessage("Не удалось открыть фото: нет номера снимка.", "error");
+      return;
+    }
+
+    try {
+      setMessage(`Загружаю фото: ${slot.departmentName}...`, "info");
+      const response = await fetch(getFeedbackPhotoUrl(photo.feedbackId, slot.departmentId), { method: "GET" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Не удалось загрузить фото.");
+      }
+
+      const loadedPhoto = normalizeServerPhoto(payload.record);
+      if (!loadedPhoto || !hasPhotoImageData(loadedPhoto)) {
+        throw new Error("Сервер вернул фото без изображения.");
+      }
+
+      slot.serverPhoto = {
+        ...photo,
+        ...loadedPhoto,
+        feedbackId: photo.feedbackId || loadedPhoto.feedbackId,
+        sourceLabel: loadedPhoto.sourceLabel || photo.sourceLabel || ""
+      };
+      openPreview(departmentId);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не удалось загрузить фото.", "error");
+    }
+  }
+
   function handleSlotTap(departmentId) {
     const slot = getSlotByDepartmentId(departmentId);
     if (!slot) {
@@ -294,7 +361,7 @@
     state.tapTimerId = window.setTimeout(() => {
       state.tapTimerId = 0;
       state.tapSlotId = "";
-      openPreview(departmentId);
+      void openPreviewDeferred(departmentId);
     }, PREVIEW_TAP_DELAY_MS);
   }
 
@@ -442,6 +509,7 @@
   function buildSlotCard(slot) {
     const photo = getSlotDisplayPhoto(slot);
     const isLocal = Boolean(slot.localDraft);
+    const hasPhotoImage = hasPhotoImageData(photo);
     const statusClass = isLocal ? " android-intake__card-status--local" : "";
     const statusText = photo
       ? (isLocal ? "Готово к отправке" : "Фото уже есть")
@@ -454,7 +522,7 @@
         <div class="android-intake__thumb">
           <button type="button" class="android-intake__thumb-button" data-slot-open="${escapeHtml(slot.departmentId)}">
             ${photo
-              ? `<img src="${escapeHtml(photo.imageDataUrl)}" alt="${escapeHtml(slot.departmentName)}">`
+              ? (hasPhotoImage ? `<img src="${escapeHtml(photo.imageDataUrl)}" alt="${escapeHtml(slot.departmentName)}">` : `<div class="android-intake__server-photo"><div class="android-intake__server-photo-icon">&#10003;</div><div class="android-intake__camera-text">Фото есть</div><small>Тап - открыть</small></div>`)
               : `<div><div class="android-intake__camera-icon">📷</div><div class="android-intake__camera-text">Снять фото</div></div>`}
           </button>
         </div>

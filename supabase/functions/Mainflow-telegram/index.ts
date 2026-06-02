@@ -6025,7 +6025,7 @@ async function listAndroidIntakeSessionPhotoRecords(
 ) {
   const { data, error } = await (supabase as any)
     .from("sharsh_ocr_feedback")
-    .select("id, department_id, department_name, report_date, photo_report_date, image_name, image_data_url, notes, created_at")
+    .select("id, department_id, department_name, report_date, photo_report_date, image_name, notes, created_at")
     .gte("created_at", sessionStartIso)
     .lt("created_at", sessionEndIso)
     .neq("image_name", "telegram-web-app-form")
@@ -6043,8 +6043,7 @@ async function listAndroidIntakeSessionPhotoRecords(
   for (const rawRow of Array.isArray(data) ? data : []) {
     const row = rawRow as Record<string, unknown>;
     const departmentId = parseDepartmentId(row.department_id);
-    const imageDataUrl = typeof row.image_data_url === "string" ? row.image_data_url : "";
-    if (!departmentId || !departmentIds.has(departmentId) || !imageDataUrl.startsWith("data:image/")) {
+    if (!departmentId || !departmentIds.has(departmentId)) {
       continue;
     }
     if (!latestByDepartment.has(departmentId)) {
@@ -6062,7 +6061,8 @@ async function listAndroidIntakeSessionPhotoRecords(
       reportDate: typeof row.report_date === "string" ? row.report_date : "",
       photoReportDate: typeof row.photo_report_date === "string" ? row.photo_report_date : "",
       imageName: typeof row.image_name === "string" ? row.image_name : "",
-      imageDataUrl: typeof row.image_data_url === "string" ? row.image_data_url : "",
+      imageDataUrl: "",
+      hasImageDataUrl: true,
       createdAt: typeof row.created_at === "string" ? row.created_at : "",
       sourceLabel: buildAndroidIntakePhotoSourceLabel(notes)
     };

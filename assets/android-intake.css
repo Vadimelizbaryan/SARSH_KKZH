@@ -168,6 +168,34 @@ body {
   font-weight: 700;
 }
 
+.android-intake__server-photo {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 10px;
+  text-align: center;
+  color: #245339;
+}
+
+.android-intake__server-photo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: #1f7a53;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.android-intake__server-photo small {
+  color: #61736a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .android-intake__card-meta {
   margin-top: 10px;
   display: grid;
