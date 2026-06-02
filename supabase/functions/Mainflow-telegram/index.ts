@@ -569,9 +569,28 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
+function sanitizeEdgeErrorText(message: string) {
+  const normalized = String(message || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  const lower = normalized.toLowerCase();
+  if (
+    lower.includes("<!doctype")
+    || lower.includes("<html")
+    || lower.includes("cloudflare")
+    || lower.includes("connection timed out")
+    || lower.includes("error code: 522")
+    || lower.includes("522:")
+  ) {
+    return "Сервер Supabase временно не отвечает. Нажмите «Обновить данные» через минуту.";
+  }
+  return normalized.length > 500 ? `${normalized.slice(0, 500)}...` : normalized;
+}
+
 function getErrorText(error: unknown) {
   if (error instanceof Error) {
-    return error.message;
+    return sanitizeEdgeErrorText(error.message);
   }
   if (error && typeof error === "object") {
     const details = [
@@ -581,14 +600,14 @@ function getErrorText(error: unknown) {
       typeof (error as { code?: unknown }).code === "string" ? `code=${String((error as { code: string }).code)}` : ""
     ].filter(Boolean);
     if (details.length) {
-      return details.join(" | ");
+      return sanitizeEdgeErrorText(details.join(" | "));
     }
     try {
-      return JSON.stringify(error);
+      return sanitizeEdgeErrorText(JSON.stringify(error));
     } catch (_error) {
     }
   }
-  return String(error);
+  return sanitizeEdgeErrorText(String(error));
 }
 
 function sanitizeNumber(value: unknown) {
@@ -13652,18 +13671,23 @@ Deno.serve(async (request) => {
             message: "Запрос доступа отправлен владельцу в Telegram. После подтверждения нажмите «Обновить данные»."
           }, 202);
         }
-        const snapshot = await loadSnapshot(supabase);
-        const reportDate = snapshot.reportDate || getYerevanReportDateText();
-        const carryoverValues = departmentId
-          ? getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId)
-          : null;
-        const autoRotateImages = await isTelegramPhotoAutoRotateEnabled(supabase);
+        let reportDate = getYerevanReportDateText();
+        let carryoverValues: ReturnType<typeof getTelegramWebFormCarryoverFromSnapshot> | null = null;
+        let autoRotateImages = false;
+        if (!isAndroidIntakeHub) {
+          const snapshot = await loadSnapshot(supabase);
+          reportDate = snapshot.reportDate || reportDate;
+          carryoverValues = departmentId
+            ? getTelegramWebFormCarryoverFromSnapshot(snapshot, departmentId)
+            : null;
+          autoRotateImages = await isTelegramPhotoAutoRotateEnabled(supabase);
+        }
         const formUrl = isAndroidIntakeHub
           ? getAndroidIntakeHubUrl(reportDate, { deviceId, deviceName })
           : getTelegramWebFormUrl(
             departmentId as DepartmentId,
             reportDate,
-            carryoverValues || undefined,
+            carryoverValues ?? undefined,
             { deviceId, deviceName },
             { autoRotateImages }
           );

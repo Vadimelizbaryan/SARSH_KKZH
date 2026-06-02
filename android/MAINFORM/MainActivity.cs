@@ -392,27 +392,23 @@ public class MainActivity : Activity
 
         if (!response.IsSuccessStatusCode)
         {
-            var bootstrapError = TryGetBootstrapMessage(responseText);
-            throw new InvalidOperationException(
-                string.IsNullOrWhiteSpace(bootstrapError)
-                    ? GetString(Resource.String.department_form_load_failed)
-                    : bootstrapError
-            );
+            throw new InvalidOperationException(GetSafeServerMessage(
+                TryGetBootstrapMessage(responseText) ?? responseText,
+                Resource.String.department_form_load_failed
+            ));
         }
 
-        using var json = JsonDocument.Parse(responseText);
+        using var json = ParseJsonResponse(responseText, Resource.String.department_form_invalid_response);
         var root = json.RootElement;
         var isOk = root.TryGetProperty("ok", out var okElement) &&
                    okElement.ValueKind == JsonValueKind.True;
 
         if (!isOk)
         {
-            var bootstrapError = TryGetBootstrapMessage(responseText);
-            throw new InvalidOperationException(
-                string.IsNullOrWhiteSpace(bootstrapError)
-                    ? GetString(Resource.String.department_form_load_failed)
-                    : bootstrapError
-            );
+            throw new InvalidOperationException(GetSafeServerMessage(
+                TryGetBootstrapMessage(responseText),
+                Resource.String.department_form_load_failed
+            ));
         }
 
         var formUrl = root.TryGetProperty("url", out var urlElement) &&
@@ -660,25 +656,21 @@ public class MainActivity : Activity
         var responseText = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
         {
-            var bootstrapError = TryGetBootstrapMessage(responseText);
-            throw new InvalidOperationException(
-                string.IsNullOrWhiteSpace(bootstrapError)
-                    ? GetString(Resource.String.photo_processing_failed)
-                    : bootstrapError
-            );
+            throw new InvalidOperationException(GetSafeServerMessage(
+                TryGetBootstrapMessage(responseText) ?? responseText,
+                Resource.String.photo_processing_failed
+            ));
         }
 
-        using var json = JsonDocument.Parse(responseText);
+        using var json = ParseJsonResponse(responseText, Resource.String.photo_processing_failed);
         var root = json.RootElement;
         var isOk = root.TryGetProperty("ok", out var okElement) && okElement.ValueKind == JsonValueKind.True;
         if (!isOk)
         {
-            var bootstrapError = TryGetBootstrapMessage(responseText);
-            throw new InvalidOperationException(
-                string.IsNullOrWhiteSpace(bootstrapError)
-                    ? GetString(Resource.String.photo_processing_failed)
-                    : bootstrapError
-            );
+            throw new InvalidOperationException(GetSafeServerMessage(
+                TryGetBootstrapMessage(responseText),
+                Resource.String.photo_processing_failed
+            ));
         }
 
         var matched = root.TryGetProperty("matched", out var matchedElement) &&
@@ -933,6 +925,75 @@ public class MainActivity : Activity
         return string.IsNullOrWhiteSpace(device) ? "Android MAINFORM" : device;
     }
 
+    private JsonDocument ParseJsonResponse(string responseText, int fallbackResourceId)
+    {
+        try
+        {
+            return JsonDocument.Parse(responseText);
+        }
+        catch
+        {
+            throw new InvalidOperationException(GetSafeServerMessage(responseText, fallbackResourceId));
+        }
+    }
+
+    private string GetSafeServerMessage(string? message, int fallbackResourceId)
+    {
+        var fallback = GetString(fallbackResourceId);
+        if (LooksLikeTemporaryServerError(message))
+        {
+            return GetString(Resource.String.server_temporary_error);
+        }
+
+        var normalized = (message ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return fallback;
+        }
+
+        return normalized.Length > 260 ? $"{normalized[..260]}..." : normalized;
+    }
+
+    private string GetSafePageLoadErrorMessage(int statusCode, string? reasonPhrase)
+    {
+        if (statusCode >= 500 || statusCode == 522)
+        {
+            return GetString(Resource.String.server_temporary_error);
+        }
+
+        var reason = string.IsNullOrWhiteSpace(reasonPhrase) ? "" : $" {reasonPhrase.Trim()}";
+        return GetSafeServerMessage($"HTTP {statusCode}{reason}", Resource.String.department_form_load_failed);
+    }
+
+    private static bool LooksLikeTemporaryServerError(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        var lower = message.ToLowerInvariant();
+        return lower.Contains("<!doctype", StringComparison.Ordinal)
+            || lower.Contains("<html", StringComparison.Ordinal)
+            || lower.Contains("cloudflare", StringComparison.Ordinal)
+            || lower.Contains("connection timed out", StringComparison.Ordinal)
+            || lower.Contains("error code: 522", StringComparison.Ordinal)
+            || lower.Contains("522:", StringComparison.Ordinal);
+    }
+
+    private void ShowPageLoadError(string message)
+    {
+        RunOnUiThread(() =>
+        {
+            UpdateProgress(0);
+            if (_currentPageText is not null)
+            {
+                _currentPageText.Text = message;
+            }
+            Toast.MakeText(this, message, ToastLength.Long)?.Show();
+        });
+    }
+
     private static string? TryGetBootstrapMessage(string? responseText)
     {
         if (string.IsNullOrWhiteSpace(responseText))
@@ -1126,6 +1187,42 @@ public class MainActivity : Activity
         {
             base.OnPageFinished(view, url);
             activity.OnPageFinished(url);
+        }
+
+        public override void OnReceivedHttpError(
+            WebView? view,
+            IWebResourceRequest? request,
+            WebResourceResponse? errorResponse
+        )
+        {
+            base.OnReceivedHttpError(view, request, errorResponse);
+            if (request?.IsForMainFrame != true || errorResponse is null)
+            {
+                return;
+            }
+
+            activity.ShowPageLoadError(activity.GetSafePageLoadErrorMessage(
+                errorResponse.StatusCode,
+                errorResponse.ReasonPhrase
+            ));
+        }
+
+        public override void OnReceivedError(
+            WebView? view,
+            IWebResourceRequest? request,
+            WebResourceError? error
+        )
+        {
+            base.OnReceivedError(view, request, error);
+            if (request?.IsForMainFrame != true)
+            {
+                return;
+            }
+
+            activity.ShowPageLoadError(activity.GetSafeServerMessage(
+                error?.Description?.ToString(),
+                Resource.String.department_form_load_failed
+            ));
         }
     }
 
