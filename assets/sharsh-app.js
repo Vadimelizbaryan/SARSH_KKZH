@@ -8673,6 +8673,15 @@ function buildInitialPhotoLightboxState() {
     }
   }
 
+  function getAndroidApkPath() {
+    try {
+      return appendShareQuery(new URL("android/releases/MAINFORM.apk", window.location.href).href);
+    } catch (_error) {
+      const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+      return appendShareQuery(`${prefix}android/releases/MAINFORM.apk`);
+    }
+  }
+
   function buildHospitalReportData(snapshot) {
     const primaryRows = snapshot.rows.filter((row) => row.group === "primary");
     const subtotal = (key) => getSummaryValue(snapshot, primaryRows, key);
@@ -9660,11 +9669,17 @@ function buildInitialPhotoLightboxState() {
     const sonoDesktopSetupPath = window.location.protocol !== "file:"
       ? getSonoDesktopSetupPath()
       : "";
+    const androidApkPath = window.location.protocol !== "file:"
+      ? getAndroidApkPath()
+      : "";
     const downloadDesktopButtonHtml = desktopSetupPath
       ? `<a class="button-link" href="${escapeHtml(desktopSetupPath)}" download="Mainflow.exe" target="_blank" rel="noopener">Mainflow.exe</a>`
       : "";
     const downloadSonoDesktopButtonHtml = sonoDesktopSetupPath
       ? `<a class="button-link" href="${escapeHtml(sonoDesktopSetupPath)}" download="Sono.exe" target="_blank" rel="noopener">SONO.exe</a>`
+      : "";
+    const downloadAndroidApkButtonHtml = androidApkPath
+      ? `<a class="button-link" href="${escapeHtml(androidApkPath)}" download="MAINFORM.apk" target="_blank" rel="noopener">MAINFORM.apk</a>`
       : "";
     const downloadMainPdfButtonHtml = mainBlankPdfPath
       ? `<a class="button-link" href="${escapeHtml(mainBlankPdfPath)}" download target="_blank" rel="noopener">PDF ներբ.</a>`
@@ -9693,6 +9708,7 @@ function buildInitialPhotoLightboxState() {
             <div class="main-toolbar-group">
               ${downloadSonoDesktopButtonHtml}
               ${downloadDesktopButtonHtml}
+              ${downloadAndroidApkButtonHtml}
               ${downloadMainPdfButtonHtml}
               <button type="button" id="sendTelegramPdfsBtn">PDF ուղարկել TG</button>
               <a class="button-link" href="${escapeHtml(getHospitalReportPath())}"${getInternalPageTargetAttrs()}>Հաշվետվ.</a>
