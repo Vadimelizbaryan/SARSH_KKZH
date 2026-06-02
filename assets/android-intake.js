@@ -39,7 +39,8 @@
     pendingDepartmentId: "",
     tapSlotId: "",
     tapTimerId: 0,
-    pollTimerId: 0
+    pollTimerId: 0,
+    hiddenFeedbackIds: []
   };
 
   function escapeHtml(value) {
@@ -80,6 +81,44 @@
 
   function getStorageKey(sessionKey) {
     return `${SESSION_STORAGE_PREFIX}:${deviceId}:${sessionKey || "pending"}`;
+  }
+
+  function getManualSessionStorageKey(sessionKey) {
+    return `${getStorageKey(sessionKey)}:manual-session`;
+  }
+
+  function readManualSession(sessionKey) {
+    if (!sessionKey) {
+      return { hiddenFeedbackIds: [] };
+    }
+    try {
+      const raw = localStorage.getItem(getManualSessionStorageKey(sessionKey));
+      if (!raw) {
+        return { hiddenFeedbackIds: [] };
+      }
+      const parsed = JSON.parse(raw);
+      const hiddenFeedbackIds = Array.isArray(parsed?.hiddenFeedbackIds)
+        ? parsed.hiddenFeedbackIds.map((item) => String(item || "").trim()).filter(Boolean)
+        : [];
+      return { hiddenFeedbackIds };
+    } catch (_error) {
+      return { hiddenFeedbackIds: [] };
+    }
+  }
+
+  function writeManualSession(sessionKey, hiddenFeedbackIds) {
+    if (!sessionKey) {
+      return;
+    }
+    const uniqueIds = Array.from(new Set(
+      (Array.isArray(hiddenFeedbackIds) ? hiddenFeedbackIds : [])
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    ));
+    localStorage.setItem(getManualSessionStorageKey(sessionKey), JSON.stringify({
+      hiddenFeedbackIds: uniqueIds,
+      updatedAt: new Date().toISOString()
+    }));
   }
 
   function readLocalDrafts(sessionKey) {
@@ -213,11 +252,23 @@
     state.sessionStartIso = String(payload?.sessionStartIso || "");
     state.sessionEndIso = String(payload?.sessionEndIso || "");
     const storedDrafts = readLocalDrafts(state.sessionKey);
+    const manualSession = readManualSession(state.sessionKey);
+    const hiddenFeedbackIds = new Set(manualSession.hiddenFeedbackIds);
+    state.hiddenFeedbackIds = Array.from(hiddenFeedbackIds);
     const serverDepartments = Array.isArray(payload?.departments) ? payload.departments : [];
     state.slots = departments.map((department) => {
       const serverDepartment = serverDepartments.find((item) => String(item.departmentId || "") === department.id) || {};
       const previousSlot = getSlotByDepartmentId(department.id);
       const serverPhoto = normalizeServerPhoto(serverDepartment.latestPhoto);
+      if (serverPhoto?.feedbackId && hiddenFeedbackIds.has(serverPhoto.feedbackId)) {
+        return {
+          departmentId: department.id,
+          marker: department.marker,
+          departmentName: department.name,
+          serverPhoto: null,
+          localDraft: normalizeLocalDraft(storedDrafts[department.id])
+        };
+      }
       if (
         serverPhoto
         && previousSlot?.serverPhoto
@@ -443,6 +494,36 @@
     writeLocalDrafts();
   }
 
+  function startManualNewSession() {
+    if (state.isSending) {
+      return;
+    }
+    if (!state.sessionKey) {
+      setMessage("Сначала обновите страницу, чтобы получить текущую сессию.", "error");
+      return;
+    }
+
+    const hiddenFeedbackIds = new Set(readManualSession(state.sessionKey).hiddenFeedbackIds);
+    state.slots.forEach((slot) => {
+      if (slot.serverPhoto?.feedbackId) {
+        hiddenFeedbackIds.add(slot.serverPhoto.feedbackId);
+      }
+      slot.serverPhoto = null;
+      slot.localDraft = null;
+    });
+    state.preview = null;
+    state.pendingDepartmentId = "";
+    state.tapSlotId = "";
+    if (state.tapTimerId) {
+      window.clearTimeout(state.tapTimerId);
+      state.tapTimerId = 0;
+    }
+    state.hiddenFeedbackIds = Array.from(hiddenFeedbackIds);
+    writeManualSession(state.sessionKey, state.hiddenFeedbackIds);
+    writeLocalDrafts();
+    setMessage("Новая сессия начата. Сделайте фото новых бланков.", "success");
+  }
+
   async function sendPendingPhotos() {
     if (!canSendAll()) {
       if (getMissingCount() > 0) {
@@ -556,6 +637,7 @@
           </div>
           <div class="android-intake__controls">
             <button type="button" class="android-intake__button android-intake__button--secondary" data-refresh>Обновить</button>
+            <button type="button" class="android-intake__button android-intake__button--secondary" data-new-session ${state.isSending ? "disabled" : ""}>Сделать новую сессию</button>
             <button type="button" class="android-intake__button android-intake__button--primary" data-send ${canSendAll() ? "" : "disabled"}>${escapeHtml(sendLabel)}</button>
           </div>
         </section>
@@ -597,6 +679,11 @@
       sendButton.addEventListener("click", () => {
         void sendPendingPhotos();
       });
+    }
+
+    const newSessionButton = app.querySelector("[data-new-session]");
+    if (newSessionButton) {
+      newSessionButton.addEventListener("click", startManualNewSession);
     }
 
     const refreshButton = app.querySelector("[data-refresh]");
