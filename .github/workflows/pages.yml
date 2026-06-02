@@ -29,7 +29,6 @@ jobs:
           cp setup.html _site/
           cp ykow8ru3.html _site/
           cp archive-print.html _site/
-          cp ocr-feedback.html _site/
           cp tg-form.html _site/
           cp tg-qh-form.html _site/
           cp tg-sono-form.html _site/
