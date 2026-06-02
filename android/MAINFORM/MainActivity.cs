@@ -74,6 +74,7 @@ public class MainActivity : Activity
     private IValueCallback? _fileChooserCallback;
     private Android.Net.Uri? _pendingCameraUri;
     private bool _pendingOpenCameraAfterPermission;
+    private bool _pendingOpenWebFileChooserAfterPermission;
     private bool _updatePromptShown;
     private bool _pageReady;
     private DepartmentOption? _selectedDepartment;
@@ -225,7 +226,21 @@ public class MainActivity : Activity
             return;
         }
 
+        if (granted && _pendingOpenWebFileChooserAfterPermission)
+        {
+            _pendingOpenWebFileChooserAfterPermission = false;
+            ShowWebFileChooser();
+            return;
+        }
+
         _pendingOpenCameraAfterPermission = false;
+        if (_pendingOpenWebFileChooserAfterPermission)
+        {
+            _pendingOpenWebFileChooserAfterPermission = false;
+            _fileChooserCallback?.OnReceiveValue(null);
+            _fileChooserCallback = null;
+            _pendingCameraUri = null;
+        }
         Toast.MakeText(this, Resource.String.camera_permission_denied, ToastLength.Long)?.Show();
     }
 
@@ -484,8 +499,7 @@ public class MainActivity : Activity
 
     private void StartCameraCapture()
     {
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.M &&
-            CheckSelfPermission(Android.Manifest.Permission.Camera) != Permission.Granted)
+        if (!HasCameraPermission())
         {
             _pendingOpenCameraAfterPermission = true;
             RequestPermissions([Android.Manifest.Permission.Camera], CameraPermissionRequestCode);
@@ -1103,8 +1117,29 @@ public class MainActivity : Activity
     internal bool StartFileChooser(IValueCallback? callback)
     {
         _fileChooserCallback?.OnReceiveValue(null);
+        _pendingOpenWebFileChooserAfterPermission = false;
+        _pendingCameraUri = null;
         _fileChooserCallback = callback;
 
+        if (!HasCameraPermission())
+        {
+            _pendingOpenWebFileChooserAfterPermission = true;
+            RequestPermissions([Android.Manifest.Permission.Camera], CameraPermissionRequestCode);
+            return true;
+        }
+
+        ShowWebFileChooser();
+        return true;
+    }
+
+    private bool HasCameraPermission()
+    {
+        return Build.VERSION.SdkInt < BuildVersionCodes.M ||
+               CheckSelfPermission(Android.Manifest.Permission.Camera) == Permission.Granted;
+    }
+
+    private void ShowWebFileChooser()
+    {
         var contentIntent = new Intent(Intent.ActionGetContent);
         contentIntent.AddCategory(Intent.CategoryOpenable);
         contentIntent.SetType("image/*");
@@ -1115,8 +1150,17 @@ public class MainActivity : Activity
         var chooserIntent = Intent.CreateChooser(contentIntent, GetString(Resource.String.choose_image));
         chooserIntent.PutExtra(Intent.ExtraInitialIntents, initialIntents);
 
-        StartActivityForResult(chooserIntent, FileChooserRequestCode);
-        return true;
+        try
+        {
+            StartActivityForResult(chooserIntent, FileChooserRequestCode);
+        }
+        catch
+        {
+            _fileChooserCallback?.OnReceiveValue(null);
+            _fileChooserCallback = null;
+            _pendingCameraUri = null;
+            Toast.MakeText(this, Resource.String.gallery_unavailable, ToastLength.Long)?.Show();
+        }
     }
 
     private Intent? CreateCameraIntent()
@@ -1129,12 +1173,18 @@ public class MainActivity : Activity
 
         try
         {
-            var imageFile = Java.IO.File.CreateTempFile("mainform_", ".jpg", CacheDir);
+            var imageDir = ExternalCacheDir ?? CacheDir;
+            if (imageDir is null)
+            {
+                return null;
+            }
+            var imageFile = Java.IO.File.CreateTempFile("mainform_", ".jpg", imageDir);
             var authority = $"{PackageName}.fileprovider";
             var imageUri = FileProvider.GetUriForFile(this, authority, imageFile);
             _pendingCameraUri = imageUri;
 
             intent.PutExtra(MediaStore.ExtraOutput, imageUri);
+            intent.ClipData = ClipData.NewUri(ContentResolver, "MAINFORM photo", imageUri);
             intent.AddFlags(ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission);
 
             var handlers = PackageManager.QueryIntentActivities(intent, Android.Content.PM.PackageInfoFlags.MatchDefaultOnly);
