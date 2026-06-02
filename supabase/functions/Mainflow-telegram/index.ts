@@ -6012,6 +6012,12 @@ function buildAndroidIntakePhotoSourceLabel(notes: string[]) {
   return "Լուսանկար";
 }
 
+function normalizeOcrFeedbackNotes(notes: unknown) {
+  return Array.isArray(notes)
+    ? notes.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+}
+
 async function listAndroidIntakeSessionPhotoRecords(
   supabase: ReturnType<typeof createClient>,
   sessionStartIso: string,
