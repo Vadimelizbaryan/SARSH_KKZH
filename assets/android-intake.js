@@ -33,6 +33,7 @@
     slots: [],
     isLoading: true,
     isSending: false,
+    isResetting: false,
     message: "Загружаю список отделений и последние фото...",
     messageTone: "info",
     preview: null,
@@ -68,6 +69,12 @@
   function getSubmitUrl() {
     const url = new URL(getTelegramFunctionEndpoint());
     url.searchParams.set("action", "android-intake-photo-submit");
+    return url.toString();
+  }
+
+  function getNewSessionUrl() {
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "android-intake-new-session");
     return url.toString();
   }
 
@@ -494,8 +501,8 @@
     writeLocalDrafts();
   }
 
-  function startManualNewSession() {
-    if (state.isSending) {
+  async function startManualNewSession() {
+    if (state.isSending || state.isResetting) {
       return;
     }
     if (!state.sessionKey) {
@@ -503,25 +510,71 @@
       return;
     }
 
+    const serverFeedbackIds = state.slots
+      .map((slot) => String(slot.serverPhoto?.feedbackId || "").trim())
+      .filter(Boolean);
     const hiddenFeedbackIds = new Set(readManualSession(state.sessionKey).hiddenFeedbackIds);
-    state.slots.forEach((slot) => {
-      if (slot.serverPhoto?.feedbackId) {
-        hiddenFeedbackIds.add(slot.serverPhoto.feedbackId);
+    serverFeedbackIds.forEach((feedbackId) => hiddenFeedbackIds.add(feedbackId));
+
+    state.isResetting = true;
+    setMessage("Удаляю старые фото с сервера и начинаю новую сессию...", "info");
+    render();
+
+    try {
+      let deletedCount = 0;
+      if (serverFeedbackIds.length) {
+        const response = await fetch(getNewSessionUrl(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            androidDeviceId: deviceId,
+            androidDeviceName: deviceName,
+            sessionKey: state.sessionKey,
+            reportDate: state.reportDate,
+            feedbackIds: serverFeedbackIds
+          })
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || "Не удалось удалить старые фото с сервера.");
+        }
+        deletedCount = Number(payload.deletedFeedbackCount || 0);
+        const deletedIds = Array.isArray(payload.deletedFeedbackIds)
+          ? payload.deletedFeedbackIds.map((item) => String(item || "").trim()).filter(Boolean)
+          : [];
+        deletedIds.forEach((feedbackId) => hiddenFeedbackIds.add(feedbackId));
       }
-      slot.serverPhoto = null;
-      slot.localDraft = null;
-    });
-    state.preview = null;
-    state.pendingDepartmentId = "";
-    state.tapSlotId = "";
-    if (state.tapTimerId) {
-      window.clearTimeout(state.tapTimerId);
-      state.tapTimerId = 0;
+
+      state.slots.forEach((slot) => {
+        slot.serverPhoto = null;
+        slot.localDraft = null;
+      });
+      state.preview = null;
+      state.pendingDepartmentId = "";
+      state.tapSlotId = "";
+      if (state.tapTimerId) {
+        window.clearTimeout(state.tapTimerId);
+        state.tapTimerId = 0;
+      }
+      state.hiddenFeedbackIds = Array.from(hiddenFeedbackIds);
+      writeManualSession(state.sessionKey, state.hiddenFeedbackIds);
+      writeLocalDrafts();
+      state.isResetting = false;
+      render();
+      setMessage(
+        deletedCount > 0
+          ? `Новая сессия начата. Старые фото удалены с сервера: ${deletedCount}. Сделайте фото новых бланков.`
+          : "Новая сессия начата. Сделайте фото новых бланков.",
+        "success"
+      );
+      void loadState(false);
+    } catch (error) {
+      state.isResetting = false;
+      render();
+      setMessage(error instanceof Error ? error.message : "Не удалось начать новую сессию.", "error");
     }
-    state.hiddenFeedbackIds = Array.from(hiddenFeedbackIds);
-    writeManualSession(state.sessionKey, state.hiddenFeedbackIds);
-    writeLocalDrafts();
-    setMessage("Новая сессия начата. Сделайте фото новых бланков.", "success");
   }
 
   async function sendPendingPhotos() {
@@ -637,7 +690,7 @@
           </div>
           <div class="android-intake__controls">
             <button type="button" class="android-intake__button android-intake__button--secondary" data-refresh>Обновить</button>
-            <button type="button" class="android-intake__button android-intake__button--secondary" data-new-session ${state.isSending ? "disabled" : ""}>Сделать новую сессию</button>
+            <button type="button" class="android-intake__button android-intake__button--secondary" data-new-session ${state.isSending || state.isResetting ? "disabled" : ""}>${state.isResetting ? "Удаляю старые фото..." : "Сделать новую сессию"}</button>
             <button type="button" class="android-intake__button android-intake__button--primary" data-send ${canSendAll() ? "" : "disabled"}>${escapeHtml(sendLabel)}</button>
           </div>
         </section>
@@ -683,7 +736,9 @@
 
     const newSessionButton = app.querySelector("[data-new-session]");
     if (newSessionButton) {
-      newSessionButton.addEventListener("click", startManualNewSession);
+      newSessionButton.addEventListener("click", () => {
+        void startManualNewSession();
+      });
     }
 
     const refreshButton = app.querySelector("[data-refresh]");

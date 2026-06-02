@@ -6088,6 +6088,157 @@ async function listAndroidIntakeSessionPhotoRecords(
   });
 }
 
+function isAndroidIntakeFeedbackNotes(notes: unknown) {
+  return normalizeOcrFeedbackNotes(notes).some((note) => /Admission hub Android photo/i.test(note));
+}
+
+function normalizeFeedbackIdList(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(new Set(
+    value
+      .map((item) => String(item || "").trim())
+      .filter((item) => /^\d+$/.test(item))
+  ));
+}
+
+async function cleanupAndroidIntakeSessionPhotoRecords(
+  supabase: ReturnType<typeof createClient>,
+  sessionStartIso: string,
+  sessionEndIso: string,
+  reportDate: string,
+  feedbackIds: string[]
+) {
+  const requestedIds = new Set(feedbackIds);
+  const selectColumns = "id, department_id, report_date, photo_report_date, image_name, notes, created_at";
+  const resultMap = new Map<string, Record<string, unknown>>();
+  const queries = [
+    (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .select(selectColumns)
+      .gte("created_at", sessionStartIso)
+      .lt("created_at", sessionEndIso)
+      .neq("image_name", "telegram-web-app-form")
+      .neq("image_name", "telegram-qh-form")
+      .not("image_data_url", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(2000)
+  ];
+
+  if (reportDate) {
+    queries.push(
+      (supabase as any)
+        .from("sharsh_ocr_feedback")
+        .select(selectColumns)
+        .eq("report_date", reportDate)
+        .neq("image_name", "telegram-web-app-form")
+        .neq("image_name", "telegram-qh-form")
+        .not("image_data_url", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(2000)
+    );
+  }
+
+  const settled = await Promise.all(queries);
+  for (const { data, error } of settled) {
+    if (error) {
+      throw error;
+    }
+    for (const item of Array.isArray(data) ? data : []) {
+      const row = item as Record<string, unknown>;
+      const id = String(row.id || "").trim();
+      if (id) {
+        resultMap.set(id, row);
+      }
+    }
+  }
+
+  const ids = Array.from(resultMap.values())
+    .filter((row) => {
+      const id = String(row.id || "").trim();
+      const departmentId = parseDepartmentId(row.department_id);
+      return Boolean(
+        id
+        && departmentId
+        && (requestedIds.has(id) || isAndroidIntakeFeedbackNotes(row.notes))
+      );
+    })
+    .map((row) => Number(row.id))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  const uniqueIds = Array.from(new Set(ids));
+  if (!uniqueIds.length) {
+    return {
+      deletedFeedbackCount: 0,
+      deletedFeedbackIds: [] as string[]
+    };
+  }
+
+  const { error: deleteError } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .delete()
+    .in("id", uniqueIds);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  const { error: updateError } = await (supabase as any)
+    .from("sharsh_departments")
+    .update({
+      photo_workflow_status: "idle",
+      photo_feedback_id: null,
+      photo_feedback_updated_at: null,
+      photo_name: null
+    })
+    .in("photo_feedback_id", uniqueIds);
+
+  if (updateError) {
+    console.warn("Failed to clear Android intake photo references:", getErrorText(updateError));
+  }
+
+  return {
+    deletedFeedbackCount: uniqueIds.length,
+    deletedFeedbackIds: uniqueIds.map((id) => String(id))
+  };
+}
+
+async function handleAndroidIntakeNewSession(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const supabase = createSupabaseAdmin() as unknown as ReturnType<typeof createClient>;
+    const access = await verifyAndroidIntakeHubAccess(supabase, payload);
+    if (!access.ok) {
+      return jsonResponse({ ok: false, error: access.error }, access.status);
+    }
+
+    const session = getAndroidIntakeSessionContext();
+    const reportDate = sanitizeReportDate(payload?.reportDate) || getYerevanReportDateText();
+    const result = await cleanupAndroidIntakeSessionPhotoRecords(
+      supabase,
+      session.sessionStartIso,
+      session.sessionEndIso,
+      reportDate,
+      normalizeFeedbackIdList(payload?.feedbackIds)
+    );
+
+    return jsonResponse({
+      ok: true,
+      sessionKey: session.sessionKey,
+      sessionLabel: session.sessionLabel,
+      ...result
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_intake_new_session_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
 async function insertAcceptedFeedback(
   supabase: ReturnType<typeof createClient>,
   departmentId: DepartmentId,
@@ -13736,6 +13887,9 @@ Deno.serve(async (request) => {
   }
   if (postUrl.searchParams.get("action") === "android-photo-check") {
     return await handleAndroidPhotoCheck(request);
+  }
+  if (postUrl.searchParams.get("action") === "android-intake-new-session") {
+    return await handleAndroidIntakeNewSession(request);
   }
   if (postUrl.searchParams.get("action") === "android-intake-photo-submit") {
     return await handleAndroidIntakePhotoSubmit(request);
