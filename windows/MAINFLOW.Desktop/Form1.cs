@@ -1685,7 +1685,7 @@ public partial class Form1 : Form
 
     private sealed record DesktopShellState
     {
-        public DesktopMode Mode { get; init; } = DesktopMode.Offline;
+        public DesktopMode Mode { get; init; } = DesktopMode.Online;
         public string LastRelativePage { get; init; } = DefaultRelativePage;
         public bool AutoStartEnabled { get; init; } = true;
 
