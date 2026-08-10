@@ -8476,9 +8476,11 @@ async function repairTelegramWebhook(request: Request) {
   const webhookUrl = supabaseUrl
     ? `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/Mainflow-telegram`
     : `${currentUrl.origin}${currentUrl.pathname}`;
+  const secretToken = getTelegramSecretToken();
   return await callTelegramApi("setWebhook", {
     url: webhookUrl,
-    allowed_updates: ["message", "edited_message", "callback_query"]
+    allowed_updates: ["message", "edited_message", "callback_query"],
+    ...(secretToken ? { secret_token: secretToken } : {})
   });
 }
 
