@@ -1532,10 +1532,7 @@ public partial class Form1 : Form
         }
 
         var pathOnly = GetRelativePagePathOnly(normalized);
-        if (
-            string.Equals(pathOnly, "archive-print.html", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(pathOnly, "ocr-feedback.html", StringComparison.OrdinalIgnoreCase)
-        )
+        if (string.Equals(pathOnly, "ocr-feedback.html", StringComparison.OrdinalIgnoreCase))
         {
             return DefaultRelativePage;
         }
