@@ -519,6 +519,12 @@ const corsHeaders = {
 
 type DepartmentId = keyof typeof DEPARTMENTS;
 
+const ANDROID_INTAKE_EXCLUDED_PHOTO_DEPARTMENT_IDS = new Set<DepartmentId>(["r19", "r20", "r21"]);
+
+function isAndroidIntakePhotoDepartment(departmentId: DepartmentId) {
+  return !ANDROID_INTAKE_EXCLUDED_PHOTO_DEPARTMENT_IDS.has(departmentId);
+}
+
 const NIGHT_SHIFT_VALUE_KEYS = ["shar", "spa", "paym", "zh", "family", "zp", "qi"] as const;
 const NIGHT_SHIFT_ROW_PREFIX = "night:";
 const NIGHT_SHIFT_META_KEY = "night_shift";
@@ -3914,12 +3920,14 @@ async function handleAndroidIntakeState(request: Request) {
       sessionLabel: session.sessionLabel,
       sessionStartIso: session.sessionStartIso,
       sessionEndIso: session.sessionEndIso,
-      departments: Object.entries(DEPARTMENTS).map(([departmentId, meta]) => ({
-        departmentId,
-        marker: meta.marker,
-        departmentName: meta.department,
-        latestPhoto: latestByDepartment.get(departmentId) || null
-      }))
+      departments: Object.entries(DEPARTMENTS)
+        .filter(([departmentId]) => isAndroidIntakePhotoDepartment(departmentId as DepartmentId))
+        .map(([departmentId, meta]) => ({
+          departmentId,
+          marker: meta.marker,
+          departmentName: meta.department,
+          latestPhoto: latestByDepartment.get(departmentId) || null
+        }))
     });
   } catch (error) {
     return jsonResponse({
@@ -3937,6 +3945,9 @@ async function handleAndroidIntakePhotoSubmit(request: Request) {
     const departmentId = parseDepartmentId(typeof payload?.departmentId === "string" ? payload.departmentId : "");
     if (!departmentId) {
       return jsonResponse({ ok: false, error: "Department is required." }, 400);
+    }
+    if (!isAndroidIntakePhotoDepartment(departmentId)) {
+      return jsonResponse({ ok: false, error: "Photo upload is disabled for this department." }, 403);
     }
 
     const supabase = createSupabaseAdmin();
@@ -6232,7 +6243,7 @@ async function listAndroidIntakeSessionPhotoRecords(
   for (const rawRow of Array.isArray(data) ? data : []) {
     const row = rawRow as Record<string, unknown>;
     const departmentId = parseDepartmentId(row.department_id);
-    if (!departmentId || !departmentIds.has(departmentId)) {
+    if (!departmentId || !departmentIds.has(departmentId) || !isAndroidIntakePhotoDepartment(departmentId)) {
       continue;
     }
     if (!latestByDepartment.has(departmentId)) {

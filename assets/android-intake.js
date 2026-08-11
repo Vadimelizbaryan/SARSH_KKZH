@@ -13,9 +13,10 @@
   const deviceId = String(query.get("androidDeviceId") || "").trim();
   const deviceName = String(query.get("androidDeviceName") || "").trim();
   const fallbackReportDate = String(query.get("date") || "").trim();
+  const excludedPhotoDepartmentIds = new Set(["r19", "r20", "r21"]);
   const departments = Array.isArray(config.departmentDefinitions)
     ? config.departmentDefinitions
-      .filter((item) => item && typeof item.id === "string")
+      .filter((item) => item && typeof item.id === "string" && !excludedPhotoDepartmentIds.has(String(item.id)))
       .map((item) => ({
         id: String(item.id),
         marker: String(item.marker || item.id),
