@@ -62,7 +62,7 @@ Telegram-ботом для проекта `Mainflow`.
 Webhook должен смотреть на функцию:
 
 ```text
-https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram
+https://tmhazxfpkyzwllaqahhk.supabase.co/functions/v1/Mainflow-telegram
 ```
 
 ### 3.4. Функция должна отвечать как ready
@@ -70,7 +70,7 @@ https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram
 Если открыть в браузере:
 
 ```text
-https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram
+https://tmhazxfpkyzwllaqahhk.supabase.co/functions/v1/Mainflow-telegram
 ```
 
 должен вернуться ответ:
