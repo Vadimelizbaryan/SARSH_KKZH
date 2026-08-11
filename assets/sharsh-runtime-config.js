@@ -2,8 +2,8 @@
   const STORAGE_KEY = "sarsh-kkzh-runtime-config-v3";
   const DEFAULT_CONFIG = {
     syncMode: "supabase-function",
-    supabaseUrl: "https://ywecvlapdlaojpvijaqy.supabase.co",
-    supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZWN2bGFwZGxhb2pwdmlqYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNTAzMjgsImV4cCI6MjA5MzYyNjMyOH0._HEPdPB2bBTo_N-1Qo8jLau5g5oYGgvoGnBWPxDupL4",
+    supabaseUrl: "https://tmhazxfpkyzwllaqahhk.supabase.co",
+    supabaseAnonKey: "sb_publishable_0B19aZPbrp8R-hOCTitvXA_tNVqiAEC",
     functionName: "sharsh-sync",
     autoSync: true,
     autoRotateImages: false,

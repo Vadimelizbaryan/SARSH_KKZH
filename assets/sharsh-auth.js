@@ -45,7 +45,7 @@
   function escapeAttr(value) {
     return String(value || "")
       .replaceAll("&", "&")
-      .replaceAll('"', """)
+      .replaceAll('"', "&quot;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;");
   }

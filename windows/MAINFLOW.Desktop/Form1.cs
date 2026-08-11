@@ -11,8 +11,8 @@ namespace MAINFLOW.Desktop;
 public partial class Form1 : Form
 {
     private const string DefaultRelativePage = "index.html";
-    private const string RemoteSupabaseUrl = "https://ywecvlapdlaojpvijaqy.supabase.co";
-    private const string RemoteSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZWN2bGFwZGxhb2pwdmlqYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNTAzMjgsImV4cCI6MjA5MzYyNjMyOH0._HEPdPB2bBTo_N-1Qo8jLau5g5oYGgvoGnBWPxDupL4";
+    private const string RemoteSupabaseUrl = "https://tmhazxfpkyzwllaqahhk.supabase.co";
+    private const string RemoteSupabaseAnonKey = "sb_publishable_0B19aZPbrp8R-hOCTitvXA_tNVqiAEC";
     private const string RemoteFunctionName = "sharsh-sync";
     private const string AutoStartRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string AutoStartRegistryValueName = "MAINFLOW Desktop";
@@ -1685,7 +1685,7 @@ public partial class Form1 : Form
 
     private sealed record DesktopShellState
     {
-        public DesktopMode Mode { get; init; } = DesktopMode.Offline;
+        public DesktopMode Mode { get; init; } = DesktopMode.Online;
         public string LastRelativePage { get; init; } = DefaultRelativePage;
         public bool AutoStartEnabled { get; init; } = true;
 
