@@ -12341,9 +12341,6 @@ function isTelegramSecretValid(request: Request) {
   }
   const actual = request.headers.get("x-telegram-bot-api-secret-token") || "";
   const normalizedActual = actual.trim();
-  if (!normalizedActual) {
-    return true;
-  }
   return normalizedActual === expected;
 }
 
