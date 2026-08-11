@@ -38,6 +38,11 @@
     messageTone: "info",
     preview: null,
     pendingDepartmentId: "",
+    uploadProgress: {
+      completed: 0,
+      total: 0,
+      currentDepartmentName: ""
+    },
     pollTimerId: 0,
     hiddenFeedbackIds: []
   };
@@ -198,6 +203,22 @@
 
   function getPendingUploadCount() {
     return state.slots.filter((slot) => slot.localDraft).length;
+  }
+
+  function getUploadedCount() {
+    return state.slots.filter((slot) => Boolean(slot.serverPhoto) && !slot.localDraft).length;
+  }
+
+  function getPhotoStatusSummary() {
+    const total = state.slots.length;
+    const missing = getMissingCount();
+    return {
+      total,
+      missing,
+      ready: Math.max(0, total - missing),
+      pending: getPendingUploadCount(),
+      uploaded: getUploadedCount()
+    };
   }
 
   function canSendAll() {
@@ -560,6 +581,11 @@
     }
 
     state.isSending = true;
+    state.uploadProgress = {
+      completed: 0,
+      total: queue.length,
+      currentDepartmentName: ""
+    };
     render();
 
     try {
@@ -569,6 +595,11 @@
         if (!draft) {
           continue;
         }
+        state.uploadProgress = {
+          completed: index,
+          total: queue.length,
+          currentDepartmentName: slot.departmentName
+        };
         setMessage(`Отправляю ${index + 1} из ${queue.length}: ${slot.departmentName}. OCR обрабатывает фото...`, "info");
         const response = await fetch(getSubmitUrl(), {
           method: "POST",
@@ -596,14 +627,29 @@
           reportDate: state.reportDate,
           sourceLabel: "Ընդունարան"
         });
+        state.uploadProgress = {
+          completed: index + 1,
+          total: queue.length,
+          currentDepartmentName: slot.departmentName
+        };
         render();
       }
       state.isSending = false;
+      state.uploadProgress = {
+        completed: 0,
+        total: 0,
+        currentDepartmentName: ""
+      };
       render();
       setMessage("Все новые фото отправлены. OCR обработал снимки. На веб-странице откройте блок «Фото бланков текущей таблицы» и проверьте результаты.", "success");
       void loadState(false);
     } catch (error) {
       state.isSending = false;
+      state.uploadProgress = {
+        completed: 0,
+        total: 0,
+        currentDepartmentName: ""
+      };
       render();
       setMessage(error instanceof Error ? error.message : "Не удалось отправить фото.", "error");
     }
@@ -644,8 +690,40 @@
     `;
   }
 
+  function buildPhotoStatusBar() {
+    const summary = getPhotoStatusSummary();
+    const capturePercent = summary.total ? Math.round((summary.ready / summary.total) * 100) : 0;
+    const upload = state.uploadProgress;
+    const uploadPercent = upload.total ? Math.round((upload.completed / upload.total) * 100) : 0;
+    const uploadStep = Math.min(upload.total, upload.completed + 1);
+
+    return `
+      <section class="android-intake__status-panel" aria-live="polite">
+        <div class="android-intake__status-heading">
+          <strong>Статус фотографий</strong>
+          <span>${summary.ready} из ${summary.total} готовы</span>
+        </div>
+        <div class="android-intake__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="${summary.total}" aria-valuenow="${summary.ready}" aria-label="Готовность фотографий">
+          <span class="android-intake__progress-fill" style="width: ${capturePercent}%"></span>
+        </div>
+        <div class="android-intake__status-metrics">
+          <span class="android-intake__status-metric android-intake__status-metric--uploaded">Отправлено: <strong>${summary.uploaded}</strong></span>
+          <span class="android-intake__status-metric android-intake__status-metric--pending">Ожидают отправки: <strong>${summary.pending}</strong></span>
+          <span class="android-intake__status-metric">Нужно снять: <strong>${summary.missing}</strong></span>
+        </div>
+        ${state.isSending ? `
+          <div class="android-intake__upload-progress">
+            <div class="android-intake__upload-progress-title"><strong>Отправка ${uploadStep} из ${upload.total}</strong><span>${escapeHtml(upload.currentDepartmentName || "Подготавливаю отправку...")}</span></div>
+            <div class="android-intake__progress-track android-intake__progress-track--upload" role="progressbar" aria-valuemin="0" aria-valuemax="${upload.total}" aria-valuenow="${upload.completed}" aria-label="Отправка фотографий">
+              <span class="android-intake__progress-fill android-intake__progress-fill--upload" style="width: ${uploadPercent}%"></span>
+            </div>
+          </div>
+        ` : ""}
+      </section>
+    `;
+  }
+
   function render() {
-    const missingCount = getMissingCount();
     const pendingUploads = getPendingUploadCount();
     const sendLabel = state.isSending
       ? "Отправляю..."
@@ -666,7 +744,8 @@
             <button type="button" class="android-intake__button android-intake__button--primary" data-send ${canSendAll() ? "" : "disabled"}>${escapeHtml(sendLabel)}</button>
           </div>
         </section>
-        <p class="android-intake__hint">Один тап по готовому фото открывает просмотр. Двойной тап по готовому фото делает пересъёмку. Старые фото автоматически сбрасываются при новой вечерней сессии в 19:00.</p>
+        ${buildPhotoStatusBar()}
+        <p class="android-intake__hint">«Открыть фото» показывает снимок. «Переснять фото» открывает камеру или галерею. Старые фото автоматически сбрасываются при новой вечерней сессии в 19:00.</p>
         <p class="android-intake__message${state.messageTone === "error" ? " android-intake__message--error" : (state.messageTone === "success" ? " android-intake__message--success" : "")}">${escapeHtml(state.message)}</p>
         <section class="android-intake__grid">
           ${state.slots.map(buildSlotCard).join("")}
