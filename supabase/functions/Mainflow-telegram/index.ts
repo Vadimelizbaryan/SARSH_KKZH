@@ -12341,9 +12341,6 @@ function isTelegramSecretValid(request: Request) {
   }
   const actual = request.headers.get("x-telegram-bot-api-secret-token") || "";
   const normalizedActual = actual.trim();
-  if (!normalizedActual) {
-    return true;
-  }
   return normalizedActual === expected;
 }
 
@@ -14213,7 +14210,7 @@ Deno.serve(async (request) => {
     return await handleTelegramCivilReferralsDelete(request);
   }
 
-  if (!isTelegramSecretValid(request)) {
+  if (request.method === "POST" && !isTelegramSecretValid(request)) {
     return jsonResponse({ error: "Invalid Telegram secret token." }, 403);
   }
 
