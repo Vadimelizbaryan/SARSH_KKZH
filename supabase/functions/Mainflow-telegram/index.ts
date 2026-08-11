@@ -54,6 +54,13 @@ const SONO_EXPECTED_FILE_NAMES = new Set(["sono.docx", "sono.doc"]);
 const SONO_OLE_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1] as const;
 const ARMENIAN_PDF_FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarmenian/NotoSansArmenian%5Bwdth,wght%5D.ttf";
 const YEREVAN_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
+type FirebaseAndroidPublicConfig = {
+  projectId: string;
+  applicationId: string;
+  senderId: string;
+  apiKey: string;
+  storageBucket: string;
+};
 const WORD_XML_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const DOM_ELEMENT_NODE = 1;
 const DOM_TEXT_NODE = 3;
@@ -2410,6 +2417,8 @@ type AndroidDeviceAccessRecord = {
   blockedAt: string;
   lastSeenAt: string;
   lastDepartmentId: string;
+  fcmToken?: string;
+  fcmTokenUpdatedAt?: string;
 };
 
 type TelegramPhotoHandlingOptions = {
@@ -2611,6 +2620,11 @@ function sanitizeAndroidDeviceName(value: unknown) {
   return normalized.slice(0, 160);
 }
 
+function sanitizeAndroidDevicePushToken(value: unknown) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return normalized.slice(0, 4096);
+}
+
 function parseAndroidDeviceAccessRecords(raw: unknown): AndroidDeviceAccessRecord[] {
   if (typeof raw !== "string" || !raw.trim()) {
     return [];
@@ -2638,7 +2652,9 @@ function parseAndroidDeviceAccessRecords(raw: unknown): AndroidDeviceAccessRecor
           approvedAt: typeof record.approvedAt === "string" ? record.approvedAt : "",
           blockedAt: typeof record.blockedAt === "string" ? record.blockedAt : "",
           lastSeenAt: typeof record.lastSeenAt === "string" ? record.lastSeenAt : "",
-          lastDepartmentId: typeof record.lastDepartmentId === "string" ? record.lastDepartmentId : ""
+          lastDepartmentId: typeof record.lastDepartmentId === "string" ? record.lastDepartmentId : "",
+          fcmToken: sanitizeAndroidDevicePushToken(record.fcmToken),
+          fcmTokenUpdatedAt: typeof record.fcmTokenUpdatedAt === "string" ? record.fcmTokenUpdatedAt : ""
         };
       })
       .filter((item): item is AndroidDeviceAccessRecord => item !== null);
@@ -3307,6 +3323,160 @@ async function getAndroidDeviceAccessState(
     departmentId
   );
   return { status: "pending" as const, record: createdPendingRecord };
+}
+
+async function saveAndroidDevicePushToken(
+  supabase: ReturnType<typeof createClient>,
+  deviceId: string,
+  deviceName: string,
+  departmentId: DepartmentId,
+  fcmToken: string
+) {
+  const normalizedDeviceId = sanitizeAndroidDeviceId(deviceId);
+  if (!normalizedDeviceId) {
+    throw new Error("Android device id is missing.");
+  }
+
+  const normalizedDeviceName = sanitizeAndroidDeviceName(deviceName) || "Android MAINFORM";
+  const normalizedToken = sanitizeAndroidDevicePushToken(fcmToken);
+  const now = new Date().toISOString();
+  const [approvedDevices, pendingDevices, blockedDevices] = await Promise.all([
+    loadApprovedAndroidDevices(supabase),
+    loadPendingAndroidDevices(supabase),
+    loadBlockedAndroidDevices(supabase)
+  ]);
+
+  const patchRecord = (record: AndroidDeviceAccessRecord): AndroidDeviceAccessRecord => ({
+    ...record,
+    deviceName: normalizedDeviceName,
+    updatedAt: now,
+    lastSeenAt: now,
+    lastDepartmentId: departmentId,
+    fcmToken: normalizedToken,
+    fcmTokenUpdatedAt: now
+  });
+
+  const approvedRecord = approvedDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (approvedRecord) {
+    const nextRecord = patchRecord(approvedRecord);
+    await saveApprovedAndroidDevices(
+      supabase,
+      [nextRecord, ...approvedDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    );
+    return nextRecord;
+  }
+
+  const pendingRecord = pendingDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (pendingRecord) {
+    const nextRecord = patchRecord(pendingRecord);
+    await savePendingAndroidDevices(
+      supabase,
+      [nextRecord, ...pendingDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    );
+    return nextRecord;
+  }
+
+  const blockedRecord = blockedDevices.find((item) => item.deviceId === normalizedDeviceId);
+  if (blockedRecord) {
+    const nextRecord = patchRecord(blockedRecord);
+    await saveBlockedAndroidDevices(
+      supabase,
+      [nextRecord, ...blockedDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+    );
+    return nextRecord;
+  }
+
+  const createdPendingRecord = await requestAndroidDeviceApproval(
+    supabase,
+    normalizedDeviceId,
+    normalizedDeviceName,
+    departmentId
+  );
+  const nextRecord = patchRecord(createdPendingRecord);
+  await savePendingAndroidDevices(
+    supabase,
+    [nextRecord, ...pendingDevices.filter((item) => item.deviceId !== normalizedDeviceId)]
+  );
+  return nextRecord;
+}
+
+function getFirebaseAndroidPublicConfig(): FirebaseAndroidPublicConfig {
+  return {
+    projectId: (Deno.env.get("FIREBASE_PROJECT_ID") || "").trim(),
+    applicationId: (Deno.env.get("FIREBASE_ANDROID_APP_ID") || "").trim(),
+    senderId: (Deno.env.get("FIREBASE_ANDROID_SENDER_ID") || "").trim(),
+    apiKey: (Deno.env.get("FIREBASE_ANDROID_API_KEY") || "").trim(),
+    storageBucket: (Deno.env.get("FIREBASE_ANDROID_STORAGE_BUCKET") || "").trim()
+  };
+}
+
+function buildAndroidFirebaseConfigResponse() {
+  const config = getFirebaseAndroidPublicConfig();
+  const enabled = Boolean(config.projectId && config.applicationId && config.senderId && config.apiKey);
+  return {
+    ok: true,
+    enabled,
+    projectId: enabled ? config.projectId : "",
+    applicationId: enabled ? config.applicationId : "",
+    senderId: enabled ? config.senderId : "",
+    apiKey: enabled ? config.apiKey : "",
+    storageBucket: enabled ? config.storageBucket : ""
+  };
+}
+
+async function handleAndroidFirebaseConfig(_request: Request) {
+  try {
+    return jsonResponse(buildAndroidFirebaseConfigResponse());
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_firebase_config_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
+async function handleAndroidDeviceFcmRegister(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const deviceId = sanitizeAndroidDeviceId(payload?.deviceId);
+    const deviceName = sanitizeAndroidDeviceName(payload?.deviceName) || "Android MAINFORM";
+    const departmentId = parseDepartmentId(payload?.departmentId);
+    const fcmToken = sanitizeAndroidDevicePushToken(payload?.fcmToken);
+    if (!deviceId || !departmentId || !fcmToken) {
+      return jsonResponse({ ok: false, error: "Device, department and fcmToken are required." }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const accessState = await getAndroidDeviceAccessState(supabase, deviceId, deviceName, departmentId);
+    if (accessState.status === "blocked") {
+      return jsonResponse({ ok: false, error: "access_denied" }, 403);
+    }
+
+    const updatedRecord = await saveAndroidDevicePushToken(
+      supabase,
+      deviceId,
+      deviceName,
+      departmentId,
+      fcmToken
+    );
+    return jsonResponse({
+      ok: true,
+      approved: accessState.status === "approved",
+      deviceId: updatedRecord.deviceId,
+      departmentId: updatedRecord.lastDepartmentId,
+      pushEnabled: Boolean(updatedRecord.fcmToken),
+      fcmTokenUpdatedAt: updatedRecord.fcmTokenUpdatedAt || ""
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_device_fcm_register_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
 }
 
 async function requestSonoDesktopDeviceApproval(
@@ -13715,15 +13885,127 @@ Deno.serve(async (request) => {
     }
 
     if (action === "telegram-form-archive-pdf") {
-      return jsonResponse({ ok: false, error: "Archive feature is disabled." }, 410);
+      try {
+        const currentUrl = new URL(request.url);
+        const dateKey = normalizeTelegramFormArchiveDateKey(currentUrl.searchParams.get("date") || "");
+        if (!dateKey) {
+          return jsonResponse({ ok: false, error: "Archive date is required." }, 400);
+        }
+
+        const formsOnlyRaw = (currentUrl.searchParams.get("formsOnly") || "").trim().toLowerCase();
+        const formsOnly = formsOnlyRaw === "1" || formsOnlyRaw === "true" || formsOnlyRaw === "yes";
+        const supabase = createSupabaseAdmin();
+        if (!formsOnly) {
+          const snapshot = await loadSnapshot(supabase);
+          const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
+          const archivePdf = await buildOrLoadMainArchivePdfResult(
+            supabase,
+            snapshot,
+            snapshotReportDate,
+            dateKey
+          );
+          return buildPdfBytesResponse(
+            archivePdf.bytes,
+            archivePdf.fileName
+          );
+        }
+
+        const records = await loadTelegramWebFormArchiveRecordsForDate(supabase, dateKey);
+        if (!records.length) {
+          const snapshot = await loadSnapshot(supabase);
+          const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
+          const archivePdf = await buildOrLoadMainArchivePdfResult(
+            supabase,
+            snapshot,
+            snapshotReportDate,
+            dateKey
+          );
+          return buildPdfBytesResponse(
+            archivePdf.bytes,
+            archivePdf.fileName
+          );
+        }
+
+        const pdfBytes = await buildTelegramWebFormArchiveDatePdfBytes(records);
+        return buildPdfBytesResponse(
+          pdfBytes,
+          `Telegram_forms_${dateKey}.pdf`
+        );
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "telegram_form_archive_pdf_failed",
+          error: getErrorText(error)
+        }, 500);
+      }
     }
 
     if (action === "main-archive-pdf") {
-      return jsonResponse({ ok: false, error: "Archive feature is disabled." }, 410);
+      try {
+        const currentUrl = new URL(request.url);
+        const supabase = createSupabaseAdmin();
+        const snapshot = await loadSnapshot(supabase);
+        const snapshotReportDate = snapshot.reportDate || getYerevanReportDateText();
+        const requestedDate = (currentUrl.searchParams.get("date") || "").trim();
+        const downloadRaw = (currentUrl.searchParams.get("download") || "").trim().toLowerCase();
+        const shouldDownload = downloadRaw === "1" || downloadRaw === "true" || downloadRaw === "yes";
+        const dateKey = normalizeTelegramFormArchiveDateKey(requestedDate || snapshotReportDate) || getYerevanDateKey();
+        const archivePdf = await buildOrLoadMainArchivePdfResult(
+          supabase,
+          snapshot,
+          snapshotReportDate,
+          dateKey
+        );
+        return buildPdfBytesResponse(
+          archivePdf.bytes,
+          archivePdf.fileName,
+          { download: shouldDownload }
+        );
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "main_archive_pdf_failed",
+          error: getErrorText(error)
+        }, 500);
+      }
     }
 
     if (action === "daily-main-archive") {
-      return jsonResponse({ ok: false, error: "Archive feature is disabled." }, 410);
+      if (!isTelegramReminderRequestValid(request)) {
+        return jsonResponse({ ok: false, error: "Unauthorized." }, 403);
+      }
+
+      try {
+        const currentUrl = new URL(request.url);
+        const forceRaw = (currentUrl.searchParams.get("force") || "").trim().toLowerCase();
+        const requestedDateKey = normalizeTelegramFormArchiveDateKey(currentUrl.searchParams.get("date") || "");
+        const force = forceRaw === "1" || forceRaw === "true" || forceRaw === "yes";
+        const supabase = createSupabaseAdmin();
+        const result = await persistDailyMainArchivePdf(supabase, {
+          requestedDateKey,
+          force
+        });
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          status: result.skipped ? "daily_main_archive_already_ready" : "daily_main_archive_saved",
+          archiveKey: result.archiveKey,
+          reportDate: result.reportDate,
+          deletedFeedbackCount: result.deletedFeedbackCount,
+          fileName: result.storedPdf.fileName,
+          storagePath: result.storedPdf.storagePath,
+          skipped: result.skipped
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          status: "daily_main_archive_failed",
+          error: getErrorText(error)
+        }, 500);
+      }
     }
 
     if (action === "feedback-photo") {
@@ -13775,6 +14057,10 @@ Deno.serve(async (request) => {
           error: error instanceof Error ? error.message : String(error)
         }, 500);
       }
+    }
+
+    if (action === "android-firebase-config") {
+      return await handleAndroidFirebaseConfig(request);
     }
 
     if (action === "android-intake-state") {
@@ -13895,6 +14181,9 @@ Deno.serve(async (request) => {
   }
   if (postUrl.searchParams.get("action") === "android-intake-photo-submit") {
     return await handleAndroidIntakePhotoSubmit(request);
+  }
+  if (postUrl.searchParams.get("action") === "android-device-fcm-register") {
+    return await handleAndroidDeviceFcmRegister(request);
   }
   if (postUrl.searchParams.get("action") === "night-form-load") {
     return await handleTelegramShiftFormLoad(request, "night");

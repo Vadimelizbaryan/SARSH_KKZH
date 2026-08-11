@@ -572,7 +572,6 @@
   }
 
   async function loadMainArchiveRecord(archiveKey) {
-    return null;
     const normalizedArchiveKey = String(archiveKey || "").trim();
     if (!hasRemoteSync() || !normalizedArchiveKey) {
       return null;
@@ -603,7 +602,6 @@
   }
 
   async function listMainArchiveRecords(limit = 120) {
-    return [];
     if (!hasRemoteSync()) {
       return [];
     }
@@ -632,7 +630,6 @@
   }
 
   async function saveMainArchivePdf(dateKey, options = {}) {
-    throw new Error("Архивная функция отключена.");
     if (!hasRemoteSync()) {
       throw new Error("Сохранение архива доступно только в онлайн-режиме владельца.");
     }
@@ -1497,13 +1494,6 @@
   }
 
   async function rolloverMainAfterArchive(archiveKey, reportDate) {
-    return {
-      snapshot: loadLocalSnapshot(),
-      source: hasRemoteSync() ? "remote" : "local-only",
-      archiveRecord: null,
-      rolloverApplied: false,
-      rolloverAlreadyApplied: true
-    };
     const safeArchiveKey = typeof archiveKey === "string" ? archiveKey.trim() : "";
     if (!safeArchiveKey) {
       throw new Error("Не указан день архива для утреннего переноса.");
@@ -1553,7 +1543,6 @@
   }
 
   async function queueAwareRolloverMainAfterArchive(archiveKey, reportDate) {
-    return rolloverMainAfterArchive(archiveKey, reportDate);
     const safeArchiveKey = typeof archiveKey === "string" ? archiveKey.trim() : "";
     if (!safeArchiveKey) {
       throw new Error("Не указан день архива для утреннего переноса.");
@@ -2609,7 +2598,6 @@
   }
 
   async function saveMainArchivePdf(dateKey, options = {}) {
-    throw new Error("Архивная функция отключена.");
     if (!hasRemoteSync()) {
       throw new Error("\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435 \u0430\u0440\u0445\u0438\u0432\u0430 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u0442\u043e\u043b\u044c\u043a\u043e \u0432 \u043e\u043d\u043b\u0430\u0439\u043d-\u0440\u0435\u0436\u0438\u043c\u0435 \u0432\u043b\u0430\u0434\u0435\u043b\u044c\u0446\u0430.");
     }

@@ -72,14 +72,14 @@ id, которые перечислены в этой переменной.
 После деплоя функции выполни такой запрос в браузере или PowerShell:
 
 ```text
-https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram
+https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=https://tmhazxfpkyzwllaqahhk.supabase.co/functions/v1/Mainflow-telegram
 ```
 
 Лучше сразу передать секретный токен:
 
 ```powershell
 $body = @{
-  url = "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram"
+  url = "https://tmhazxfpkyzwllaqahhk.supabase.co/functions/v1/Mainflow-telegram"
   secret_token = "<TELEGRAM_WEBHOOK_SECRET>"
 }
 
