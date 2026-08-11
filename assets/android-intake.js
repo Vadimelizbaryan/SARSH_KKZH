@@ -8,7 +8,6 @@
   }
 
   const SESSION_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:android-intake-hub:v1`;
-  const PREVIEW_TAP_DELAY_MS = 260;
   const POLL_INTERVAL_MS = 60 * 1000;
   const query = new URLSearchParams(window.location.search);
   const deviceId = String(query.get("androidDeviceId") || "").trim();
@@ -38,8 +37,6 @@
     messageTone: "info",
     preview: null,
     pendingDepartmentId: "",
-    tapSlotId: "",
-    tapTimerId: 0,
     pollTimerId: 0,
     hiddenFeedbackIds: []
   };
@@ -399,30 +396,6 @@
     }
   }
 
-  function handleSlotTap(departmentId) {
-    const slot = getSlotByDepartmentId(departmentId);
-    if (!slot) {
-      return;
-    }
-    if (!getSlotDisplayPhoto(slot)) {
-      openFilePicker(departmentId);
-      return;
-    }
-    if (state.tapSlotId === departmentId && state.tapTimerId) {
-      window.clearTimeout(state.tapTimerId);
-      state.tapTimerId = 0;
-      state.tapSlotId = "";
-      openFilePicker(departmentId);
-      return;
-    }
-    state.tapSlotId = departmentId;
-    state.tapTimerId = window.setTimeout(() => {
-      state.tapTimerId = 0;
-      state.tapSlotId = "";
-      void openPreviewDeferred(departmentId);
-    }, PREVIEW_TAP_DELAY_MS);
-  }
-
   async function resizeImageFile(file) {
     const dataUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -553,11 +526,6 @@
       });
       state.preview = null;
       state.pendingDepartmentId = "";
-      state.tapSlotId = "";
-      if (state.tapTimerId) {
-        window.clearTimeout(state.tapTimerId);
-        state.tapTimerId = 0;
-      }
       state.hiddenFeedbackIds = Array.from(hiddenFeedbackIds);
       writeManualSession(state.sessionKey, state.hiddenFeedbackIds);
       writeLocalDrafts();
@@ -654,7 +622,7 @@
     return `
       <article class="android-intake__card${isLocal ? " is-local" : ""}${photo && !isLocal ? " is-complete" : ""}">
         <div class="android-intake__thumb">
-          <button type="button" class="android-intake__thumb-button" data-slot-open="${escapeHtml(slot.departmentId)}">
+          <button type="button" class="android-intake__thumb-button" ${photo ? "data-slot-preview" : "data-slot-retake"}="${escapeHtml(slot.departmentId)}">
             ${photo
               ? (hasPhotoImage ? `<img src="${escapeHtml(photo.imageDataUrl)}" alt="${escapeHtml(slot.departmentName)}">` : `<div class="android-intake__server-photo"><div class="android-intake__server-photo-icon">&#10003;</div><div class="android-intake__camera-text">Фото есть</div><small>Тап - открыть</small></div>`)
               : `<div><div class="android-intake__camera-icon">📷</div><div class="android-intake__camera-text">Снять фото</div></div>`}
@@ -666,7 +634,10 @@
           ${photo && photo.sourceLabel ? `<div class="android-intake__card-status">${escapeHtml(photo.sourceLabel)}</div>` : ""}
         </div>
         <div class="android-intake__card-actions">
-          <button type="button" class="android-intake__mini-button" data-slot-open="${escapeHtml(slot.departmentId)}">${photo ? "Открыть / переснять" : "Снять фото"}</button>
+          ${photo
+            ? `<button type="button" class="android-intake__mini-button" data-slot-preview="${escapeHtml(slot.departmentId)}">Открыть фото</button>
+               <button type="button" class="android-intake__mini-button android-intake__mini-button--retake" data-slot-retake="${escapeHtml(slot.departmentId)}">Переснять фото</button>`
+            : `<button type="button" class="android-intake__mini-button android-intake__mini-button--retake" data-slot-retake="${escapeHtml(slot.departmentId)}">Снять фото</button>`}
         </div>
       </article>
     `;
@@ -721,9 +692,15 @@
       fileInput.addEventListener("change", handleFileChange, { once: false });
     }
 
-    app.querySelectorAll("[data-slot-open]").forEach((button) => {
+    app.querySelectorAll("[data-slot-preview]").forEach((button) => {
       button.addEventListener("click", () => {
-        handleSlotTap(String(button.getAttribute("data-slot-open") || ""));
+        void openPreviewDeferred(String(button.getAttribute("data-slot-preview") || ""));
+      });
+    });
+
+    app.querySelectorAll("[data-slot-retake]").forEach((button) => {
+      button.addEventListener("click", () => {
+        openFilePicker(String(button.getAttribute("data-slot-retake") || ""));
       });
     });
 

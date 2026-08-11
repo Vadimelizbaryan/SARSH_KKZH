@@ -247,6 +247,12 @@ body {
   font-weight: 700;
 }
 
+.android-intake__mini-button--retake {
+  background: #f1e4c9;
+  border-color: #d8bb81;
+  color: #5e4514;
+}
+
 .android-intake__modal[hidden] {
   display: none;
 }
