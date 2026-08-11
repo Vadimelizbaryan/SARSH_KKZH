@@ -29,8 +29,8 @@ public class MainActivity : Activity
     private const int FileChooserRequestCode = 1101;
     private const int NativePhotoRequestCode = 1102;
     private const int CameraPermissionRequestCode = 1103;
-    private const int PhotoMaxDimension = 1600;
-    private const int PhotoQuality = 86;
+    private const int PhotoMaxDimension = 2400;
+    private const int PhotoQuality = 94;
     private const string AndroidIntakeHubDepartmentId = "admission_hub";
 
     private static readonly HttpClient BootstrapHttpClient = new()
