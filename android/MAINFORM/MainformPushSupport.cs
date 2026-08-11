@@ -10,9 +10,9 @@ namespace MAINFORM;
 internal static class MainformPushSupport
 {
     private const string AndroidFirebaseConfigUrl =
-        "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-firebase-config";
+        "https://tmhazxfpkyzwllaqahhk.supabase.co/functions/v1/Mainflow-telegram?action=android-firebase-config";
     private const string AndroidDeviceFcmRegisterUrl =
-        "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-device-fcm-register";
+        "https://tmhazxfpkyzwllaqahhk.supabase.co/functions/v1/Mainflow-telegram?action=android-device-fcm-register";
     private const string PreferenceName = "mainform_preferences";
     private const string SelectedDepartmentKey = "selected_department_slug";
     private const string DeviceIdKey = "android_device_id";

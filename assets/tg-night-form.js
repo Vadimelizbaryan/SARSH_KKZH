@@ -55,7 +55,7 @@
   }
 
   function getEndpoint() {
-    const baseUrl = String(runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co").replace(/\/+$/, "");
+    const baseUrl = String(runtime.supabaseUrl || "https://tmhazxfpkyzwllaqahhk.supabase.co").replace(/\/+$/, "");
     return `${baseUrl}/functions/v1/Mainflow-telegram?action=night-form-submit`;
   }
 
