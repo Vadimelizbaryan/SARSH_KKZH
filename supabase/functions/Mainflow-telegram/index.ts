@@ -14210,7 +14210,7 @@ Deno.serve(async (request) => {
     return await handleTelegramCivilReferralsDelete(request);
   }
 
-  if (!isTelegramSecretValid(request)) {
+  if (request.method === "POST" && !isTelegramSecretValid(request)) {
     return jsonResponse({ error: "Invalid Telegram secret token." }, 403);
   }
 
