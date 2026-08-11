@@ -294,7 +294,7 @@
   }
 
   function getEndpoint() {
-    const baseUrl = String(runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co").replace(/\/+$/, "");
+    const baseUrl = String(runtime.supabaseUrl || "https://tmhazxfpkyzwllaqahhk.supabase.co").replace(/\/+$/, "");
     return `${baseUrl}/functions/v1/Mainflow-telegram?action=web-qh-form-submit`;
   }
 
@@ -312,7 +312,7 @@
   let latestDepartmentPhotoPollTimerId = 0;
 
   function getTelegramFunctionBaseUrl() {
-    const baseUrl = String(runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co").replace(/\/+$/, "");
+    const baseUrl = String(runtime.supabaseUrl || "https://tmhazxfpkyzwllaqahhk.supabase.co").replace(/\/+$/, "");
     return `${baseUrl}/functions/v1/Mainflow-telegram`;
   }
 

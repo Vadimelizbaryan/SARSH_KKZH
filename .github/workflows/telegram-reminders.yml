@@ -33,7 +33,7 @@ jobs:
   send-reminder:
     runs-on: ubuntu-latest
     env:
-      FUNCTION_URL: https://ywecvlapdlaojpvijaqy.functions.supabase.co/Mainflow-telegram
+      FUNCTION_URL: https://tmhazxfpkyzwllaqahhk.supabase.co/functions/v1/Mainflow-telegram
       TELEGRAM_REMINDER_SECRET: ${{ secrets.TELEGRAM_REMINDER_SECRET }}
     steps:
       - name: Pick reminder slot

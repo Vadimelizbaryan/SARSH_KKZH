@@ -9,7 +9,7 @@ namespace SONO.Desktop;
 public partial class MainForm : Form
 {
     private const string DefaultRelativePage = "sono-desktop.html";
-    private const string FunctionBaseUrl = "https://ywecvlapdlaojpvijaqy.functions.supabase.co/Mainflow-telegram";
+    private const string FunctionBaseUrl = "https://tmhazxfpkyzwllaqahhk.supabase.co/functions/v1/Mainflow-telegram";
     private const string PreferredDataBasePath = @"D:\SHARSH AI Data";
     private const string RemoteDesktopManifestUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/SONO.Desktop/package-manifest.json";
     private const string RemoteDesktopSetupUrl = "https://vadimelizbaryan.github.io/SARSH_KKZH/windows/releases/Sono.exe";

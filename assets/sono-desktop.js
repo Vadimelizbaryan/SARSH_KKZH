@@ -32,7 +32,7 @@
     }
     const runtime = window.SHARSH_RUNTIME_CONFIG || {};
     const baseUrl = String(
-      runtime.supabaseUrl || "https://ywecvlapdlaojpvijaqy.supabase.co",
+      runtime.supabaseUrl || "https://tmhazxfpkyzwllaqahhk.supabase.co",
     ).replace(/\/+$/, "");
     return `${baseUrl}/functions/v1/Mainflow-telegram`;
   }

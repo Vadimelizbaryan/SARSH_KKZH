@@ -18,9 +18,9 @@ namespace MAINFORM;
 public class MainActivity : Activity
 {
     private const string AndroidFormBootstrapUrl =
-        "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-form-url";
+        "https://tmhazxfpkyzwllaqahhk.supabase.co/functions/v1/Mainflow-telegram?action=android-form-url";
     private const string AndroidPhotoCheckUrl =
-        "https://ywecvlapdlaojpvijaqy.supabase.co/functions/v1/Mainflow-telegram?action=android-photo-check";
+        "https://tmhazxfpkyzwllaqahhk.supabase.co/functions/v1/Mainflow-telegram?action=android-photo-check";
     private const string AndroidReleaseManifestUrl =
         "https://vadimelizbaryan.github.io/SARSH_KKZH/android/releases/latest.json";
     private const string PreferenceName = "mainform_preferences";
