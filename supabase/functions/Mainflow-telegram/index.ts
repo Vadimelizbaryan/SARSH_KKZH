@@ -1471,6 +1471,56 @@ async function buildJimpRotatedImageBytes(
   return new Uint8Array(buffer);
 }
 
+const TOP_TABLE_CROP = {
+  left: 0.02,
+  top: 0.04,
+  right: 0.98,
+  bottom: 0.50
+};
+
+async function buildTopTableCropImageDataUrl(dataUrl: string) {
+  const { bytes } = parseImageDataUrl(dataUrl);
+  const image = await Jimp.read(Buffer.from(bytes));
+  const width = Number(image.bitmap.width || 0);
+  const height = Number(image.bitmap.height || 0);
+
+  // The form is normally photographed in landscape. If rotation did not
+  // succeed, keep the original so the second pass cannot cut off the table.
+  if (width < 400 || height < 300 || width <= height) {
+    return dataUrl;
+  }
+
+  const x = Math.max(0, Math.floor(width * TOP_TABLE_CROP.left));
+  const y = Math.max(0, Math.floor(height * TOP_TABLE_CROP.top));
+  const right = Math.min(width, Math.ceil(width * TOP_TABLE_CROP.right));
+  const bottom = Math.min(height, Math.ceil(height * TOP_TABLE_CROP.bottom));
+  const cropWidth = right - x;
+  const cropHeight = bottom - y;
+  if (cropWidth < 300 || cropHeight < 180) {
+    return dataUrl;
+  }
+
+  image.crop({ x, y, w: cropWidth, h: cropHeight });
+  const buffer = await image.getBuffer("image/jpeg");
+  return buildImageDataUrl("image/jpeg", new Uint8Array(buffer));
+}
+
+let topTableTemplateDataUrlPromise: Promise<string> | null = null;
+
+async function getTopTableTemplateDataUrl() {
+  if (!topTableTemplateDataUrlPromise) {
+    topTableTemplateDataUrlPromise = fetchImageAsDataUrl(getOcrTemplateBlankImageUrl())
+      .then((dataUrl) => buildTopTableCropImageDataUrl(dataUrl));
+  }
+
+  try {
+    return await topTableTemplateDataUrlPromise;
+  } catch (error) {
+    topTableTemplateDataUrlPromise = null;
+    throw error;
+  }
+}
+
 async function inspectTelegramPhotoOrientation(
   dataUrl: string,
   fileName: string,
@@ -1649,7 +1699,12 @@ async function requestOpenAiStructuredVision(
   imageDataUrl: string,
   schemaName: string,
   schema: Record<string, unknown>,
-  referenceImageUrls: string[] = []
+  referenceImageUrls: string[] = [],
+  options: {
+    imageDetail?: "auto" | "high" | "original";
+    reasoningEffort?: "low" | "medium" | "high" | "xhigh";
+    referenceImageDataUrls?: string[];
+  } = {}
 ) {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) {
@@ -1661,21 +1716,24 @@ async function requestOpenAiStructuredVision(
       .filter((url) => typeof url === "string" && url.trim())
       .map((url) => fetchImageAsDataUrl(url.trim()))
   );
+  const inlineReferenceImageDataUrls = (options.referenceImageDataUrls || [])
+    .filter((dataUrl) => typeof dataUrl === "string" && dataUrl.startsWith("data:image/"));
+  const imageDetail = options.imageDetail || "high";
 
   const content = [
     {
       type: "input_text",
       text: prompt
     },
-    ...referenceImageDataUrls.map((dataUrl) => ({
+    ...[...referenceImageDataUrls, ...inlineReferenceImageDataUrls].map((dataUrl) => ({
         type: "input_image",
         image_url: dataUrl,
-        detail: "high"
+        detail: imageDetail
       })),
     {
       type: "input_image",
       image_url: imageDataUrl,
-      detail: "high"
+      detail: imageDetail
     }
   ];
 
@@ -1687,6 +1745,7 @@ async function requestOpenAiStructuredVision(
     },
     body: JSON.stringify({
       model: PHOTO_RECOGNITION_MODEL,
+      ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
       input: [
         {
           role: "user",
@@ -2252,7 +2311,11 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
     imageDataUrl,
     "telegram_department_photo_recognition",
     buildPhotoRecognitionSchema(),
-    [getOcrTemplateBlankImageUrl()]
+    [getOcrTemplateBlankImageUrl()],
+    {
+      imageDetail: "original",
+      reasoningEffort: "high"
+    }
   );
 
   const parsedValues = parsed.values && typeof parsed.values === "object"
@@ -2263,15 +2326,76 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
   const rightCellValues = sanitizeRightCellValues(parsed.rightCellValues);
   applyRightCellValues(sanitizedValues, rightCellValues);
   const finalValues = sanitizedValues;
-  const structure = sanitizePhotoStructure(parsed.structure);
+  let structure = sanitizePhotoStructure(parsed.structure);
   const baseNotes = Array.isArray(parsed.notes)
     ? parsed.notes.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())
     : [];
   if (sanitizedValues.presentTotal === null) {
     sanitizedValues.presentTotal = extractPresentTotalFromNotes(baseNotes);
   }
-  const structureInvalid = !!structure && (!structure.all22CellsVisible || structure.gridCellCount !== 22);
   const notes = [...baseNotes];
+  try {
+    const [topTableImageDataUrl, topTableTemplateDataUrl] = await Promise.all([
+      buildTopTableCropImageDataUrl(imageDataUrl),
+      getTopTableTemplateDataUrl()
+    ]);
+    const topTablePrompt = [
+      "This is a focused verification pass for the top handwritten numeric table of an Armenian hospital department form.",
+      `Department id: ${departmentId}. Department name: ${departmentMeta.department}.`,
+      "You receive two cropped images in order: the blank-table reference, then the filled-table image.",
+      "Read only the handwritten numeric values from the visible 22-cell table. Do not infer, calculate, or copy printed labels.",
+      "Confirm the printed cell borders before returning values. Return null for every uncertain cell.",
+      "The top table must have exactly 22 visual cells, from left to right.",
+      PHOTO_TEMPLATE_GUIDE,
+      "Return rightCellValues as exactly 11 items for cells 12-22 in their visual left-to-right order.",
+      "rightCellValues[0] is visual cell 12; do not shift it to cell 13.",
+      "The final rightmost item is visual cell 22.",
+      "The cropped images do not necessarily include the report date, so return reportDate as null unless it is actually visible.",
+      "Use notes only for short uncertainty comments."
+    ].join("\n");
+    const topTableParsed = await requestOpenAiStructuredVision(
+      topTablePrompt,
+      topTableImageDataUrl,
+      "telegram_department_top_table_verification",
+      buildPhotoRecognitionSchema(),
+      [],
+      {
+        imageDetail: "original",
+        reasoningEffort: "high",
+        referenceImageDataUrls: [topTableTemplateDataUrl]
+      }
+    );
+    const topTableStructure = sanitizePhotoStructure(topTableParsed.structure);
+    const topTableVerified = !!topTableStructure && topTableStructure.all22CellsVisible && topTableStructure.gridCellCount === 22;
+    if (topTableVerified) {
+      const topTableValues = topTableParsed.values && typeof topTableParsed.values === "object"
+        ? sanitizeValues(topTableParsed.values as Record<string, unknown>)
+        : sanitizeValues(null);
+      const topTableRightCellValues = sanitizeRightCellValues(topTableParsed.rightCellValues);
+
+      for (const key of VALUE_KEYS) {
+        if (topTableValues[key] !== null) {
+          finalValues[key] = topTableValues[key];
+        }
+      }
+      if (topTableRightCellValues) {
+        PHOTO_RIGHT_CELL_KEYS.forEach((key, index) => {
+          if (topTableRightCellValues[index] !== null) {
+            finalValues[key] = topTableRightCellValues[index];
+          }
+        });
+      }
+      structure = topTableStructure;
+      notes.push("Top-table verification pass completed with the cropped high-detail image.");
+    } else {
+      notes.push("Top-table verification pass could not confirm all 22 cells; the full-form result was retained.");
+    }
+  } catch (error) {
+    console.warn("Top-table photo verification failed:", sanitizePublicErrorMessage(error));
+    notes.push("Top-table verification was unavailable; the full-form result was retained.");
+  }
+
+  const structureInvalid = !!structure && (!structure.all22CellsVisible || structure.gridCellCount !== 22);
   if (structureInvalid) {
     notes.push(
       structure?.reason

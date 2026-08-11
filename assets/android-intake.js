@@ -433,7 +433,7 @@
       img.src = dataUrl;
     });
 
-    const maxDimension = 1600;
+    const maxDimension = 2400;
     const ratio = Math.min(1, maxDimension / Math.max(image.width, image.height));
     const width = Math.max(1, Math.round(image.width * ratio));
     const height = Math.max(1, Math.round(image.height * ratio));
@@ -445,7 +445,7 @@
       throw new Error("Не удалось подготовить фото.");
     }
     context.drawImage(image, 0, 0, width, height);
-    const normalizedDataUrl = canvas.toDataURL("image/jpeg", 0.86);
+    const normalizedDataUrl = canvas.toDataURL("image/jpeg", 0.94);
     const safeName = String(file.name || "android-intake-photo.jpg").trim() || "android-intake-photo.jpg";
     const fileName = safeName.toLowerCase().endsWith(".jpg") || safeName.toLowerCase().endsWith(".jpeg")
       ? safeName
