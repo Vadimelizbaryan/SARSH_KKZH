@@ -132,7 +132,7 @@ public class MainActivity : Activity
 
         if (_clearPhotoButton is not null)
         {
-            _clearPhotoButton.Click += (_, _) => ClearSelectedPhoto(showToast: true);
+            _clearPhotoButton.Click += (_, _) => RetakePhoto();
         }
 
         RenderPhotoState();
@@ -726,6 +726,12 @@ public class MainActivity : Activity
         {
             Toast.MakeText(this, Resource.String.photo_cleared, ToastLength.Short)?.Show();
         }
+    }
+
+    private void RetakePhoto()
+    {
+        ClearSelectedPhoto(showToast: false);
+        StartNativePhotoChooser();
     }
 
     private void RenderPhotoState()
