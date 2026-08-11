@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-06-01T21:41:47.1662124Z",
+    "generatedAtUtc":  "2026-08-11T06:53:18.4983248Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -48,8 +48,8 @@
                   },
                   {
                       "path":  "assets/sharsh-app.js",
-                      "size":  663707,
-                      "sha256":  "3761402953ADC66735347BE0DD142D9CB07A7BB7BF329DF219F296F161C29113"
+                      "size":  665272,
+                      "sha256":  "18E4BCB3C939A03A06439CE88828CDB03969EC4B3799679BB5360F0FAF77A2B5"
                   },
                   {
                       "path":  "assets/sharsh-auth.js",
@@ -63,8 +63,8 @@
                   },
                   {
                       "path":  "assets/sharsh-runtime-config.js",
-                      "size":  8383,
-                      "sha256":  "109CA9166C2404A06C02A160A25D933472A4C72217F9A36313E8DAC4EE7E484B"
+                      "size":  8376,
+                      "sha256":  "6034F5CDCFEAD7022A2F29988FDCAE707D6B9150D4DF6116DA0832792F114CFF"
                   },
                   {
                       "path":  "assets/sharsh-setup.js",
@@ -328,28 +328,28 @@
                   },
                   {
                       "path":  "index.html",
-                      "size":  1064,
-                      "sha256":  "CF79E1C9DB16D2DBC77FEB484B9C0C053BB06B3A2690E53CD581EA1E9F7094A5"
+                      "size":  1067,
+                      "sha256":  "7E28AFC44201313A7685BD3EC785D8897E3BE2C06017F4B2E706A1BFE323618C"
                   },
                   {
                       "path":  "Mainflow.deps.json",
-                      "size":  37229,
-                      "sha256":  "868A4C241D71315993B73AB5F58D9A45E8315E4C171EFFB0EB473A2C21A06F7D"
+                      "size":  37463,
+                      "sha256":  "D6FA68CFE3988574122436850BC8383A175D4EFBD654F2E7F9E0CE8A07B29620"
                   },
                   {
                       "path":  "Mainflow.dll",
-                      "size":  126464,
-                      "sha256":  "6576EF52E5286242B01048E42EAD7ED3AFE006E0795BCFFFEED7CEFCF33B323C"
+                      "size":  125952,
+                      "sha256":  "68B6E915E639861524D3E941E1B02DE59B406101829BA59915DCD18341873EF9"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "057DC0DDFBBA4586F2D0D93782626D5A5EF3C253C9D4EABDA5AC9E2AC72B8D20"
+                      "sha256":  "E7FA607FA7D0D4529561C7675F32B44E9565C61CA4B805C4FFC881C9CCD81FB0"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",
                       "size":  468,
-                      "sha256":  "399AC888E7917C3921A66C20AE72E54084D507A9507D4FBBA3FCAA174F75CA25"
+                      "sha256":  "DA2CF3BF76601C7F12FE6155AAA856F7FD451D7C99702731F6F35E0EA50C8385"
                   },
                   {
                       "path":  "Microsoft.CSharp.dll",
@@ -440,6 +440,11 @@
                       "path":  "mscordaccore_amd64_amd64_8.0.2426.7010.dll",
                       "size":  1346392,
                       "sha256":  "16A9305143B47996D24BA9487F6CCD7187B24DF625F7BDD00E999A965E68C2B6"
+                  },
+                  {
+                      "path":  "mscordaccore_amd64_amd64_8.0.2926.32403.dll",
+                      "size":  1348480,
+                      "sha256":  "1564212B9BB55E1DA04FB59C68854C889DECC263B1206CBB42A9CB398D7AF098"
                   },
                   {
                       "path":  "mscordbi.dll",
@@ -1798,8 +1803,8 @@
                   },
                   {
                       "path":  "ykow8ru3.html",
-                      "size":  595,
-                      "sha256":  "366970E4D21A0E4E1EC70768830ADF8A4FC10543763B69895580D6E330B8D858"
+                      "size":  713,
+                      "sha256":  "E96E00C9F85DA34017FF6F4A52F0293A26122F2608A07D16B6384604B90B0F2D"
                   },
                   {
                       "path":  "Отделения/Общий бланк отделений.pdf",
@@ -1978,8 +1983,8 @@
                   },
                   {
                       "path":  "Օրվա շարժ․.html",
-                      "size":  729,
-                      "sha256":  "6215954FF334D13EE1880F8BFA37EBD641F78AA0150458848FB5D40B85FF763E"
+                      "size":  785,
+                      "sha256":  "EA03275CB64B15A1DCC6B0C96D29C91AF0D326AA326CFA111EB61199A616C0FC"
                   }
               ]
 }
