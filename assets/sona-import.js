@@ -216,7 +216,7 @@
       counts[record.review_status] = (counts[record.review_status] || 0) + 1;
       return counts;
     }, {});
-    return `<section class="sona-workspace">
+    return `<section id="sona-workspace" class="sona-workspace">
       <section class="sona-card">
         <div class="sona-actions"><div><p class="sona-kicker">Текущая папка</p><h2>${escapeHtml(state.batch.batch_name)}</h2></div><span class="sona-pill ${escapeHtml(state.batch.status)}">${escapeHtml(statusLabel(state.batch.status))}</span></div>
         <div class="sona-summary">
@@ -291,7 +291,7 @@
     }
   }
 
-  async function loadBatch(batchId, refreshBatches) {
+  async function loadBatch(batchId, refreshBatches, focusWorkspace) {
     const payload = await api("get_batch", { batchId });
     state.batch = { ...payload.batch, files: payload.files || [], records: payload.records || [] };
     state.selectedRecordIds.clear();
@@ -301,6 +301,11 @@
       state.batches = batches.batches || [];
     }
     render();
+    if (focusWorkspace) {
+      window.requestAnimationFrame(() => {
+        document.getElementById("sona-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
   }
 
   async function loadRecords(renderAfter) {
@@ -470,7 +475,7 @@
           await createAndUpload();
           break;
         case "select-batch":
-          await loadBatch(target.dataset.batchId, false);
+          await loadBatch(target.dataset.batchId, false, true);
           break;
         case "refresh-batch":
           await loadBatch(state.batch.id, true);
