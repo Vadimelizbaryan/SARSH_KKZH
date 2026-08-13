@@ -7,6 +7,7 @@
 - Основной файл: `https://vadimelizbaryan.github.io/SARSH_KKZH/index.html`
 - Страница настройки: `https://vadimelizbaryan.github.io/SARSH_KKZH/setup.html`
 - Журнал OCR feedback: `https://vadimelizbaryan.github.io/SARSH_KKZH/ocr-feedback.html`
+- SONA: `https://vadimelizbaryan.github.io/SARSH_KKZH/sona-import.html` — защищённый импорт папок SONA.
 - Список ссылок отделений: `department-links.txt`
 
 ## Что находится в проекте
