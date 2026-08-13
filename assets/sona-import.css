@@ -188,6 +188,10 @@ body {
 
 .sona-filter-result strong { color: #315d3a; font-size: 16px; }
 
+.sona-filters .sona-button[disabled] {
+  min-width: 116px;
+}
+
 .sona-status {
   margin: 15px 0 0;
   padding: 11px 13px;

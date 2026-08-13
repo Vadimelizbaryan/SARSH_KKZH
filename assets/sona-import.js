@@ -25,6 +25,7 @@
     registryFilter: "",
     reviewFilter: "",
     busy: false,
+    filterLoading: false,
     progress: null,
     status: "Войдите как владелец, затем выберите первую папку SONA для пилотной загрузки.",
     statusType: "",
@@ -87,7 +88,7 @@
     return window.SHARSH_AUTH || null;
   }
 
-  async function api(type, data) {
+  async function api(type, data, options) {
     if (window.SHARSH_AUTH_READY) {
       await window.SHARSH_AUTH_READY;
     }
@@ -96,15 +97,29 @@
     if (!runtime.supabaseUrl || !runtime.supabaseAnonKey || !token) {
       throw new Error("Вход владельца Supabase ещё не готов. Войдите заново и обновите страницу.");
     }
-    const response = await fetch(`${runtime.supabaseUrl.replace(/\/+$/, "")}/functions/v1/sona-import`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: runtime.supabaseAnonKey,
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ type, ...(data || {}) })
-    });
+    const controller = new AbortController();
+    const timeoutMs = Number(options?.timeoutMs) || 120000;
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    let response;
+    try {
+      response = await fetch(`${runtime.supabaseUrl.replace(/\/+$/, "")}/functions/v1/sona-import`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: runtime.supabaseAnonKey,
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ type, ...(data || {}) }),
+        signal: controller.signal
+      });
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        throw new Error("Сервер не ответил за отведённое время. Нажмите «Применить» ещё раз — обработка документов не будет запущена повторно.");
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload || payload.error) {
       throw new Error(payload && payload.error ? payload.error : `Ошибка сервера (${response.status}).`);
@@ -220,7 +235,7 @@
       return counts;
     }, {});
     return `<section id="sona-workspace" class="sona-workspace">
-      <section class="sona-card">
+      <section id="sona-records" class="sona-card">
         <div class="sona-actions"><div><p class="sona-kicker">Текущая папка</p><h2>${escapeHtml(state.batch.batch_name)}</h2></div><span class="sona-pill ${escapeHtml(state.batch.status)}">${escapeHtml(statusLabel(state.batch.status))}</span></div>
         <div class="sona-summary">
           <div class="sona-summary-card"><strong>${counters.total || 0}</strong><span>файлов</span></div>
@@ -246,7 +261,7 @@
             <option value="approved" ${state.reviewFilter === "approved" ? "selected" : ""}>Утверждённые</option>
             <option value="rejected" ${state.reviewFilter === "rejected" ? "selected" : ""}>Отклонённые</option>
           </select></label>
-          <button class="sona-button" type="button" data-action="load-records">Применить</button>
+          <button class="sona-button" type="button" data-action="load-records" ${state.filterLoading ? "disabled" : ""}>${state.filterLoading ? "Применяю…" : "Применить"}</button>
         </div>
         <p class="sona-filter-result">Найдено записей: <strong>${state.records.length}</strong>. ${state.reviewFilter === "" ? "Показаны все статусы." : `Показан статус: ${escapeHtml(statusLabel(state.reviewFilter))}.`}</p>
         <div class="sona-review-actions"><button class="sona-button primary" type="button" data-action="approve-records" ${state.selectedRecordIds.size ? "" : "disabled"}>Утвердить выбранные (${state.selectedRecordIds.size})</button><button class="sona-button danger" type="button" data-action="reject-records" ${state.selectedRecordIds.size ? "" : "disabled"}>Отклонить</button></div>
@@ -319,7 +334,7 @@
       registryType: state.registryFilter,
       reviewStatus: state.reviewFilter,
       limit: 500
-    });
+    }, { timeoutMs: 20000 });
     state.records = payload.records || [];
     if (renderAfter) render();
   }
@@ -506,7 +521,13 @@
           await openFile(target.dataset.fileId);
           break;
         case "load-records":
+          state.filterLoading = true;
+          setStatus("Применяю фильтр и получаю записи с сервера…", "");
           await loadRecords(true);
+          setStatus(`Фильтр применён. Найдено записей: ${state.records.length}.`, "success");
+          window.requestAnimationFrame(() => {
+            document.getElementById("sona-records")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
           break;
         case "approve-records":
           await reviewSelected("approved");
@@ -519,6 +540,7 @@
       setStatus(error instanceof Error ? error.message : "Операция не выполнена.", "error");
     } finally {
       state.busy = false;
+      state.filterLoading = false;
       render();
     }
   }
