@@ -13,6 +13,40 @@
     unclassified: "Չդասակարգված"
   };
   const VISIBLE_REGISTRIES = Object.keys(REGISTRIES).filter((key) => !["archive_only", "unclassified"].includes(key));
+  // Every SONA registry comes from a different source form.  Keeping one
+  // "universal" table caused, for example, a ward to appear under rank and a
+  // group heading to appear under diagnosis.  These are deliberate views over
+  // the same protected records, not copies of the data.
+  const TABLE_COLUMNS = {
+    civil_hospitals: [
+      ["name", "Ֆ.Ա.Ա."], ["medicalCenter", "ԲԿ"], ["unit", "Զ/Մ"], ["rank", "Կոչում"],
+      ["draft", "Զորակոչ"], ["birth", "Ծննդ."], ["referralDate", "Ուղեգրման օր"]
+    ],
+    admitted_military: [
+      ["name", "Ֆ.Ա.Ա."], ["unit", "Զ/Մ"], ["rank", "Կոչում"], ["department", "Բաժ"],
+      ["admissionDate", "Ընդունման օր"], ["referralDate", "Ուղեգրման օր"], ["diagnosis", "Ախտորոշում"]
+    ],
+    discharged_transferred: [
+      ["name", "Ֆ.Ա.Ա."], ["medicalCenter", "ԲԿ"], ["department", "Բաժ"], ["unit", "Զ/Մ"],
+      ["rank", "Կոչում"], ["dischargeDate", "Դուրսգրման օր"], ["transfer", "Տեղափոխում"], ["note", "Նշում"]
+    ],
+    referrals_admissions: [
+      ["name", "Ֆ.Ա.Ա."], ["medicalCenter", "ԲԿ"], ["unit", "Զ/Մ"], ["rank", "Կոչում"],
+      ["draft", "Զորակոչ"], ["birth", "Ծննդ."], ["referralDate", "Ուղեգրման օր"]
+    ],
+    returned: [
+      ["name", "Ֆ.Ա.Ա."], ["unit", "Զ/Մ"], ["rank", "Կոչում"], ["medicalCenter", "ԲԿ"],
+      ["department", "Բաժ"], ["eventDate", "Ամսաթիվ"], ["note", "Նշում"]
+    ],
+    outpatient: [
+      ["name", "Ֆ.Ա.Ա."], ["unit", "Զ/Մ"], ["rank", "Կոչում"], ["medicalCenter", "ԲԿ"],
+      ["eventDate", "Ամսաթիվ"], ["diagnosis", "Ախտորոշում"], ["note", "Բուժում / նշում"]
+    ],
+    discharged_not_transferred: [
+      ["name", "Ֆ.Ա.Ա."], ["medicalCenter", "ԲԿ"], ["department", "Բաժ"], ["unit", "Զ/Մ"],
+      ["dischargeDate", "Դուրսգրման օր"], ["note", "Խումբ / նշում"]
+    ]
+  };
   const query = new URLSearchParams(window.location.search);
   const initialRegistry = REGISTRIES[query.get("registry")] ? query.get("registry") : "civil_hospitals";
   const state = {
@@ -113,25 +147,60 @@
     return VISIBLE_REGISTRIES.map((key) => `<option value="${key}" ${key === state.registryType ? "selected" : ""}>${escapeHtml(REGISTRIES[key])}</option>`).join("");
   }
 
-  function recordDate(record) {
-    return record.admission_date || record.discharge_date || record.referral_date || record.event_date || "—";
+  function plainValue(value) {
+    return value ? escapeHtml(value) : "—";
+  }
+
+  function transferDateFromNotes(notes) {
+    const match = String(notes || "").match(/(?:տեղափոխման\s*օր|տեղափոխ(?:վել|ման)?\s*օր)\s*[՝:]?\s*([0-9][0-9 .\-/]{4,30})/iu);
+    return match ? match[1].trim() : "";
+  }
+
+  function renderRecordCell(record, field) {
+    switch (field) {
+      case "name": {
+        const years = [record.birth_year ? `ծն․ ${record.birth_year}` : "", record.draft_year ? `զորակոչ ${record.draft_year}` : ""].filter(Boolean);
+        return `<strong>${escapeHtml(record.patient_name || "Без ФИО")}</strong>${years.length ? `<br><small>${escapeHtml(years.join(" · "))}</small>` : ""}`;
+      }
+      case "medicalCenter": return plainValue(record.medical_center);
+      case "unit": return plainValue(record.military_unit);
+      case "rank": return plainValue(record.rank);
+      case "department": return plainValue(record.department_name);
+      case "draft": return plainValue(record.draft_year);
+      case "birth": return plainValue(record.birth_year);
+      case "admissionDate": return plainValue(record.admission_date);
+      case "dischargeDate": return plainValue(record.discharge_date);
+      case "referralDate": return plainValue(record.referral_date || record.event_date);
+      case "eventDate": return plainValue(record.event_date || record.admission_date || record.discharge_date || record.referral_date);
+      case "diagnosis": return plainValue(record.diagnosis);
+      case "transfer": {
+        const transferDate = transferDateFromNotes(record.notes);
+        const values = [record.transfer_destination, transferDate].filter(Boolean);
+        if (!values.length) return "—";
+        const [destination, date] = values;
+        return date ? `${escapeHtml(destination)}<br><small>${escapeHtml(date)}</small>` : escapeHtml(destination);
+      }
+      case "note": return plainValue(record.notes);
+      case "source": return `<small>${escapeHtml(record.source_name || "Источник SONA")}${record.source_row ? `, строка ${escapeHtml(record.source_row)}` : ""}</small>`;
+      case "status": return `<span class="sona-pill ${escapeHtml(record.review_status)}">${escapeHtml(statusLabel(record.review_status))}</span>`;
+      default: return "—";
+    }
+  }
+
+  function tableColumns() {
+    const registryColumns = TABLE_COLUMNS[state.registryType] || TABLE_COLUMNS.civil_hospitals;
+    return [["number", "#"], ...registryColumns, ["source", "Աղբյուր"], ["status", "Կարգավիճակ"]];
   }
 
   function renderTable(rows) {
     if (!rows.length) {
       return `<div class="civil-empty">По текущему поиску записей не найдено.</div>`;
     }
-    return `<div class="civil-table-wrap"><table class="civil-table sona-base-table"><thead><tr>
-      <th>#</th><th>Ֆ.Ա.Ա.</th><th>ԲԿ</th><th>Զ/Մ / կոչում</th><th>Ամսաթիվ</th><th>Ախտորոշում / նշում</th><th>Աղբյուր</th><th>Կարգավիճակ</th>
+    const columns = tableColumns();
+    return `<div class="civil-table-wrap"><table class="civil-table sona-base-table registry-${escapeHtml(state.registryType)}"><thead><tr>
+      ${columns.map(([, label]) => `<th>${escapeHtml(label)}</th>`).join("")}
     </tr></thead><tbody>${rows.map((record, index) => `<tr>
-      <td>${index + 1}</td>
-      <td><strong>${escapeHtml(record.patient_name || "Без ФИО")}</strong>${record.birth_year || record.draft_year ? `<br><small>${record.birth_year || ""}${record.draft_year ? ` · զորակոչ ${escapeHtml(record.draft_year)}` : ""}</small>` : ""}</td>
-      <td>${escapeHtml(record.medical_center || "—")}</td>
-      <td>${escapeHtml([record.military_unit, record.rank, record.department_name].filter(Boolean).join(" · ") || "—")}</td>
-      <td>${escapeHtml(recordDate(record))}${record.transfer_destination ? `<br><small>${escapeHtml(record.transfer_destination)}</small>` : ""}</td>
-      <td>${escapeHtml(record.diagnosis || record.notes || "—")}</td>
-      <td><small>${escapeHtml(record.source_name || "Источник SONA")}${record.source_row ? `, строка ${escapeHtml(record.source_row)}` : ""}</small></td>
-      <td><span class="sona-pill ${escapeHtml(record.review_status)}">${escapeHtml(statusLabel(record.review_status))}</span></td>
+      ${columns.map(([field]) => `<td>${field === "number" ? index + 1 : renderRecordCell(record, field)}</td>`).join("")}
     </tr>`).join("")}</tbody></table></div>`;
   }
 
