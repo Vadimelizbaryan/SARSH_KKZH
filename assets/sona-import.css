@@ -338,6 +338,39 @@ body {
 .sona-table .file-name { max-width: 340px; word-break: break-word; }
 .sona-table .row-actions { white-space: nowrap; }
 
+.sona-registry-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.sona-registry-card {
+  display: grid;
+  gap: 7px;
+  min-height: 100px;
+  padding: 16px;
+  border: 1px solid rgba(55, 45, 27, .14);
+  border-radius: 17px;
+  color: #2e281f;
+  background: #fffdfa;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sona-registry-card.active {
+  border-color: #315d3a;
+  box-shadow: inset 0 0 0 1px #315d3a;
+  background: #eef7ee;
+}
+
+.sona-registry-card strong { font-size: 16px; line-height: 1.3; }
+.sona-registry-card span { color: #655c4e; font-size: 13px; }
+.sona-registry-card b { color: #2e653b; font-size: 20px; }
+.sona-registry-workspace { margin-top: 20px; }
+.sona-registry-table td { max-width: 310px; }
+
 .sona-mini-button {
   appearance: none;
   border: 0;

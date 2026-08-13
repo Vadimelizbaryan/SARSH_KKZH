@@ -85,6 +85,7 @@
   const HOSPITAL_REPORT_FILENAME = "hospital-report.html";
   const CIVIL_REFERRALS_FILENAME = "civil-referrals.html";
   const SONA_IMPORT_FILENAME = "sona-import.html";
+  const SONA_REGISTRY_FILENAME = "sona-registry.html";
   const NIGHT_SHIFT_FILENAME = "night.html";
   const DAY_SHIFT_FILENAME = "day.html";
   const DISCHARGE_SHIFT_FILENAME = "discharge.html";
@@ -8646,6 +8647,14 @@ function buildInitialPhotoLightboxState() {
     return appendShareQuery(`${prefix}${SONA_IMPORT_FILENAME}`);
   }
 
+  function getSonaRegistryPath() {
+    if (basePath === "@site") {
+      return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent(SONA_REGISTRY_FILENAME)}`);
+    }
+    const prefix = basePath && basePath !== "." ? `${basePath}/` : "";
+    return appendShareQuery(`${prefix}${SONA_REGISTRY_FILENAME}`);
+  }
+
   function getNightShiftPath() {
     if (basePath === "@site") {
       return appendShareQuery(`${window.location.origin}/functions/v1/site?path=${encodeURIComponent(NIGHT_SHIFT_FILENAME)}&view=night`);
@@ -9735,6 +9744,7 @@ function buildInitialPhotoLightboxState() {
               <a class="button-link" href="${escapeHtml(getDischargeShiftPath())}"${getInternalPageTargetAttrs()}>Դուրսգրում</a>
               <a class="button-link" href="${escapeHtml(getCivilReferralsPath())}"${getInternalPageTargetAttrs()}>Քաղ. ԲԿ բազա</a>
               <a class="button-link" href="${escapeHtml(getSonaImportPath())}"${getInternalPageTargetAttrs()}>SONA արխիվ</a>
+              <a class="button-link" href="${escapeHtml(getSonaRegistryPath())}"${getInternalPageTargetAttrs()}>SONA բազաներ</a>
               <a class="button-link" href="${escapeHtml(getSetupPath())}">Կարգավ.</a>
             </div>
             <div class="main-toolbar-group main-toolbar-group--actions">

@@ -277,7 +277,7 @@
     app.innerHTML = `
       <section class="sona-topbar">
         <div><p class="sona-kicker">Защищённый модуль</p><h1>SONA: импорт документов в реестры</h1><p class="sona-subtitle">Загружайте папку, сохраняйте оригиналы в закрытом архиве, запускайте распознавание только по своему подтверждению и утверждайте результаты вручную.</p></div>
-        <a class="sona-link" href="index.html">← Главная</a>
+        <div class="sona-actions"><a class="sona-link" href="sona-registry.html">Базы SONA</a><a class="sona-link" href="index.html">← Главная</a></div>
       </section>
       ${renderProgress()}
       <p class="sona-status ${escapeHtml(state.statusType)}">${escapeHtml(state.status)}</p>
