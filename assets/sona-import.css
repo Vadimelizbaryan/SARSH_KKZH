@@ -371,6 +371,61 @@ body {
 .sona-registry-workspace { margin-top: 20px; }
 .sona-registry-table td { max-width: 310px; }
 
+.sona-base-page .civil-hero {
+  margin-bottom: 0;
+}
+
+.sona-base-tools {
+  align-items: end;
+}
+
+.sona-base-select {
+  display: grid;
+  gap: 5px;
+  color: #5f5749;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.sona-base-select select {
+  min-height: 48px;
+  min-width: 190px;
+  padding: 10px 13px;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 15px;
+  background: #fff;
+  color: #17140d;
+  font: inherit;
+  font-weight: 800;
+}
+
+.sona-base-table th:nth-child(1),
+.sona-base-table td:nth-child(1) { width: 48px; }
+.sona-base-table th:nth-child(2),
+.sona-base-table td:nth-child(2) { width: 280px; }
+.sona-base-table th:nth-child(3),
+.sona-base-table td:nth-child(3) { width: 210px; }
+.sona-base-table th:nth-child(4),
+.sona-base-table td:nth-child(4) { width: 220px; }
+.sona-base-table th:nth-child(5),
+.sona-base-table td:nth-child(5) { width: 145px; }
+.sona-base-table th:nth-child(6),
+.sona-base-table td:nth-child(6) { width: 310px; }
+.sona-base-table th:nth-child(7),
+.sona-base-table td:nth-child(7) { width: 210px; }
+.sona-base-table th:nth-child(8),
+.sona-base-table td:nth-child(8) { width: 135px; }
+
+.civil-status.success {
+  color: #1f6033;
+  background: #e4f3e5;
+}
+
+.civil-status.error {
+  color: #843828;
+  background: #fbe7e2;
+}
+
 .sona-mini-button {
   appearance: none;
   border: 0;
