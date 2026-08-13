@@ -396,6 +396,34 @@ async function requireBatch(supabase: ReturnType<typeof createClient>, batchId: 
   return data as { id: string; batch_name: string };
 }
 
+async function refreshBatchStatus(supabase: ReturnType<typeof createClient>, batchId: string) {
+  const { data, error } = await supabase
+    .from("sona_batch_files")
+    .select("upload_status")
+    .eq("batch_id", batchId);
+  if (error) {
+    throw error;
+  }
+  const files = data || [];
+  const hasActiveWork = files.some((file) => file.upload_status === "registered" || file.upload_status === "processing");
+  const hasFailed = files.some((file) => file.upload_status === "failed");
+  const status = !files.length
+    ? "draft"
+    : hasActiveWork
+      ? "ready"
+      : hasFailed
+        ? "failed"
+        : "completed";
+  const { error: updateError } = await supabase
+    .from("sona_import_batches")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", batchId);
+  if (updateError) {
+    throw updateError;
+  }
+  return status;
+}
+
 async function getBatchFile(supabase: ReturnType<typeof createClient>, fileId: string) {
   const { data, error } = await supabase
     .from("sona_batch_files")
@@ -569,6 +597,7 @@ async function handleProcessFile(supabase: ReturnType<typeof createClient>, payl
     const message = getUnsupportedMessage(extension);
     await supabase.from("sona_documents").update({ extraction_status: "unsupported", processing_status: "needs_review", processing_error: message, updated_at: now }).eq("id", documentId);
     await supabase.from("sona_batch_files").update({ upload_status: "unsupported", processing_error: message, updated_at: now }).eq("id", fileId);
+    await refreshBatchStatus(supabase, String(batchFile.batch_id));
     return { ok: false, unsupported: true, message };
   }
 
@@ -619,6 +648,7 @@ async function handleProcessFile(supabase: ReturnType<typeof createClient>, payl
       throw documentUpdateError;
     }
     await supabase.from("sona_batch_files").update({ upload_status: "processed", processing_error: null, updated_at: new Date().toISOString() }).eq("id", fileId);
+    await refreshBatchStatus(supabase, String(batchFile.batch_id));
     return { ok: true, model, recordsCreated: records.length, documentType: result.documentType || "unclassified", warnings: Array.isArray(result.warnings) ? result.warnings : [] };
   } catch (error) {
     const message = error instanceof Error ? error.message : "SONA document processing failed.";
