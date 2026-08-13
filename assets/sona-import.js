@@ -23,7 +23,7 @@
     records: [],
     selectedRecordIds: new Set(),
     registryFilter: "",
-    reviewFilter: "pending_review",
+    reviewFilter: "",
     busy: false,
     progress: null,
     status: "Войдите как владелец, затем выберите первую папку SONA для пилотной загрузки.",
@@ -191,7 +191,10 @@
     const records = state.records || [];
     if (!state.batch) return "";
     if (!records.length) {
-      return '<p class="sona-empty">По текущему фильтру записей пока нет. Сначала распознайте DOCX/RTF и затем проверьте результат.</p>';
+      const filterHint = state.reviewFilter === "pending_review"
+        ? " В этой партии нет записей на проверке: они уже утверждены или отложены. Выберите «Все» или «Утверждённые» и нажмите «Применить»."
+        : "";
+      return `<p class="sona-empty">По текущему фильтру записей нет.${filterHint}</p>`;
     }
     return `<div class="sona-table-wrap"><table class="sona-table"><thead><tr>
       <th><input aria-label="Выбрать все" type="checkbox" data-action="select-all-records"></th><th>Пациент / источник</th><th>Реестр</th><th>Данные</th><th>Проверка</th>
@@ -238,13 +241,14 @@
         <div class="sona-filters">
           <label class="sona-field">Реестр<select data-action="registry-filter">${renderRegistryOptions(state.registryFilter)}</select></label>
           <label class="sona-field">Статус<select data-action="review-filter">
+            <option value="" ${state.reviewFilter === "" ? "selected" : ""}>Все статусы</option>
             <option value="pending_review" ${state.reviewFilter === "pending_review" ? "selected" : ""}>На проверке</option>
             <option value="approved" ${state.reviewFilter === "approved" ? "selected" : ""}>Утверждённые</option>
             <option value="rejected" ${state.reviewFilter === "rejected" ? "selected" : ""}>Отклонённые</option>
-            <option value="" ${state.reviewFilter === "" ? "selected" : ""}>Все</option>
           </select></label>
           <button class="sona-button" type="button" data-action="load-records">Применить</button>
         </div>
+        <p class="sona-filter-result">Найдено записей: <strong>${state.records.length}</strong>. ${state.reviewFilter === "" ? "Показаны все статусы." : `Показан статус: ${escapeHtml(statusLabel(state.reviewFilter))}.`}</p>
         <div class="sona-review-actions"><button class="sona-button primary" type="button" data-action="approve-records" ${state.selectedRecordIds.size ? "" : "disabled"}>Утвердить выбранные (${state.selectedRecordIds.size})</button><button class="sona-button danger" type="button" data-action="reject-records" ${state.selectedRecordIds.size ? "" : "disabled"}>Отклонить</button></div>
         ${renderRecords()}
       </section>
