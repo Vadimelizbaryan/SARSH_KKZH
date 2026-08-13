@@ -192,6 +192,43 @@ body {
 .sona-status.error { background: #fbe9e4; color: #813a29; }
 .sona-status.success { background: #e9f3e9; color: #285c37; }
 
+.sona-progress {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 13px 15px;
+  border: 1px solid rgba(49, 93, 58, .2);
+  border-radius: 14px;
+  color: #294d31;
+  background: #eef7ee;
+}
+
+.sona-progress-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.sona-progress-copy strong { font-size: 14px; }
+
+.sona-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(49, 93, 58, .16);
+}
+
+.sona-progress-track span {
+  display: block;
+  width: var(--sona-progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #477c51, #2d663b);
+  transition: width .25s ease;
+}
+
 .sona-safety-note {
   margin: 17px 0 0;
   padding: 12px 13px;

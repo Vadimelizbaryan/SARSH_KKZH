@@ -25,6 +25,7 @@
     registryFilter: "",
     reviewFilter: "pending_review",
     busy: false,
+    progress: null,
     status: "Войдите как владелец, затем выберите первую папку SONA для пилотной загрузки.",
     statusType: "",
     uploadClientPromise: null
@@ -142,6 +143,13 @@
     }, { total: 0 });
   }
 
+  function renderProgress() {
+    const progress = state.progress;
+    if (!progress || !progress.total) return "";
+    const percent = Math.max(0, Math.min(100, Math.round((progress.current / progress.total) * 100)));
+    return `<div class="sona-progress" role="status"><div class="sona-progress-copy"><strong>${escapeHtml(progress.label || "Выполняю операцию")}</strong><span>${progress.current} из ${progress.total}</span></div><div class="sona-progress-track"><span style="--sona-progress:${percent}%"></span></div></div>`;
+  }
+
   function renderBatches() {
     if (!state.batches.length) {
       return '<p class="sona-empty">Папок ещё нет. Начните с одной небольшой папки SONA.</p>';
@@ -252,6 +260,8 @@
         <div><p class="sona-kicker">Защищённый модуль</p><h1>SONA: импорт документов в реестры</h1><p class="sona-subtitle">Загружайте папку, сохраняйте оригиналы в закрытом архиве, запускайте распознавание только по своему подтверждению и утверждайте результаты вручную.</p></div>
         <a class="sona-link" href="index.html">← Главная</a>
       </section>
+      ${renderProgress()}
+      <p class="sona-status ${escapeHtml(state.statusType)}">${escapeHtml(state.status)}</p>
       <section class="sona-grid">
         <section class="sona-card">
           <p class="sona-kicker">Шаг 1</p><h2>Новая папка SONA</h2><p>Для первого запуска выберите одну небольшую папку. Вложенная структура будет сохранена как путь источника.</p>
@@ -267,7 +277,6 @@
         </section>
         <section class="sona-card"><p class="sona-kicker">Шаг 2</p><h2>Загруженные партии</h2><p>Выберите партию, чтобы посмотреть состояние файлов и проверить извлечённые записи.</p>${renderBatches()}</section>
       </section>
-      <p class="sona-status ${escapeHtml(state.statusType)}">${escapeHtml(state.status)}</p>
       ${renderWorkspace()}`;
   }
 
@@ -331,9 +340,12 @@
     const storage = await getUploadClient();
     let uploaded = 0;
     const failed = [];
-    for (const file of files) {
+    state.progress = { current: 0, total: files.length, label: "Загрузка документов в закрытый архив" };
+    render();
+    for (const [index, file] of files.entries()) {
       const sourcePath = sourcePathFor(file);
       try {
+        state.progress = { current: index + 1, total: files.length, label: `Загрузка: ${file.name}` };
         setStatus(`Загружаю ${uploaded + 1} из ${files.length}: ${file.name}`, "");
         const ticket = await api("create_upload_url", {
           batchId: batch.id,
@@ -363,6 +375,7 @@
       }
     }
     state.selectedFiles = [];
+    state.progress = null;
     await loadBatches(batch.id);
     setStatus(`Загрузка завершена: ${uploaded} из ${files.length}. ${failed.length ? `Ошибок: ${failed.length}. ${failed.slice(0, 2).join("; ")}` : "Можно открыть файлы или начать распознавание DOCX/RTF."}`, failed.length ? "error" : "success");
   }
@@ -388,8 +401,11 @@
     if (!window.confirm(`Запустить распознавание ${files.length} документов? Результаты останутся на ручной проверке.`)) return;
     let completed = 0;
     const errors = [];
+    state.progress = { current: 0, total: files.length, label: "Запущено распознавание документов" };
+    render();
     for (const [index, file] of files.entries()) {
       try {
+        state.progress = { current: index + 1, total: files.length, label: `Распознаю: ${file.original_name}` };
         setStatus(`Распознаю ${index + 1} из ${files.length}: ${file.original_name}`, "");
         await processOne(file.id, true);
         completed += 1;
@@ -397,6 +413,7 @@
         errors.push(`${file.original_name}: ${error instanceof Error ? error.message : "ошибка"}`);
       }
     }
+    state.progress = null;
     await loadBatch(state.batch.id, true);
     setStatus(`Распознано документов: ${completed} из ${files.length}. ${errors.length ? `Ошибок: ${errors.length}. ${errors.slice(0, 2).join("; ")}` : "Проверьте записи и утвердите нужные."}`, errors.length ? "error" : "success");
   }
