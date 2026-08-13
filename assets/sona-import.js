@@ -410,12 +410,33 @@
         await processOne(file.id, true);
         completed += 1;
       } catch (error) {
-        errors.push(`${file.original_name}: ${error instanceof Error ? error.message : "ошибка"}`);
+        errors.push({
+          fileId: file.id,
+          fileName: file.original_name,
+          message: error instanceof Error ? error.message : "ошибка"
+        });
       }
     }
     state.progress = null;
     await loadBatch(state.batch.id, true);
-    setStatus(`Распознано документов: ${completed} из ${files.length}. ${errors.length ? `Ошибок: ${errors.length}. ${errors.slice(0, 2).join("; ")}` : "Проверьте записи и утвердите нужные."}`, errors.length ? "error" : "success");
+    const serverFiles = new Map((state.batch?.files || []).map((file) => [file.id, file]));
+    const reconciled = errors.filter((entry) => ["processed", "unsupported"].includes(serverFiles.get(entry.fileId)?.upload_status));
+    const stillProcessing = errors.filter((entry) => serverFiles.get(entry.fileId)?.upload_status === "processing");
+    const realErrors = errors.filter((entry) => !reconciled.includes(entry) && !stillProcessing.includes(entry));
+    completed += reconciled.length;
+    const recoveredText = reconciled.length
+      ? ` Браузер потерял ответ для ${reconciled.length} файла, но сервер завершил его обработку.`
+      : "";
+    const pendingText = stillProcessing.length
+      ? ` ${stillProcessing.length} файл ещё обрабатывается на сервере — нажмите «Обновить» через минуту.`
+      : "";
+    const errorText = realErrors.length
+      ? ` Ошибок: ${realErrors.length}. ${realErrors.slice(0, 2).map((entry) => `${entry.fileName}: ${entry.message}`).join("; ")}`
+      : "";
+    setStatus(
+      `Распознано документов: ${completed} из ${files.length}.${recoveredText}${pendingText}${errorText || (!pendingText ? " Проверьте записи и утвердите нужные." : "")}`,
+      realErrors.length ? "error" : (stillProcessing.length ? "" : "success")
+    );
   }
 
   async function reviewSelected(reviewStatus) {
@@ -456,7 +477,17 @@
           setStatus("Состояние партии обновлено.", "success");
           break;
         case "process-file":
-          await processOne(target.dataset.fileId, false);
+          try {
+            await processOne(target.dataset.fileId, false);
+          } catch (error) {
+            await loadBatch(state.batch.id, true);
+            const currentFile = (state.batch?.files || []).find((file) => file.id === target.dataset.fileId);
+            if (["processed", "unsupported"].includes(currentFile?.upload_status)) {
+              setStatus("Браузер не получил ответ вовремя, но сервер завершил обработку файла.", "success");
+              break;
+            }
+            throw error;
+          }
           await loadBatch(state.batch.id, true);
           break;
         case "process-batch":
