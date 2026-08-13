@@ -703,6 +703,55 @@ async function handleListRecords(supabase: ReturnType<typeof createClient>, payl
   return { records: await listRecordsForBatch(supabase, batchId, readString(payload.registryType, 60), readString(payload.reviewStatus, 60), limit) };
 }
 
+async function handleListRegistrySummary(supabase: ReturnType<typeof createClient>) {
+  const { data, error } = await supabase
+    .from("sona_registry_summary")
+    .select("registry_type, review_status, record_count, latest_record_at")
+    .order("registry_type", { ascending: true });
+  if (error) {
+    throw error;
+  }
+  return { summary: data || [] };
+}
+
+async function handleListRegistryRecords(supabase: ReturnType<typeof createClient>, payload: Record<string, unknown>) {
+  const registryType = readString(payload.registryType, 60);
+  if (!isRegistryType(registryType)) {
+    throw new Error("Choose a valid SONA registry.");
+  }
+  const reviewStatus = readString(payload.reviewStatus, 40) || "approved";
+  const limit = Math.max(1, Math.min(1000, Number(payload.limit) || 500));
+  let query = supabase
+    .from("sona_records")
+    .select("id, document_id, registry_type, patient_name, military_unit, rank, birth_year, draft_year, medical_center, department_name, diagnosis, event_date, admission_date, discharge_date, referral_date, transfer_destination, notes, source_row, source_text, confidence, review_status, reviewed_at, created_at")
+    .eq("registry_type", registryType)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (["pending_review", "approved", "rejected"].includes(reviewStatus)) {
+    query = query.eq("review_status", reviewStatus);
+  }
+  const { data, error } = await query;
+  if (error) {
+    throw error;
+  }
+  const records = data || [];
+  const documentIds = [...new Set(records.map((record) => String(record.document_id || "")).filter(Boolean))];
+  const documentsById = new Map<string, string>();
+  if (documentIds.length) {
+    const documents = await supabase.from("sona_documents").select("id, original_name").in("id", documentIds);
+    if (documents.error) {
+      throw documents.error;
+    }
+    (documents.data || []).forEach((document) => documentsById.set(String(document.id), String(document.original_name || "")));
+  }
+  return {
+    records: records.map((record) => ({
+      ...record,
+      source_name: documentsById.get(String(record.document_id || "")) || "Источник SONA"
+    }))
+  };
+}
+
 async function handleReviewRecords(supabase: ReturnType<typeof createClient>, payload: Record<string, unknown>, user: { id: string }, email: string) {
   const recordIds = Array.isArray(payload.recordIds)
     ? payload.recordIds.map((value) => readString(value, 80)).filter(Boolean).slice(0, 500)
@@ -771,6 +820,12 @@ Deno.serve(async (request) => {
         break;
       case "list_records":
         result = await handleListRecords(supabase, payload);
+        break;
+      case "list_registry_summary":
+        result = await handleListRegistrySummary(supabase);
+        break;
+      case "list_registry_records":
+        result = await handleListRegistryRecords(supabase, payload);
         break;
       case "review_records":
         result = await handleReviewRecords(supabase, payload, auth.user, auth.email);

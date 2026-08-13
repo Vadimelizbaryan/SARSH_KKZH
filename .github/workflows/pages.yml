@@ -49,6 +49,7 @@ jobs:
           cp hospital-report.html _site/
           cp civil-referrals.html _site/
           cp sona-import.html _site/
+          cp sona-registry.html _site/
           cp "Օրվա շարժ․.html" _site/
           cp department-instructions.html _site/
           cp department-instructions.pdf _site/
