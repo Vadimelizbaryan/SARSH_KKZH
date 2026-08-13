@@ -345,6 +345,12 @@ function isRegistryType(value: unknown): value is RegistryType {
   return typeof value === "string" && REGISTRY_TYPES.includes(value as RegistryType);
 }
 
+function getUnsupportedMessage(extension: string) {
+  return extension === "doc"
+    ? "Legacy DOC files must first be saved as DOCX or RTF. The original is kept in the private archive."
+    : `Automatic text extraction is not yet enabled for .${extension.toUpperCase()} files.`;
+}
+
 function mapExtractionRecords(documentId: string, extracted: Record<string, unknown>) {
   const rows = Array.isArray(extracted.records) ? extracted.records : [];
   return rows.slice(0, 500).map((row, index) => {
@@ -485,6 +491,7 @@ async function handleRegisterFile(supabase: ReturnType<typeof createClient>, pay
   }
   const fileHash = await sha256Hex(bytes);
   const now = new Date().toISOString();
+  const unsupported = !EXTRACTABLE_EXTENSIONS.has(file.extension);
   const { data: document, error: documentError } = await supabase
     .from("sona_documents")
     .upsert({
@@ -494,6 +501,9 @@ async function handleRegisterFile(supabase: ReturnType<typeof createClient>, pay
       extension: file.extension,
       mime_type: file.mimeType,
       byte_size: bytes.byteLength,
+      extraction_status: unsupported ? "unsupported" : "pending",
+      processing_status: unsupported ? "needs_review" : "pending",
+      processing_error: unsupported ? getUnsupportedMessage(file.extension) : null,
       updated_at: now
     }, { onConflict: "file_hash", ignoreDuplicates: true })
     .select("id, file_hash, canonical_storage_path, processing_status, extraction_status")
@@ -556,9 +566,7 @@ async function handleProcessFile(supabase: ReturnType<typeof createClient>, payl
   const extension = String(batchFile.extension || "").toLowerCase();
   const now = new Date().toISOString();
   if (!EXTRACTABLE_EXTENSIONS.has(extension)) {
-    const message = extension === "doc"
-      ? "Legacy DOC files must first be saved as DOCX or RTF. The original is kept in the private archive."
-      : `Automatic text extraction is not yet enabled for .${extension.toUpperCase()} files.`;
+    const message = getUnsupportedMessage(extension);
     await supabase.from("sona_documents").update({ extraction_status: "unsupported", processing_status: "needs_review", processing_error: message, updated_at: now }).eq("id", documentId);
     await supabase.from("sona_batch_files").update({ upload_status: "unsupported", processing_error: message, updated_at: now }).eq("id", fileId);
     return { ok: false, unsupported: true, message };
