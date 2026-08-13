@@ -4,3 +4,6 @@ verify_jwt = true
 [functions.Mainflow-telegram]
 verify_jwt = false
 # deploy-touch: no-verify-jwt is enforced in CI deploy command
+
+[functions.sona-import]
+verify_jwt = true
