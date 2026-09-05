@@ -14837,6 +14837,16 @@ Deno.serve(async (request) => {
     }
   });
 
+  // A department photo has two Vision passes and must not rely on an
+  // opportunistic background worker.  We keep this request alive until it
+  // sends either the OCR result or a clear failure message to the uploader.
+  // The Vision calls themselves run in parallel and have explicit timeouts.
+  const incomingMessage = (update as Record<string, unknown>).message as Record<string, unknown> | undefined;
+  if (incomingMessage && extractPhotoFileId(incomingMessage)) {
+    await task;
+    return jsonResponse({ ok: true, mode: "photo-ocr-completed" });
+  }
+
   if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") {
     EdgeRuntime.waitUntil(task);
     return jsonResponse({ ok: true });
