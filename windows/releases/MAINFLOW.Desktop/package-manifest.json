@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-09-05T07:37:19.8545929Z",
+    "generatedAtUtc":  "2026-09-05T07:45:05.7063817Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -354,12 +354,12 @@
                   {
                       "path":  "Mainflow.dll",
                       "size":  125952,
-                      "sha256":  "89D27F9F8162D88E6F58595C2F70B819D6C0A42451FB4F86B3EDF15FA2D94181"
+                      "sha256":  "D78C61E4BDDD08616F6A53C78E72E3C6012ED2774F37EB49140FC30AED7B580A"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "E3E885EAC162EF1CB86371E103CF6908CE4E334E74611351563C8364A536B037"
+                      "sha256":  "0ACA2B2B03406AD24D906EDE88D8EF529349168FC28F338AA2175C0AD93577F0"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",
@@ -1753,38 +1753,38 @@
                   },
                   {
                       "path":  "tg-civil-referrals.html",
-                      "size":  883,
-                      "sha256":  "1C5157F11C6EB6CAC575AB1DA07551B6E0C0AC62DE85314631D65E5B204D598E"
+                      "size":  1004,
+                      "sha256":  "869004E677A2EEDFE6FF9E84A803B73376A4D4DA23C141E4D7C66ADBF84B79FA"
                   },
                   {
                       "path":  "tg-day-form.html",
-                      "size":  916,
-                      "sha256":  "E460833C9EDA101AABCB8D60DE4D7FA136E7FF606FFE0627A6EAE146606D8A32"
+                      "size":  1073,
+                      "sha256":  "CF6DEEE5F83DB3648ED7C1A728E4FAE560C438571CDE0726B54DBEF105B19A23"
                   },
                   {
                       "path":  "tg-discharge-form.html",
-                      "size":  936,
-                      "sha256":  "0BC4D65C45C4B49D46BDDE2874B8346DC83F1EAA3C35B0258C2779347AC45E3A"
+                      "size":  1103,
+                      "sha256":  "CDF711562EE8E38336537AE5FBFE738BC257B19BD058269EFFAE55EC9EADF64B"
                   },
                   {
                       "path":  "tg-form.html",
-                      "size":  903,
-                      "sha256":  "35769011735929EBA0DC757835EA060ED1106DAA46877C45C53D4C40173D55D0"
+                      "size":  911,
+                      "sha256":  "879F1618768EE153B558BA1D34F0CBCD8DB3EA7C83FF9583A75F75E40B96C99D"
                   },
                   {
                       "path":  "tg-night-form.html",
-                      "size":  920,
-                      "sha256":  "0D5BEE6E79D595540322F6A9B8F9C49DD55DBEEE4932C3FD784E982339499C6A"
+                      "size":  1075,
+                      "sha256":  "382B676B444AFDC51A37D0F46986414E19F15C41DFDCA7CCEECB67C53CE6B368"
                   },
                   {
                       "path":  "tg-qh-form.html",
-                      "size":  931,
-                      "sha256":  "D42F68FA51E93DE22EEEF00BF3336F5361B5DB5D0D51F90FCF5F82532A705CE5"
+                      "size":  939,
+                      "sha256":  "1FF1B6D63473FD5FD710F4F4F1C4016B767418F51D5F4EB644CD9F01BE94E205"
                   },
                   {
                       "path":  "tg-sono-form.html",
-                      "size":  983,
-                      "sha256":  "ECC79EC9EF65BD05118686A5A139ECE5FE13A67750CD1BA9D9822BAD56DA83B2"
+                      "size":  996,
+                      "sha256":  "E008CEA8BC9BD26B1770AF4049DB25045993AAB44A5125E5815CB170E62280A7"
                   },
                   {
                       "path":  "UIAutomationClient.dll",
