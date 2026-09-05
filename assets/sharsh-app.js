@@ -65,6 +65,7 @@
   const DEPARTMENT_UNLOCK_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:department-unlock:`;
   const PHOTO_MAX_DIMENSION = 1800;
   const PHOTO_JPEG_QUALITY = 0.88;
+  const PHOTO_MAX_INPUT_BYTES = 35 * 1024 * 1024;
   const MAIN_PHOTO_ROUTE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:main-photo-route:v1`;
   const MAIN_PHOTO_ROUTE_MAX_AGE_MS = 15 * 60 * 1000;
   const MAIN_PHOTO_ROUTE_TRANSFER_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:main-photo-route-transfer:`;
@@ -1891,6 +1892,30 @@ function buildInitialPhotoLightboxState() {
     return canvas;
   }
 
+  function buildScaledCanvasFromImage(image, maxDimension = PHOTO_MAX_DIMENSION) {
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    if (!sourceWidth || !sourceHeight) {
+      throw new Error("Не удалось определить размер изображения.");
+    }
+
+    const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Браузер не поддерживает подготовку фото.");
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+    return canvas;
+  }
+
   async function rotateImageDataUrl(sourceDataUrl, rotation = 90) {
     if (typeof sourceDataUrl !== "string" || !sourceDataUrl.startsWith("data:image/")) {
       throw new Error("Нужно подготовленное изображение для поворота.");
@@ -2165,8 +2190,13 @@ function buildInitialPhotoLightboxState() {
       throw new Error("Не удалось определить размер изображения.");
     }
 
+    // Always downscale before evaluating four rotations. A modern phone photo can
+    // be 12–48 megapixels; rotating every full-size canvas freezes the browser
+    // before any request is sent. OCR itself uses the same 1800px working copy.
+    const compactSourceCanvas = buildScaledCanvasFromImage(image);
+
     if (!runtime.autoRotateImages) {
-      return buildPreparedPhotoResultFromCanvas(buildRotatedCanvasFromImage(image, 0), 0);
+      return buildPreparedPhotoResultFromCanvas(compactSourceCanvas, 0);
     }
 
     const candidateRotations = [0, 90, 180, 270];
@@ -2175,7 +2205,7 @@ function buildInitialPhotoLightboxState() {
     let bestScore = Number.NEGATIVE_INFINITY;
 
     candidateRotations.forEach((rotation) => {
-      const initialCanvas = buildRotatedCanvasFromImage(image, rotation);
+      const initialCanvas = buildRotatedCanvasFromImage(compactSourceCanvas, rotation);
       const { canvas: candidateCanvas, rotation: normalizedRotation } = flipCanvasIfSrIsBottomLeft(initialCanvas, rotation);
       const score = scoreCanvasForSrTopRight(candidateCanvas);
       if (score > bestScore) {
@@ -2222,8 +2252,26 @@ function buildInitialPhotoLightboxState() {
   }
 
   async function compressImageFile(file) {
-    const sourceDataUrl = await readFileAsDataUrl(file);
-    return normalizeImageDataUrl(sourceDataUrl);
+    if (!file || typeof file !== "object") {
+      throw new Error("Выберите фото бланка." );
+    }
+
+    const fileSize = Number(file.size) || 0;
+    if (fileSize > PHOTO_MAX_INPUT_BYTES) {
+      throw new Error("Фото слишком большое для браузера (больше 35 МБ). Сделайте новое фото или сохраните его в JPEG.");
+    }
+
+    const fileName = typeof file.name === "string" ? file.name : "";
+    const isHeic = /\.(heic|heif)$/i.test(fileName) || /image\/(heic|heif)/i.test(String(file.type || ""));
+    try {
+      const sourceDataUrl = await readFileAsDataUrl(file);
+      return await normalizeImageDataUrl(sourceDataUrl);
+    } catch (error) {
+      if (isHeic) {
+        throw new Error("Этот браузер не может подготовить фото HEIC/HEIF. Откройте его в «Фото» и сохраните как JPEG, затем загрузите его снова.");
+      }
+      throw error;
+    }
   }
 
   function buildCropBounds(sourceWidth, sourceHeight, cropConfig) {
