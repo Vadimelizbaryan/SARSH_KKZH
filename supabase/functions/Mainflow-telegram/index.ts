@@ -39,6 +39,7 @@ const ANDROID_INTAKE_OCR_STATUS_PREFIX = "android-intake-ocr-status:";
 const ANDROID_INTAKE_OCR_ERROR_PREFIX = "android-intake-ocr-error:";
 const TELEGRAM_PHOTO_OCR_STATUS_PREFIX = "telegram-photo-ocr-status:";
 const TELEGRAM_PHOTO_OCR_ERROR_PREFIX = "telegram-photo-ocr-error:";
+const TELEGRAM_PHOTO_REPLY_META_PREFIX = "telegram_photo_reply_target:";
 const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
 const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է միայն բոտի ադմինիստրատորին։";
 const TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT = "Գիշերային ընդունում";
@@ -4667,6 +4668,42 @@ async function saveMetaValue(
   }
 }
 
+function getTelegramPhotoReplyMetaKey(feedbackId: string | number) {
+  return `${TELEGRAM_PHOTO_REPLY_META_PREFIX}${String(feedbackId).trim()}`;
+}
+
+async function saveTelegramPhotoReplyTarget(
+  supabase: ReturnType<typeof createClient>,
+  feedbackId: string | number,
+  chatId: number | string
+) {
+  await saveMetaValue(
+    supabase,
+    getTelegramPhotoReplyMetaKey(feedbackId),
+    JSON.stringify({ chatId: String(chatId), savedAt: new Date().toISOString() })
+  );
+}
+
+async function loadTelegramPhotoReplyTarget(
+  supabase: ReturnType<typeof createClient>,
+  feedbackId: string | number
+) {
+  const raw = await loadMetaValue(supabase, getTelegramPhotoReplyMetaKey(feedbackId));
+  if (!raw) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as { chatId?: unknown };
+    const chatId = String(parsed?.chatId || "").trim();
+    return chatId || "";
+  } catch {
+    // The record is private service metadata.  Ignore malformed legacy values
+    // and use the configured administrator fallback instead.
+    return "";
+  }
+}
+
 async function loadTelegramPendingPhotoApprovals(supabase: ReturnType<typeof createClient>) {
   return parseTelegramPendingPhotoApprovals(
     await loadMetaValue(supabase, TELEGRAM_PENDING_PHOTO_APPROVALS_META_KEY)
@@ -7085,6 +7122,30 @@ async function sendTelegramMessage(chatId: number | string, text: string, option
     body.parse_mode = options.parseMode;
   }
   await callTelegramApi("sendMessage", body);
+}
+
+function telegramHtmlToPlainText(text: string) {
+  return String(text || "")
+    .replace(/<pre>/gi, "")
+    .replace(/<\/pre>/gi, "")
+    .replace(/<b>/gi, "")
+    .replace(/<\/b>/gi, "")
+    .replace(/<[^>]+>/g, "")
+    .trim();
+}
+
+async function sendTelegramPhotoOcrScenario(
+  chatId: number | string,
+  detailedPhotoSummary: string
+) {
+  try {
+    await sendTelegramMessage(chatId, detailedPhotoSummary, { parseMode: "HTML" });
+  } catch (htmlError) {
+    // A malformed fragment must not make the actual OCR result disappear.
+    // Telegram can still deliver the same content as plain text.
+    console.warn("Telegram HTML OCR summary delivery failed; retrying as plain text:", sanitizePublicErrorMessage(htmlError));
+    await sendTelegramMessage(chatId, telegramHtmlToPlainText(detailedPhotoSummary));
+  }
 }
 
 async function sendTelegramMessageWithReplyMarkup(
@@ -13810,6 +13871,14 @@ async function handleTelegramPhoto(
       `${TELEGRAM_PHOTO_OCR_STATUS_PREFIX}pending`
     ]
   );
+  try {
+    // Keep the delivery route with the private service metadata.  If a later
+    // OCR retry is needed, the completed scenario response still returns to
+    // the person who sent this exact photo.
+    await saveTelegramPhotoReplyTarget(supabase, feedbackId, chatId);
+  } catch (error) {
+    console.error("Failed to save Telegram photo reply target:", sanitizePublicErrorMessage(error));
+  }
   await markDepartmentPhotoPending(supabase, departmentId, feedbackId, selectedPhotoFileName);
 
   let recognized: Awaited<ReturnType<typeof recognizeDepartmentPhoto>>;
@@ -13917,7 +13986,7 @@ async function handleTelegramPhoto(
   // Previously this detailed response went only to notification chats, leaving
   // the person who sent the form with a generic acknowledgement.
   try {
-    await sendTelegramMessage(chatId, detailedPhotoSummary, { parseMode: "HTML" });
+    await sendTelegramPhotoOcrScenario(chatId, detailedPhotoSummary);
   } catch (error) {
     console.error("Failed to send Telegram photo OCR summary to uploader:", sanitizePublicErrorMessage(error));
   }
@@ -13969,6 +14038,206 @@ async function handleTelegramPhoto(
     );
   }
 
+}
+
+type PendingTelegramPhotoFeedback = {
+  id: string;
+  departmentId: DepartmentId;
+  reportDate: string;
+  imageName: string;
+  imageDataUrl: string;
+  notes: string[];
+};
+
+function replaceTelegramPhotoOcrStatusNotes(
+  notes: unknown,
+  status: "pending" | "completed" | "failed",
+  extraNotes: string[] = []
+) {
+  return [
+    ...normalizeOcrFeedbackNotes(notes).filter((note) => {
+      return !note.startsWith(TELEGRAM_PHOTO_OCR_STATUS_PREFIX)
+        && !note.startsWith(TELEGRAM_PHOTO_OCR_ERROR_PREFIX);
+    }),
+    `${TELEGRAM_PHOTO_OCR_STATUS_PREFIX}${status}`,
+    ...extraNotes.filter(Boolean)
+  ];
+}
+
+async function listPendingTelegramPhotoFeedbacks(
+  supabase: ReturnType<typeof createClient>,
+  limit = 1
+) {
+  const { data, error } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("id, department_id, report_date, image_name, image_data_url, notes, created_at")
+    .not("image_data_url", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(40);
+
+  if (error) {
+    throw error;
+  }
+
+  const rows: PendingTelegramPhotoFeedback[] = [];
+  for (const rawRow of Array.isArray(data) ? data : []) {
+    const row = rawRow as Record<string, unknown>;
+    const notes = normalizeOcrFeedbackNotes(row.notes);
+    const departmentId = parseDepartmentId(row.department_id);
+    const imageDataUrl = typeof row.image_data_url === "string" ? row.image_data_url : "";
+    if (!departmentId
+      || !imageDataUrl.startsWith("data:image/")
+      || !notes.some((note) => note === `${TELEGRAM_PHOTO_OCR_STATUS_PREFIX}pending`)) {
+      continue;
+    }
+
+    rows.push({
+      id: String(row.id || "").trim(),
+      departmentId,
+      reportDate: typeof row.report_date === "string" && row.report_date.trim()
+        ? row.report_date.trim()
+        : getYerevanReportDateText(),
+      imageName: typeof row.image_name === "string" ? row.image_name : "",
+      imageDataUrl,
+      notes
+    });
+  }
+
+  return rows.slice(0, Math.max(1, Math.min(3, limit)));
+}
+
+async function sendRecoveredTelegramPhotoOcrScenario(
+  supabase: ReturnType<typeof createClient>,
+  feedbackId: string,
+  detailedPhotoSummary: string
+) {
+  const originalSender = await loadTelegramPhotoReplyTarget(supabase, feedbackId);
+  // Earlier accepted photos did not yet save the sender route.  Their result
+  // is delivered to the private administrator chat instead of being lost.
+  const targetChatIds = Array.from(new Set(
+    originalSender ? [originalSender] : getPrivateTelegramAdminChatIds()
+  ));
+
+  if (!targetChatIds.length) {
+    throw new Error("No private Telegram recipient is configured for the OCR result.");
+  }
+
+  for (const targetChatId of targetChatIds) {
+    await sendTelegramPhotoOcrScenario(targetChatId, detailedPhotoSummary);
+  }
+  return { recipients: targetChatIds.length, deliveredToOriginalSender: Boolean(originalSender) };
+}
+
+async function recoverOnePendingTelegramPhotoOcr(
+  supabase: ReturnType<typeof createClient>,
+  feedback: PendingTelegramPhotoFeedback
+) {
+  const snapshot = await loadSnapshot(supabase);
+  const currentDepartmentRow = snapshot?.rows.find((item) => item.id === feedback.departmentId) || null;
+  let recognized: Awaited<ReturnType<typeof recognizeDepartmentPhoto>>;
+  let evaluation: ReturnType<typeof evaluateTelegramPhotoRecognitionCandidate>;
+
+  try {
+    recognized = await recognizeDepartmentPhoto(feedback.departmentId, feedback.imageDataUrl);
+    evaluation = evaluateTelegramPhotoRecognitionCandidate(recognized, currentDepartmentRow?.values);
+  } catch (error) {
+    const errorText = getErrorText(error);
+    const { error: updateError } = await (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .update({
+        notes: replaceTelegramPhotoOcrStatusNotes(feedback.notes, "failed", [
+          `${TELEGRAM_PHOTO_OCR_ERROR_PREFIX}${errorText}`
+        ])
+      })
+      .eq("id", feedback.id)
+      .eq("department_id", feedback.departmentId);
+    if (updateError) {
+      console.error("Failed to record recovered Telegram photo OCR failure:", getErrorText(updateError));
+    }
+    throw error;
+  }
+
+  const { error: ocrUpdateError } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .update({
+      photo_report_date: recognized.reportDate || feedback.reportDate,
+      recognized_keys: recognized.recognizedKeys,
+      ocr_raw: recognized.values,
+      final_values: recognized.values,
+      notes: replaceTelegramPhotoOcrStatusNotes(feedback.notes, "completed", recognized.notes),
+      cell_reviews: []
+    })
+    .eq("id", feedback.id)
+    .eq("department_id", feedback.departmentId);
+  if (ocrUpdateError) {
+    throw ocrUpdateError;
+  }
+
+  const telegramWebFormFeedback = await loadLatestTelegramWebFormFeedback(
+    supabase,
+    feedback.departmentId,
+    feedback.reportDate
+  );
+  let didSaveSnapshot = false;
+  let saveSource: "telegram-form" | "photo" | null = null;
+  let savedSnapshot: Awaited<ReturnType<typeof loadSnapshot>> | null = null;
+  if (telegramWebFormFeedback) {
+    await saveDepartmentSnapshot(supabase, feedback.departmentId, feedback.reportDate, telegramWebFormFeedback.values, "telegram-form");
+    await markDepartmentPhotoProcessed(supabase, feedback.departmentId, feedback.id, feedback.imageName, "processed_telegram");
+    didSaveSnapshot = true;
+    saveSource = "telegram-form";
+    savedSnapshot = await loadSnapshot(supabase);
+  } else if (evaluation.isControlPassed) {
+    await saveDepartmentSnapshot(supabase, feedback.departmentId, feedback.reportDate, recognized.values, "photo");
+    await markDepartmentPhotoProcessed(supabase, feedback.departmentId, feedback.id, feedback.imageName, "processed_photo");
+    didSaveSnapshot = true;
+    saveSource = "photo";
+    savedSnapshot = await loadSnapshot(supabase);
+  } else {
+    await markDepartmentPhotoPending(supabase, feedback.departmentId, feedback.id, feedback.imageName);
+  }
+
+  if (didSaveSnapshot && savedSnapshot) {
+    try {
+      await maybeAutoSendMainPdfsWhenSnapshotReady(supabase, savedSnapshot);
+    } catch (error) {
+      console.error("Failed to auto-send main PDFs after recovered Telegram OCR:", sanitizePublicErrorMessage(error));
+    }
+  }
+
+  const detailedPhotoSummary = buildPhotoSaveSummary(
+    feedback.departmentId,
+    feedback.reportDate,
+    recognized,
+    "повторная обработка сохранённого фото",
+    feedback.id,
+    didSaveSnapshot,
+    evaluation.validation,
+    saveSource
+  );
+  const delivery = await sendRecoveredTelegramPhotoOcrScenario(supabase, feedback.id, detailedPhotoSummary);
+  return {
+    feedbackId: feedback.id,
+    departmentId: feedback.departmentId,
+    didSaveSnapshot,
+    delivery
+  };
+}
+
+async function recoverPendingTelegramPhotoOcr(
+  supabase: ReturnType<typeof createClient>,
+  limit = 1
+) {
+  const pending = await listPendingTelegramPhotoFeedbacks(supabase, limit);
+  if (!pending.length) {
+    return { recovered: 0, skipped: "no_pending_telegram_photo_ocr" };
+  }
+
+  const results = [];
+  for (const feedback of pending) {
+    results.push(await recoverOnePendingTelegramPhotoOcr(supabase, feedback));
+  }
+  return { recovered: results.length, results };
 }
 
 async function handleTelegramSheetDocument(
@@ -14598,6 +14867,36 @@ Deno.serve(async (request) => {
           service: "Mainflow-telegram",
           action,
           status: "main_table_rollover_failed",
+          error: getErrorText(error)
+        }, 500);
+      }
+    }
+
+    if (action === "recover-pending-telegram-photo-ocr") {
+      if (!isTelegramReminderRequestValid(request)) {
+        return jsonResponse({ ok: false, error: "Unauthorized." }, 403);
+      }
+
+      try {
+        const requestUrl = new URL(request.url);
+        const requestedLimit = Number(requestUrl.searchParams.get("limit") || "1");
+        const supabase = createSupabaseAdmin();
+        const result = await recoverPendingTelegramPhotoOcr(
+          supabase,
+          Number.isFinite(requestedLimit) ? requestedLimit : 1
+        );
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          action,
+          result
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          action,
+          status: "pending_telegram_photo_ocr_recovery_failed",
           error: getErrorText(error)
         }, 500);
       }

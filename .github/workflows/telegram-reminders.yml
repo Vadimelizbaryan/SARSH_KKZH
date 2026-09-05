@@ -23,6 +23,7 @@ on:
           - morning-pdfs
           - daily-main-archive
           - daily-main-rollover
+          - recover-photo-ocr
           - midday
           - evening
       force:
@@ -99,6 +100,9 @@ jobs:
           if [ "$slot" = "daily-main-rollover" ]; then
             action="daily-main-rollover"
           fi
+          if [ "$slot" = "recover-photo-ocr" ]; then
+            action="recover-pending-telegram-photo-ocr"
+          fi
 
           echo "action=$action" >> "$GITHUB_OUTPUT"
           echo "slot=$slot" >> "$GITHUB_OUTPUT"
@@ -117,6 +121,8 @@ jobs:
             url="$FUNCTION_URL?action=daily-main-archive"
           elif [ "${{ steps.params.outputs.action }}" = "daily-main-rollover" ]; then
             url="$FUNCTION_URL?action=daily-main-rollover"
+          elif [ "${{ steps.params.outputs.action }}" = "recover-pending-telegram-photo-ocr" ]; then
+            url="$FUNCTION_URL?action=recover-pending-telegram-photo-ocr"
           else
             url="$FUNCTION_URL?action=daily-reminder&slot=${{ steps.params.outputs.slot }}"
           fi
