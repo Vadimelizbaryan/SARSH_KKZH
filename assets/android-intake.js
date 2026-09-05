@@ -34,6 +34,9 @@
     isLoading: true,
     isSending: false,
     isResetting: false,
+    isRequestingAccess: false,
+    retryingFeedbackId: "",
+    accessRequired: false,
     message: "Загружаю список отделений и последние фото...",
     messageTone: "info",
     preview: null,
@@ -72,6 +75,18 @@
   function getSubmitUrl() {
     const url = new URL(getTelegramFunctionEndpoint());
     url.searchParams.set("action", "android-intake-photo-submit");
+    return url.toString();
+  }
+
+  function getRetryOcrUrl() {
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "android-intake-photo-retry-ocr");
+    return url.toString();
+  }
+
+  function getAccessRequestUrl() {
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "android-intake-access-request");
     return url.toString();
   }
 
@@ -251,7 +266,9 @@
       imageName: String(record.imageName || ""),
       createdAt: String(record.createdAt || ""),
       reportDate: String(record.reportDate || ""),
-      sourceLabel: String(record.sourceLabel || "")
+      sourceLabel: String(record.sourceLabel || ""),
+      ocrStatus: String(record.ocrStatus || "completed"),
+      ocrError: String(record.ocrError || "")
     };
   }
 
@@ -330,8 +347,10 @@
       const response = await fetch(getStateUrl(), { method: "GET" });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.ok) {
+        state.accessRequired = response.status === 403;
         throw new Error(payload?.error || "Не удалось загрузить состояние фотосессии.");
       }
+      state.accessRequired = false;
       mergeStatePayload(payload);
       state.isLoading = false;
       if (!state.message || state.messageTone === "info") {
@@ -655,11 +674,77 @@
     }
   }
 
+  async function requestAccessAgain() {
+    if (!deviceId || state.isRequestingAccess) {
+      return;
+    }
+    state.isRequestingAccess = true;
+    render();
+    try {
+      const response = await fetch(getAccessRequestUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          androidDeviceId: deviceId,
+          androidDeviceName: deviceName
+        })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Не удалось повторить запрос доступа.");
+      }
+      state.accessRequired = payload.status !== "approved";
+      setMessage(payload.message || "Запрос подтверждения отправлен администратору в Telegram.", "success");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не удалось повторить запрос доступа.", "error");
+    } finally {
+      state.isRequestingAccess = false;
+      render();
+    }
+  }
+
+  async function retryPhotoOcr(departmentId) {
+    const slot = getSlotByDepartmentId(departmentId);
+    const photo = slot?.serverPhoto;
+    if (!slot || !photo?.feedbackId || state.retryingFeedbackId) {
+      return;
+    }
+    state.retryingFeedbackId = photo.feedbackId;
+    setMessage(`Повторно запускаю OCR: ${slot.departmentName}...`, "info");
+    render();
+    try {
+      const response = await fetch(getRetryOcrUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          androidDeviceId: deviceId,
+          androidDeviceName: deviceName,
+          departmentId: slot.departmentId,
+          feedbackId: photo.feedbackId
+        })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Не удалось повторить OCR.");
+      }
+      syncServerPhotoIntoSlot(slot.departmentId, payload.record || photo);
+      setMessage(payload.message || "OCR обработал сохранённое фото.", payload.ocrStatus === "failed" ? "error" : "success");
+      await loadState(false);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не удалось повторить OCR.", "error");
+    } finally {
+      state.retryingFeedbackId = "";
+      render();
+    }
+  }
+
   function buildSlotCard(slot) {
     const photo = getSlotDisplayPhoto(slot);
     const isLocal = Boolean(slot.localDraft);
     const hasPhotoImage = hasPhotoImageData(photo);
-    const statusClass = isLocal ? " android-intake__card-status--local" : "";
+    const ocrFailed = Boolean(photo && !isLocal && photo.ocrStatus === "failed");
+    const ocrPending = Boolean(photo && !isLocal && photo.ocrStatus === "pending");
+    const statusClass = isLocal ? " android-intake__card-status--local" : (ocrFailed ? " android-intake__card-status--error" : "");
     const statusText = photo
       ? (isLocal ? "Готово к отправке" : "Фото уже есть")
       : "Фото ещё не сделано";
@@ -679,10 +764,13 @@
           <div class="android-intake__card-title">${escapeHtml(slot.marker)}<small>${escapeHtml(slot.departmentName)}</small></div>
           <div class="android-intake__card-status${statusClass}"><strong>${escapeHtml(statusText)}</strong>${statusMeta ? ` · ${escapeHtml(statusMeta)}` : ""}</div>
           ${photo && photo.sourceLabel ? `<div class="android-intake__card-status">${escapeHtml(photo.sourceLabel)}</div>` : ""}
+          ${ocrPending ? `<div class="android-intake__card-status">OCR ожидает обработки</div>` : ""}
+          ${ocrFailed ? `<div class="android-intake__card-status android-intake__card-status--error">OCR не завершился. Фото сохранено.</div>` : ""}
         </div>
         <div class="android-intake__card-actions">
           ${photo
             ? `<button type="button" class="android-intake__mini-button" data-slot-preview="${escapeHtml(slot.departmentId)}">Открыть фото</button>
+               ${ocrFailed ? `<button type="button" class="android-intake__mini-button" data-slot-retry-ocr="${escapeHtml(slot.departmentId)}" ${state.retryingFeedbackId === photo.feedbackId ? "disabled" : ""}>${state.retryingFeedbackId === photo.feedbackId ? "OCR..." : "Повторить OCR"}</button>` : ""}
                <button type="button" class="android-intake__mini-button android-intake__mini-button--retake" data-slot-retake="${escapeHtml(slot.departmentId)}">Переснять фото</button>`
             : `<button type="button" class="android-intake__mini-button android-intake__mini-button--retake" data-slot-retake="${escapeHtml(slot.departmentId)}">Снять фото</button>`}
         </div>
@@ -740,6 +828,7 @@
           </div>
           <div class="android-intake__controls">
             <button type="button" class="android-intake__button android-intake__button--secondary" data-refresh>Обновить</button>
+            ${state.accessRequired ? `<button type="button" class="android-intake__button android-intake__button--secondary" data-access-request ${state.isRequestingAccess ? "disabled" : ""}>${state.isRequestingAccess ? "Отправляю запрос..." : "Повторить запрос доступа"}</button>` : ""}
             <button type="button" class="android-intake__button android-intake__button--secondary" data-new-session ${state.isSending || state.isResetting ? "disabled" : ""}>${state.isResetting ? "Удаляю старые фото..." : "Сделать новую сессию"}</button>
             <button type="button" class="android-intake__button android-intake__button--primary" data-send ${canSendAll() ? "" : "disabled"}>${escapeHtml(sendLabel)}</button>
           </div>
@@ -784,6 +873,12 @@
       });
     });
 
+    app.querySelectorAll("[data-slot-retry-ocr]").forEach((button) => {
+      button.addEventListener("click", () => {
+        void retryPhotoOcr(String(button.getAttribute("data-slot-retry-ocr") || ""));
+      });
+    });
+
     const sendButton = app.querySelector("[data-send]");
     if (sendButton) {
       sendButton.addEventListener("click", () => {
@@ -802,6 +897,13 @@
     if (refreshButton) {
       refreshButton.addEventListener("click", () => {
         void loadState(false);
+      });
+    }
+
+    const accessRequestButton = app.querySelector("[data-access-request]");
+    if (accessRequestButton) {
+      accessRequestButton.addEventListener("click", () => {
+        void requestAccessAgain();
       });
     }
 

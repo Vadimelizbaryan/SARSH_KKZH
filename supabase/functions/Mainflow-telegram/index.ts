@@ -35,6 +35,8 @@ const TELEGRAM_MAIN_PDFS_META_KEY = "telegram_main_pdfs_sent";
 const TELEGRAM_PENDING_PHOTO_APPROVALS_META_KEY = "telegram_pending_photo_approvals";
 const TELEGRAM_PHOTO_AUTOROTATE_META_KEY = "pref:telegram_photo_auto_rotate";
 const ANDROID_INTAKE_HUB_ID = "admission_hub";
+const ANDROID_INTAKE_OCR_STATUS_PREFIX = "android-intake-ocr-status:";
+const ANDROID_INTAKE_OCR_ERROR_PREFIX = "android-intake-ocr-error:";
 const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
 const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է միայն բոտի ադմինիստրատորին։";
 const TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT = "Գիշերային ընդունում";
@@ -3266,13 +3268,11 @@ async function requestAndroidDeviceApproval(
     [nextRecord, ...pendingDevices.filter((item) => item.deviceId !== deviceId)]
   );
 
-  if (alreadyPending) {
-    return nextRecord;
-  }
-
   const department = DEPARTMENTS[departmentId];
   const messageText = [
-    "MAINFORM Android հավելվածը խնդրում է մուտքի թույլտվություն։",
+    alreadyPending
+      ? "MAINFORM Android: повторное напоминание о подтверждении устройства."
+      : "MAINFORM Android հավելվածը խնդրում է մուտքի թույլտվություն։",
     `Սարք: ${getAndroidDeviceDisplayName(nextRecord)}`,
     `ID: ${deviceId}`,
     `Բաժանմունք: ${department.marker} ${department.department}`,
@@ -4063,6 +4063,172 @@ async function handleAndroidIntakeState(request: Request) {
   }
 }
 
+async function handleAndroidIntakeAccessRequest(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const deviceId = sanitizeAndroidDeviceId(
+      typeof payload?.androidDeviceId === "string" ? payload.androidDeviceId : ""
+    );
+    const deviceName = sanitizeAndroidDeviceName(
+      typeof payload?.androidDeviceName === "string" ? payload.androidDeviceName : ""
+    ) || "Android MAINFORM";
+    if (!deviceId) {
+      return jsonResponse({ ok: false, error: "Device id is required." }, 400);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const [approvedDevices, pendingDevices, blockedDevices] = await Promise.all([
+      loadApprovedAndroidDevices(supabase),
+      loadPendingAndroidDevices(supabase),
+      loadBlockedAndroidDevices(supabase)
+    ]);
+    if (approvedDevices.some((item) => item.deviceId === deviceId)) {
+      return jsonResponse({ ok: true, status: "approved", message: "Устройство уже подтверждено." });
+    }
+    if (blockedDevices.some((item) => item.deviceId === deviceId)) {
+      return jsonResponse({ ok: false, error: "Доступ этого устройства был отклонён." }, 403);
+    }
+
+    await requestAndroidDeviceApproval(supabase, deviceId, deviceName, "r4");
+    return jsonResponse({
+      ok: true,
+      status: pendingDevices.some((item) => item.deviceId === deviceId) ? "resent" : "requested",
+      message: "Запрос подтверждения отправлен в Telegram администратору."
+    });
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_intake_access_request_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
+type AndroidIntakeOcrStatus = "pending" | "completed" | "failed";
+
+function getAndroidIntakeOcrStatus(notes: unknown): AndroidIntakeOcrStatus {
+  const statusNote = normalizeOcrFeedbackNotes(notes)
+    .find((note) => note.startsWith(ANDROID_INTAKE_OCR_STATUS_PREFIX));
+  const status = statusNote?.slice(ANDROID_INTAKE_OCR_STATUS_PREFIX.length).trim();
+  return status === "pending" || status === "failed" || status === "completed"
+    ? status
+    : "completed";
+}
+
+function buildAndroidIntakeOcrNotes(
+  existingNotes: unknown,
+  status: AndroidIntakeOcrStatus,
+  errorMessage = ""
+) {
+  const retainedNotes = normalizeOcrFeedbackNotes(existingNotes)
+    .filter((note) => !note.startsWith(ANDROID_INTAKE_OCR_STATUS_PREFIX))
+    .filter((note) => !note.startsWith(ANDROID_INTAKE_OCR_ERROR_PREFIX));
+  const safeError = errorMessage ? sanitizeEdgeErrorText(errorMessage) : "";
+  return [
+    `${ANDROID_INTAKE_OCR_STATUS_PREFIX}${status}`,
+    ...retainedNotes,
+    ...(safeError ? [`${ANDROID_INTAKE_OCR_ERROR_PREFIX}${safeError}`] : [])
+  ];
+}
+
+async function readAndroidIntakeFeedbackNotes(
+  supabase: ReturnType<typeof createClient>,
+  feedbackId: string,
+  departmentId: DepartmentId
+) {
+  const { data, error } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .select("notes")
+    .eq("id", feedbackId)
+    .eq("department_id", departmentId)
+    .maybeSingle();
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    throw new Error("Saved Android photo was not found.");
+  }
+  return data.notes;
+}
+
+async function processAndroidIntakePhotoOcr(
+  supabase: ReturnType<typeof createClient>,
+  options: {
+    feedbackId: string;
+    departmentId: DepartmentId;
+    reportDate: string;
+    imageDataUrl: string;
+    imageName: string;
+  }
+) {
+  const existingNotes = await readAndroidIntakeFeedbackNotes(
+    supabase,
+    options.feedbackId,
+    options.departmentId
+  );
+  const shouldAutoRotatePhoto = await isTelegramPhotoAutoRotateEnabled(supabase);
+  const preparedPhoto = await inspectTelegramPhotoOrientation(
+    options.imageDataUrl,
+    options.imageName,
+    {
+      requireAdvice: false,
+      enabled: shouldAutoRotatePhoto
+    }
+  );
+  const snapshot = await loadSnapshot(supabase);
+  const liveDepartmentRow = snapshot?.rows.find((item) => item.id === options.departmentId) || null;
+  const recognized = await recognizeDepartmentPhoto(options.departmentId, preparedPhoto.dataUrl);
+  const evaluation = evaluateTelegramPhotoRecognitionCandidate(
+    recognized,
+    liveDepartmentRow?.values
+  );
+  const { error: updateError } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .update({
+      photo_report_date: recognized.reportDate || options.reportDate,
+      recognized_keys: recognized.recognizedKeys,
+      ocr_raw: recognized.values,
+      final_values: recognized.values,
+      notes: buildAndroidIntakeOcrNotes(
+        [...normalizeOcrFeedbackNotes(existingNotes), ...preparedPhoto.orientationNotes, ...recognized.notes],
+        "completed"
+      ),
+      cell_reviews: []
+    })
+    .eq("id", options.feedbackId)
+    .eq("department_id", options.departmentId);
+  if (updateError) {
+    throw updateError;
+  }
+
+  await markDepartmentPhotoPending(supabase, options.departmentId, options.feedbackId, options.imageName);
+  const preview = await loadAcceptedFeedbackPreview(supabase, options.feedbackId, options.departmentId);
+  return {
+    preview,
+    evaluation
+  };
+}
+
+async function markAndroidIntakePhotoOcrFailed(
+  supabase: ReturnType<typeof createClient>,
+  feedbackId: string,
+  departmentId: DepartmentId,
+  error: unknown
+) {
+  const existingNotes = await readAndroidIntakeFeedbackNotes(supabase, feedbackId, departmentId);
+  const { error: updateError } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .update({
+      notes: buildAndroidIntakeOcrNotes(existingNotes, "failed", getErrorText(error))
+    })
+    .eq("id", feedbackId)
+    .eq("department_id", departmentId);
+  if (updateError) {
+    throw updateError;
+  }
+}
+
 async function handleAndroidIntakePhotoSubmit(request: Request) {
   try {
     const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -4080,66 +4246,170 @@ async function handleAndroidIntakePhotoSubmit(request: Request) {
       return jsonResponse({ ok: false, error: access.error }, access.status);
     }
 
-    const snapshot = await loadSnapshot(supabase);
-    const reportDate = sanitizeReportDate(payload?.reportDate) || snapshot.reportDate || getYerevanReportDateText();
+    const reportDate = sanitizeReportDate(payload?.reportDate) || getYerevanReportDateText();
     const imageDataUrl = sanitizeAndroidPhotoDataUrl(payload?.imageDataUrl);
     const imageName = sanitizeAndroidPhotoName(payload?.imageName) || "admission-hub-photo.jpg";
     if (!imageDataUrl) {
       return jsonResponse({ ok: false, error: "Photo is required." }, 400);
     }
 
-    const shouldAutoRotatePhoto = await isTelegramPhotoAutoRotateEnabled(supabase);
-    const preparedPhoto = await inspectTelegramPhotoOrientation(
-      imageDataUrl,
-      imageName,
-      {
-        requireAdvice: false,
-        enabled: shouldAutoRotatePhoto
-      }
-    );
-    const liveDepartmentRow = snapshot?.rows.find((item) => item.id === departmentId) || null;
-    const recognized = await recognizeDepartmentPhoto(departmentId, preparedPhoto.dataUrl);
-    const evaluation = evaluateTelegramPhotoRecognitionCandidate(
-      recognized,
-      liveDepartmentRow?.values
-    );
     const feedbackId = await insertAcceptedFeedback(
       supabase,
       departmentId,
       reportDate,
-      recognized.reportDate,
-      preparedPhoto.fileName,
-      preparedPhoto.dataUrl,
-      recognized.values,
-      recognized.recognizedKeys,
+      reportDate,
+      imageName,
+      imageDataUrl,
+      {},
+      [],
       [
         "Admission hub Android photo.",
         `Device: ${access.deviceName}`,
-        "OCR review required before manual save to the main table.",
-        ...preparedPhoto.orientationNotes,
-        ...recognized.notes
+        "Photo saved before OCR. OCR review is required before manual save to the main table.",
+        `${ANDROID_INTAKE_OCR_STATUS_PREFIX}pending`
       ]
     );
-    await markDepartmentPhotoPending(supabase, departmentId, feedbackId, preparedPhoto.fileName);
-    const preview = await loadAcceptedFeedbackPreview(supabase, feedbackId, departmentId);
+    await markDepartmentPhotoPending(supabase, departmentId, feedbackId, imageName);
 
-    return jsonResponse({
-      ok: true,
-      departmentId,
-      reportDate,
-      feedbackId,
-      record: preview,
-      controlPassed: Boolean(evaluation.isControlPassed),
-      hasRecognizedValues: Boolean(evaluation.hasRecognizedValues),
-      message: evaluation.isControlPassed
-        ? "Լուսանկարը ուղարկվել է։ OCR-ը մշակել է այն, բայց մինչ պահպանումը ստուգեք տվյալները վեբ էջում։"
-        : "Լուսանկարը ուղարկվել է։ OCR-ը մշակել է այն, բայց տվյալները պետք է ձեռքով ստուգել և ուղղել վեբ էջում։"
-    });
+    try {
+      const processed = await processAndroidIntakePhotoOcr(supabase, {
+        feedbackId,
+        departmentId,
+        reportDate,
+        imageDataUrl,
+        imageName
+      });
+      return jsonResponse({
+        ok: true,
+        departmentId,
+        reportDate,
+        feedbackId,
+        record: processed.preview,
+        ocrStatus: "completed",
+        controlPassed: Boolean(processed.evaluation.isControlPassed),
+        hasRecognizedValues: Boolean(processed.evaluation.hasRecognizedValues),
+        message: processed.evaluation.isControlPassed
+          ? "Լուսանկարը պահպանվել և OCR-ով մշակվել է։ Մինչ պահպանումը ստուգեք տվյալները վեբ էջում։"
+          : "Լուսանկարը պահպանվել է։ OCR-ի արդյունքները պետք է ձեռքով ստուգել և ուղղել վեբ էջում։"
+      });
+    } catch (ocrError) {
+      try {
+        await markAndroidIntakePhotoOcrFailed(supabase, feedbackId, departmentId, ocrError);
+      } catch (statusError) {
+        console.error("Failed to record Android intake OCR failure:", getErrorText(statusError));
+      }
+      const preview = await loadAcceptedFeedbackPreview(supabase, feedbackId, departmentId).catch(() => null);
+      return jsonResponse({
+        ok: true,
+        departmentId,
+        reportDate,
+        feedbackId,
+        record: preview,
+        ocrStatus: "failed",
+        controlPassed: false,
+        hasRecognizedValues: false,
+        message: "Фото сохранено на сервере. OCR временно не завершился — нажмите «Повторить OCR» после проверки соединения."
+      });
+    }
   } catch (error) {
     return jsonResponse({
       ok: false,
       service: "Mainflow-telegram",
       status: "android_intake_photo_submit_failed",
+      error: getErrorText(error)
+    }, 500);
+  }
+}
+
+async function handleAndroidIntakePhotoRetryOcr(request: Request) {
+  try {
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    const departmentId = parseDepartmentId(typeof payload?.departmentId === "string" ? payload.departmentId : "");
+    const feedbackId = String(payload?.feedbackId || "").trim();
+    if (!departmentId || !/^\d+$/.test(feedbackId)) {
+      return jsonResponse({ ok: false, error: "Department and saved photo id are required." }, 400);
+    }
+    if (!isAndroidIntakePhotoDepartment(departmentId)) {
+      return jsonResponse({ ok: false, error: "Photo upload is disabled for this department." }, 403);
+    }
+
+    const supabase = createSupabaseAdmin();
+    const access = await verifyAndroidIntakeHubAccess(supabase, payload);
+    if (!access.ok) {
+      return jsonResponse({ ok: false, error: access.error }, access.status);
+    }
+
+    const { data, error: loadError } = await (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .select("id, department_id, report_date, image_name, image_data_url, notes")
+      .eq("id", feedbackId)
+      .eq("department_id", departmentId)
+      .maybeSingle();
+    if (loadError) {
+      throw loadError;
+    }
+    if (!data || !isAndroidIntakeFeedbackNotes(data.notes)) {
+      return jsonResponse({ ok: false, error: "Saved admission photo was not found." }, 404);
+    }
+
+    const imageDataUrl = typeof data.image_data_url === "string" ? data.image_data_url : "";
+    if (!imageDataUrl.startsWith("data:image/")) {
+      return jsonResponse({ ok: false, error: "Saved photo has no image data." }, 409);
+    }
+    const reportDate = typeof data.report_date === "string" ? data.report_date : getYerevanReportDateText();
+    const imageName = typeof data.image_name === "string" && data.image_name.trim()
+      ? data.image_name.trim()
+      : "admission-hub-photo.jpg";
+    const { error: pendingUpdateError } = await (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .update({ notes: buildAndroidIntakeOcrNotes(data.notes, "pending") })
+      .eq("id", feedbackId)
+      .eq("department_id", departmentId);
+    if (pendingUpdateError) {
+      throw pendingUpdateError;
+    }
+
+    try {
+      const processed = await processAndroidIntakePhotoOcr(supabase, {
+        feedbackId,
+        departmentId,
+        reportDate,
+        imageDataUrl,
+        imageName
+      });
+      return jsonResponse({
+        ok: true,
+        feedbackId,
+        departmentId,
+        record: processed.preview,
+        ocrStatus: "completed",
+        controlPassed: Boolean(processed.evaluation.isControlPassed),
+        hasRecognizedValues: Boolean(processed.evaluation.hasRecognizedValues),
+        message: "OCR обработал сохранённое фото. Проверьте значения перед применением."
+      });
+    } catch (ocrError) {
+      try {
+        await markAndroidIntakePhotoOcrFailed(supabase, feedbackId, departmentId, ocrError);
+      } catch (statusError) {
+        console.error("Failed to record Android intake OCR retry failure:", getErrorText(statusError));
+      }
+      const preview = await loadAcceptedFeedbackPreview(supabase, feedbackId, departmentId).catch(() => null);
+      return jsonResponse({
+        ok: true,
+        feedbackId,
+        departmentId,
+        record: preview,
+        ocrStatus: "failed",
+        controlPassed: false,
+        hasRecognizedValues: false,
+        message: "Фото осталось сохранённым. OCR не завершился; повторите попытку позже."
+      });
+    }
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      service: "Mainflow-telegram",
+      status: "android_intake_photo_retry_ocr_failed",
       error: getErrorText(error)
     }, 500);
   }
@@ -6388,7 +6658,8 @@ async function listAndroidIntakeSessionPhotoRecords(
       imageDataUrl: "",
       hasImageDataUrl: true,
       createdAt: typeof row.created_at === "string" ? row.created_at : "",
-      sourceLabel: buildAndroidIntakePhotoSourceLabel(notes)
+      sourceLabel: buildAndroidIntakePhotoSourceLabel(notes),
+      ocrStatus: getAndroidIntakeOcrStatus(notes)
     };
   });
 }
@@ -6658,6 +6929,7 @@ async function loadAcceptedFeedbackPreview(
 
   const imageDataUrl = typeof data.image_data_url === "string" ? data.image_data_url : "";
   const imageName = typeof data.image_name === "string" ? data.image_name : "";
+  const rawNotes = normalizeOcrFeedbackNotes(data.notes);
   const recognizedKeys = Array.isArray(data.recognized_keys) ? data.recognized_keys.map((item) => String(item)) : [];
   const finalValues = data.final_values && typeof data.final_values === "object" ? data.final_values : {};
   const hasFormValues = recognizedKeys.length > 0 || Object.keys(finalValues).length > 0;
@@ -6674,7 +6946,11 @@ async function loadAcceptedFeedbackPreview(
     imageDataUrl,
     recognizedKeys,
     finalValues,
-    notes: Array.isArray(data.notes) ? data.notes.map((item) => String(item)) : [],
+    notes: rawNotes.filter((note) => !note.startsWith(ANDROID_INTAKE_OCR_STATUS_PREFIX) && !note.startsWith(ANDROID_INTAKE_OCR_ERROR_PREFIX)),
+    ocrStatus: getAndroidIntakeOcrStatus(rawNotes),
+    ocrError: rawNotes
+      .find((note) => note.startsWith(ANDROID_INTAKE_OCR_ERROR_PREFIX))
+      ?.slice(ANDROID_INTAKE_OCR_ERROR_PREFIX.length) || "",
     cellReviews: Array.isArray(data.cell_reviews) ? data.cell_reviews : [],
     saveStatus: typeof data.save_status === "string" ? data.save_status : "accepted_as_is",
     createdAt: typeof data.created_at === "string" ? data.created_at : ""
@@ -14313,6 +14589,12 @@ Deno.serve(async (request) => {
   }
   if (postUrl.searchParams.get("action") === "android-intake-photo-submit") {
     return await handleAndroidIntakePhotoSubmit(request);
+  }
+  if (postUrl.searchParams.get("action") === "android-intake-photo-retry-ocr") {
+    return await handleAndroidIntakePhotoRetryOcr(request);
+  }
+  if (postUrl.searchParams.get("action") === "android-intake-access-request") {
+    return await handleAndroidIntakeAccessRequest(request);
   }
   if (postUrl.searchParams.get("action") === "android-device-fcm-register") {
     return await handleAndroidDeviceFcmRegister(request);

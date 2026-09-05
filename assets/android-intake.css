@@ -309,6 +309,11 @@ body {
   color: #855400;
 }
 
+.android-intake__card-status--error,
+.android-intake__card-status--error strong {
+  color: #a72f22;
+}
+
 .android-intake__card-actions {
   margin-top: 8px;
   display: flex;
