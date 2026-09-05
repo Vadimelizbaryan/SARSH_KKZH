@@ -2338,41 +2338,6 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
       timeoutMs: 100_000
     }
   );
-  const topTableVerificationPromise = Promise.all([
-    buildTopTableCropImageDataUrl(imageDataUrl),
-    getTopTableTemplateDataUrl()
-  ])
-    .then(([topTableImageDataUrl, topTableTemplateDataUrl]) => requestOpenAiStructuredVision(
-      [
-        "This is a focused verification pass for the top handwritten numeric table of an Armenian hospital department form.",
-        `Department id: ${departmentId}. Department name: ${departmentMeta.department}.`,
-        "You receive two cropped images in order: the blank-table reference, then the filled-table image.",
-        "Read only the handwritten numeric values from the visible 22-cell table. Do not infer, calculate, or copy printed labels.",
-        "Confirm the printed cell borders before returning values. Return null for every uncertain cell.",
-        "The top table must have exactly 22 visual cells, from left to right.",
-        PHOTO_TEMPLATE_GUIDE,
-        "Return rightCellValues as exactly 11 items for cells 12-22 in their visual left-to-right order.",
-        "rightCellValues[0] is visual cell 12; do not shift it to cell 13.",
-        "The final rightmost item is visual cell 22.",
-        "The cropped images do not necessarily include the report date, so return reportDate as null unless it is actually visible.",
-        "Use notes only for short uncertainty comments."
-      ].join("\n"),
-      topTableImageDataUrl,
-      "telegram_department_top_table_verification",
-      buildPhotoRecognitionSchema(),
-      [],
-      {
-        imageDetail: "high",
-        reasoningEffort: "medium",
-        referenceImageDataUrls: [topTableTemplateDataUrl],
-        timeoutMs: 100_000
-      }
-    ))
-    .catch((error) => {
-      console.warn("Top-table photo verification failed:", sanitizePublicErrorMessage(error));
-      return null;
-    });
-
   const parsed = await fullRecognitionPromise;
 
   const parsedValues = parsed.values && typeof parsed.values === "object"
@@ -2390,37 +2355,10 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
   if (sanitizedValues.presentTotal === null) {
     sanitizedValues.presentTotal = extractPresentTotalFromNotes(baseNotes);
   }
-  const notes = [...baseNotes];
-  const topTableParsed = await topTableVerificationPromise;
-  if (topTableParsed) {
-    const topTableStructure = sanitizePhotoStructure(topTableParsed.structure);
-    const topTableVerified = !!topTableStructure && topTableStructure.all22CellsVisible && topTableStructure.gridCellCount === 22;
-    if (topTableVerified) {
-      const topTableValues = topTableParsed.values && typeof topTableParsed.values === "object"
-        ? sanitizeValues(topTableParsed.values as Record<string, unknown>)
-        : sanitizeValues(null);
-      const topTableRightCellValues = sanitizeRightCellValues(topTableParsed.rightCellValues);
-
-      for (const key of VALUE_KEYS) {
-        if (topTableValues[key] !== null) {
-          finalValues[key] = topTableValues[key];
-        }
-      }
-      if (topTableRightCellValues) {
-        PHOTO_RIGHT_CELL_KEYS.forEach((key, index) => {
-          if (topTableRightCellValues[index] !== null) {
-            finalValues[key] = topTableRightCellValues[index];
-          }
-        });
-      }
-      structure = topTableStructure;
-      notes.push("Top-table verification pass completed with the cropped high-detail image.");
-    } else {
-      notes.push("Top-table verification pass could not confirm all 22 cells; the full-form result was retained.");
-    }
-  } else {
-    notes.push("Top-table verification was unavailable; the full-form result was retained.");
-  }
+  const notes = [
+    ...baseNotes,
+    "Full-form high-detail OCR completed without server-side image cropping."
+  ];
 
   const structureInvalid = !!structure && (!structure.all22CellsVisible || structure.gridCellCount !== 22);
   if (structureInvalid) {
