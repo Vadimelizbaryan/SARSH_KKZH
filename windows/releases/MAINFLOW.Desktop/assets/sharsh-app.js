@@ -2199,7 +2199,8 @@ function buildInitialPhotoLightboxState() {
     // before any request is sent. OCR itself uses the same 1800px working copy.
     const compactSourceCanvas = buildScaledCanvasFromImage(image);
 
-    if (!runtime.autoRotateImages) {
+    const autoRotateImages = Boolean(sync?.runtime?.autoRotateImages);
+    if (!autoRotateImages) {
       return buildPreparedPhotoResultFromCanvas(compactSourceCanvas, 0);
     }
 
