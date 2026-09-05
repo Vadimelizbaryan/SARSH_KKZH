@@ -13828,6 +13828,16 @@ async function handleTelegramPhoto(
     photoValidation,
     autoSaveSource
   );
+
+  // The uploader must see the same OCR table that is sent to administrators.
+  // Previously this detailed response went only to notification chats, leaving
+  // the person who sent the form with a generic acknowledgement.
+  try {
+    await sendTelegramMessage(chatId, detailedPhotoSummary, { parseMode: "HTML" });
+  } catch (error) {
+    console.error("Failed to send Telegram photo OCR summary to uploader:", sanitizePublicErrorMessage(error));
+  }
+
   const notifyChatIds = getTelegramNotifyChatIds(chatId);
   if (notifyChatIds.length) {
     if (shouldSaveSnapshot && savedSnapshot && autoSaveSource === "telegram-form" && telegramWebFormFeedback) {
