@@ -514,6 +514,7 @@
     return {
       imageName: "",
       imageDataUrl: "",
+      feedbackId: "",
       notes: [],
       detectedDepartmentId: "",
       detectedBy: "",
@@ -12964,6 +12965,7 @@ function buildInitialPhotoLightboxState() {
       id: `batch-${Date.now()}-${index}`,
       imageName: file && file.name ? String(file.name) : `image-${index + 1}`,
       imageDataUrl: "",
+      feedbackId: "",
       detectedDepartmentId: "",
       detectedBy: "",
       notes: [],
@@ -12989,14 +12991,20 @@ function buildInitialPhotoLightboxState() {
           ready: "Готово к отправке",
           detecting: "Определяется",
           detected: "Определено",
+          uploaded: "Загружено на сервер",
           failed: "Не распознано"
         }[item.stage] || "Ожидание");
+      const feedbackId = String(item.feedbackId || "").trim();
+      const feedbackPath = department && feedbackId
+        ? appendQueryParams(config.getDepartmentPagePath(basePath, department.id), { tgFeedback: feedbackId })
+        : "";
 
       return `
         <div class="photo-import-result-item">
           <span>${escapeHtml(`${index + 1}. ${item.imageName || "image"}`)}</span>
           <strong>${escapeHtml(title)}</strong>
           ${item.savedFileName ? `<small>${escapeHtml(item.savedFileName)}</small>` : ""}
+          ${feedbackPath ? `<a class="main-photo-route-result-link" href="${escapeHtml(feedbackPath)}" target="_blank" rel="noopener">Открыть фото</a>` : ""}
         </div>
       `;
     }).join("");
@@ -13193,7 +13201,13 @@ function buildInitialPhotoLightboxState() {
       setInfo(`Новый бланк добавлен в очередь отделения: ${department.department}.`, false);
     }
 
-    return true;
+    const queuedRow = getDepartmentRow(state.snapshot, item.departmentId);
+    return {
+      departmentId: item.departmentId,
+      feedbackId: queuedRow?.photoFeedbackId === null || typeof queuedRow?.photoFeedbackId === "undefined"
+        ? ""
+        : String(queuedRow.photoFeedbackId)
+    };
   }
 
   function isSupportedMainPhotoFile(file) {
@@ -14101,11 +14115,16 @@ function buildInitialPhotoLightboxState() {
     const saveDirectoryLabel = state.mainPhotoSaveDirectoryName
       ? `Сохранять: ${state.mainPhotoSaveDirectoryName}`
       : "Сохранять: MFPictures";
+    const feedbackId = String(routeState.feedbackId || "").trim();
+    const uploadedPhotoPath = detectedDepartment && feedbackId
+      ? appendQueryParams(config.getDepartmentPagePath(basePath, detectedDepartment.id), { tgFeedback: feedbackId })
+      : "";
+    const selectedFileLabel = routeState.imageName || "выбранное фото";
 
     return `
       <section class="panel no-print photo-import-panel">
-        <h2>Фото бланка в отделение</h2>
-        <p>Сначала выберите папку сохранения, если нужны копии на диск. Потом загрузите фото бланка: система определит отделение и отметит его красной кнопкой, как после Telegram.</p>
+        <h2>Загрузка фото бланка</h2>
+        <p><strong>Шаг 1:</strong> выберите фото. <strong>Шаг 2:</strong> система определит отделение и сохранит оригинал на сервере. <strong>Шаг 3:</strong> откройте фото, проверьте распознавание и сохраните строку.</p>
         <div class="photo-import-save-actions">
           <button type="button" id="mainPhotoRouteSaveFolderBtn" ${!canUseMainPhotoSaveDirectory() || routeState.isProcessing ? "disabled" : ""}>
             ${escapeHtml(saveDirectoryLabel)}
@@ -14139,8 +14158,24 @@ function buildInitialPhotoLightboxState() {
               : "Определение отделения доступно только в онлайн-режиме владельца.")
           )
         }</p>
-        ${detectedDepartment || batchPreviewItems || (routeState.notes && routeState.notes.length) ? `
+        ${routeState.imageDataUrl || detectedDepartment || batchPreviewItems || (routeState.notes && routeState.notes.length) ? `
           <div class="photo-import-results">
+            ${routeState.imageDataUrl ? `
+              <div class="photo-import-result-grid">
+                <div class="photo-import-result-item photo-import-result-item--recognized">
+                  <span>Шаг 1</span>
+                  <strong>Фото выбрано</strong>
+                  <small>${escapeHtml(selectedFileLabel)}</small>
+                </div>
+                ${feedbackId ? `
+                  <div class="photo-import-result-item photo-import-result-item--recognized">
+                    <span>Шаг 2</span>
+                    <strong>Загружено на сервер</strong>
+                    <small>Оригинал сохранён, можно открыть результат.</small>
+                  </div>
+                ` : ""}
+              </div>
+            ` : ""}
             ${detectedDepartment ? `
               <div class="photo-import-result-grid">
                 <div class="photo-import-result-item">
@@ -14155,6 +14190,12 @@ function buildInitialPhotoLightboxState() {
                 ` : ""}
               </div>
             ` : ""}
+            ${uploadedPhotoPath ? `
+              <div class="photo-import-actions main-photo-route-next-action">
+                <a class="button-link" href="${escapeHtml(uploadedPhotoPath)}" target="_blank" rel="noopener">Шаг 3. Открыть фото и распознать</a>
+                <span>Откроется страница нужного отделения с этим же бланком.</span>
+              </div>
+            ` : ""}
             ${batchPreviewItems ? `<div class="photo-import-result-grid">${batchPreviewItems}</div>` : ""}
             ${routeState.notes && routeState.notes.length ? `
               <div class="photo-import-notes">
@@ -14165,12 +14206,15 @@ function buildInitialPhotoLightboxState() {
         ` : ""}
         ${routeState.imageDataUrl ? `
           <div class="photo-import-preview">
-            <img
-              src="${escapeHtml(routeState.imageDataUrl)}"
-              alt="Фото для определения отделения"
-              class="photo-import-preview-image"
-              data-photo-zoom-trigger="main"
-            >
+            <figure class="main-photo-route-preview">
+              <figcaption><strong>Загруженный бланк</strong><span>Нажмите на фото, чтобы увеличить.</span></figcaption>
+              <img
+                src="${escapeHtml(routeState.imageDataUrl)}"
+                alt="Фото для определения отделения"
+                class="photo-import-preview-image"
+                data-photo-zoom-trigger="main"
+              >
+            </figure>
           </div>
         ` : ""}
       </section>
@@ -14193,6 +14237,7 @@ function buildInitialPhotoLightboxState() {
       state.mainPhotoRoute.notes = [];
       state.mainPhotoRoute.detectedDepartmentId = "";
       state.mainPhotoRoute.detectedBy = "";
+      state.mainPhotoRoute.feedbackId = "";
       state.mainPhotoRoute.batchTotalCount = preparedItems.length;
       state.mainPhotoRoute.batchDetectedCount = 0;
       state.mainPhotoRoute.batchFailedCount = 0;
@@ -14256,7 +14301,11 @@ function buildInitialPhotoLightboxState() {
               detectedBy: "vision",
               notes
             };
-            await queueMainPhotoRouteDepartmentPhoto(queuedItem);
+            const queuedResult = await queueMainPhotoRouteDepartmentPhoto(queuedItem);
+            if (batchItem) {
+              batchItem.feedbackId = queuedResult.feedbackId || "";
+              batchItem.stage = "uploaded";
+            }
             try {
               const saveResult = await saveMainPhotoRouteCopy(queuedItem, index + 1);
               if (saveResult.ok) {
@@ -14271,7 +14320,8 @@ function buildInitialPhotoLightboxState() {
               );
             }
             recognizedQueue.push({
-              ...queuedItem
+              ...queuedItem,
+              feedbackId: queuedResult.feedbackId || ""
             });
             state.mainPhotoRoute.batchDetectedCount += 1;
           } else {
@@ -14284,6 +14334,7 @@ function buildInitialPhotoLightboxState() {
         state.mainPhotoRoute.notes = batchNotes;
         state.mainPhotoRoute.detectedDepartmentId = recognizedQueue.length === 1 ? recognizedQueue[0].departmentId : "";
         state.mainPhotoRoute.detectedBy = recognizedQueue.length === 1 ? "vision" : "";
+        state.mainPhotoRoute.feedbackId = recognizedQueue.length === 1 ? recognizedQueue[0].feedbackId || "" : "";
 
         if (!recognizedQueue.length) {
           setMainPhotoRouteStatus(
@@ -14329,6 +14380,7 @@ function buildInitialPhotoLightboxState() {
     state.mainPhotoRoute.notes = [];
     state.mainPhotoRoute.detectedDepartmentId = "";
     state.mainPhotoRoute.detectedBy = "";
+    state.mainPhotoRoute.feedbackId = "";
     setMainPhotoRouteStatus("Определяю отделение по маркеру и шапке бланка...", false);
     renderPage();
 
@@ -14367,7 +14419,8 @@ function buildInitialPhotoLightboxState() {
         detectedBy,
         notes
       };
-      await queueMainPhotoRouteDepartmentPhoto(queuedItem);
+      const queuedResult = await queueMainPhotoRouteDepartmentPhoto(queuedItem);
+      state.mainPhotoRoute.feedbackId = queuedResult.feedbackId || "";
 
       let saveStatusText = state.mainPhotoSaveDirectoryHandle
         ? " Копия на диск не сохранена: нет разрешения записи."
@@ -15020,6 +15073,7 @@ function buildInitialPhotoLightboxState() {
       state.mainPhotoRoute.imageDataUrl = await rotateImageDataUrl(state.mainPhotoRoute.imageDataUrl, 90);
       state.mainPhotoRoute.detectedDepartmentId = "";
       state.mainPhotoRoute.detectedDepartmentName = "";
+      state.mainPhotoRoute.feedbackId = "";
       state.mainPhotoRoute.isProcessing = false;
       setMainPhotoRouteStatus("Фото вручную повернуто на 90°. Если ориентация правильная, запускайте определение отделения.", false);
       renderPage();

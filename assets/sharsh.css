@@ -551,6 +551,44 @@ a {
   cursor: zoom-in;
 }
 
+.main-photo-route-preview {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  max-width: 100%;
+}
+
+.main-photo-route-preview figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.main-photo-route-preview figcaption span,
+.main-photo-route-next-action span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.main-photo-route-next-action {
+  padding: 10px;
+  border: 1px solid rgba(31, 141, 73, 0.25);
+  border-radius: 14px;
+  background: rgba(31, 141, 73, 0.08);
+}
+
+.main-photo-route-result-link {
+  width: max-content;
+  max-width: 100%;
+  color: var(--fresh);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .photo-import-preview-frame {
   position: relative;
   display: inline-block;
