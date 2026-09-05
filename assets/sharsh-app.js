@@ -5994,6 +5994,14 @@ function buildInitialPhotoLightboxState() {
     return value === null || value === "" || typeof value === "undefined" ? "" : String(value);
   }
 
+  // A blank value in stored data means that the numeric cell has not been
+  // filled yet.  In the main sheet it must still be visibly zero; keeping
+  // getDisplayValue unchanged preserves the distinction for OCR review forms.
+  function getTableCellDisplayValue(value) {
+    const displayValue = getDisplayValue(value);
+    return displayValue === "" ? "0" : displayValue;
+  }
+
   function getRowDisplayValue(snapshot, row, key) {
     if (key === "presentTotal") {
       return getDisplayValue(calcPresentTotal(snapshot, row));
@@ -8175,7 +8183,7 @@ function buildInitialPhotoLightboxState() {
 
     if (key === "leaveTotal") {
       if (!row.hasLeaveTotal) {
-        return `<td class="${classes} blank-cell" data-column-key="${key}"><span></span></td>`;
+        return `<td class="${classes} blank-cell" data-column-key="${key}"><span>0</span></td>`;
       }
       if (renderComputedInline) {
         return `<td class="${classes}" data-column-key="${key}"><span>${escapeHtml(String(calcLeaveTotal(snapshot, row) || 0))}</span></td>`;
@@ -8186,17 +8194,17 @@ function buildInitialPhotoLightboxState() {
     const linkedSource = getLinkedSource(row, key);
     if (linkedSource) {
       if (renderComputedInline) {
-        return `<td class="${classes}" data-column-key="${key}"><span>${escapeHtml(getDisplayValue(getEffectiveValue(snapshot, row, key)))}</span></td>`;
+        return `<td class="${classes}" data-column-key="${key}"><span>${escapeHtml(getTableCellDisplayValue(getEffectiveValue(snapshot, row, key)))}</span></td>`;
       }
       return `<td class="${classes}" data-column-key="${key}"><span data-linked="${row.id}:${key}"></span></td>`;
     }
 
     if (!supportsValue(row, key)) {
-      return `<td class="${classes} blank-cell" data-column-key="${key}"><span></span></td>`;
+      return `<td class="${classes} blank-cell" data-column-key="${key}"><span>0</span></td>`;
     }
 
     if (!interactive || !isEditable(row, key)) {
-      return `<td class="${classes}" data-column-key="${key}"><span data-value="${row.id}:${key}">${escapeHtml(getDisplayValue(getEffectiveValue(snapshot, row, key)))}</span></td>`;
+      return `<td class="${classes}" data-column-key="${key}"><span data-value="${row.id}:${key}">${escapeHtml(getTableCellDisplayValue(getEffectiveValue(snapshot, row, key)))}</span></td>`;
     }
 
     return `
@@ -8207,7 +8215,7 @@ function buildInitialPhotoLightboxState() {
           aria-label="${escapeHtml(row.department)} ${escapeHtml(key)}"
           data-row="${row.id}"
           data-key="${key}"
-          value="${escapeHtml(getDisplayValue(row.values[key]))}"
+          value="${escapeHtml(getTableCellDisplayValue(row.values[key]))}"
         >
       </td>
     `;
@@ -11810,13 +11818,12 @@ function buildInitialPhotoLightboxState() {
       config.columns.forEach((key) => {
         const span = body.querySelector(`[data-value="${row.id}:${key}"]`);
         if (span) {
-          span.textContent = getDisplayValue(getEffectiveValue(activeSnapshot, row, key));
+          span.textContent = getTableCellDisplayValue(getEffectiveValue(activeSnapshot, row, key));
         }
 
         const input = body.querySelector(`input[data-row="${row.id}"][data-key="${key}"]`);
         if (input instanceof HTMLInputElement) {
-          const nextValue = getDisplayValue(getEffectiveValue(activeSnapshot, row, key));
-          input.value = nextValue === "" ? "0" : nextValue;
+          input.value = getTableCellDisplayValue(getEffectiveValue(activeSnapshot, row, key));
         }
       });
 
@@ -11891,7 +11898,9 @@ function buildInitialPhotoLightboxState() {
       const linkedEl = body.querySelector(`[data-linked="${linkedKey}"]`);
       if (linkedEl) {
         const targetRow = getDepartmentRow(activeSnapshot, targetRowId);
-        linkedEl.textContent = targetRow ? getDisplayValue(getEffectiveValue(activeSnapshot, targetRow, targetKey)) : "";
+        linkedEl.textContent = targetRow
+          ? getTableCellDisplayValue(getEffectiveValue(activeSnapshot, targetRow, targetKey))
+          : "0";
       }
     });
 
