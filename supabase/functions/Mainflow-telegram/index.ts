@@ -37,6 +37,8 @@ const TELEGRAM_PHOTO_AUTOROTATE_META_KEY = "pref:telegram_photo_auto_rotate";
 const ANDROID_INTAKE_HUB_ID = "admission_hub";
 const ANDROID_INTAKE_OCR_STATUS_PREFIX = "android-intake-ocr-status:";
 const ANDROID_INTAKE_OCR_ERROR_PREFIX = "android-intake-ocr-error:";
+const TELEGRAM_PHOTO_OCR_STATUS_PREFIX = "telegram-photo-ocr-status:";
+const TELEGRAM_PHOTO_OCR_ERROR_PREFIX = "telegram-photo-ocr-error:";
 const DEFAULT_WORKPLACE_RADIUS_METERS = 500;
 const TELEGRAM_ADMIN_ONLY_TEXT = "Այս հրամանը հասանելի է միայն բոտի ադմինիստրատորին։";
 const TELEGRAM_NIGHT_SHIFT_BUTTON_TEXT = "Գիշերային ընդունում";
@@ -3203,32 +3205,32 @@ async function requestTelegramColleagueApproval(
   const pendingChats = await loadTelegramPendingColleagueChats(supabase);
   const alreadyPending = pendingChats.some((item) => item.chatId === candidate.chatId);
 
-  if (!alreadyPending) {
-    await saveTelegramPendingColleagueChats(
-      supabase,
-      [candidate, ...pendingChats.filter((item) => item.chatId !== candidate.chatId)]
-    );
+  await saveTelegramPendingColleagueChats(
+    supabase,
+    [candidate, ...pendingChats.filter((item) => item.chatId !== candidate.chatId)]
+  );
 
-    const adminChatIds = getTelegramAdminChatIds();
-    if (adminChatIds.length) {
-      const adminText = [
-        "Новая заявка на подключение к Mainflow боту.",
-        `Пользователь: ${getTelegramColleagueDisplayName(candidate)}`,
-        candidate.username ? `Username: @${candidate.username}` : "",
-        `Chat ID: ${candidate.chatId}`,
-        `Время: ${getYerevanDateTimeText()}`,
-        "",
-        "Разрешить этому коллеге работать с ботом?"
-      ].filter(Boolean).join("\n");
-      for (const adminChatId of adminChatIds) {
-        await sendTelegramMessageWithReplyMarkup(
-          adminChatId,
-          adminText,
-          buildColleagueApprovalReplyMarkup(candidate.chatId)
-        ).catch((error) => {
-          console.error("Failed to send Telegram access request:", sanitizePublicErrorMessage(error));
-        });
-      }
+  const adminChatIds = getTelegramAdminChatIds();
+  if (adminChatIds.length) {
+    const adminText = [
+      alreadyPending
+        ? "Повторное напоминание: заявка на подключение к Mainflow боту ещё ожидает решения."
+        : "Новая заявка на подключение к Mainflow боту.",
+      `Пользователь: ${getTelegramColleagueDisplayName(candidate)}`,
+      candidate.username ? `Username: @${candidate.username}` : "",
+      `Chat ID: ${candidate.chatId}`,
+      `Время: ${getYerevanDateTimeText()}`,
+      "",
+      "Разрешить этому коллеге работать с ботом?"
+    ].filter(Boolean).join("\n");
+    for (const adminChatId of adminChatIds) {
+      await sendTelegramMessageWithReplyMarkup(
+        adminChatId,
+        adminText,
+        buildColleagueApprovalReplyMarkup(candidate.chatId)
+      ).catch((error) => {
+        console.error("Failed to send Telegram access request:", sanitizePublicErrorMessage(error));
+      });
     }
   }
 
@@ -12672,8 +12674,15 @@ function extractPhotoFileId(message: Record<string, unknown>) {
     return typeof largest.file_id === "string" ? largest.file_id : null;
   }
 
-  const document = message.document as { file_id?: unknown; mime_type?: unknown } | undefined;
-  if (document && typeof document.file_id === "string" && typeof document.mime_type === "string" && document.mime_type.startsWith("image/")) {
+  const document = message.document as { file_id?: unknown; file_name?: unknown; mime_type?: unknown } | undefined;
+  const documentFileName = typeof document?.file_name === "string" ? document.file_name.trim().toLowerCase() : "";
+  const documentMimeType = typeof document?.mime_type === "string" ? document.mime_type.trim().toLowerCase() : "";
+  const hasImageExtension = /\.(?:jpe?g|png|webp)$/i.test(documentFileName);
+  if (
+    document
+    && typeof document.file_id === "string"
+    && (documentMimeType.startsWith("image/") || hasImageExtension)
+  ) {
     return document.file_id;
   }
 
@@ -13702,11 +13711,76 @@ async function handleTelegramPhoto(
 
   const selectedPhotoDataUrl = dataUrl;
   const selectedPhotoFileName = fileName;
-  const recognized = await recognizeDepartmentPhoto(departmentId, selectedPhotoDataUrl);
-  const recognizedEvaluation = evaluateTelegramPhotoRecognitionCandidate(
-    recognized,
-    currentDepartmentRow?.values
+  const feedbackId = await insertAcceptedFeedback(
+    supabase,
+    departmentId,
+    reportDate,
+    reportDate,
+    selectedPhotoFileName,
+    selectedPhotoDataUrl,
+    {},
+    [],
+    [
+      "Telegram photo saved before OCR.",
+      `Department source: ${departmentSource}.`,
+      `${TELEGRAM_PHOTO_OCR_STATUS_PREFIX}pending`
+    ]
   );
+  await markDepartmentPhotoPending(supabase, departmentId, feedbackId, selectedPhotoFileName);
+
+  let recognized: Awaited<ReturnType<typeof recognizeDepartmentPhoto>>;
+  let recognizedEvaluation: ReturnType<typeof evaluateTelegramPhotoRecognitionCandidate>;
+  try {
+    recognized = await recognizeDepartmentPhoto(departmentId, selectedPhotoDataUrl);
+    recognizedEvaluation = evaluateTelegramPhotoRecognitionCandidate(
+      recognized,
+      currentDepartmentRow?.values
+    );
+  } catch (ocrError) {
+    const ocrErrorText = getErrorText(ocrError);
+    const { error: ocrStatusError } = await (supabase as any)
+      .from("sharsh_ocr_feedback")
+      .update({
+        notes: [
+          "Telegram photo saved before OCR.",
+          `Department source: ${departmentSource}.`,
+          `${TELEGRAM_PHOTO_OCR_STATUS_PREFIX}failed`,
+          `${TELEGRAM_PHOTO_OCR_ERROR_PREFIX}${ocrErrorText}`
+        ]
+      })
+      .eq("id", feedbackId)
+      .eq("department_id", departmentId);
+    if (ocrStatusError) {
+      console.error("Failed to record Telegram photo OCR failure:", getErrorText(ocrStatusError));
+    }
+    await sendTelegramMessage(
+      chatId,
+      `${senderFirstName}, լուսանկարը պահպանվել է սերվերում, բայց OCR-ը ժամանակավորապես չհաջողվեց։ Նկարը չի կորել․ մի փոքր ուշ ուղարկեք այն կրկին։`
+    );
+    return;
+  }
+
+  const { error: ocrUpdateError } = await (supabase as any)
+    .from("sharsh_ocr_feedback")
+    .update({
+      photo_report_date: recognized.reportDate || reportDate,
+      recognized_keys: recognized.recognizedKeys,
+      ocr_raw: recognized.values,
+      final_values: recognized.values,
+      notes: [
+        "Telegram photo saved before OCR.",
+        `Department source: ${departmentSource}.`,
+        `${TELEGRAM_PHOTO_OCR_STATUS_PREFIX}completed`,
+        ...orientationNotes,
+        ...recognized.notes
+      ],
+      cell_reviews: []
+    })
+    .eq("id", feedbackId)
+    .eq("department_id", departmentId);
+  if (ocrUpdateError) {
+    throw ocrUpdateError;
+  }
 
   const structureInvalid = recognizedEvaluation.structureInvalid;
   const hasRecognizedValues = recognizedEvaluation.hasRecognizedValues;
@@ -13714,17 +13788,6 @@ async function handleTelegramPhoto(
   const photoValidationLinesHy = formatDepartmentValidationLinesHy(photoValidation);
   const isPhotoControlPassed = recognizedEvaluation.isControlPassed;
   const telegramWebFormFeedback = await loadLatestTelegramWebFormFeedback(supabase, departmentId, reportDate);
-  const feedbackId = await insertAcceptedFeedback(
-    supabase,
-    departmentId,
-    reportDate,
-    recognized.reportDate,
-    selectedPhotoFileName,
-    selectedPhotoDataUrl,
-    recognized.values,
-    recognized.recognizedKeys,
-    [...orientationNotes, ...recognized.notes]
-  );
   let shouldSaveSnapshot = false;
   let savedSnapshot: Awaited<ReturnType<typeof loadSnapshot>> | null = null;
   let autoSaveSource: "telegram-form" | "photo" | null = null;
