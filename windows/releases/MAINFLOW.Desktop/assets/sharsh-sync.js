@@ -541,13 +541,6 @@
           source: "remote"
         };
       case "rollover_main_after_archive": {
-        return {
-          snapshot: loadLocalSnapshot(),
-          source: hasRemoteSync() ? "remote" : "local-only",
-          archiveRecord: null,
-          rolloverApplied: false,
-          rolloverAlreadyApplied: true
-        };
         const responsePayload = await postRemotePayload(
           {
             type: "rollover_main_after_archive",

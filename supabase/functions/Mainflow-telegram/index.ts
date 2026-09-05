@@ -10494,7 +10494,7 @@ async function persistDailyMainArchivePdf(
  * sharsh-sync.  The service-role JWT is only used inside this Edge Function;
  * callers still need TELEGRAM_REMINDER_SECRET to reach this action.
  */
-async function runScheduledMainTableRollover() {
+async function runScheduledMainTableRollover(options: { force?: boolean } = {}) {
   const supabase = createSupabaseAdmin();
   const archiveKey = getYerevanDateKey();
 
@@ -10520,7 +10520,8 @@ async function runScheduledMainTableRollover() {
     body: JSON.stringify({
       type: "rollover_main_after_archive",
       archiveKey,
-      reportDate: archive.reportDate || getYerevanReportDateText()
+      reportDate: archive.reportDate || getYerevanReportDateText(),
+      force: options.force === true
     })
   });
   const responseText = await response.text();
@@ -14556,7 +14557,10 @@ Deno.serve(async (request) => {
       }
 
       try {
-        const result = await runScheduledMainTableRollover();
+        const requestUrl = new URL(request.url);
+        const result = await runScheduledMainTableRollover({
+          force: requestUrl.searchParams.get("force") === "1"
+        });
         return jsonResponse({
           ok: true,
           service: "Mainflow-telegram",

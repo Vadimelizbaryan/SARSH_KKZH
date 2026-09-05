@@ -1759,6 +1759,26 @@ async function authorizeOwner(request: Request, supabase: ReturnType<typeof crea
   return null;
 }
 
+/**
+ * The daily rollover is initiated by the private Mainflow-telegram Edge
+ * Function, not by a browser session.  Limit this service-role exception to
+ * that one mutation and require both service headers to match exactly.
+ */
+function isInternalScheduledRolloverRequest(request: Request, type: string) {
+  if (type !== "rollover_main_after_archive") {
+    return false;
+  }
+
+  const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
+  const bearerToken = extractBearerToken(request);
+  const apiKey = (request.headers.get("apikey") || "").trim();
+  return Boolean(
+    serviceRoleKey
+    && bearerToken === serviceRoleKey
+    && apiKey === serviceRoleKey
+  );
+}
+
 function isPublicPostType(type: string) {
   return type === "list_ocr_feedback"
     || type === "list_telegram_form_feedback"
@@ -2825,7 +2845,8 @@ Deno.serve(async (request) => {
 
     const payload = await request.json();
     const type = typeof payload?.type === "string" ? payload.type : "";
-    if (!isPublicPostType(type)) {
+    const isInternalScheduledRollover = isInternalScheduledRolloverRequest(request, type);
+    if (!isPublicPostType(type) && !isInternalScheduledRollover) {
       const authError = await authorizeOwner(request, supabase);
       if (authError) {
         return jsonResponse({ error: authError }, 403);
@@ -3127,6 +3148,9 @@ Deno.serve(async (request) => {
       if (!archiveKey) {
         return jsonResponse({ error: "Archive key is required." }, 400);
       }
+      // A forced retry is available only to the private scheduled caller.
+      // Owner/browser requests remain strictly idempotent by archive day.
+      const force = isInternalScheduledRollover && payload.force === true;
 
       const reportDate = typeof payload.reportDate === "string" && payload.reportDate.trim()
         ? payload.reportDate.trim()
@@ -3144,7 +3168,7 @@ Deno.serve(async (request) => {
 
       const existingArchiveRecord = await loadMainArchiveRecord(supabase, archiveKey);
 
-      if (rolloverMeta?.report_date === archiveKey) {
+      if (rolloverMeta?.report_date === archiveKey && !force) {
         return jsonResponse({
           ...await loadSnapshot(supabase),
           archiveRecord: existingArchiveRecord,
