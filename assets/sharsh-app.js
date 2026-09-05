@@ -56,7 +56,10 @@
   };
   const DATA_UPDATE_GRACE_MINUTES = 2 * 60;
   const DATA_UPDATE_EARLY_TOLERANCE_MINUTES = 60;
-  const ARCHIVE_CAPTURE_HOUR = 10;
+  // The server scheduler performs the daily rollover at 13:00 Asia/Yerevan.
+  // Keeping the same hour here gives an open main page a safe, idempotent
+  // fallback if the scheduled request is delayed.
+  const ARCHIVE_CAPTURE_HOUR = 13;
   const MAX_ARCHIVE_RECORDS = 60;
   const MAX_MAIN_TABLE_SAVED_RECORDS = 60;
   const DEPARTMENT_PDF_ARCHIVE_STORAGE_KEY = `${config.STORAGE_NAMESPACE}:department-pdf-archive:v1`;
@@ -4471,7 +4474,10 @@ function buildInitialPhotoLightboxState() {
     if (existing) {
       return {
         record: existing,
-        shouldRollover: getPendingMorningRolloverKey() === context.key
+        // The server protects the operation by archive key.  Retrying from an
+        // open page after the scheduled time is therefore safe and provides a
+        // fallback when the scheduler was temporarily delayed.
+        shouldRollover: true
       };
     }
 
@@ -4514,8 +4520,7 @@ function buildInitialPhotoLightboxState() {
       || !record.archiveKey
       || state.morningRolloverInFlight
       || state.morningRolloverCompletedKeys.has(record.archiveKey)
-      || typeof sync.rolloverMainAfterArchive !== "function"
-      || getPendingMorningRolloverKey() !== record.archiveKey) {
+      || typeof sync.rolloverMainAfterArchive !== "function") {
       return;
     }
 

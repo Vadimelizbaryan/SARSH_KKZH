@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-09-05T08:15:12.2263607Z",
+    "generatedAtUtc":  "2026-09-05T08:30:23.1418914Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -48,8 +48,8 @@
                   },
                   {
                       "path":  "assets/sharsh-app.js",
-                      "size":  681659,
-                      "sha256":  "E1ED50E4CF3D0409823D0ED304FC13865A96F15E9ED96DD43CFA1B37EEA47729"
+                      "size":  681970,
+                      "sha256":  "7F78CDE8E73D3D293963FF0D04EFEEA4EA2C3C3CE06284081EA0D1946C197C5E"
                   },
                   {
                       "path":  "assets/sharsh-auth.js",
@@ -343,8 +343,8 @@
                   },
                   {
                       "path":  "index.html",
-                      "size":  1078,
-                      "sha256":  "0A353D9124DE67FEEB5EA4B14D6EE3968B7DFE63C4F803604A50184F95CC707B"
+                      "size":  1080,
+                      "sha256":  "B6ACF9AAB763631A8C49C44FD5047CC63D7F3821DB1083C4ADCEA4F863351D11"
                   },
                   {
                       "path":  "Mainflow.deps.json",
@@ -354,12 +354,12 @@
                   {
                       "path":  "Mainflow.dll",
                       "size":  125952,
-                      "sha256":  "495FA7DFD7C4CED9F841A12E1C6624692713F0B9768EB4443F876275D4824CBC"
+                      "sha256":  "DF8D174CD7D6D09ECA267B238C83A55E50B270F0F181B255535713D31B85A6B0"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "4936A7586966C1C02439FCC0A30881F174A7537C9C4231C6C54D261D14688CCC"
+                      "sha256":  "1EFC47A76954CEF81CD4E139A941245563758E9C83E035F61242A517C8783EC5"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",

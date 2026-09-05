@@ -10489,6 +10489,67 @@ async function persistDailyMainArchivePdf(
   };
 }
 
+/**
+ * Runs the existing, server-authoritative main-table rollover through
+ * sharsh-sync.  The service-role JWT is only used inside this Edge Function;
+ * callers still need TELEGRAM_REMINDER_SECRET to reach this action.
+ */
+async function runScheduledMainTableRollover() {
+  const supabase = createSupabaseAdmin();
+  const archiveKey = getYerevanDateKey();
+
+  // A rollover must always have an immutable archive first.  Normally the
+  // 10:01 task already produced it; this makes the 13:00 task self-contained
+  // if that earlier job was delayed or failed.
+  const archive = await persistDailyMainArchivePdf(supabase, {
+    requestedDateKey: archiveKey
+  });
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").trim().replace(/\/+$/, "");
+  const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Supabase service credentials are missing for the scheduled main-table rollover.");
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/sharsh-sync`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      type: "rollover_main_after_archive",
+      archiveKey,
+      reportDate: archive.reportDate || getYerevanReportDateText()
+    })
+  });
+  const responseText = await response.text();
+  let payload: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(responseText);
+    if (parsed && typeof parsed === "object") {
+      payload = parsed as Record<string, unknown>;
+    }
+  } catch (_error) {
+    payload = {};
+  }
+
+  if (!response.ok || payload.error) {
+    const reason = typeof payload.error === "string" && payload.error.trim()
+      ? payload.error.trim()
+      : (responseText || `HTTP ${response.status}`);
+    throw new Error(`Scheduled main-table rollover failed: ${reason}`);
+  }
+
+  return {
+    archiveKey,
+    reportDate: archive.reportDate || getYerevanReportDateText(),
+    archiveCreated: !archive.skipped,
+    rolloverApplied: Boolean(payload.rolloverApplied),
+    rolloverAlreadyApplied: Boolean(payload.rolloverAlreadyApplied)
+  };
+}
+
 async function sendAllCurrentDepartmentsPdf(
   supabase: unknown,
   chatId: number | string,
@@ -14484,6 +14545,33 @@ Deno.serve(async (request) => {
           ok: false,
           service: "Mainflow-telegram",
           status: "daily_main_archive_failed",
+          error: getErrorText(error)
+        }, 500);
+      }
+    }
+
+    if (action === "daily-main-rollover") {
+      if (!isTelegramReminderRequestValid(request)) {
+        return jsonResponse({ ok: false, error: "Unauthorized." }, 403);
+      }
+
+      try {
+        const result = await runScheduledMainTableRollover();
+        return jsonResponse({
+          ok: true,
+          service: "Mainflow-telegram",
+          action,
+          status: result.rolloverAlreadyApplied
+            ? "main_table_rollover_already_applied"
+            : "main_table_rollover_applied",
+          ...result
+        });
+      } catch (error) {
+        return jsonResponse({
+          ok: false,
+          service: "Mainflow-telegram",
+          action,
+          status: "main_table_rollover_failed",
           error: getErrorText(error)
         }, 500);
       }
