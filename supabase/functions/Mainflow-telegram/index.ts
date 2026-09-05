@@ -1708,6 +1708,7 @@ async function requestOpenAiStructuredVision(
     imageDetail?: "auto" | "high" | "original";
     reasoningEffort?: "low" | "medium" | "high" | "xhigh";
     referenceImageDataUrls?: string[];
+    timeoutMs?: number;
   } = {}
 ) {
   const apiKey = getOpenAiApiKey();
@@ -1741,31 +1742,45 @@ async function requestOpenAiStructuredVision(
     }
   ];
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: PHOTO_RECOGNITION_MODEL,
-      ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
-      input: [
-        {
-          role: "user",
-          content
+  const timeoutMs = Math.max(10_000, Math.min(120_000, Number(options.timeoutMs) || 100_000));
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
+      },
+      signal: abortController.signal,
+      body: JSON.stringify({
+        model: PHOTO_RECOGNITION_MODEL,
+        ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+        input: [
+          {
+            role: "user",
+            content
+          }
+        ],
+        text: {
+          format: {
+            type: "json_schema",
+            name: schemaName,
+            strict: true,
+            schema
+          }
         }
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: schemaName,
-          strict: true,
-          schema
-        }
-      }
-    })
-  });
+      })
+    });
+  } catch (error) {
+    if (abortController.signal.aborted) {
+      throw new Error(`OpenAI photo recognition did not finish within ${Math.round(timeoutMs / 1000)} seconds.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload || typeof payload !== "object") {
@@ -2310,17 +2325,54 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
     "Use notes for short uncertainty comments only when needed."
   ].join("\n");
 
-  const parsed = await requestOpenAiStructuredVision(
+  const fullRecognitionPromise = requestOpenAiStructuredVision(
     prompt,
     imageDataUrl,
     "telegram_department_photo_recognition",
     buildPhotoRecognitionSchema(),
     [getOcrTemplateBlankImageUrl()],
     {
-      imageDetail: "original",
-      reasoningEffort: "high"
+      imageDetail: "high",
+      reasoningEffort: "medium",
+      timeoutMs: 100_000
     }
   );
+  const topTableVerificationPromise = Promise.all([
+    buildTopTableCropImageDataUrl(imageDataUrl),
+    getTopTableTemplateDataUrl()
+  ])
+    .then(([topTableImageDataUrl, topTableTemplateDataUrl]) => requestOpenAiStructuredVision(
+      [
+        "This is a focused verification pass for the top handwritten numeric table of an Armenian hospital department form.",
+        `Department id: ${departmentId}. Department name: ${departmentMeta.department}.`,
+        "You receive two cropped images in order: the blank-table reference, then the filled-table image.",
+        "Read only the handwritten numeric values from the visible 22-cell table. Do not infer, calculate, or copy printed labels.",
+        "Confirm the printed cell borders before returning values. Return null for every uncertain cell.",
+        "The top table must have exactly 22 visual cells, from left to right.",
+        PHOTO_TEMPLATE_GUIDE,
+        "Return rightCellValues as exactly 11 items for cells 12-22 in their visual left-to-right order.",
+        "rightCellValues[0] is visual cell 12; do not shift it to cell 13.",
+        "The final rightmost item is visual cell 22.",
+        "The cropped images do not necessarily include the report date, so return reportDate as null unless it is actually visible.",
+        "Use notes only for short uncertainty comments."
+      ].join("\n"),
+      topTableImageDataUrl,
+      "telegram_department_top_table_verification",
+      buildPhotoRecognitionSchema(),
+      [],
+      {
+        imageDetail: "high",
+        reasoningEffort: "medium",
+        referenceImageDataUrls: [topTableTemplateDataUrl],
+        timeoutMs: 100_000
+      }
+    ))
+    .catch((error) => {
+      console.warn("Top-table photo verification failed:", sanitizePublicErrorMessage(error));
+      return null;
+    });
+
+  const parsed = await fullRecognitionPromise;
 
   const parsedValues = parsed.values && typeof parsed.values === "object"
     ? parsed.values as Record<string, unknown>
@@ -2338,37 +2390,8 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
     sanitizedValues.presentTotal = extractPresentTotalFromNotes(baseNotes);
   }
   const notes = [...baseNotes];
-  try {
-    const [topTableImageDataUrl, topTableTemplateDataUrl] = await Promise.all([
-      buildTopTableCropImageDataUrl(imageDataUrl),
-      getTopTableTemplateDataUrl()
-    ]);
-    const topTablePrompt = [
-      "This is a focused verification pass for the top handwritten numeric table of an Armenian hospital department form.",
-      `Department id: ${departmentId}. Department name: ${departmentMeta.department}.`,
-      "You receive two cropped images in order: the blank-table reference, then the filled-table image.",
-      "Read only the handwritten numeric values from the visible 22-cell table. Do not infer, calculate, or copy printed labels.",
-      "Confirm the printed cell borders before returning values. Return null for every uncertain cell.",
-      "The top table must have exactly 22 visual cells, from left to right.",
-      PHOTO_TEMPLATE_GUIDE,
-      "Return rightCellValues as exactly 11 items for cells 12-22 in their visual left-to-right order.",
-      "rightCellValues[0] is visual cell 12; do not shift it to cell 13.",
-      "The final rightmost item is visual cell 22.",
-      "The cropped images do not necessarily include the report date, so return reportDate as null unless it is actually visible.",
-      "Use notes only for short uncertainty comments."
-    ].join("\n");
-    const topTableParsed = await requestOpenAiStructuredVision(
-      topTablePrompt,
-      topTableImageDataUrl,
-      "telegram_department_top_table_verification",
-      buildPhotoRecognitionSchema(),
-      [],
-      {
-        imageDetail: "original",
-        reasoningEffort: "high",
-        referenceImageDataUrls: [topTableTemplateDataUrl]
-      }
-    );
+  const topTableParsed = await topTableVerificationPromise;
+  if (topTableParsed) {
     const topTableStructure = sanitizePhotoStructure(topTableParsed.structure);
     const topTableVerified = !!topTableStructure && topTableStructure.all22CellsVisible && topTableStructure.gridCellCount === 22;
     if (topTableVerified) {
@@ -2394,8 +2417,7 @@ async function recognizeDepartmentPhoto(departmentId: DepartmentId, imageDataUrl
     } else {
       notes.push("Top-table verification pass could not confirm all 22 cells; the full-form result was retained.");
     }
-  } catch (error) {
-    console.warn("Top-table photo verification failed:", sanitizePublicErrorMessage(error));
+  } else {
     notes.push("Top-table verification was unavailable; the full-form result was retained.");
   }
 
