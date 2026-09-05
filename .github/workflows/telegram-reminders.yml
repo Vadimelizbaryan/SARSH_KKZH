@@ -126,7 +126,7 @@ jobs:
           fi
 
           if [ -n "$TELEGRAM_REMINDER_SECRET" ]; then
-            curl -fsS -H "x-telegram-reminder-secret: $TELEGRAM_REMINDER_SECRET" "$url"
+            curl --fail-with-body -sS -H "x-telegram-reminder-secret: $TELEGRAM_REMINDER_SECRET" "$url"
           else
-            curl -fsS "$url"
+            curl --fail-with-body -sS "$url"
           fi
