@@ -104,6 +104,86 @@ body {
   color: #16663a;
 }
 
+.android-intake__status-panel {
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid #c9dbc9;
+  border-radius: 18px;
+  background: #f4fbf4;
+  display: grid;
+  gap: 10px;
+}
+
+.android-intake__status-heading,
+.android-intake__upload-progress-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: #244239;
+  font-size: 14px;
+}
+
+.android-intake__status-heading span,
+.android-intake__upload-progress-title span {
+  color: #51645b;
+  text-align: right;
+}
+
+.android-intake__progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dce7df;
+}
+
+.android-intake__progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2c8b5e;
+  transition: width 180ms ease;
+}
+
+.android-intake__status-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.android-intake__status-metric {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #edf1ed;
+  color: #4e5d56;
+  font-size: 12px;
+}
+
+.android-intake__status-metric--uploaded {
+  background: #dff3e4;
+  color: #16663a;
+}
+
+.android-intake__status-metric--pending {
+  background: #fff2d8;
+  color: #855400;
+}
+
+.android-intake__upload-progress {
+  display: grid;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.android-intake__progress-track--upload {
+  background: #f2dfb7;
+}
+
+.android-intake__progress-fill--upload {
+  background: #d18400;
+}
+
 .android-intake__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -168,6 +248,34 @@ body {
   font-weight: 700;
 }
 
+.android-intake__server-photo {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 10px;
+  text-align: center;
+  color: #245339;
+}
+
+.android-intake__server-photo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: #1f7a53;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.android-intake__server-photo small {
+  color: #61736a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .android-intake__card-meta {
   margin-top: 10px;
   display: grid;
@@ -201,6 +309,11 @@ body {
   color: #855400;
 }
 
+.android-intake__card-status--error,
+.android-intake__card-status--error strong {
+  color: #a72f22;
+}
+
 .android-intake__card-actions {
   margin-top: 8px;
   display: flex;
@@ -217,6 +330,12 @@ body {
   color: #2c4038;
   font-size: 13px;
   font-weight: 700;
+}
+
+.android-intake__mini-button--retake {
+  background: #f1e4c9;
+  border-color: #d8bb81;
+  color: #5e4514;
 }
 
 .android-intake__modal[hidden] {

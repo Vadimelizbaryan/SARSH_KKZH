@@ -1,0 +1,506 @@
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #f4efe5;
+  color: #1e1b17;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+.sona-app {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 26px clamp(16px, 3vw, 42px) 54px;
+}
+
+.sona-topbar,
+.sona-card,
+.sona-summary-card {
+  border: 1px solid rgba(55, 45, 27, 0.12);
+  background: rgba(255, 253, 248, 0.95);
+  box-shadow: 0 14px 44px rgba(73, 55, 24, 0.08);
+}
+
+.sona-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px;
+  border-radius: 24px;
+  margin-bottom: 20px;
+}
+
+.sona-kicker {
+  margin: 0 0 6px;
+  color: #6a5428;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.sona-topbar h1,
+.sona-card h2 {
+  margin: 0;
+  color: #292115;
+}
+
+.sona-topbar h1 {
+  font-size: clamp(26px, 4vw, 37px);
+  line-height: 1.08;
+}
+
+.sona-subtitle {
+  max-width: 700px;
+  margin: 10px 0 0;
+  color: #625a4d;
+  line-height: 1.5;
+}
+
+.sona-link,
+.sona-button {
+  appearance: none;
+  border: 1px solid rgba(50, 39, 21, 0.16);
+  border-radius: 12px;
+  min-height: 42px;
+  padding: 9px 14px;
+  color: #2c2416;
+  background: #fffdfa;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sona-button.primary {
+  background: #315d3a;
+  border-color: #315d3a;
+  color: #fff;
+}
+
+.sona-button.warning {
+  background: #9b4c27;
+  border-color: #9b4c27;
+  color: #fff;
+}
+
+.sona-button.danger {
+  background: #7d3127;
+  border-color: #7d3127;
+  color: #fff;
+}
+
+.sona-button:disabled {
+  cursor: wait;
+  opacity: .55;
+}
+
+.sona-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, .96fr) minmax(340px, 1.04fr);
+}
+
+.sona-card {
+  min-width: 0;
+  padding: 22px;
+  border-radius: 20px;
+}
+
+.sona-card h2 {
+  font-size: 20px;
+}
+
+.sona-card > p {
+  margin: 8px 0 18px;
+  color: #625a4d;
+  line-height: 1.45;
+}
+
+.sona-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sona-field {
+  display: grid;
+  gap: 6px;
+  color: #453b2c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sona-field.wide {
+  grid-column: 1 / -1;
+}
+
+.sona-field input,
+.sona-field select,
+.sona-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid rgba(47, 38, 24, .2);
+  border-radius: 11px;
+  padding: 10px 11px;
+  color: #241d13;
+  background: #fff;
+  font: inherit;
+}
+
+.sona-field textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
+.sona-file-choice {
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+  border: 1px dashed rgba(49, 93, 58, .42);
+  border-radius: 13px;
+  background: #f6faf4;
+}
+
+.sona-file-choice strong { color: #2f5c38; }
+.sona-file-choice small { color: #625a4d; line-height: 1.4; }
+
+.sona-actions,
+.sona-filters,
+.sona-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sona-actions { margin-top: 16px; }
+
+.sona-filter-result {
+  margin: 12px 0;
+  color: #625a4d;
+  font-size: 13px;
+}
+
+.sona-filter-result strong { color: #315d3a; font-size: 16px; }
+
+.sona-filters .sona-button[disabled] {
+  min-width: 116px;
+}
+
+.sona-status {
+  margin: 15px 0 0;
+  padding: 11px 13px;
+  border-radius: 12px;
+  color: #433827;
+  background: #f5efdf;
+  line-height: 1.45;
+}
+
+.sona-status.error { background: #fbe9e4; color: #813a29; }
+.sona-status.success { background: #e9f3e9; color: #285c37; }
+
+.sona-progress {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 13px 15px;
+  border: 1px solid rgba(49, 93, 58, .2);
+  border-radius: 14px;
+  color: #294d31;
+  background: #eef7ee;
+}
+
+.sona-progress-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.sona-progress-copy strong { font-size: 14px; }
+
+.sona-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(49, 93, 58, .16);
+}
+
+.sona-progress-track span {
+  display: block;
+  width: var(--sona-progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #477c51, #2d663b);
+  transition: width .25s ease;
+}
+
+.sona-safety-note {
+  margin: 17px 0 0;
+  padding: 12px 13px;
+  border-left: 4px solid #b27a28;
+  color: #5b4929;
+  background: #fff8e8;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sona-batch-list {
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.sona-batch-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  text-align: left;
+  border: 1px solid rgba(55, 45, 27, .13);
+  border-radius: 13px;
+  padding: 12px;
+  background: #fffefa;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sona-batch-item.active { border-color: #315d3a; box-shadow: inset 0 0 0 1px #315d3a; background: #f2f8f1; }
+.sona-batch-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sona-batch-item small { display: block; margin-top: 3px; color: #706756; }
+
+.sona-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #5b4929;
+  background: #f1e7d4;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sona-pill.processed,
+.sona-pill.approved { color: #1f6033; background: #e0f1e2; }
+.sona-pill.failed,
+.sona-pill.rejected { color: #883827; background: #f8e1dc; }
+.sona-pill.pending_review,
+.sona-pill.registered { color: #795719; background: #fff0ce; }
+
+.sona-workspace { margin-top: 20px; }
+.sona-workspace > .sona-card + .sona-card { margin-top: 20px; }
+
+.sona-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.sona-summary-card {
+  padding: 12px;
+  border-radius: 13px;
+}
+
+.sona-summary-card strong { display: block; font-size: 23px; color: #2d5635; }
+.sona-summary-card span { color: #6b604f; font-size: 12px; }
+
+.sona-table-wrap { overflow: auto; border: 1px solid rgba(55, 45, 27, .12); border-radius: 13px; }
+
+.sona-table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  background: #fffefa;
+  font-size: 13px;
+}
+
+.sona-table th,
+.sona-table td {
+  border-bottom: 1px solid rgba(55, 45, 27, .1);
+  padding: 9px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.sona-table th { color: #5d513d; background: #f7f1e6; font-size: 12px; }
+.sona-table tr:last-child td { border-bottom: 0; }
+.sona-table .file-name { max-width: 340px; word-break: break-word; }
+.sona-table .row-actions { white-space: nowrap; }
+
+.sona-registry-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.sona-registry-card {
+  display: grid;
+  gap: 7px;
+  min-height: 100px;
+  padding: 16px;
+  border: 1px solid rgba(55, 45, 27, .14);
+  border-radius: 17px;
+  color: #2e281f;
+  background: #fffdfa;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sona-registry-card.active {
+  border-color: #315d3a;
+  box-shadow: inset 0 0 0 1px #315d3a;
+  background: #eef7ee;
+}
+
+.sona-registry-card strong { font-size: 16px; line-height: 1.3; }
+.sona-registry-card span { color: #655c4e; font-size: 13px; }
+.sona-registry-card b { color: #2e653b; font-size: 20px; }
+.sona-registry-workspace { margin-top: 20px; }
+.sona-registry-table td { max-width: 310px; }
+
+.sona-base-page .civil-hero {
+  margin-bottom: 0;
+}
+
+.sona-base-tools {
+  align-items: end;
+}
+
+.sona-base-select {
+  display: grid;
+  gap: 5px;
+  color: #5f5749;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.sona-base-select select {
+  min-height: 48px;
+  min-width: 190px;
+  padding: 10px 13px;
+  border: 1px solid rgba(17, 17, 17, 0.16);
+  border-radius: 15px;
+  background: #fff;
+  color: #17140d;
+  font: inherit;
+  font-weight: 800;
+}
+
+.sona-base-table {
+  min-width: 0;
+  font-size: 13px;
+  table-layout: auto;
+}
+
+.sona-base-table th,
+.sona-base-table td {
+  padding: 7px 9px;
+  line-height: 1.28;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.sona-base-table th {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.sona-base-table td:first-child,
+.sona-base-table th:first-child {
+  width: 38px;
+  min-width: 38px;
+}
+
+.sona-base-table td:nth-child(2),
+.sona-base-table th:nth-child(2) {
+  min-width: 190px;
+}
+
+.sona-base-table td:last-child,
+.sona-base-table th:last-child {
+  min-width: 104px;
+  white-space: nowrap;
+}
+
+.sona-base-table td:nth-last-child(2),
+.sona-base-table th:nth-last-child(2) {
+  min-width: 145px;
+}
+
+.sona-base-table small {
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+@media (min-width: 1100px) {
+  .sona-base-table td:nth-child(3),
+  .sona-base-table th:nth-child(3) { min-width: 115px; }
+  .sona-base-table td:nth-child(4),
+  .sona-base-table th:nth-child(4) { min-width: 100px; }
+  .sona-base-table td:nth-child(5),
+  .sona-base-table th:nth-child(5) { min-width: 90px; }
+  .sona-base-table td:nth-child(6),
+  .sona-base-table th:nth-child(6) { min-width: 110px; }
+}
+
+.civil-status.success {
+  color: #1f6033;
+  background: #e4f3e5;
+}
+
+.civil-status.error {
+  color: #843828;
+  background: #fbe7e2;
+}
+
+.sona-mini-button {
+  appearance: none;
+  border: 0;
+  padding: 4px 0;
+  color: #315d3a;
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sona-empty { margin: 13px 0 0; color: #6b604f; }
+.sona-hidden { display: none !important; }
+
+.sona-consent {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 720px;
+  color: #574b38;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  .sona-grid { grid-template-columns: 1fr; }
+  .sona-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .sona-app { padding: 12px 12px 34px; }
+  .sona-topbar, .sona-card { padding: 17px; border-radius: 17px; }
+  .sona-topbar { flex-direction: column; }
+  .sona-form-grid { grid-template-columns: 1fr; }
+  .sona-field.wide { grid-column: auto; }
+}

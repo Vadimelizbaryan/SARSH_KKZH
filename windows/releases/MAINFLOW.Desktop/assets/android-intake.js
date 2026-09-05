@@ -8,15 +8,15 @@
   }
 
   const SESSION_STORAGE_PREFIX = `${config.STORAGE_NAMESPACE}:android-intake-hub:v1`;
-  const PREVIEW_TAP_DELAY_MS = 260;
   const POLL_INTERVAL_MS = 60 * 1000;
   const query = new URLSearchParams(window.location.search);
   const deviceId = String(query.get("androidDeviceId") || "").trim();
   const deviceName = String(query.get("androidDeviceName") || "").trim();
   const fallbackReportDate = String(query.get("date") || "").trim();
+  const excludedPhotoDepartmentIds = new Set(["r19", "r20", "r21"]);
   const departments = Array.isArray(config.departmentDefinitions)
     ? config.departmentDefinitions
-      .filter((item) => item && typeof item.id === "string")
+      .filter((item) => item && typeof item.id === "string" && !excludedPhotoDepartmentIds.has(String(item.id)))
       .map((item) => ({
         id: String(item.id),
         marker: String(item.marker || item.id),
@@ -33,13 +33,21 @@
     slots: [],
     isLoading: true,
     isSending: false,
+    isResetting: false,
+    isRequestingAccess: false,
+    retryingFeedbackId: "",
+    accessRequired: false,
     message: "Загружаю список отделений и последние фото...",
     messageTone: "info",
     preview: null,
     pendingDepartmentId: "",
-    tapSlotId: "",
-    tapTimerId: 0,
-    pollTimerId: 0
+    uploadProgress: {
+      completed: 0,
+      total: 0,
+      currentDepartmentName: ""
+    },
+    pollTimerId: 0,
+    hiddenFeedbackIds: []
   };
 
   function escapeHtml(value) {
@@ -70,8 +78,72 @@
     return url.toString();
   }
 
+  function getRetryOcrUrl() {
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "android-intake-photo-retry-ocr");
+    return url.toString();
+  }
+
+  function getAccessRequestUrl() {
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "android-intake-access-request");
+    return url.toString();
+  }
+
+  function getNewSessionUrl() {
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "android-intake-new-session");
+    return url.toString();
+  }
+
+  function getFeedbackPhotoUrl(feedbackId, departmentId) {
+    const url = new URL(getTelegramFunctionEndpoint());
+    url.searchParams.set("action", "feedback-photo");
+    url.searchParams.set("id", feedbackId);
+    url.searchParams.set("departmentId", departmentId);
+    return url.toString();
+  }
+
   function getStorageKey(sessionKey) {
     return `${SESSION_STORAGE_PREFIX}:${deviceId}:${sessionKey || "pending"}`;
+  }
+
+  function getManualSessionStorageKey(sessionKey) {
+    return `${getStorageKey(sessionKey)}:manual-session`;
+  }
+
+  function readManualSession(sessionKey) {
+    if (!sessionKey) {
+      return { hiddenFeedbackIds: [] };
+    }
+    try {
+      const raw = localStorage.getItem(getManualSessionStorageKey(sessionKey));
+      if (!raw) {
+        return { hiddenFeedbackIds: [] };
+      }
+      const parsed = JSON.parse(raw);
+      const hiddenFeedbackIds = Array.isArray(parsed?.hiddenFeedbackIds)
+        ? parsed.hiddenFeedbackIds.map((item) => String(item || "").trim()).filter(Boolean)
+        : [];
+      return { hiddenFeedbackIds };
+    } catch (_error) {
+      return { hiddenFeedbackIds: [] };
+    }
+  }
+
+  function writeManualSession(sessionKey, hiddenFeedbackIds) {
+    if (!sessionKey) {
+      return;
+    }
+    const uniqueIds = Array.from(new Set(
+      (Array.isArray(hiddenFeedbackIds) ? hiddenFeedbackIds : [])
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    ));
+    localStorage.setItem(getManualSessionStorageKey(sessionKey), JSON.stringify({
+      hiddenFeedbackIds: uniqueIds,
+      updatedAt: new Date().toISOString()
+    }));
   }
 
   function readLocalDrafts(sessionKey) {
@@ -132,6 +204,10 @@
     return slot.localDraft || slot.serverPhoto || null;
   }
 
+  function hasPhotoImageData(photo) {
+    return typeof photo?.imageDataUrl === "string" && photo.imageDataUrl.startsWith("data:image/");
+  }
+
   function isSlotComplete(slot) {
     return Boolean(getSlotDisplayPhoto(slot));
   }
@@ -142,6 +218,22 @@
 
   function getPendingUploadCount() {
     return state.slots.filter((slot) => slot.localDraft).length;
+  }
+
+  function getUploadedCount() {
+    return state.slots.filter((slot) => Boolean(slot.serverPhoto) && !slot.localDraft).length;
+  }
+
+  function getPhotoStatusSummary() {
+    const total = state.slots.length;
+    const missing = getMissingCount();
+    return {
+      total,
+      missing,
+      ready: Math.max(0, total - missing),
+      pending: getPendingUploadCount(),
+      uploaded: getUploadedCount()
+    };
   }
 
   function canSendAll() {
@@ -162,16 +254,21 @@
       return null;
     }
     const imageDataUrl = typeof record.imageDataUrl === "string" ? record.imageDataUrl : "";
-    if (!imageDataUrl.startsWith("data:image/")) {
+    const hasImageDataUrl = imageDataUrl.startsWith("data:image/");
+    const feedbackId = String(record.feedbackId || record.id || "").trim();
+    if (!feedbackId && !hasImageDataUrl) {
       return null;
     }
     return {
-      feedbackId: String(record.feedbackId || record.id || ""),
-      imageDataUrl,
+      feedbackId,
+      imageDataUrl: hasImageDataUrl ? imageDataUrl : "",
+      hasImageDataUrl: Boolean(hasImageDataUrl || record.hasImageDataUrl),
       imageName: String(record.imageName || ""),
       createdAt: String(record.createdAt || ""),
       reportDate: String(record.reportDate || ""),
-      sourceLabel: String(record.sourceLabel || "")
+      sourceLabel: String(record.sourceLabel || ""),
+      ocrStatus: String(record.ocrStatus || "completed"),
+      ocrError: String(record.ocrError || "")
     };
   }
 
@@ -198,14 +295,38 @@
     state.sessionStartIso = String(payload?.sessionStartIso || "");
     state.sessionEndIso = String(payload?.sessionEndIso || "");
     const storedDrafts = readLocalDrafts(state.sessionKey);
+    const manualSession = readManualSession(state.sessionKey);
+    const hiddenFeedbackIds = new Set(manualSession.hiddenFeedbackIds);
+    state.hiddenFeedbackIds = Array.from(hiddenFeedbackIds);
     const serverDepartments = Array.isArray(payload?.departments) ? payload.departments : [];
     state.slots = departments.map((department) => {
       const serverDepartment = serverDepartments.find((item) => String(item.departmentId || "") === department.id) || {};
+      const previousSlot = getSlotByDepartmentId(department.id);
+      const serverPhoto = normalizeServerPhoto(serverDepartment.latestPhoto);
+      if (serverPhoto?.feedbackId && hiddenFeedbackIds.has(serverPhoto.feedbackId)) {
+        return {
+          departmentId: department.id,
+          marker: department.marker,
+          departmentName: department.name,
+          serverPhoto: null,
+          localDraft: normalizeLocalDraft(storedDrafts[department.id])
+        };
+      }
+      if (
+        serverPhoto
+        && previousSlot?.serverPhoto
+        && serverPhoto.feedbackId
+        && serverPhoto.feedbackId === previousSlot.serverPhoto.feedbackId
+        && hasPhotoImageData(previousSlot.serverPhoto)
+      ) {
+        serverPhoto.imageDataUrl = previousSlot.serverPhoto.imageDataUrl;
+        serverPhoto.hasImageDataUrl = true;
+      }
       return {
         departmentId: department.id,
         marker: department.marker,
         departmentName: department.name,
-        serverPhoto: normalizeServerPhoto(serverDepartment.latestPhoto),
+        serverPhoto,
         localDraft: normalizeLocalDraft(storedDrafts[department.id])
       };
     });
@@ -226,8 +347,10 @@
       const response = await fetch(getStateUrl(), { method: "GET" });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.ok) {
+        state.accessRequired = response.status === 403;
         throw new Error(payload?.error || "Не удалось загрузить состояние фотосессии.");
       }
+      state.accessRequired = false;
       mergeStatePayload(payload);
       state.isLoading = false;
       if (!state.message || state.messageTone === "info") {
@@ -274,28 +397,44 @@
     render();
   }
 
-  function handleSlotTap(departmentId) {
+  async function openPreviewDeferred(departmentId) {
     const slot = getSlotByDepartmentId(departmentId);
-    if (!slot) {
+    const photo = getSlotDisplayPhoto(slot);
+    if (!slot || !photo) {
       return;
     }
-    if (!getSlotDisplayPhoto(slot)) {
-      openFilePicker(departmentId);
-      return;
-    }
-    if (state.tapSlotId === departmentId && state.tapTimerId) {
-      window.clearTimeout(state.tapTimerId);
-      state.tapTimerId = 0;
-      state.tapSlotId = "";
-      openFilePicker(departmentId);
-      return;
-    }
-    state.tapSlotId = departmentId;
-    state.tapTimerId = window.setTimeout(() => {
-      state.tapTimerId = 0;
-      state.tapSlotId = "";
+    if (slot.localDraft || hasPhotoImageData(photo)) {
       openPreview(departmentId);
-    }, PREVIEW_TAP_DELAY_MS);
+      return;
+    }
+    if (!photo.feedbackId) {
+      setMessage("Не удалось открыть фото: нет номера снимка.", "error");
+      return;
+    }
+
+    try {
+      setMessage(`Загружаю фото: ${slot.departmentName}...`, "info");
+      const response = await fetch(getFeedbackPhotoUrl(photo.feedbackId, slot.departmentId), { method: "GET" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Не удалось загрузить фото.");
+      }
+
+      const loadedPhoto = normalizeServerPhoto(payload.record);
+      if (!loadedPhoto || !hasPhotoImageData(loadedPhoto)) {
+        throw new Error("Сервер вернул фото без изображения.");
+      }
+
+      slot.serverPhoto = {
+        ...photo,
+        ...loadedPhoto,
+        feedbackId: photo.feedbackId || loadedPhoto.feedbackId,
+        sourceLabel: loadedPhoto.sourceLabel || photo.sourceLabel || ""
+      };
+      openPreview(departmentId);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не удалось загрузить фото.", "error");
+    }
   }
 
   async function resizeImageFile(file) {
@@ -313,7 +452,7 @@
       img.src = dataUrl;
     });
 
-    const maxDimension = 1600;
+    const maxDimension = 2400;
     const ratio = Math.min(1, maxDimension / Math.max(image.width, image.height));
     const width = Math.max(1, Math.round(image.width * ratio));
     const height = Math.max(1, Math.round(image.height * ratio));
@@ -325,7 +464,7 @@
       throw new Error("Не удалось подготовить фото.");
     }
     context.drawImage(image, 0, 0, width, height);
-    const normalizedDataUrl = canvas.toDataURL("image/jpeg", 0.86);
+    const normalizedDataUrl = canvas.toDataURL("image/jpeg", 0.94);
     const safeName = String(file.name || "android-intake-photo.jpg").trim() || "android-intake-photo.jpg";
     const fileName = safeName.toLowerCase().endsWith(".jpg") || safeName.toLowerCase().endsWith(".jpeg")
       ? safeName
@@ -376,6 +515,77 @@
     writeLocalDrafts();
   }
 
+  async function startManualNewSession() {
+    if (state.isSending || state.isResetting) {
+      return;
+    }
+    if (!state.sessionKey) {
+      setMessage("Сначала обновите страницу, чтобы получить текущую сессию.", "error");
+      return;
+    }
+
+    const serverFeedbackIds = state.slots
+      .map((slot) => String(slot.serverPhoto?.feedbackId || "").trim())
+      .filter(Boolean);
+    const hiddenFeedbackIds = new Set(readManualSession(state.sessionKey).hiddenFeedbackIds);
+    serverFeedbackIds.forEach((feedbackId) => hiddenFeedbackIds.add(feedbackId));
+
+    state.isResetting = true;
+    setMessage("Удаляю старые фото с сервера и начинаю новую сессию...", "info");
+    render();
+
+    try {
+      let deletedCount = 0;
+      if (serverFeedbackIds.length) {
+        const response = await fetch(getNewSessionUrl(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            androidDeviceId: deviceId,
+            androidDeviceName: deviceName,
+            sessionKey: state.sessionKey,
+            reportDate: state.reportDate,
+            feedbackIds: serverFeedbackIds
+          })
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || "Не удалось удалить старые фото с сервера.");
+        }
+        deletedCount = Number(payload.deletedFeedbackCount || 0);
+        const deletedIds = Array.isArray(payload.deletedFeedbackIds)
+          ? payload.deletedFeedbackIds.map((item) => String(item || "").trim()).filter(Boolean)
+          : [];
+        deletedIds.forEach((feedbackId) => hiddenFeedbackIds.add(feedbackId));
+      }
+
+      state.slots.forEach((slot) => {
+        slot.serverPhoto = null;
+        slot.localDraft = null;
+      });
+      state.preview = null;
+      state.pendingDepartmentId = "";
+      state.hiddenFeedbackIds = Array.from(hiddenFeedbackIds);
+      writeManualSession(state.sessionKey, state.hiddenFeedbackIds);
+      writeLocalDrafts();
+      state.isResetting = false;
+      render();
+      setMessage(
+        deletedCount > 0
+          ? `Новая сессия начата. Старые фото удалены с сервера: ${deletedCount}. Сделайте фото новых бланков.`
+          : "Новая сессия начата. Сделайте фото новых бланков.",
+        "success"
+      );
+      void loadState(false);
+    } catch (error) {
+      state.isResetting = false;
+      render();
+      setMessage(error instanceof Error ? error.message : "Не удалось начать новую сессию.", "error");
+    }
+  }
+
   async function sendPendingPhotos() {
     if (!canSendAll()) {
       if (getMissingCount() > 0) {
@@ -390,6 +600,11 @@
     }
 
     state.isSending = true;
+    state.uploadProgress = {
+      completed: 0,
+      total: queue.length,
+      currentDepartmentName: ""
+    };
     render();
 
     try {
@@ -399,6 +614,11 @@
         if (!draft) {
           continue;
         }
+        state.uploadProgress = {
+          completed: index,
+          total: queue.length,
+          currentDepartmentName: slot.departmentName
+        };
         setMessage(`Отправляю ${index + 1} из ${queue.length}: ${slot.departmentName}. OCR обрабатывает фото...`, "info");
         const response = await fetch(getSubmitUrl(), {
           method: "POST",
@@ -426,23 +646,105 @@
           reportDate: state.reportDate,
           sourceLabel: "Ընդունարան"
         });
+        state.uploadProgress = {
+          completed: index + 1,
+          total: queue.length,
+          currentDepartmentName: slot.departmentName
+        };
         render();
       }
       state.isSending = false;
+      state.uploadProgress = {
+        completed: 0,
+        total: 0,
+        currentDepartmentName: ""
+      };
       render();
       setMessage("Все новые фото отправлены. OCR обработал снимки. На веб-странице откройте блок «Фото бланков текущей таблицы» и проверьте результаты.", "success");
       void loadState(false);
     } catch (error) {
       state.isSending = false;
+      state.uploadProgress = {
+        completed: 0,
+        total: 0,
+        currentDepartmentName: ""
+      };
       render();
       setMessage(error instanceof Error ? error.message : "Не удалось отправить фото.", "error");
+    }
+  }
+
+  async function requestAccessAgain() {
+    if (!deviceId || state.isRequestingAccess) {
+      return;
+    }
+    state.isRequestingAccess = true;
+    render();
+    try {
+      const response = await fetch(getAccessRequestUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          androidDeviceId: deviceId,
+          androidDeviceName: deviceName
+        })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Не удалось повторить запрос доступа.");
+      }
+      state.accessRequired = payload.status !== "approved";
+      setMessage(payload.message || "Запрос подтверждения отправлен администратору в Telegram.", "success");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не удалось повторить запрос доступа.", "error");
+    } finally {
+      state.isRequestingAccess = false;
+      render();
+    }
+  }
+
+  async function retryPhotoOcr(departmentId) {
+    const slot = getSlotByDepartmentId(departmentId);
+    const photo = slot?.serverPhoto;
+    if (!slot || !photo?.feedbackId || state.retryingFeedbackId) {
+      return;
+    }
+    state.retryingFeedbackId = photo.feedbackId;
+    setMessage(`Повторно запускаю OCR: ${slot.departmentName}...`, "info");
+    render();
+    try {
+      const response = await fetch(getRetryOcrUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          androidDeviceId: deviceId,
+          androidDeviceName: deviceName,
+          departmentId: slot.departmentId,
+          feedbackId: photo.feedbackId
+        })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Не удалось повторить OCR.");
+      }
+      syncServerPhotoIntoSlot(slot.departmentId, payload.record || photo);
+      setMessage(payload.message || "OCR обработал сохранённое фото.", payload.ocrStatus === "failed" ? "error" : "success");
+      await loadState(false);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не удалось повторить OCR.", "error");
+    } finally {
+      state.retryingFeedbackId = "";
+      render();
     }
   }
 
   function buildSlotCard(slot) {
     const photo = getSlotDisplayPhoto(slot);
     const isLocal = Boolean(slot.localDraft);
-    const statusClass = isLocal ? " android-intake__card-status--local" : "";
+    const hasPhotoImage = hasPhotoImageData(photo);
+    const ocrFailed = Boolean(photo && !isLocal && photo.ocrStatus === "failed");
+    const ocrPending = Boolean(photo && !isLocal && photo.ocrStatus === "pending");
+    const statusClass = isLocal ? " android-intake__card-status--local" : (ocrFailed ? " android-intake__card-status--error" : "");
     const statusText = photo
       ? (isLocal ? "Готово к отправке" : "Фото уже есть")
       : "Фото ещё не сделано";
@@ -452,9 +754,9 @@
     return `
       <article class="android-intake__card${isLocal ? " is-local" : ""}${photo && !isLocal ? " is-complete" : ""}">
         <div class="android-intake__thumb">
-          <button type="button" class="android-intake__thumb-button" data-slot-open="${escapeHtml(slot.departmentId)}">
+          <button type="button" class="android-intake__thumb-button" ${photo ? "data-slot-preview" : "data-slot-retake"}="${escapeHtml(slot.departmentId)}">
             ${photo
-              ? `<img src="${escapeHtml(photo.imageDataUrl)}" alt="${escapeHtml(slot.departmentName)}">`
+              ? (hasPhotoImage ? `<img src="${escapeHtml(photo.imageDataUrl)}" alt="${escapeHtml(slot.departmentName)}">` : `<div class="android-intake__server-photo"><div class="android-intake__server-photo-icon">&#10003;</div><div class="android-intake__camera-text">Фото есть</div><small>Тап - открыть</small></div>`)
               : `<div><div class="android-intake__camera-icon">📷</div><div class="android-intake__camera-text">Снять фото</div></div>`}
           </button>
         </div>
@@ -462,16 +764,54 @@
           <div class="android-intake__card-title">${escapeHtml(slot.marker)}<small>${escapeHtml(slot.departmentName)}</small></div>
           <div class="android-intake__card-status${statusClass}"><strong>${escapeHtml(statusText)}</strong>${statusMeta ? ` · ${escapeHtml(statusMeta)}` : ""}</div>
           ${photo && photo.sourceLabel ? `<div class="android-intake__card-status">${escapeHtml(photo.sourceLabel)}</div>` : ""}
+          ${ocrPending ? `<div class="android-intake__card-status">OCR ожидает обработки</div>` : ""}
+          ${ocrFailed ? `<div class="android-intake__card-status android-intake__card-status--error">OCR не завершился. Фото сохранено.</div>` : ""}
         </div>
         <div class="android-intake__card-actions">
-          <button type="button" class="android-intake__mini-button" data-slot-open="${escapeHtml(slot.departmentId)}">${photo ? "Открыть / переснять" : "Снять фото"}</button>
+          ${photo
+            ? `<button type="button" class="android-intake__mini-button" data-slot-preview="${escapeHtml(slot.departmentId)}">Открыть фото</button>
+               ${ocrFailed ? `<button type="button" class="android-intake__mini-button" data-slot-retry-ocr="${escapeHtml(slot.departmentId)}" ${state.retryingFeedbackId === photo.feedbackId ? "disabled" : ""}>${state.retryingFeedbackId === photo.feedbackId ? "OCR..." : "Повторить OCR"}</button>` : ""}
+               <button type="button" class="android-intake__mini-button android-intake__mini-button--retake" data-slot-retake="${escapeHtml(slot.departmentId)}">Переснять фото</button>`
+            : `<button type="button" class="android-intake__mini-button android-intake__mini-button--retake" data-slot-retake="${escapeHtml(slot.departmentId)}">Снять фото</button>`}
         </div>
       </article>
     `;
   }
 
+  function buildPhotoStatusBar() {
+    const summary = getPhotoStatusSummary();
+    const capturePercent = summary.total ? Math.round((summary.ready / summary.total) * 100) : 0;
+    const upload = state.uploadProgress;
+    const uploadPercent = upload.total ? Math.round((upload.completed / upload.total) * 100) : 0;
+    const uploadStep = Math.min(upload.total, upload.completed + 1);
+
+    return `
+      <section class="android-intake__status-panel" aria-live="polite">
+        <div class="android-intake__status-heading">
+          <strong>Статус фотографий</strong>
+          <span>${summary.ready} из ${summary.total} готовы</span>
+        </div>
+        <div class="android-intake__progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="${summary.total}" aria-valuenow="${summary.ready}" aria-label="Готовность фотографий">
+          <span class="android-intake__progress-fill" style="width: ${capturePercent}%"></span>
+        </div>
+        <div class="android-intake__status-metrics">
+          <span class="android-intake__status-metric android-intake__status-metric--uploaded">Отправлено: <strong>${summary.uploaded}</strong></span>
+          <span class="android-intake__status-metric android-intake__status-metric--pending">Ожидают отправки: <strong>${summary.pending}</strong></span>
+          <span class="android-intake__status-metric">Нужно снять: <strong>${summary.missing}</strong></span>
+        </div>
+        ${state.isSending ? `
+          <div class="android-intake__upload-progress">
+            <div class="android-intake__upload-progress-title"><strong>Отправка ${uploadStep} из ${upload.total}</strong><span>${escapeHtml(upload.currentDepartmentName || "Подготавливаю отправку...")}</span></div>
+            <div class="android-intake__progress-track android-intake__progress-track--upload" role="progressbar" aria-valuemin="0" aria-valuemax="${upload.total}" aria-valuenow="${upload.completed}" aria-label="Отправка фотографий">
+              <span class="android-intake__progress-fill android-intake__progress-fill--upload" style="width: ${uploadPercent}%"></span>
+            </div>
+          </div>
+        ` : ""}
+      </section>
+    `;
+  }
+
   function render() {
-    const missingCount = getMissingCount();
     const pendingUploads = getPendingUploadCount();
     const sendLabel = state.isSending
       ? "Отправляю..."
@@ -488,10 +828,13 @@
           </div>
           <div class="android-intake__controls">
             <button type="button" class="android-intake__button android-intake__button--secondary" data-refresh>Обновить</button>
+            ${state.accessRequired ? `<button type="button" class="android-intake__button android-intake__button--secondary" data-access-request ${state.isRequestingAccess ? "disabled" : ""}>${state.isRequestingAccess ? "Отправляю запрос..." : "Повторить запрос доступа"}</button>` : ""}
+            <button type="button" class="android-intake__button android-intake__button--secondary" data-new-session ${state.isSending || state.isResetting ? "disabled" : ""}>${state.isResetting ? "Удаляю старые фото..." : "Сделать новую сессию"}</button>
             <button type="button" class="android-intake__button android-intake__button--primary" data-send ${canSendAll() ? "" : "disabled"}>${escapeHtml(sendLabel)}</button>
           </div>
         </section>
-        <p class="android-intake__hint">Один тап по готовому фото открывает просмотр. Двойной тап по готовому фото делает пересъёмку. Старые фото автоматически сбрасываются при новой вечерней сессии в 19:00.</p>
+        ${buildPhotoStatusBar()}
+        <p class="android-intake__hint">«Открыть фото» показывает снимок. «Переснять фото» открывает камеру или галерею. Старые фото автоматически сбрасываются при новой вечерней сессии в 19:00.</p>
         <p class="android-intake__message${state.messageTone === "error" ? " android-intake__message--error" : (state.messageTone === "success" ? " android-intake__message--success" : "")}">${escapeHtml(state.message)}</p>
         <section class="android-intake__grid">
           ${state.slots.map(buildSlotCard).join("")}
@@ -518,9 +861,21 @@
       fileInput.addEventListener("change", handleFileChange, { once: false });
     }
 
-    app.querySelectorAll("[data-slot-open]").forEach((button) => {
+    app.querySelectorAll("[data-slot-preview]").forEach((button) => {
       button.addEventListener("click", () => {
-        handleSlotTap(String(button.getAttribute("data-slot-open") || ""));
+        void openPreviewDeferred(String(button.getAttribute("data-slot-preview") || ""));
+      });
+    });
+
+    app.querySelectorAll("[data-slot-retake]").forEach((button) => {
+      button.addEventListener("click", () => {
+        openFilePicker(String(button.getAttribute("data-slot-retake") || ""));
+      });
+    });
+
+    app.querySelectorAll("[data-slot-retry-ocr]").forEach((button) => {
+      button.addEventListener("click", () => {
+        void retryPhotoOcr(String(button.getAttribute("data-slot-retry-ocr") || ""));
       });
     });
 
@@ -531,10 +886,24 @@
       });
     }
 
+    const newSessionButton = app.querySelector("[data-new-session]");
+    if (newSessionButton) {
+      newSessionButton.addEventListener("click", () => {
+        void startManualNewSession();
+      });
+    }
+
     const refreshButton = app.querySelector("[data-refresh]");
     if (refreshButton) {
       refreshButton.addEventListener("click", () => {
         void loadState(false);
+      });
+    }
+
+    const accessRequestButton = app.querySelector("[data-access-request]");
+    if (accessRequestButton) {
+      accessRequestButton.addEventListener("click", () => {
+        void requestAccessAgain();
       });
     }
 

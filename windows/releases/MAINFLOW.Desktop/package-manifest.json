@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-08-11T08:04:16.6184071Z",
+    "generatedAtUtc":  "2026-09-05T07:37:19.8545929Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -8,23 +8,23 @@
                   },
                   {
                       "path":  "android-intake.html",
-                      "size":  658,
-                      "sha256":  "600A14436B562B7EDE02A1C1EA4D1082DAFBDE99D977BDD87B5CBD7D5AFF5CF5"
+                      "size":  648,
+                      "sha256":  "8A96B9884E642C91F38E848763C9787069B4C23F57DA62A9A2CC850DFD362C40"
                   },
                   {
                       "path":  "archive-print.html",
-                      "size":  634,
-                      "sha256":  "F2D8A0DF7FB1CBEE4A5636C0D43AC5D0321E51FA6F50E4347D83E174AEFA01E1"
+                      "size":  650,
+                      "sha256":  "4BF2D8D76BB4F02072D4569F434B2F83F98580C2959312B0BCC1CFBD51EE57E0"
                   },
                   {
                       "path":  "assets/android-intake.css",
-                      "size":  4950,
-                      "sha256":  "EC058CA103EF0633A101E7D4F562C3FF2EAE84FD5B5062900235807271A11942"
+                      "size":  7184,
+                      "sha256":  "1424CDE39865A8A7EAB1D70F50C1B5CC1C04FE021197A97EF36D17F4BE268913"
                   },
                   {
                       "path":  "assets/android-intake.js",
-                      "size":  21809,
-                      "sha256":  "06BB0045034BC4EBDC8CEBDA805648A464E38F46AB43401691F96098EDA56579"
+                      "size":  38658,
+                      "sha256":  "907BA8C033776FFFA00E5ECA31D9F266CCAD46DFC3ABEB2AF20923F00ED36F4D"
                   },
                   {
                       "path":  "assets/civil-referrals.js",
@@ -48,8 +48,8 @@
                   },
                   {
                       "path":  "assets/sharsh-app.js",
-                      "size":  674862,
-                      "sha256":  "E4ABBA5B506AE05D3A0378E5764BEB19B150F08C506D1F55C6441937A8A10389"
+                      "size":  675110,
+                      "sha256":  "13588560135065969CC6ACA1265A6C4E48D07C883EE865B96D6FA8F8EE212693"
                   },
                   {
                       "path":  "assets/sharsh-auth.js",
@@ -73,13 +73,28 @@
                   },
                   {
                       "path":  "assets/sharsh-sync.js",
-                      "size":  91825,
-                      "sha256":  "5055D9DC448E911475BE1BDB8BAF9ACEC4F5B907A39863F771A3B3AC4DE308D3"
+                      "size":  91836,
+                      "sha256":  "790D85496C0BB9F8A89C3FFAF8985CB0B2F131BBDA7964CFECD8C68454C48CA8"
                   },
                   {
                       "path":  "assets/shift-admissions.js",
                       "size":  27091,
                       "sha256":  "07EEC8CE06E49E641BCA2920C73478ADA71936F054E84BA17D22D15C7A52C54E"
+                  },
+                  {
+                      "path":  "assets/sona-import.css",
+                      "size":  10390,
+                      "sha256":  "FB830C7C898C91851FDEE49DFDE725697F268C81F045DBBA2A0C6A4D276B4DEB"
+                  },
+                  {
+                      "path":  "assets/sona-import.js",
+                      "size":  33547,
+                      "sha256":  "D357EA1071BA27A7D0C515A5837C66CDEA94F7946B7E23A6ADABD8F991319AA8"
+                  },
+                  {
+                      "path":  "assets/sona-registry.js",
+                      "size":  15903,
+                      "sha256":  "800864FE9AC23031DD4F38B08C0F7DCF6282F7A7383F9446A9AB48008AD44E00"
                   },
                   {
                       "path":  "assets/sono-desktop.js",
@@ -328,28 +343,28 @@
                   },
                   {
                       "path":  "index.html",
-                      "size":  1061,
-                      "sha256":  "EA311F4482A3FAA52BC7A06D656E1762F0036B1DAB3D42F6919CE8F4E5E438C0"
+                      "size":  1063,
+                      "sha256":  "6B2125F2BC3D7EF83D0A96001FD420ACE2782E921DD26600EF0068B1E8A86EAB"
                   },
                   {
                       "path":  "Mainflow.deps.json",
-                      "size":  37463,
-                      "sha256":  "D6FA68CFE3988574122436850BC8383A175D4EFBD654F2E7F9E0CE8A07B29620"
+                      "size":  37462,
+                      "sha256":  "02C9C985CEE418BDD8AEA6E884E42F52CB08F0FC5CC32A7FA9D98A10D3D4B17F"
                   },
                   {
                       "path":  "Mainflow.dll",
                       "size":  125952,
-                      "sha256":  "1D5DF0367F3EB0F9ED3AF23AA7EE0F2D840CEC998CE41FC6244666F397C65965"
+                      "sha256":  "89D27F9F8162D88E6F58595C2F70B819D6C0A42451FB4F86B3EDF15FA2D94181"
                   },
                   {
                       "path":  "Mainflow.exe",
                       "size":  179200,
-                      "sha256":  "13B7EB181DE156D38A344171F116F0403A409E1DDD0636BD7451034968D11123"
+                      "sha256":  "E3E885EAC162EF1CB86371E103CF6908CE4E334E74611351563C8364A536B037"
                   },
                   {
                       "path":  "Mainflow.runtimeconfig.json",
                       "size":  468,
-                      "sha256":  "DA2CF3BF76601C7F12FE6155AAA856F7FD451D7C99702731F6F35E0EA50C8385"
+                      "sha256":  "8A9AF36FD8F6C0A07A84CD58C559A65B9FEC515F4265BC75CCBE7B531A3A197F"
                   },
                   {
                       "path":  "Microsoft.CSharp.dll",
@@ -442,9 +457,9 @@
                       "sha256":  "16A9305143B47996D24BA9487F6CCD7187B24DF625F7BDD00E999A965E68C2B6"
                   },
                   {
-                      "path":  "mscordaccore_amd64_amd64_8.0.2926.32403.dll",
-                      "size":  1348480,
-                      "sha256":  "1564212B9BB55E1DA04FB59C68854C889DECC263B1206CBB42A9CB398D7AF098"
+                      "path":  "mscordaccore_amd64_amd64_8.0.3026.36720.dll",
+                      "size":  1348440,
+                      "sha256":  "353BACDBAB1A3624AB2D94A97815E2779DB8F4DF3C353987FC63392D9DFA5B74"
                   },
                   {
                       "path":  "mscordbi.dll",
@@ -483,8 +498,8 @@
                   },
                   {
                       "path":  "ocr-feedback.html",
-                      "size":  706,
-                      "sha256":  "0047FA6DDB57DC801A7F6CFB69ECBD5E1C417586D0B5F78ED190A85BB113079D"
+                      "size":  723,
+                      "sha256":  "7AEA6614763620040BDA394DCEEA7834F566BCC8851CBEDCB71D48247BD2E234"
                   },
                   {
                       "path":  "PenImc_cor3.dll",
@@ -785,6 +800,16 @@
                       "path":  "setup.html",
                       "size":  5999,
                       "sha256":  "E0E8CAABA6519250CB88CC4165CFDF8F0334C2F72122D1B07DD9B7764ACDB9AE"
+                  },
+                  {
+                      "path":  "sona-import.html",
+                      "size":  709,
+                      "sha256":  "F309B33FD5D0C0DF74B845BAA2DBE8F52E436A6A3080B35AF049FD6E8D04A005"
+                  },
+                  {
+                      "path":  "sona-registry.html",
+                      "size":  709,
+                      "sha256":  "77191EF5C162140807CEB4C07023187FAED4A96BD91EA9617C31636DDAC23777"
                   },
                   {
                       "path":  "sono-desktop.html",
@@ -1808,8 +1833,8 @@
                   },
                   {
                       "path":  "ykow8ru3.html",
-                      "size":  713,
-                      "sha256":  "E96E00C9F85DA34017FF6F4A52F0293A26122F2608A07D16B6384604B90B0F2D"
+                      "size":  711,
+                      "sha256":  "EF87AEED1F72C7C7269A277867EB33B19BF41996B40408FF5BBA4DB84B1C64A3"
                   },
                   {
                       "path":  "Отделения/Общий бланк отделений.pdf",
@@ -1988,8 +2013,8 @@
                   },
                   {
                       "path":  "Օրվա շարժ․.html",
-                      "size":  785,
-                      "sha256":  "EA03275CB64B15A1DCC6B0C96D29C91AF0D326AA326CFA111EB61199A616C0FC"
+                      "size":  783,
+                      "sha256":  "EB3204687A44B6408D14368558264C9422B966CB350AC92615D36DD33CD2D395"
                   }
               ]
 }

@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-05-31T20:49:20.9412304Z",
+    "generatedAtUtc":  "2026-09-05T07:37:36.1488556Z",
     "files":  [
                   {
                       "path":  "Accessibility.dll",
@@ -8,13 +8,13 @@
                   },
                   {
                       "path":  "assets/sono-desktop.js",
-                      "size":  23114,
-                      "sha256":  "F09DD6091923C34CB144B7AED9A068E53A1A9CB6B9376E46F48E651E75089081"
+                      "size":  23787,
+                      "sha256":  "EDA3A5EB74E3FA5D714DECBB590D4CB3427D3D5133BDD24AB65642E17E222985"
                   },
                   {
                       "path":  "assets/tg-sono-form.css",
-                      "size":  6649,
-                      "sha256":  "C1394AE52B9C5F4A2B72C264F265F3902C62D5BCB7100E3AF28D842704223730"
+                      "size":  7018,
+                      "sha256":  "0F172BA8D521F1B6FF25EF338BEFAC4F974D80A9D0E199E53E0BF60376BBA386"
                   },
                   {
                       "path":  "clretwrc.dll",
@@ -145,6 +145,11 @@
                       "path":  "mscordaccore_amd64_amd64_8.0.2426.7010.dll",
                       "size":  1346392,
                       "sha256":  "16A9305143B47996D24BA9487F6CCD7187B24DF625F7BDD00E999A965E68C2B6"
+                  },
+                  {
+                      "path":  "mscordaccore_amd64_amd64_8.0.3026.36720.dll",
+                      "size":  1348440,
+                      "sha256":  "353BACDBAB1A3624AB2D94A97815E2779DB8F4DF3C353987FC63392D9DFA5B74"
                   },
                   {
                       "path":  "mscordbi.dll",
@@ -348,28 +353,28 @@
                   },
                   {
                       "path":  "Sono.deps.json",
-                      "size":  37217,
-                      "sha256":  "7FF7D8E7D17466E2D34DF85FC6CB0FC4437892D89D8DC876982B85AA8F19C797"
+                      "size":  37450,
+                      "sha256":  "8952B07BA3010357A5B23A7B5116827A337837836085B3E5FCF577164B42AD6C"
                   },
                   {
                       "path":  "Sono.dll",
                       "size":  154624,
-                      "sha256":  "940DD936CA3412385E0BFF8ADE3DFD933765CB4373B11A66F6AE8C1AD0711F5F"
+                      "sha256":  "20CC7132E023BF6F195D591E03AE54064B3B328BCF29AEE32155EC6C84191F0C"
                   },
                   {
                       "path":  "Sono.exe",
                       "size":  268288,
-                      "sha256":  "303008AE85B9BDA549258103E837F22FF9E8223244E928842B02C4E90E8EA167"
+                      "sha256":  "4BC54FEAF0F9079716C49B5783C8E3107D95793A587388E445B72813C01FB759"
                   },
                   {
                       "path":  "Sono.runtimeconfig.json",
                       "size":  468,
-                      "sha256":  "399AC888E7917C3921A66C20AE72E54084D507A9507D4FBBA3FCAA174F75CA25"
+                      "sha256":  "8A9AF36FD8F6C0A07A84CD58C559A65B9FEC515F4265BC75CCBE7B531A3A197F"
                   },
                   {
                       "path":  "sono-desktop.html",
-                      "size":  947,
-                      "sha256":  "50DAB42355B4C5A5FCA8C7BCCABB81A855F233BBE130BA7F83179E4F69115199"
+                      "size":  972,
+                      "sha256":  "01F2C34F452C9D5CC2F91A84C878A4725D67AECD224360019E9B17EF1B7B6D31"
                   },
                   {
                       "path":  "System.AppContext.dll",
